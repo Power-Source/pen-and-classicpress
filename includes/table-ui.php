@@ -103,6 +103,8 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 			<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id ) ); ?>"><?php esc_html_e( 'Kampagnen wechseln', 'ps-pen-paper' ); ?></a>
 			<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-log' ); ?>"><?php esc_html_e( 'Spielprotokoll', 'ps-pen-paper' ); ?></a>
 			<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-rulebook' ); ?>"><?php esc_html_e( 'Regelwerk', 'ps-pen-paper' ); ?></a>
+			<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-handouts' ); ?>"><?php esc_html_e( 'Handouts', 'ps-pen-paper' ); ?></a>
+			<?php if ( $is_gm ) : ?><a data-table-view="folio" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-folio' ); ?>"><?php esc_html_e( 'Spielleitermappe', 'ps-pen-paper' ); ?></a><?php endif; ?>
 			<?php if ( $is_gm ) : ?><a data-table-view="settings" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-settings' ); ?>"><?php esc_html_e( 'Rundeneinstellungen', 'ps-pen-paper' ); ?></a><?php endif; ?>
 			<?php if ( $is_gm ) : ?><a data-table-view="story" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-story' ); ?>"><?php esc_html_e( 'Szenen & Karten', 'ps-pen-paper' ); ?></a><?php endif; ?>
 		</nav>
@@ -183,7 +185,9 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 				<div class="pspp-table-panel pspp-table-stage" data-table-panel="dice"><?php ps_pen_paper_render_dice( $campaign, $page_id, false ); ?></div>
 				<section class="pspp-table-panel pspp-table-stage" data-table-panel="log"><?php ps_pen_paper_render_journal( $campaign, $page_id ); ?></section>
 				<section id="pspp-rulebook" class="pspp-table-panel pspp-table-stage" data-table-panel="rules"><?php ps_pen_paper_render_rules( $campaign, false ); ?></section>
+				<section id="pspp-handouts" class="pspp-table-panel pspp-table-stage" data-table-panel="handouts"><?php ps_pen_paper_render_handouts( $campaign, $page_id ); ?></section>
 				<?php if ( $is_gm ) : ?>
+					<section id="pspp-folio" class="pspp-table-panel pspp-table-stage" data-table-panel="folio"><?php ps_pen_paper_render_folio( $campaign, $page_id ); ?></section>
 					<section id="pspp-story" class="pspp-table-panel pspp-table-stage" data-table-panel="story"><?php ps_pen_paper_render_story( $campaign, $page_id ); ?></section>
 					<section id="pspp-settings" class="pspp-table-panel pspp-table-stage pspp-table-settings" data-table-panel="settings"><?php ps_pen_paper_render_access_settings( $campaign, $page_id ); ?></section>
 				<?php endif; ?>

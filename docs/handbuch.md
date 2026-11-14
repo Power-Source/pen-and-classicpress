@@ -1,12 +1,12 @@
 # PS Pen & Paper – Pluginhandbuch
 
-Stand: Version 0.11.0 · 14. November 2026.
+Stand: Version 0.13.0 · 14. November 2026.
 
 Dieses Handbuch beschreibt den vorhandenen Funktionsumfang, nicht die gesamte
 Roadmap. Die Abbildungen zur Demorunde stammen aus der tatsächlich angelegten
 [Demokampagne „Die letzte Fracht von Nebelhafen“](demokampagne.md).
 Ihre Welt, Namen und Demoregeln sind Beispiele, keine Vorgaben des Plugins.
-Die Universumsabbildungen zeigen eine getrennte, anschließend entfernte Prüfwelt.
+Die Universums- und Kartenabbildungen zeigen getrennte, anschließend entfernte Prüfwelten.
 Eine fremde Partnerprogramm-Debugleiste wurde nur für diese Aufnahmen ausgeblendet.
 
 ## Inhalt
@@ -22,24 +22,29 @@ Eine fremde Partnerprogramm-Debugleiste wurde nur für diese Aufnahmen ausgeblen
 9. [Farben anpassen](#9-farben-anpassen)
 10. [Handy und Tablet](#10-handy-und-tablet)
 11. [Probleme und Grenzen](#11-probleme-und-grenzen)
+12. [Szenen und Kartentisch](#12-szenen-und-kartentisch)
+13. [Spielleitermappe, Kapitel und Handouts](#13-spielleitermappe-kapitel-und-handouts)
 
 ## 1. Ist das schon spielbar?
 
-**Als Werkzeug für eine moderierte Pen-and-Paper-Runde: ja. Als vollständiger
-Abenteuer-Spielbereich mit Szenenverwaltung: noch nicht.**
+**Ja: Der erste vollständige Ablauf von Szenenvorbereitung und Freigabe bis zum
+gemeinsamen Kartentisch ist vorhanden.** Ein umfangreicher Abenteuereditor ist
+das noch nicht; Kapitel, eine private Spielleitermappe und Text-/Bild-Handouts
+sind seit 0.13.0 enthalten.
 
 | Bereits nutzbar | Noch nicht vorhanden |
 |---|---|
-| Getrennte Kampagnen und Mitgliedschaften | Kapitel- und Szeneneditor |
-| Frei benennbare Attribute, Texte und Ressourcen | Geschützte Spielleitergeheimnisse und Szenenfreigaben |
-| Charakterbögen mit direkter Bearbeitung oder Freigabepflicht | Entwürfe und Spielervorschau für Abenteuertexte |
+| Getrennte Kampagnen, Mitgliedschaften und Kapitel mit Szenenfolge | Sitzungsplanung und öffentliche Zusammenfassungen |
+| Szenenentwürfe, getrennte Geheimnisse und bewusste Freigaben | Umfangreiche NPC-Verwaltung und Begegnungen |
+| Private Inhaltsvorschau und geschützter Kartentisch | Nebel des Krieges und Zeichenwerkzeuge |
+| Frei benennbare Charakterfelder, Basisbögen und Freigaben | Inventar und Ausrüstung |
 | Würfel, Attributwerte und geschützte Ergebnisse | Automatische Erfolgsbewertung oder komplexe Würfelmechaniken |
 | Änderungs- und Wurfprotokoll | Automatisch geprüfter Punktepool |
-| Kampagnenfarben und responsive Bedienung | Inventar, NPC-Verwaltung und private Handouts |
+| Spielleitermappe, geschützte Text-/Bild-Handouts und responsive Bedienung | Strukturierte NPC-Werte und private PDF-Dateien |
 
-Die Spielleitung erzählt derzeit beispielsweise mündlich oder über ein
-geeignetes separates Kommunikationsmittel. Die Kampagnenbeschreibung eignet
-sich für eine gemeinsame Einleitung, **nicht für Geheimnisse**.
+Die Spielleitung kann Szenentexte und Karten vorbereiten und gezielt anzeigen.
+Die Kampagnenbeschreibung eignet sich weiter für eine gemeinsame Einleitung,
+**nicht für Geheimnisse**. Dafür gibt es das getrennte Geheimnisfeld der Szene.
 PS Chat lässt sich mit den ergänzten Spieltisch-Schnittstellen geschützt
 einbetten; PS Wiki ist noch nicht mit Kampagnenrechten verbunden.
 
@@ -439,7 +444,9 @@ die damaligen Stände geöffnet.
 
 Charakter- und Regelhistorie beginnen mit Version 0.7.0. Frühere Änderungen
 werden nicht rückwirkend ergänzt. Mitglieder- und Style-Änderungen werden
-derzeit nicht protokolliert; Szenenereignisse folgen mit dem Story Builder.
+derzeit nicht protokolliert. Seit 0.12.0 stehen Szenenentwürfe, Freigaben,
+Rücknahmen und Kartenbewegungen mit privaten Vorher-/Nachher-Ständen im
+Spielleiterprotokoll; die Gruppe sieht Szenenwechsel mit freigegebenem Titel.
 Änderungen an Zugang und Teaser werden seit Version 0.9.0 mit Vorher/Nachher
 ausschließlich für Spielleitung und Administration protokolliert.
 
@@ -488,7 +495,7 @@ Die Abbildung wurde bei 390 Pixeln Browserbreite aufgenommen.
 Es gibt keinen erforderlichen Drag-and-drop-Ablauf. Ein Betriebssystemwunsch
 nach reduzierter Bewegung wird berücksichtigt. Ohne JavaScript bleiben
 Formulare und Ergebnisse nutzbar; Schnellwahl, Live-Farbvorschau und Änderungen
-an der Feldliste sowie Anwesenheit und Zugsteuerung benötigen JavaScript.
+an der Feldliste sowie Anwesenheit, Zugsteuerung und interaktive Karten benötigen JavaScript.
 
 ## 11. Probleme und Grenzen
 
@@ -512,18 +519,171 @@ Audit-System.
 
 ### Was vor einem vollständigen Website-Abenteuer noch fehlt
 
-Als Nächstes braucht es den **Story Builder**: Kapitel und Szenen, geschützte
-Spielleiternotizen, Entwürfe, Spielervorschau, Freigabe und Rücknahme sowie
-die passenden Protokolleinträge. Private Dateien benötigen zusätzlichen
-Zugriffsschutz; eine normale Medien-URL ist nicht automatisch privat.
+Der erste **Story-Builder-Ablauf** mit Szenen, getrennten Geheimnissen,
+Inhaltsvorschau, Freigabe, Rücknahme und Protokollierung ist vorhanden.
+Kapitel mit geordneter Szenenfolge, private Personen-/Orts-/Notizkarten und
+Text-/Bild-Handouts sind seit 0.13.0 vorhanden. Inventar, redaktioneller Komfort
+und weitere Handoutdateiformate fehlen noch. Eine normale Medien-URL ist nicht
+automatisch privat.
 Auch die unterstützten WordPress-, ClassicPress- und PHP-Versionen müssen
 noch verbindlich festgelegt und plattformübergreifend geprüft werden.
+
+## 12. Szenen und Kartentisch
+
+### Als Spielleitung vorbereiten
+
+1. Im Spielbereich **Szenen & Karten** öffnen. Im Backend befindet sich derselbe
+   Editor in der Kampagnenverwaltung.
+2. Unter **Neue Szene** Titel und freizugebenden Text eintragen.
+3. **Geheimnisse – nur Spielleitung** getrennt ausfüllen. Dieses Feld erscheint
+   weder in der Spielervorschau noch in den Kartenantworten für Spieler.
+   Für eine reine Erzählszene direkt zu Schritt 7 gehen: Neue Szenen beginnen
+   ohne Raster; ohne Bild und Marker wird keine leere Kartenfläche angezeigt.
+   Die folgenden Kartenfelder liegen unter **Optionale Karte und Figurenmarker**.
+4. Optional ein PNG-, JPEG- oder WebP-Kartenbild hochladen: höchstens 2 MiB und
+   3000 × 3000 Pixel. Ohne Bild ist eine neutrale Kartenfläche möglich.
+5. **Quadratraster** auf 10–500 Bildpixel setzen; **0** bedeutet ohne Raster
+   und ohne Einrasten.
+6. Über **Marker hinzufügen** bis zu 30 Figuren oder Gegenstände anlegen:
+   sichtbarer Name, Typ, Farbe, Bewegungsberechtigter und Startposition.
+   X und Y sind Prozentwerte von 0 bis 100; 50 bedeutet die Kartenmitte.
+7. **Entwurf speichern** und **Gespeicherten Entwurf als Spieler ansehen** öffnen.
+   Diese private Inhaltsvorschau ist ohne Figurensteuerung und zeigt nur den
+   gespeicherten Stand, nicht ungespeicherte Eingaben.
+
+![Szenenvorbereitung mit privater Inhaltsvorschau und getrennten Geheimnissen](images/15-szenenvorbereitung.png)
+
+*Die schematische Prüfkarte ist ein Beispiel, kein mitgeliefertes Spielsystem.*
+
+### Bewusst freigeben und anzeigen
+
+1. Das Bestätigungsfeld lesen und **Gespeicherten Entwurf freigeben** wählen.
+   Das veröffentlicht noch keine andere Szene am Tisch.
+2. **Freigegebene Szene am Tisch anzeigen** wechselt die gemeinsame Ansicht.
+3. Neue Änderungen zunächst wieder als Entwurf speichern. Der bisherige
+   veröffentlichte Stand bleibt sichtbar, bis du erneut freigibst.
+4. **Freigabe zurücknehmen** sperrt weitere Spielerabrufe dieser Szene und ihres
+   Bildes. Die Spielansicht kehrt nach der nächsten Aktualisierung zur Einleitung
+   zurück. **Zur Rundeneinleitung wechseln** lässt sich auch unabhängig davon nutzen.
+
+**Wichtig:** Eine erneute Freigabe übernimmt die vorbereiteten Startpositionen.
+Zwischenzeitlich am Tisch bewegte Positionen werden dabei ersetzt.
+Jede Bewegung erhöht die Szenenrevision. War ein Bearbeitungsformular bereits
+offen, kann sein Speichern deshalb eine Aktualisierung verlangen; fremde Änderungen
+werden nicht still überschrieben.
+
+### Gemeinsam auf der Karte spielen
+
+![Kartentisch mit Figuren, Raster, Zoom und geteiltem Ping](images/16-kartentisch.png)
+
+- **+**, **−** und **Einpassen** steuern den Ausschnitt. Die Karte lässt sich
+  ziehen; Mausrad oder zwei Finger verändern den Zoom.
+- Eine zugewiesene Figur wählen und ihr Ziel antippen oder die Figur ziehen.
+  Alternativ **Figur ohne Ziehen bewegen** öffnen und X/Y eingeben.
+  Per Tastatur lässt sich der Figurenmarker mit Eingabe oder Leertaste auswählen;
+  danach sind die Positionsfelder fokussiert.
+- Die Spielleitung bewegt alle Marker. Spieler bewegen ausschließlich ihre
+  ausdrücklich zugewiesenen Marker, nicht automatisch jede Spielerfigur.
+- **Ping setzen** wählen und auf die Karte tippen. Der Hinweis trägt den
+  tatsächlichen Absender und läuft nach spätestens 15 Sekunden aus.
+
+Die aktuelle Karte wird auf sichtbaren Browserseiten alle fünf Sekunden
+aktualisiert. Bewegungen und Szenenwechsel erscheinen deshalb gegebenenfalls
+leicht verzögert. Positionen bleiben über Neuladen und Abmelden hinaus gespeichert.
+Eine Mitgliedschaftsänderung wird bei neuen Abrufen und Bewegungen geprüft.
+
+Alle freigegebenen Marker sind für die Runde sichtbar. Namen bewusst wählen;
+private Charakterwerte werden nicht automatisch an einen Marker angehängt.
+Raster und Bewegung prüfen weder Reichweite noch Kollisionen oder Spielregeln.
+Nebel des Krieges, versteckte Marker, Zeichenwerkzeuge und Entfernungsmessung
+sind noch nicht vorhanden.
+
+### Bildschutz und Aufbewahrung
+
+Kartenbilder liegen in privaten Datensätzen ohne öffentliche Mediathek-Adresse.
+Spieler erhalten nur das Bild der aktuellen freigegebenen Szene. Alte Bildstände
+bleiben geschützt für die Historie gespeichert und werden beim endgültigen
+Löschen der Kampagne entfernt. Kleine Dateien verwenden und die Datenbank sichern.
+Bereits betrachtete oder heruntergeladene Inhalte können durch eine Rücknahme
+nicht nachträglich aus fremden Browsern oder Kopien entfernt werden.
 
 ### Zu den Abbildungen
 
 Die Bilder zeigen echte angemeldete Rollenansichten und gespeicherte Demodaten.
 Browsernavigation und fremde Debug-Einblendungen sind für die Abbildungen
 ausgespart beziehungsweise nur während der Aufnahme ausgeblendet.
+
+## 13. Spielleitermappe, Kapitel und Handouts
+
+### Abenteuer in der Spielleitermappe vorbereiten
+
+1. Als Spielleitung im Spielbereich **Spielleitermappe** öffnen. Im Backend
+   steht derselbe Bereich in der Kampagnenverwaltung zur Verfügung.
+2. **Neuer Mappeneintrag** wählen und die Art festlegen: Kapitel, Handout,
+   Person, Ort oder Notiz. Die Art lässt sich nach dem Anlegen nicht umstellen.
+3. Titel, Inhalt und gegebenenfalls geheime Ergänzungen eintragen.
+   Personen, Orte, Kapitel und Notizen bleiben vollständig privat.
+4. Über die Sortiernummer die Reihenfolge innerhalb der jeweiligen Rubrik
+   festlegen. Kleinere Zahlen erscheinen zuerst.
+5. Optional ein Kapitel und eine Szene verknüpfen. Die Verknüpfung dient der
+   Vorbereitung und verändert weder Mitgliedschaften noch Freigaben.
+6. **Mappeneintrag speichern**. Bei einem Revisionskonflikt den aktuellen
+   Stand neu laden; Änderungen werden nicht still überschrieben.
+
+Eine Personenkarte ist eine erzählerische Gedächtnisstütze, kein verpflichtender
+Gegnerbogen. Ortskarten sammeln Atmosphäre und Hinweise; Notizen eignen sich
+für die eigene Vorbereitung oder eine private Zusammenfassung.
+
+### Kapitel und Szenenfolge
+
+Ein Kapitel zunächst speichern und dann erneut bearbeiten. Unter **Szenen im
+Kapitel** neben jeder gewünschten Szene eine Reihenfolgenummer eintragen.
+Ein leeres Feld nimmt die Szene nicht auf. Bis zu 100 Szenen sind pro Kapitel
+möglich; eine Szene kann in mehreren Kapiteln vermerkt sein.
+
+Die Kapitelübersicht zeigt die geordnete Folge mit Links und Freigabestatus.
+Ein Link öffnet die Szenenvorbereitung. **Eine Kapitelzuordnung veröffentlicht
+keine Szene und wechselt nicht die aktive Szene.** Dafür weiterhin die
+ausdrücklichen Szenenaktionen aus Abschnitt 12 verwenden.
+
+![Spielleitermappe der fortgesetzten Nebelhafen-Demo mit Kapitel und Szenenfolge](images/17-spielleitermappe.png)
+
+### Ein Handout auf den Tisch legen
+
+1. Einen Eintrag der Art **Handout** mit Titel und Text speichern.
+2. Optional ein eigenes PNG-, JPEG- oder WebP-Bild hochladen, höchstens 2 MiB
+   und 3000 × 3000 Pixel. PDFs und andere Dateien sind nicht unterstützt.
+3. **Private Vorschau des gespeicherten Handoutentwurfs** öffnen.
+4. Die Bestätigung markieren und **Handout für die Runde freigeben** wählen.
+5. Spieler öffnen **Handouts** beziehungsweise **Handouts neu laden**.
+
+Die Gruppe erhält ausschließlich den freigegebenen Titel, Text und das Bild.
+Geheime Ergänzungen, Kapitel- und Szenenverknüpfungen bleiben in der
+Spielleitermappe. Handouts bleiben auch nach einem Szenenwechsel zugänglich.
+Die Freigabe gilt für die gesamte aktuelle Kampagnengruppe, nicht für einzelne
+Empfänger. Auch die Spielleitung sieht unter **Handouts** nur freigegebene Stände.
+
+![Freigegebener Brief mit geschütztem Frachtzeichen aus Maras Spieleransicht](images/18-handout.png)
+
+### Überarbeiten, zurücknehmen und schützen
+
+Entwurfsänderungen verändern ein bereits freigegebenes Handout nicht. Erst eine
+erneute bestätigte Freigabe ersetzt den Gruppenstand. Ein Bild kann aus dem
+Entwurf entfernt oder ersetzt werden; Entfernung und Ersatz sind getrennte
+Aktionen. Historische Bilder bleiben für die Historie bis zur endgültigen
+Kampagnenlöschung in der Datenbank.
+
+**Handout zurücknehmen** verhindert die Ausgabe bei neuen Seitenabrufen.
+Es gibt keine automatische Handoutaktualisierung und keine Möglichkeit,
+bereits gelesene oder gespeicherte Inhalte aus fremden Browsern zurückzuholen.
+Nach Entzug der Kampagnenmitgliedschaft sind auch die Handouts nicht mehr
+abrufbar. Die Spielbereich-Seite einschließlich ihrer Abfrageparameter darf
+nicht öffentlich zwischengespeichert werden.
+
+Mappenänderungen, Handoutfreigaben und Rücknahmen besitzen private
+Vorher-/Nachher-Protokolle für die Spielleitung. Die neuen Abbildungen zeigen
+die tatsächlich fortgesetzte Nebelhafen-Demo; ihre Charaktere, Regeln und
+ursprünglichen Würfe wurden dafür nicht zurückgesetzt.
 Keine Spielwerte oder Berechtigungen wurden für die Bilder geändert.
 
 Weiterlesen: [Demorunde mit Ergebnissen und Prüfbericht](demokampagne.md) ·

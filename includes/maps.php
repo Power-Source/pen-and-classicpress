@@ -90,7 +90,7 @@ function ps_pen_paper_save_scene( $campaign, $id, $input, $revision, $image_path
 	}
 	if ( ! is_array( $input ) || ! isset( $input['title'], $input['text'], $input['secret'], $input['grid'] ) ||
 		! is_string( $input['title'] ) || ! is_string( $input['text'] ) || ! is_string( $input['secret'] ) || ! is_string( $input['grid'] ) || ! preg_match( '/^\d{1,3}$/D', $input['grid'] ) ||
-		( isset( $input['tokens'] ) && ! is_array( $input['tokens'] ) ) ) { return ps_pen_paper_scene_error(); }
+		( isset( $input['tokens'] ) && ( ! is_array( $input['tokens'] ) || count( $input['tokens'] ) > 30 ) ) ) { return ps_pen_paper_scene_error(); }
 	$draft = $before['draft'];
 	$draft['title'] = sanitize_text_field( $input['title'] );
 	$draft['text'] = sanitize_textarea_field( $input['text'] );
@@ -186,6 +186,7 @@ function ps_pen_paper_map_state( $campaign ) {
 	$scene['publication'] = $state['publication'];
 	$members = ps_pen_paper_table_members( $campaign );
 	foreach ( $scene['tokens'] as &$token ) {
+		$token = array_intersect_key( $token, array_flip( array( 'id', 'name', 'type', 'owner_id', 'x', 'y', 'color' ) ) );
 		$token['can_move'] = ps_pen_paper_can_manage_campaign( $campaign ) || ( $token['owner_id'] === get_current_user_id() && isset( $members[ $token['owner_id'] ] ) );
 	}
 	unset( $token );
@@ -242,15 +243,17 @@ function ps_pen_paper_map_request( $request ) {
 
 function ps_pen_paper_map_image_request( $request ) {
 	$campaign = ps_pen_paper_get_campaign( (int) $request['id'] );
-	$scene = ps_pen_paper_get_scene( $campaign, (int) $request['scene'] );
-	if ( is_wp_error( $scene ) ) { return $scene; }
 	$asset_id = (int) $request['asset'];
 	$public = ps_pen_paper_map_state( $campaign );
 	if ( is_wp_error( $public ) ) { return $public; }
-	$allowed = ps_pen_paper_can_manage_campaign( $campaign )
-		? ( $asset_id === $scene['draft']['asset_id'] || ( $scene['published'] && $asset_id === $scene['published']['asset_id'] ) )
-		: ( $public['scene'] && $public['scene']['id'] === (int) $request['scene'] && $public['scene']['asset_id'] === $asset_id );
-	if ( ! $allowed ) { return new WP_Error( 'forbidden', __( 'Dieses Kartenbild ist nicht freigegeben.', 'ps-pen-paper' ), array( 'status' => 403 ) ); }
+	if ( ps_pen_paper_can_manage_campaign( $campaign ) ) {
+		$scene = ps_pen_paper_get_scene( $campaign, (int) $request['scene'] );
+		if ( is_wp_error( $scene ) ) { return $scene; }
+		$allowed = $asset_id === $scene['draft']['asset_id'] || ( $scene['published'] && $asset_id === $scene['published']['asset_id'] );
+	} else {
+		$allowed = $public['scene'] && $public['scene']['id'] === (int) $request['scene'] && $public['scene']['asset_id'] === $asset_id;
+	}
+	if ( ! $allowed ) { return new WP_Error( 'image_not_released', __( 'Dieses Kartenbild ist nicht freigegeben.', 'ps-pen-paper' ), array( 'status' => 403 ) ); }
 	$image = ps_pen_paper_private_image( $campaign, $asset_id );
 	if ( is_wp_error( $image ) ) { return $image; }
 	$response = rest_ensure_response( array( 'image' => $image ) );

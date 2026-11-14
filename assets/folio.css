@@ -1,0 +1,26 @@
+.pspp-folio-index {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+	gap: 1rem;
+	margin: 1rem 0 2rem;
+}
+.pspp-folio-index section,
+.pspp-handout {
+	border: 1px solid var(--pspp-border, #667085);
+	border-radius: .35rem;
+	padding: 1.25rem;
+}
+.pspp-folio-index small {
+	display: block;
+}
+.pspp-handout {
+	margin: 1.5rem 0;
+	max-width: 75ch;
+	box-shadow: 0 4px 12px rgb(0 0 0 / 8%);
+}
+.pspp-handout img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	margin-top: 1rem;
+}

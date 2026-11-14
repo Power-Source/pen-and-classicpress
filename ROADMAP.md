@@ -67,6 +67,16 @@ einen endgültigen Funktionsumfang.
   lösen, ohne ihre Regeln, Bögen, Freigaben oder Rechte zu verändern.
 - Die Textdomain `ps-pen-paper` ist eingebunden; ein POT-Katalog im Verzeichnis
   `languages/` dient als Grundlage für spätere PO/MO-Übersetzungen.
+- Version 0.12.0 ergänzt gespeicherte Szenenentwürfe mit getrennten Geheimnissen,
+  privater Inhaltsvorschau, ausdrücklicher Freigabe, Szenenauswahl und Rücknahme.
+  Der optionale Kartentisch unterstützt geschützte Bilder, Zoom, Verschieben,
+  Zwei-Finger-Zoom, bis zu 30 zuweisbare Marker, Raster-Einrasten und kurzlebige Pings.
+  Spieler können nur ihre Marker bewegen und nur die aktive freigegebene Szene
+  abrufen. Eine Aktualisierung erfolgt alle fünf Sekunden ohne WebSocket-Pflicht.
+- Version 0.13.0 ergänzt die private Spielleitermappe mit Kapiteln, sortierten
+  Szenenfolgen, Personen, Orten und Notizen sowie bewusst freigegebenen
+  Text-/Bild-Handouts. Kapitel- und Szenenverknüpfungen vergeben keine Rechte.
+  Neue Szenen beginnen als reine Erzählszenen; Kartenwerkzeuge bleiben optional.
 
 ### Universum vor Kampagne: Grundmodell seit Version 0.11.0
 
@@ -143,7 +153,7 @@ Schutz bestehender Ereignisse aufzuweichen.
 
 - Würfe, Charaktererstellung, Attribut- und Ressourcenänderungen,
   Freigabeanträge, Freigaben, Ablehnungen und Regeländerungen nachvollziehen.
-  Der Story Builder ergänzt später Szenenveröffentlichungen und Rücknahmen.
+  Seit 0.12.0 werden auch Szenenveröffentlichungen, Rücknahmen und Kartenbewegungen erfasst.
 - Zeitpunkt, handelnde Person, betroffene Kennungen und Revisionen festhalten;
   bei Wertänderungen Vorher/Nachher und bei Freigaben die Entscheidung.
 - Ereignisse erst für tatsächlich gespeicherte Aktionen erfassen.
@@ -156,9 +166,11 @@ Schutz bestehender Ereignisse aufzuweichen.
 
 ### 3. Den Story Builder als Herzstück entwickeln
 
-Nach diesen Grundlagen hat der durchgängige Erzählablauf Vorrang vor weiteren
-Zusatzmodulen: Kapitel anlegen, Szene vorbereiten, Spielervorschau prüfen,
-freigeben und im Spielbereich lesen.
+Seit Version 0.12.0 ist der erste durchgängige Szenenablauf vorhanden:
+Szene vorbereiten, Inhaltsvorschau prüfen, freigeben, am Spieltisch anzeigen und
+zurücknehmen. Seit 0.13.0 sind Kapitel mit Szenenfolge, eine kleine private
+Spielleitermappe und geschützte Text-/Bild-Handouts vorhanden. Redaktioneller
+Komfort, weitere Dateiformate und differenzierte Handoutempfänger bleiben offen.
 
 - Spielertext und Spielleitergeheimnisse klar getrennt bearbeiten und speichern.
 - Entwurf, Veröffentlichung und Rücknahme bewusst unterscheiden; Änderungen
@@ -170,12 +182,27 @@ freigeben und im Spielbereich lesen.
 
 ## Der digitale Spieltisch und sein weiterer Ausbau
 
-Eine erste Oberfläche, Zugsteuerung, Anwesenheit, AFK und Chat-Anbindung sind
-vorhanden. Eigene Bildhintergründe, Bild-Avatare, Levelregeln und die Anbindung
-an den noch fehlenden Story Builder bleiben Entwicklungsziele.
+Oberfläche, Zugsteuerung, Anwesenheit, AFK, eigene Bildhintergründe und Chat-Anbindung
+sind vorhanden. Seit 0.12.0 ist die Spielfläche mit freigegebenen Szenen und einem
+schlanken Kartentisch verbunden. Bild-Avatare, Bogen-Hintergründe, optionale
+Levelautomatik und der weitere Story-Builder-Ausbau bleiben Entwicklungsziele.
 Vorbereitung und Spiel werden getrennt: Im Spielbereich stehen
-Gruppe, eigener Charakterbogen, Würfel und später die freigegebene Szene im
+Gruppe, eigener Charakterbogen, Würfel und die freigegebene Szene im
 Vordergrund, nicht dauerhaft geöffnete Einstellungsformulare.
+
+### Schlanker Kartentisch
+
+Vorhanden seit 0.12.0: private Kartenbilder, Zoom und Verschieben, Zwei-Finger-Zoom,
+optionales Quadratraster mit Einrasten, benannte und farbige Spieler-/NPC-/Objektmarker,
+serverseitige Bewegungsrechte, gespeicherte Positionen und kurzlebige Pings.
+Ziehen ist optional; Zielklick und tastaturbedienbare Positionsfelder sind Alternativen.
+Ein Szenenentwurf bleibt privat, bis er ausdrücklich freigegeben und ausgewählt wird.
+
+Kein geplanter Schwerpunkt: Nebel des Krieges, Zeichenwerkzeuge,
+Entfernungsmessung und weitere taktische Kartenfunktionen. Der Fokus liegt
+auf Erzählung, Bögen, Hinweisen und Spielleitervorbereitung, nicht auf einer
+Tabletop-Engine. Keine dynamische Beleuchtung, Wegfindung, Kollisionen oder
+regelabhängige Kampfautomatik.
 
 ### Aufgeräumte Spieloberfläche
 
@@ -190,9 +217,9 @@ Vordergrund, nicht dauerhaft geöffnete Einstellungsformulare.
   ist. Freies Spiel ohne feste Reihenfolge bleibt möglich.
 - Auf dem Handy zwischen „Spiel“, „Mein Bogen“, „Würfel“ und „Gruppe“ wechseln,
   statt eine Desktop-Spaltenansicht lediglich schmaler zu machen.
-- Die Szenenfläche an den Story Builder anschließen, sobald echte Entwürfe,
-  Rechte und Freigaben vorhanden sind; keine vermeintlich geschützten
-  Spielleiterinhalte in gemeinsam sichtbaren Beschreibungen ablegen.
+- Die seit 0.12.0 angebundene Szenenfläche weiterentwickeln; private Entwürfe,
+  Rechte und Freigaben beibehalten und keine Spielleitergeheimnisse in
+  gemeinsam sichtbaren Beschreibungen ablegen.
 
 ### Eigene Hintergründe und Charaktergestaltung
 
@@ -248,8 +275,9 @@ Vordergrund, nicht dauerhaft geöffnete Einstellungsformulare.
 
 **Weiterer Ausbau:** Bild-Avatare und Bogen-Hintergründe folgen mit den nötigen
 Medienrechten und Schutzregeln. Bilder für die Spielfläche sind seit 0.9.0
-geschützt möglich. Die zentrale Szenenfläche braucht den
-Story Builder. Das optionale Levelsystem bleibt ein gesonderter Ausbau.
+geschützt möglich. Die zentrale Szenenfläche ist seit 0.12.0 angebunden;
+Kapitel und Text-/Bild-Handouts sind seit 0.13.0 vorhanden. Das optionale
+Levelsystem bleibt ein gesonderter Ausbau.
 Das Handbuch beschreibt bereits die erste Spieltisch-Oberfläche.
 
 ## Module
@@ -422,10 +450,12 @@ oder seine Berechtigungen von ihnen abhängig zu machen.
 
 ## Phase 6: Spielwelt und Ausrüstung
 
-- NPCs mit frei definierbaren Eigenschaften anlegen.
+- Seit 0.13.0: private Personen-, Orts- und Notizkarten mit Kapitel- und
+  Szenenverknüpfungen. Strukturierte NPC-Eigenschaften bleiben ein späterer Ausbau.
 - Begegnungen, Gegner und Ereignisse für Szenen vorbereiten.
 - Gegenstände, Inventare und Ausrüstung verwalten.
-- Handouts und Hinweise gezielt freigeben.
+- Seit 0.13.0: Text- und Bild-Handouts gezielt für die Runde freigeben und
+  zurücknehmen, mit getrenntem Entwurfsstand und privaten Geheimnissen.
 - Über ein geeignetes Schutzkonzept für private Dateien entscheiden: Normale
   Upload-URLs können direkt erreichbar sein und sind nicht automatisch privat.
 
@@ -449,8 +479,9 @@ Diese Ideen sind bewusst noch nicht Teil der ersten spielbaren Version:
   für private Inhalte und personenbezogene Daten.
 - Druckansicht oder PDF-Export für Charakterbögen und Spielleiternotizen.
 - Optionale Benachrichtigungen bei Einladungen, Freigaben und neuen Szenen.
-- Karten, Marker oder ein einfacher Initiative-Tracker als optionale Hilfen –
-  ohne eine vollständige virtuelle Spieltisch-Engine vorauszusetzen.
+- Den seit 0.12.0 vorhandenen Kartentisch mit Markern bei Bedarf um einen
+  einfachen Initiative-Tracker ergänzen, ohne eine vollständige virtuelle
+  Spieltisch-Engine vorauszusetzen.
 
 ## Übergreifende Qualitätsanforderungen
 
@@ -478,4 +509,5 @@ Diese Ideen sind bewusst noch nicht Teil der ersten spielbaren Version:
    Charaktere und offene Freigaben beeinflussen?
 5. Welche Wiki- und Chat-Zugriffsrechte sind bereits vorhanden, und wo werden
    gegebenenfalls Erweiterungen der anderen Plugins benötigt?
-6. Wann und wie sollen private Handouts sicher bereitgestellt werden?
+6. Welche weiteren Handoutformate und Empfängerkreise werden neben den
+   geschützten Text-/Bild-Handouts für die gesamte Runde benötigt?

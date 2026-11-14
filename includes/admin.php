@@ -33,7 +33,8 @@ function ps_pen_paper_enqueue_admin_assets( $hook ) {
 	wp_enqueue_script( 'ps-pen-paper-style', $url . 'assets/styles.js', array(), '0.7.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
 	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.12.0' );
-	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array(), '0.12.0', true );
+	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array(), '0.13.0', true );
+	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.13.0' );
 }
 
 function ps_pen_paper_admin_url( $campaign_id = 0 ) {
@@ -76,6 +77,9 @@ function ps_pen_paper_handle_admin_action() {
 	}
 
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
+	if ( in_array( $operation, array( 'save_folio', 'publish_folio', 'withdraw_folio' ), true ) ) {
+		ps_pen_paper_handle_folio_action( $operation );
+	}
 	if ( in_array( $operation, array( 'save_scene', 'publish_scene', 'withdraw_scene', 'select_scene' ), true ) ) {
 		ps_pen_paper_handle_scene_action( $operation );
 	}
@@ -348,6 +352,8 @@ function ps_pen_paper_render_notice() {
 		'universe_saved' => __( 'Universum gespeichert.', 'ps-pen-paper' ),
 		'universe_linked' => __( 'Universumszuordnung gespeichert. Kampagnendaten und Rechte bleiben unverändert.', 'ps-pen-paper' ),
 		'context_saved' => __( 'Universumsvorlage, Basisbogen oder Kampagnenkontext gespeichert.', 'ps-pen-paper' ),
+		'scene_saved' => __( 'Szenenaktion gespeichert. Freigabe und Anzeige am Tisch sind getrennte Schritte.', 'ps-pen-paper' ),
+		'folio_saved' => __( 'Mappenaktion gespeichert. Nur ausdrücklich freigegebene Handouts sind für die Runde sichtbar.', 'ps-pen-paper' ),
 	);
 	$notice = isset( $_GET['pspp_notice'] ) && is_string( $_GET['pspp_notice'] ) ? sanitize_key( wp_unslash( $_GET['pspp_notice'] ) ) : '';
 	if ( isset( $notices[ $notice ] ) ) {
@@ -490,6 +496,8 @@ function ps_pen_paper_render_campaign( $campaign ) {
 	</div>
 	<?php ps_pen_paper_render_characters( $campaign ); ?>
 	<?php ps_pen_paper_render_rules( $campaign, $can_manage ); ?>
+	<?php if ( $can_manage ) : ?><section id="pspp-story" class="pspp-game"><?php ps_pen_paper_render_story( $campaign, 0 ); ?></section><?php endif; ?>
+	<?php if ( $can_manage ) : ?><section id="pspp-folio" class="pspp-game"><?php ps_pen_paper_render_folio( $campaign, 0 ); ?></section><?php endif; ?>
 	<?php if ( $can_manage ) : ?><section id="pspp-settings"><?php ps_pen_paper_render_access_settings( $campaign ); ?></section><?php endif; ?>
 	<h3><?php esc_html_e( 'Mitglieder', 'ps-pen-paper' ); ?></h3>
 	<?php if ( $can_manage ) : ?>

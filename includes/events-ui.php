@@ -41,10 +41,35 @@ function ps_pen_paper_render_event_details( $event ) {
 			<section class="pspp-snapshot">
 				<h4><?php echo esc_html( $label . ' · ' . sprintf( __( 'Revision %d', 'ps-pen-paper' ), $event[ $key ]['revision'] ) ); ?></h4>
 				<?php if ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) : ?>
-					<p><?php echo esc_html( $event[ $key ]['draft']['title'] ); ?></p>
-					<p class="pspp-multiline"><?php echo esc_html( $event[ $key ]['draft']['text'] ); ?></p>
-					<p class="pspp-multiline"><?php echo esc_html( $event[ $key ]['draft']['secret'] ); ?></p>
-					<pre class="pspp-map-history"><?php echo esc_html( wp_json_encode( array( 'draft_tokens' => $event[ $key ]['draft']['tokens'], 'published' => $event[ $key ]['published'] ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE ) ); ?></pre>
+					<?php foreach ( array( 'draft' => __( 'Entwurf', 'ps-pen-paper' ), 'published' => __( 'Freigegebener Stand', 'ps-pen-paper' ) ) as $scope => $heading ) :
+						$scene = $event[ $key ][ $scope ];
+						?>
+						<h5><?php echo esc_html( $heading ); ?></h5>
+						<?php if ( null === $scene ) : ?>
+							<p><?php esc_html_e( 'Nicht freigegeben', 'ps-pen-paper' ); ?></p>
+						<?php else : ?>
+							<p><strong><?php echo esc_html( $scene['title'] ); ?></strong></p>
+							<p class="pspp-multiline"><?php echo esc_html( $scene['text'] ); ?></p>
+							<?php if ( isset( $scene['secret'] ) && '' !== $scene['secret'] ) : ?><p class="pspp-multiline"><?php echo esc_html( __( 'Geheimnisse – nur Spielleitung', 'ps-pen-paper' ) . ': ' . $scene['secret'] ); ?></p><?php endif; ?>
+							<p><?php echo esc_html( __( 'Kartenbild:', 'ps-pen-paper' ) . ' #' . $scene['asset_id'] . ' · ' . __( 'Raster:', 'ps-pen-paper' ) . ' ' . $scene['grid'] ); ?></p>
+							<ul><?php foreach ( $scene['tokens'] as $token ) : ?><li><?php echo esc_html( $token['name'] . ' · X ' . $token['x'] / 100 . ' % · Y ' . $token['y'] / 100 . ' %' ); ?></li><?php endforeach; ?></ul>
+						<?php endif; ?>
+					<?php endforeach; ?>
+				<?php elseif ( in_array( $event['kind'], array( 'folio_saved', 'folio_published', 'folio_withdrawn' ), true ) ) : ?>
+					<?php foreach ( array( 'draft' => __( 'Privater Entwurf', 'ps-pen-paper' ), 'published' => __( 'Freigegebenes Handout', 'ps-pen-paper' ) ) as $scope => $heading ) : $entry = $event[ $key ][ $scope ]; ?>
+						<h5><?php echo esc_html( $heading ); ?></h5>
+						<?php if ( ! $entry ) : ?><p><?php esc_html_e( 'Nicht freigegeben', 'ps-pen-paper' ); ?></p>
+						<?php else : ?>
+							<p><strong><?php echo esc_html( $entry['title'] ); ?></strong></p>
+							<p class="pspp-multiline"><?php echo esc_html( $entry['text'] ); ?></p>
+							<?php if ( isset( $entry['secret'] ) ) : ?><p class="pspp-multiline"><?php echo esc_html( $entry['secret'] ); ?></p>
+								<p><?php echo esc_html( ps_pen_paper_folio_types()[ $entry['type'] ] . ' · ' . __( 'Sortiernummer:', 'ps-pen-paper' ) . ' ' . $entry['order'] ); ?></p>
+								<p><?php echo esc_html( __( 'Kapitel / Szene:', 'ps-pen-paper' ) . ' ' . $entry['chapter_id'] . ' / ' . $entry['scene_id'] ); ?></p>
+								<p><?php echo esc_html( __( 'Szenenfolge:', 'ps-pen-paper' ) . ' ' . implode( ', ', $entry['scene_ids'] ) ); ?></p>
+							<?php endif; ?>
+							<p><?php echo esc_html( __( 'Geschütztes Bild:', 'ps-pen-paper' ) . ' ' . $entry['asset_id'] ); ?></p>
+						<?php endif; ?>
+					<?php endforeach; ?>
 				<?php elseif ( 'scene_selected' === $event['kind'] ) : ?>
 					<p><?php echo esc_html( $event[ $key ]['name'] ); ?></p>
 				<?php elseif ( 'universe_saved' === $event['kind'] ) : ?>
@@ -115,6 +140,8 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 						<p><strong><?php echo esc_html( $labels[ $event['kind'] ] ); ?></strong></p>
 						<?php
 						if ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) {
+							$snapshot = array( 'name' => $event['after']['draft']['title'] );
+						} elseif ( in_array( $event['kind'], array( 'folio_saved', 'folio_published', 'folio_withdrawn' ), true ) ) {
 							$snapshot = array( 'name' => $event['after']['draft']['title'] );
 						} elseif ( 'scene_selected' === $event['kind'] ) {
 							$snapshot = $event['after'];

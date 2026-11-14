@@ -1,0 +1,41 @@
+.pspp-game .pspp-scene.pspp-has-map {
+	display: block;
+	padding: 0;
+	min-height: 0;
+	background: var(--pspp-surface);
+}
+.pspp-scene.pspp-has-map::before { display: none; }
+.pspp-map { position: relative; width: 100%; min-width: 0; color: var(--pspp-text); background: var(--pspp-surface); }
+.pspp-map-heading { padding: 22px clamp(16px, 3vw, 36px) 8px; }
+.pspp-game .pspp-map-heading h2 { margin: 8px 0; font-size: clamp(24px, 3vw, 40px); overflow-wrap: anywhere; }
+.pspp-map-heading p { max-width: 85ch; }
+.pspp-map-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; }
+.pspp-map-tools span { flex: 1 1 180px; font-size: 13px; overflow-wrap: anywhere; }
+.pspp-map-viewport { height: clamp(320px, 65svh, 800px); overflow: hidden; background: radial-gradient(ellipse at center, #253641, #101b22); border-block: 1px solid var(--pspp-border); }
+.pspp-map-viewport svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; cursor: grab; }
+.pspp-map-viewport svg:active { cursor: grabbing; }
+.pspp-map-viewport svg:focus-visible { outline: 3px solid var(--pspp-accent); outline-offset: -4px; }
+.pspp-map [data-map-tokens] g { cursor: default; }
+.pspp-map [data-map-tokens] [data-movable="true"] { cursor: pointer; }
+.pspp-map [data-map-tokens] circle, .pspp-map [data-map-tokens] rect { stroke: #101b22; stroke-width: 3; vector-effect: non-scaling-stroke; }
+.pspp-map [data-map-tokens] .is-selected circle, .pspp-map [data-map-tokens] .is-selected rect,
+.pspp-map [data-map-tokens] g:focus-visible circle, .pspp-map [data-map-tokens] g:focus-visible rect { stroke: #fff3b3; stroke-width: 4; }
+.pspp-map [data-map-tokens] text { fill: #101b22; font-family: system-ui, sans-serif; font-weight: 800; pointer-events: none; }
+.pspp-map [data-map-tokens] .pspp-map-token-name,
+.pspp-map [data-map-pings] .pspp-map-token-name { fill: white; stroke: #101b22; stroke-width: 3; paint-order: stroke; font-family: system-ui, sans-serif; font-weight: 700; pointer-events: none; }
+.pspp-map [data-map-pings], .pspp-map [data-map-grid] { pointer-events: none; }
+.pspp-map-ping { fill: #ffe09a55; stroke: #ffe09a; stroke-width: 3; vector-effect: non-scaling-stroke; animation: pspp-map-ping 1.5s ease-out 4; }
+.pspp-map-movement { padding: 12px 16px; }
+.pspp-map-movement form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-top: 12px; }
+.pspp-map-movement label { flex: 1 1 100px; min-width: 0; }
+.pspp-map-movement label:first-child { flex-basis: 200px; }
+.pspp-map-help, .pspp-map [data-map-feedback] { margin: 8px 16px 16px; font-size: 13px; }
+.pspp-game button[data-map-ping][aria-pressed="true"] { outline: 3px solid var(--pspp-accent); }
+.pspp-map-token-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 12px; margin-block: 16px; }
+.pspp-map-token-row label { display: flex; flex-direction: column; min-width: 0; }
+.pspp-map-token-row button { align-self: end; }
+#pspp-story > form { margin-block: 20px; }
+#pspp-story > form > label { display: block; margin-block: 12px; }
+.pspp-map-token-row input[type="color"] { width: 100%; min-height: 44px; }
+@keyframes pspp-map-ping { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .pspp-map-ping { animation: none; } }

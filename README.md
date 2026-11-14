@@ -8,7 +8,7 @@ Kampagnen auf WordPress und ClassicPress.
 - [Pluginhandbuch mit Screenshots](docs/handbuch.md): Einrichtung, Rollen,
   Charaktere, Freigaben, Würfel, Ressourcen, Farben und bekannte Grenzen.
 - [Durchgespielte Demokampagne](docs/demokampagne.md): echte Würfelergebnisse,
-  getrennte Rollen, Prüfbericht und noch fehlende Schritte bis zum Story Builder.
+  getrennte Rollen und ergänzende Prüfungen von Universen und Kartentisch.
 
 Die Demo ist ein Spielstand auf der Entwicklungswebsite, keine automatische
 Installation von Beispieldaten oder ein fest eingebautes Regelwerk.
@@ -38,7 +38,9 @@ Website-Mitglieder finden ihre Kampagnen unter „Pen & Paper“ im Backend. Es
 verwendet private Inhalte und Metadaten der jeweiligen Website, aber keine
 eigenen Tabellen. Eine Würfelmechanik mit geschütztem Ereignisprotokoll ist vorhanden;
 Ein erster digitaler Spieltisch und eine optionale PS-Chat-Anbindung sind vorhanden;
-der Story Builder folgt später.
+Ein erster Szeneneditor mit geschütztem Kartentisch ist seit Version 0.12.0
+vorhanden. Seit 0.13.0 ergänzen Kapitel, geschützte Text-/Bild-Handouts und eine
+private Spielleitermappe die Abenteuerverwaltung.
 
 ## Geschützter Spielbereich im Frontend
 
@@ -73,6 +75,82 @@ können bereits vor dem Start des Plugins antworten. `noindex` ersetzt keine
 Zugriffsprüfung.
 
 ## Digitaler Spieltisch
+
+### Spielleitermappe und Handouts seit Version 0.13.0
+
+**Spielleitermappe** im Frontend oder in der Backend-Kampagnenverwaltung sammelt
+Kapitel, Personen, Orte, Notizen und Handouts. Einträge sind kampagnenbezogen,
+revisionsgeschützt und ausschließlich für die Spielleitung sichtbar.
+Kapitel besitzen eine sortierbare Szenenfolge; Verknüpfungen zu Kapiteln und
+Szenen geben weder Szenen noch andere Einträge automatisch frei.
+Personen und Orte sind erzählerische Karteikarten, kein neues Kampfregelsystem.
+
+Nur **Handouts** lassen sich nach privater Vorschau und Bestätigung für die
+gesamte Runde freigeben. Dabei werden ausschließlich Titel, Text und optionales
+Bild übernommen, niemals Geheimnisse oder interne Verknüpfungen. Entwurfsänderungen
+ändern den freigegebenen Stand erst nach erneuter Freigabe. Unter **Handouts**
+bleiben Hinweise auch nach einem Szenenwechsel zugänglich, bis die Spielleitung
+sie zurücknimmt. Spieler laden den Bereich für neue Freigaben oder Rücknahmen
+neu; geöffnete Seiten und bereits gespeicherte Inhalte lassen sich nicht
+nachträglich zurückholen.
+
+Handoutbilder verwenden den bestehenden geschützten Bildspeicher: PNG/JPEG/WebP,
+höchstens 2 MiB und 3000 × 3000 Pixel, ohne öffentliche Mediathek-URL.
+Historische Bildstände bleiben bis zur Kampagnenlöschung erhalten. Beliebige
+Dateien und PDFs, Einzelspielerfreigaben und ein vollständiger NPC-Editor
+sind nicht enthalten. Mappenänderungen und Freigaben stehen mit privaten
+Vorher-/Nachher-Ständen im Spielleiterprotokoll.
+
+Neue Szenen beginnen ohne Raster. Ohne Bild, Raster und Marker bleibt nur
+der Erzähltext sichtbar; die Kartenoptionen sind im Editor eingeklappt.
+Die Karte ist eine optionale Hilfe, nicht das Zentrum des Spiels.
+
+### Szenen und schlanker Kartentisch seit Version 0.12.0
+
+Die Spielleitung öffnet **Szenen & Karten** im Spielbereich oder in der
+Backend-Kampagnenverwaltung. Jede Szene besitzt Titel, freizugebenden Text,
+getrennte Geheimnisse und optional eine Karte. Der Ablauf ist bewusst getrennt:
+**Entwurf speichern → private Inhaltsvorschau prüfen → gespeicherten Entwurf
+freigeben → freigegebene Szene am Tisch anzeigen**. Änderungen am Entwurf
+verändern nie automatisch einen bereits freigegebenen Stand.
+Die Freigabe lässt sich zurücknehmen; alternativ kehrt die Gruppe zur
+Rundeneinleitung zurück. Spieler können nur die aktuell ausgewählte,
+weiterhin freigegebene Szene abrufen, nicht den übrigen Szenenvorrat.
+
+Der Kartentisch bietet ohne zusätzliche Bibliothek:
+
+- Geschützte PNG-/JPEG-/WebP-Karten bis 2 MiB und 3000 × 3000 Pixel;
+  ohne Bild eine neutrale Kartenfläche.
+- Zoomen, Verschieben, Einpassen und Zwei-Finger-Zoom; keine WebSocket-Pflicht.
+- Bis zu 30 benannte Spieler-, NPC- oder Gegenstandsmarker mit wählbarer Farbe.
+  Aktuelle Rundenteilnehmer dürfen nur ausdrücklich zugewiesene Marker bewegen,
+  die Spielleitung alle. Marker sind keine öffentlich gemachten Charakterbögen.
+- Bewegung durch Ziehen, Auswahl und Zielklick oder Prozentfelder. Die
+  Positionsfelder sind auch über die Tastatur erreichbar. Ein optionales
+  Quadratraster mit 10–500 Bildpixeln lässt Bewegungen einrasten; 0 schaltet es aus.
+- Geteilte Karten-Pings mit serverseitig bestimmtem Absender, spätestens nach
+  15 Sekunden abgelaufen. Pings werden nicht dauerhaft protokolliert.
+
+Positionen bleiben gespeichert. Sichtbare Browserseiten fragen den Kartenstand
+alle fünf Sekunden ab; das ist eine angenäherte Aktualisierung, kein
+Echtzeitserver. Bilder werden nicht bei jedem Abruf erneut übertragen.
+Konkurrierende Änderungen werden mit Revisionen abgelehnt statt überschrieben.
+Eine Neufreigabe ersetzt den veröffentlichten Stand einschließlich seiner
+vorbereiteten Startpositionen. Die Entwurfsvorschau zeigt den gespeicherten
+Entwurf, nicht noch ungespeicherte Formulareingaben.
+
+Kartenbilder liegen wie Hintergründe in privaten Datensätzen ohne öffentliche
+Mediathek-URL. Alte Kartenbildstände bleiben für die Historie bis zum endgültigen
+Löschen der Kampagne geschützt gespeichert; Uploads vergrößern die Datenbank.
+Szenenvorbereitung, Freigabe, Rücknahme und Bewegungen werden mit geschützten
+Vorher-/Nachher-Ständen für die Spielleitung protokolliert. Die Gruppe sieht
+Szenenwechsel mit freigegebenem Titel, aber keine privaten Entwürfe oder Geheimnisse.
+
+Noch nicht enthalten sind Zeichenwerkzeuge, Nebel des Krieges,
+versteckte Marker, Entfernungsprüfung, Kollisionen und automatische Kampfregeln.
+Alle veröffentlichten Marker sind für die Runde sichtbar. Eine Rücknahme
+verhindert neue Abrufe, kann aber bereits betrachtete oder gespeicherte Inhalte
+nicht nachträglich zurückholen.
 
 Seit Version 0.9.0 trennt der Spielbereich die große Erzählfläche, die kompakte
 Gruppenleiste und den vollwertigen Charakterbogen. Es ist jeweils ein
@@ -111,7 +189,8 @@ als eingebettete Bilddaten ausgeliefert; es entsteht keine öffentliche
 Mediathek-Adresse. Ersetzen, Entfernen und Löschen der Kampagne entfernen
 die zugehörigen Bilddaten. Bilder vergrößern entsprechend die Datenbank und
 die ausgelieferte Spielseite; möglichst kleine Dateien verwenden.
-Das ist kein allgemeines System für private Handouts oder beliebige Dateien.
+Text-/Bild-Handouts werden getrennt über die Spielleitermappe verwaltet;
+beliebige private Dateien werden weiterhin nicht unterstützt.
 
 ### Universen, Basisbögen und Kampagnenkontexte
 
@@ -311,8 +390,9 @@ keine datenbankübergreifende Transaktionsgarantie und kein manipulationssichere
 Audit-System; Datenbanksicherungen bleiben erforderlich.
 
 Es gibt keine Oberfläche zum Überschreiben alter Protokolleinträge. Eine neue
-Korrektur erzeugt ein neues Ereignis. Szenenereignisse folgen mit dem Story Builder;
-Mitgliederverwaltung und Style-Änderungen werden derzeit noch nicht protokolliert.
+Korrektur erzeugt ein neues Ereignis. Szenenereignisse und Kartenbewegungen werden
+seit Version 0.12.0 geschützt protokolliert; Mitgliederverwaltung und Style-Änderungen
+werden derzeit noch nicht protokolliert.
 
 ## Charaktere und Bearbeitungsrechte
 
@@ -392,6 +472,19 @@ Spieler- und Spielleiterinhalte wie Namen, Regeln und Geschichten bleiben eigene
 Inhalte und werden nicht durch gettext übersetzt.
 
 ## Entwicklungstest
+
+`tests/folio-integration.php` prüft die private Spielleitermappe, geordnete
+Kapitel, kampagnenbezogene Verknüpfungen, ausdrückliche Handoutfreigaben,
+geschützte Bildausgabe, unveränderte veröffentlichte Stände bei
+Entwurfsänderungen, Revisionskonflikte, Protokollschutz und Fehler-Rücknahme.
+Gäste, Nichtmitglieder und entfernte Mitglieder erhalten keine Handouts.
+Die Prüfung erstellt und entfernt ausschließlich eigene temporäre Daten.
+
+`tests/maps-integration.php` prüft Entwürfe, getrennte Geheimnisse, private
+Kartenbilder, ausdrückliche Freigabe und Szenenauswahl, aktuelle Markerrechte,
+persistente Positionen und tatsächliches Pixelraster-Einrasten, Revisionskonflikte,
+Ping-Absender und Ablauf, Rücknahme sowie Rückabwicklung bei Protokollfehlern.
+Auch diese Prüfung erstellt und entfernt ausschließlich eigene temporäre Daten.
 
 `tests/character-contexts-integration.php` prüft Basisvorlagen mit stabilen
 Feldkennungen, bestätigte Übernahmen, gemeinsame und unabhängige Charakterstände,

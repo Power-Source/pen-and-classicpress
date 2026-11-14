@@ -294,10 +294,90 @@ Zurücknehmen von Auflagen, Spielerfreigaben für unabhängige Kopien, unveränd
 historische Würfe, fehlende Basisbögen, beschädigte Kontextdaten und
 Rücknahme bei fehlgeschlagener Protokollveröffentlichung ab.
 
+### Ergänzende Prüfung des Kartentischs mit Version 0.12.0
+
+Eine getrennte Prüfrunde mit Spielleitung und zwei Spielerkonten wurde über
+die tatsächlichen Frontend-Formulare bedient. Eine selbst erzeugte schematische
+PNG-Prüfkarte wurde privat hochgeladen, mit einem Spieler- und einem NPC-Marker
+versehen und zunächst nur in der privaten Inhaltsvorschau betrachtet.
+Erst die bestätigte Freigabe und anschließende Szenenauswahl machten sie für
+die Spieler sichtbar. Geheimnisse blieben außerhalb von Spieler-HTML und API.
+
+Das Spielerkonto bewegte nur seinen Marker über die Positionsfelder.
+Das Bildpixelraster führte die Position nachvollziehbar auf den nächsten
+Rasterpunkt; nach Neuladen blieb sie erhalten. Ein anderes Spielerkonto konnte
+den Marker auch über einen direkten API-Aufruf nicht bewegen. Die Spielleitung
+verschob den NPC durch Ziehen. Zoomen, Verschieben, Einpassen, Tastaturauswahl,
+Zwei-Finger-Zoom und gruppenweit geteilte Pings wurden im Browser ausgeführt.
+Absichtlich verzögerte Kartenabrufe prüften auch die Bedienung während einer
+laufenden Aktualisierung.
+
+Ein späterer Entwurf mit neuem Kartenbild ersetzte nicht den freigegebenen
+Stand. Nach Rücknahme waren Szene und Kartenbild nicht mehr abrufbar.
+Die Rückkehr zur Rundeneinleitung ließ die Szenenverwaltung weiter bedienbar.
+Geöffnete Vorbereitung und Vorschau sowie Spielerkarten wurden bei 320, 390,
+768, 1024 und 1440 Pixeln ohne horizontalen Überlauf geprüft; keine
+JavaScript-Fehler wurden erkannt. Die Abbildungen 15 und 16 zeigen diese
+separate Prüfrunde, nicht eine Veränderung der persistenten Nebelhafen-Demo.
+
+Alle acht Integrationstestsuiten bestanden. Der neue Kartentest prüft
+zusätzlich veraltete Revisionen, Grenzen der Positionen, Bild- und Kampagnentrennung,
+private Protokolle und Rücknahme bei fehlgeschlagener Veröffentlichung.
+Die Prüfrunde einschließlich Szenen, Bildern, Protokollen, Pings, Chat-Caches
+und Konten wurde entfernt. Regeln, Charakterstände und ursprüngliche Würfe
+der persistenten Demo wurden vor und nach dem Browsertest verglichen und blieben
+unverändert.
+
+### Live-Fortsetzung in derselben Demo mit Version 0.13.0
+
+Anders als die getrennten Prüfwelten der vorigen Ausbauschritte wurde diesmal
+**die bestehende Nebelhafen-Demokampagne selbst weitergeführt**. Die Ergänzungen
+bleiben dort erhalten:
+
+- **Kapitel 1 – Die letzte Fracht** mit der geordneten Szenenfolge
+  **Auf dem Servicesteg → Die Laterne an Dock 3**.
+- Eine private Personenkarte für **Tessa Wolkensteg**, eine Ortskarte für
+  **Dock 3** und die Spielleiternotiz **Was bisher geschah – Fortsetzung**.
+- **Der Brief mit dem Messingsiegel** als Text-Handout mit einem eigens
+  lokal gezeichneten Frachtzeichen. Keine externen Kunstwerke oder Bilddienste.
+
+Die Fortsetzung greift Maras gescheiterten Brückenversuch und Jorins
+Untersuchung aus dem ursprünglichen Probespiel auf. Sie schreibt weder einen
+Kampf noch einen bestimmten Lösungsweg vor. Beide neuen Szenen sind reine
+Erzählszenen ohne Kartenfläche, Raster oder Figurensteuerung.
+
+Die Spielleitung kann die Vorbereitung über **Spielleitermappe** öffnen.
+Die Gruppe findet den freigegebenen Brief unter **Handouts**. Die
+Personen-/Ortskarten, Kapitelnotizen und geheimen Ergänzungen sind keine
+öffentlichen Spielmaterialien.
+
+Die echten Frontend-Formulare wurden mit den bestehenden Konten der
+Demo-Spielleitung, Mara und Jorin bedient. Beide Spieler konnten den
+freigegebenen Brief samt Bild lesen, aber keine privaten Mappeninhalte oder
+Geheimnisse. Eine private Überarbeitung änderte das sichtbare Handout nicht.
+Rücknahme und erneute Freigabe wurden durchgespielt; beim Szenenwechsel blieb
+der Brief erhalten. Gäste erhielten keine Handouts. Die zweite Erzählszene
+erschien nach dem Wechsel auch auf der bereits geöffneten Spieleransicht.
+
+Die Demo bleibt am Beginn **Auf dem Servicesteg** stehen; die nächste Szene
+ist vorbereitet und freigegeben, aber nicht aktiv. Ihre Regeln, beide
+Charakterstände und die drei ursprünglichen Würfe wurden vor und nach den
+Prüfungen verglichen und blieben unverändert. Nur die eigens erzeugten
+Testsitzungen wurden entfernt, keine bestehenden Anmeldungen oder Demokonten.
+
+Spielleitermappe, Erzählszene und Handouts wurden bei 320, 390, 768, 1024 und
+1440 Pixeln ohne horizontalen Überlauf geprüft; keine JavaScript-Fehler.
+Alle neun Integrationstestsuiten bestanden. Die neue Mappenprüfung deckt
+zusätzlich kampagnenfremde Verknüpfungen, Revisionskonflikte, Protokollschutz,
+entzogene Mitgliedschaften und Rückabwicklung bei Speicherfehlern ab.
+Die Abbildungen 17 und 18 im Handbuch stammen aus dieser dauerhaften Demo.
+
 ## Was vor einem vollständig integrierten Abenteuer noch fehlt
 
-1. **Story Builder:** Kapitel, Szenen, getrennte Geheimnisse, Entwürfe,
-   Spielervorschau und kontrollierte Veröffentlichung beziehungsweise Rücknahme.
+1. **Story Builder weiter ausbauen:** Redaktioneller Komfort, weitere
+   Handoutdateiformate und differenzierte Empfänger. Kapitel, eine private
+   Spielleitermappe und geschützte Text-/Bild-Handouts sind seit 0.13.0
+   vorhanden; der grundlegende Szenenablauf besteht seit 0.12.0.
 2. **Selbstständige Spielleiter auf dieser Website:** Die Backend-Weiterleitung
    klären; nicht durch pauschale Administratorrechte umgehen.
 3. **Optionale Kommunikation:** PS Chat ist inzwischen geschützt eingebunden.
@@ -307,7 +387,9 @@ Rücknahme bei fehlgeschlagener Protokollveröffentlichung ab.
    gewählte System sie benötigt. Basisbögen und lokale Zahlenauflagen sind
    seit Version 0.11.0 vorhanden.
 
-**Fazit:** Eine begleitete Runde mit Charakterbögen, Würfeln und Spielprotokoll
-ist möglich. Der komplette Erzählablauf innerhalb des Plugins fehlt noch.
+**Fazit:** Eine begleitete Runde mit Charakterbögen, Würfeln, Kapiteln,
+Erzählszenen, Handouts und privater Spielleitermappe ist möglich. Der
+Kartentisch bleibt eine optionale Hilfe; Inventar und weitere Spielmaterialien
+bleiben Ausbauziele.
 
 [Zum Pluginhandbuch](handbuch.md) · [Zur Roadmap](../ROADMAP.md)

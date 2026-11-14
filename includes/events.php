@@ -22,6 +22,9 @@ function ps_pen_paper_event_labels() {
 		'scene_withdrawn'     => __( 'Szenenfreigabe zurückgenommen', 'ps-pen-paper' ),
 		'scene_selected'      => __( 'Aktive Szene gewechselt', 'ps-pen-paper' ),
 		'map_moved'           => __( 'Figur auf der Karte bewegt', 'ps-pen-paper' ),
+		'folio_saved'         => __( 'Mappeneintrag gespeichert', 'ps-pen-paper' ),
+		'folio_published'     => __( 'Handout freigegeben', 'ps-pen-paper' ),
+		'folio_withdrawn'     => __( 'Handout zurückgenommen', 'ps-pen-paper' ),
 	);
 }
 

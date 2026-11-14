@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PS Pen & Paper
  * Description: Ein universeller Baukasten für Pen-and-Paper-Kampagnen.
- * Version: 0.12.0
+ * Version: 0.13.0
  * Author: PSOURCE
  * Text Domain: ps-pen-paper
  * Domain Path: /languages
@@ -27,6 +27,8 @@ require_once __DIR__ . '/includes/access-ui.php';
 require_once __DIR__ . '/includes/backdrop.php';
 require_once __DIR__ . '/includes/maps.php';
 require_once __DIR__ . '/includes/maps-ui.php';
+require_once __DIR__ . '/includes/folio.php';
+require_once __DIR__ . '/includes/folio-ui.php';
 require_once __DIR__ . '/includes/universes.php';
 require_once __DIR__ . '/includes/character-contexts.php';
 require_once __DIR__ . '/includes/character-contexts-ui.php';
@@ -45,6 +47,7 @@ add_action( 'init', 'ps_pen_paper_register_roll_type' );
 add_action( 'init', 'ps_pen_paper_register_event_type' );
 add_action( 'init', 'ps_pen_paper_register_asset_type' );
 add_action( 'init', 'ps_pen_paper_register_scene_type' );
+add_action( 'init', 'ps_pen_paper_register_folio_type' );
 add_action( 'init', 'ps_pen_paper_register_universe_type' );
 add_action( 'before_delete_post', 'ps_pen_paper_delete_campaign_assets', 10, 2 );
 add_action( 'admin_menu', 'ps_pen_paper_register_admin_menu' );

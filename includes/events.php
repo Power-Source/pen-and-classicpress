@@ -24,6 +24,10 @@ function ps_pen_paper_event_labels() {
 		'scene_selected'      => __( 'Aktive Szene gewechselt', 'ps-pen-paper' ),
 		'map_moved'           => __( 'Figur auf der Karte bewegt', 'ps-pen-paper' ),
 		'folio_saved'         => __( 'Mappeneintrag gespeichert', 'ps-pen-paper' ),
+		'npc_saved'           => __( 'Figur gespeichert', 'ps-pen-paper' ),
+		'npc_offered'         => __( 'Figur dem Universum angeboten', 'ps-pen-paper' ),
+		'npc_approved'        => __( 'Figur ins Universum aufgenommen', 'ps-pen-paper' ),
+		'npc_copied'          => __( 'Universumsvorlage als Figur übernommen', 'ps-pen-paper' ),
 		'folio_published'     => __( 'Handout freigegeben', 'ps-pen-paper' ),
 		'folio_withdrawn'     => __( 'Handout zurückgenommen', 'ps-pen-paper' ),
 		'portrait_saved'      => __( 'Charakterporträt geändert oder geprüft', 'ps-pen-paper' ),
@@ -215,6 +219,10 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 		return $error;
 	}
 	$event['id'] = $post->ID;
+	if ( in_array( $event['kind'], array( 'npc_saved', 'npc_offered', 'npc_approved', 'npc_copied' ), true ) &&
+		( 'gm' !== $event['visibility'] || ! ps_pen_paper_valid_npc_state( $event['before'] ) || ! ps_pen_paper_valid_npc_state( $event['after'] ) ) ) {
+		return new WP_Error( 'invalid_event', __( 'Die Figurenstände im Protokoll sind beschädigt.', 'ps-pen-paper' ) );
+	}
 	if ( ( 'currency_saved' === $event['kind'] && ( 'gm' !== $event['visibility'] || ! ps_pen_paper_valid_currency( $event['before'] ) || ! ps_pen_paper_valid_currency( $event['after'] ) ) ) ||
 		( 'wallet_saved' === $event['kind'] && ( 'owner' !== $event['visibility'] || ! ps_pen_paper_valid_wallet( $event['before'] ) || ! ps_pen_paper_valid_wallet( $event['after'] ) ||
 			! isset( $event['reason'], $event['character_name'] ) || ! is_string( $event['reason'] ) || '' === trim( $event['reason'] ) || strlen( $event['reason'] ) > 1000 || ! is_string( $event['character_name'] ) ) ) ) {

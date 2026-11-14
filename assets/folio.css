@@ -24,3 +24,26 @@
 	height: auto;
 	margin-top: 1rem;
 }
+.pspp-npc-card {
+	border: 1px solid var(--pspp-border, #667085);
+	border-radius: .35rem;
+	padding: 1rem;
+	margin: 1rem 0;
+	overflow-wrap: anywhere;
+}
+.pspp-npc-card img {
+	display: block;
+	max-width: 100%;
+	max-height: 360px;
+	object-fit: contain;
+}
+.pspp-npc-card dt {
+	font-weight: 700;
+}
+.pspp-npcs input,
+.pspp-npcs select,
+.pspp-npcs textarea {
+	box-sizing: border-box;
+	min-width: 0;
+	max-width: 100%;
+}

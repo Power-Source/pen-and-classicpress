@@ -34,7 +34,7 @@ function ps_pen_paper_enqueue_admin_assets( $hook ) {
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
 	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.15.0' );
 	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array(), '0.13.0', true );
-	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.13.0' );
+	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.17.0' );
 	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.0' );
 }
 
@@ -78,6 +78,9 @@ function ps_pen_paper_handle_admin_action() {
 	}
 
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
+	if ( in_array( $operation, array( 'save_npc', 'offer_npc', 'copy_npc', 'approve_npc' ), true ) ) {
+		ps_pen_paper_handle_npc_action( $operation );
+	}
 	if ( in_array( $operation, array( 'save_currency', 'change_wallet' ), true ) ) {
 		ps_pen_paper_handle_economy_action( $operation );
 	}

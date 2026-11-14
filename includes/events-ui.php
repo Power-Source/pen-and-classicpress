@@ -31,7 +31,7 @@ function ps_pen_paper_render_rule_snapshot( $rules ) {
 	<?php
 }
 
-function ps_pen_paper_render_event_details( $event ) {
+function ps_pen_paper_render_event_details( $event, $scope = null ) {
 	?>
 	<?php if ( 'wallet_saved' === $event['kind'] ) : ?><p class="pspp-multiline"><?php echo esc_html( $event['reason'] ); ?></p><?php endif; ?>
 	<?php if ( ! in_array( $event['kind'], array( 'universe_saved', 'universe_linked', 'membership_saved' ), true ) ) : ?>
@@ -41,7 +41,17 @@ function ps_pen_paper_render_event_details( $event ) {
 		<?php foreach ( array( 'before' => __( 'Vorher', 'ps-pen-paper' ), 'after' => __( 'Nachher', 'ps-pen-paper' ) ) as $key => $label ) : ?>
 			<section class="pspp-snapshot">
 				<h4><?php echo esc_html( $label . ' · ' . sprintf( __( 'Revision %d', 'ps-pen-paper' ), $event[ $key ]['revision'] ) ); ?></h4>
-				<?php if ( in_array( $event['kind'], array( 'currency_saved', 'wallet_saved' ), true ) ) : ?>
+				<?php if ( in_array( $event['kind'], array( 'npc_saved', 'npc_offered', 'npc_approved', 'npc_copied' ), true ) ) : ?>
+					<?php
+					if ( ! $scope && isset( $event['id'] ) ) {
+						$record = get_post( $event['id'] );
+						$scope = $record ? ps_pen_paper_get_character_scope( $record->post_parent ) : null;
+					}
+					if ( ! $scope ) { echo '<p role="alert">' . esc_html__( 'Der Figurenverlauf ist nicht verfügbar.', 'ps-pen-paper' ) . '</p>'; }
+					elseif ( $event[ $key ]['npc'] ) { ps_pen_paper_render_npc_card( $scope, $event[ $key ] ); }
+					else { echo '<p>' . esc_html__( 'Noch keine Figur vorhanden.', 'ps-pen-paper' ) . '</p>'; }
+					?>
+				<?php elseif ( in_array( $event['kind'], array( 'currency_saved', 'wallet_saved' ), true ) ) : ?>
 					<?php ps_pen_paper_render_economy_history( $event['kind'], $event[ $key ] ); ?>
 				<?php elseif ( 'membership_saved' === $event['kind'] ) : ?>
 					<?php
@@ -152,7 +162,9 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 					<?php else : ?>
 						<p><strong><?php echo esc_html( $labels[ $event['kind'] ] ); ?></strong></p>
 						<?php
-						if ( 'wallet_saved' === $event['kind'] ) {
+						if ( in_array( $event['kind'], array( 'npc_saved', 'npc_offered', 'npc_approved', 'npc_copied' ), true ) ) {
+							$snapshot = array( 'name' => $event['after']['npc']['name'] );
+						} elseif ( 'wallet_saved' === $event['kind'] ) {
 							$snapshot = array( 'name' => $event['character_name'] );
 						} elseif ( 'currency_saved' === $event['kind'] ) {
 							$snapshot = array( 'name' => $event['after']['name'] );
@@ -177,7 +189,7 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 						}
 						?>
 						<p><?php echo esc_html( $snapshot['name'] . ' · ' . sprintf( __( 'Revision %1$d → %2$d', 'ps-pen-paper' ), $event['before']['revision'], $event['after']['revision'] ) ); ?></p>
-						<details><summary><?php esc_html_e( 'Änderung ansehen: Vorher / Nachher', 'ps-pen-paper' ); ?></summary><?php ps_pen_paper_render_event_details( $event ); ?></details>
+						<details><summary><?php esc_html_e( 'Änderung ansehen: Vorher / Nachher', 'ps-pen-paper' ); ?></summary><?php ps_pen_paper_render_event_details( $event, $campaign ); ?></details>
 					<?php endif; ?>
 				</li>
 			<?php endforeach; ?>

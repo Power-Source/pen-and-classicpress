@@ -117,7 +117,7 @@ function ps_pen_paper_render_universes( $page_id = 0 ) {
 					<p><?php esc_html_e( 'Die letzten 20 Änderungen; Kampagnenzuordnungen stehen im jeweiligen Kampagnenprotokoll.', 'ps-pen-paper' ); ?></p>
 					<?php foreach ( $log['events'] as $event ) : ?>
 						<p><?php echo esc_html( $event['date'] . ' · ' . $event['actor_name'] ); ?></p>
-						<?php ps_pen_paper_render_event_details( $event ); ?>
+						<?php ps_pen_paper_render_event_details( $event, $universe ); ?>
 					<?php endforeach; ?>
 				<?php endif; ?>
 			</details>

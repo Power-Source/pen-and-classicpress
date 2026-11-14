@@ -199,6 +199,7 @@ function ps_pen_paper_render_adventure_plan( $campaign, $page_id, $plan ) {
 				<?php endforeach; ?>
 			</details>
 		<?php endif; ?>
+		<?php if ( isset( $plan['scenes'][ $active ] ) && $plan['scenes'][ $active ]['published'] ) { ps_pen_paper_render_scene_npcs( $campaign, $active, $page_id ); } ?>
 		<p><?php esc_html_e( 'Dieser Plan zeigt den Stand beim Laden. Nach Änderungen durch eine andere Spielleitung bitte neu laden.', 'ps-pen-paper' ); ?></p>
 		<form method="get" action="<?php echo esc_url( $url . '#pspp-story' ); ?>">
 			<?php foreach ( $reload_args as $key => $value ) : ?><input type="hidden" name="<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $value ); ?>"><?php endforeach; ?>

@@ -32,7 +32,7 @@ function ps_pen_paper_enqueue_admin_assets( $hook ) {
 	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.7.0', true );
 	wp_enqueue_script( 'ps-pen-paper-style', $url . 'assets/styles.js', array(), '0.7.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
-	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.12.0' );
+	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.15.0' );
 	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array(), '0.13.0', true );
 	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.13.0' );
 	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.14.0' );
@@ -281,32 +281,15 @@ function ps_pen_paper_handle_admin_action() {
 	}
 
 	if ( 'add_member' === $operation ) {
-		$user = ps_pen_paper_site_user( ps_pen_paper_posted_id( 'user_id' ) );
-		$role = ps_pen_paper_posted_text( 'member_role' );
-		if ( ! $user || ! in_array( $role, array( 'gm', 'player' ), true ) ) {
-			ps_pen_paper_fail( __( 'Bitte wähle einen gültigen Benutzer und eine gültige Kampagnenrolle.', 'ps-pen-paper' ) );
-		}
-		if ( ps_pen_paper_campaign_role( $campaign, $user->ID ) ) {
-			ps_pen_paper_fail( __( 'Dieser Benutzer ist bereits Mitglied. Entferne ihn zuerst, um seine Rolle zu ändern.', 'ps-pen-paper' ) );
-		}
-		if ( ! add_post_meta( $campaign_id, '_pspp_' . $role, (string) $user->ID ) ) {
-			ps_pen_paper_fail( __( 'Das Mitglied konnte nicht gespeichert werden.', 'ps-pen-paper' ) );
-		}
+		$result = ps_pen_paper_change_membership( $campaign_id, ps_pen_paper_posted_id( 'user_id' ), 'add', ps_pen_paper_posted_text( 'member_role' ), ps_pen_paper_posted_text( 'membership_revision' ) );
+		if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
 		ps_pen_paper_redirect( 'member_added', $campaign_id );
 	}
 
 	if ( 'remove_member' === $operation ) {
 		$user_id = ps_pen_paper_posted_id( 'user_id' );
-		$role = ps_pen_paper_posted_text( 'member_role' );
-		if ( (int) $campaign->post_author === $user_id ) {
-			ps_pen_paper_fail( __( 'Der Ersteller der Kampagne kann nicht entfernt werden.', 'ps-pen-paper' ) );
-		}
-		if ( ! in_array( $role, array( 'gm', 'player' ), true ) || ! in_array( (string) $user_id, get_post_meta( $campaign_id, '_pspp_' . $role, false ), true ) ) {
-			ps_pen_paper_fail( __( 'Dieses Kampagnenmitglied wurde nicht gefunden.', 'ps-pen-paper' ) );
-		}
-		if ( ! delete_post_meta( $campaign_id, '_pspp_' . $role, (string) $user_id ) ) {
-			ps_pen_paper_fail( __( 'Das Mitglied konnte nicht entfernt werden.', 'ps-pen-paper' ) );
-		}
+		$result = ps_pen_paper_change_membership( $campaign_id, $user_id, 'remove', ps_pen_paper_posted_text( 'member_role' ), ps_pen_paper_posted_text( 'membership_revision' ) );
+		if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
 		ps_pen_paper_redirect( 'member_removed', $user_id === get_current_user_id() && ! current_user_can( 'manage_options' ) ? 0 : $campaign_id );
 	}
 
@@ -509,6 +492,8 @@ function ps_pen_paper_render_campaign( $campaign ) {
 	<?php if ( $can_manage ) : ?><section id="pspp-equipment" class="pspp-game"><?php ps_pen_paper_render_equipment_catalogue( $campaign, 0 ); ?></section><?php endif; ?>
 	<?php if ( $can_manage ) : ?><section id="pspp-settings"><?php ps_pen_paper_render_access_settings( $campaign ); ?></section><?php endif; ?>
 	<h3><?php esc_html_e( 'Mitglieder', 'ps-pen-paper' ); ?></h3>
+	<?php $membership = ps_pen_paper_membership_revision( $campaign->ID ); ?>
+	<?php if ( is_wp_error( $membership ) ) { ps_pen_paper_fail( $membership->get_error_message() ); } ?>
 	<?php if ( $can_manage ) : ?>
 		<p><?php esc_html_e( 'Der Ersteller bleibt Spielleiter und kann nicht entfernt werden. Alle Mitglieder müssen bereits Benutzer dieser Website sein.', 'ps-pen-paper' ); ?></p>
 	<?php endif; ?>
@@ -528,6 +513,7 @@ function ps_pen_paper_render_campaign( $campaign ) {
 				?>
 				<?php if ( $can_manage && (int) $campaign->post_author !== (int) $user_id ) : ?>
 					<?php ps_pen_paper_form_start( 'remove_member', 'pspp_campaign_' . $campaign->ID, $campaign->ID ); ?>
+						<input type="hidden" name="membership_revision" value="<?php echo esc_attr( $membership['revision'] ); ?>">
 						<input type="hidden" name="user_id" value="<?php echo esc_attr( $user_id ); ?>">
 						<input type="hidden" name="member_role" value="<?php echo esc_attr( $role ); ?>">
 						<?php submit_button( __( 'Entfernen', 'ps-pen-paper' ), 'secondary', 'submit', false ); ?>
@@ -539,6 +525,7 @@ function ps_pen_paper_render_campaign( $campaign ) {
 	<?php if ( $can_manage ) : ?>
 		<h3><?php esc_html_e( 'Mitglied hinzufügen', 'ps-pen-paper' ); ?></h3>
 		<?php ps_pen_paper_form_start( 'add_member', 'pspp_campaign_' . $campaign->ID, $campaign->ID ); ?>
+			<input type="hidden" name="membership_revision" value="<?php echo esc_attr( $membership['revision'] ); ?>">
 			<p><label><?php esc_html_e( 'Benutzer', 'ps-pen-paper' ); ?> <?php ps_pen_paper_user_select(); ?></label></p>
 			<p><label for="pspp-member-role"><?php esc_html_e( 'Rolle in dieser Kampagne', 'ps-pen-paper' ); ?></label>
 			<select id="pspp-member-role" name="member_role">

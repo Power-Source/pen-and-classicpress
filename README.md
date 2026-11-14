@@ -441,23 +441,40 @@ Für Würfe gelten weiterhin deren eigene Sichtbarkeiten. Entfernte Mitglieder
 verlieren auch den Zugriff auf frühere Einträge; Seitenzahlen berücksichtigen
 nur die jeweils berechtigten Ereignisse.
 
-Einträge werden vor der Änderung zunächst vollständig als nicht lesbare
-Entwürfe vorbereitet und erst nach erfolgreicher Speicherung veröffentlicht.
+Mitgliederaufnahme und -entfernung sowie Beitrittsanfragen einschließlich
+Annahme/Ablehnung werden nun ebenfalls erfasst. Ihre Rollen- und Antragsstände
+sehen ausschließlich aktuelle Spielleiter und Administratoren, nicht die
+betroffenen Spieler. Namen und Benutzerkennungen bleiben im damaligen
+Protokollstand erhalten. Ein Rollenentzug entzieht auch den Zugriff auf diese
+Historie. Frühere Mitgliedschaftsänderungen werden nicht nachträglich erfunden.
+Manuelle Änderungen und Antragsentscheidungen aus Verwaltungsformularen prüfen
+eine gemeinsame Mitgliederrevision; veraltete Formulare müssen neu geladen
+werden. Ein erneut übermittelter bereits offener eigener Beitrittsantrag erzeugt
+keinen zusätzlichen Eintrag.
+
+Einträge werden vollständig als nicht lesbare Entwürfe vorbereitet und erst
+innerhalb des gemeinsamen Speichervorgangs veröffentlicht.
 Auch neue Charaktere bleiben bis zur Speicherung ihres gültigen Datenstands
 beziehungsweise Freigabeantrags verborgen.
-Bei erkannten Speicherfehlern wird abgebrochen beziehungsweise die eigene
-Änderung revisionsgeschützt zurückgenommen. Hat inzwischen jemand weiter
-bearbeitet, wird dessen Stand nicht überschrieben: Eine ausdrückliche
-Fehlermeldung fordert die Administratorprüfung an; der vorbereitete Eintrag
-bleibt als Entwurf erhalten. Bei einem Prozessabbruch zwischen den
-Speicherschritten kann ebenfalls eine solche Prüfung nötig sein. Dies ist
-keine datenbankübergreifende Transaktionsgarantie und kein manipulationssicheres
-Audit-System; Datenbanksicherungen bleiben erforderlich.
+Die zentrale Dokument-/Ereignisspeicherung übernimmt Änderung und zugehörigen
+Eintrag innerhalb derselben Datenbanktransaktion. Bei einem Fehler oder
+Prozessabbruch vor dem Abschluss werden beide zurückgenommen; nach dem
+Abschluss sind beide gespeichert. Dafür müssen die Beitrags- und Metadatentabelle
+InnoDB verwenden und die Standard-Datenbankverbindung mit `mysqli` verfügbar
+sein. Fehlen diese Voraussetzungen oder ist bereits eine fremde Transaktion
+aktiv, wird die Änderung mit Fehlermeldung abgewiesen.
+Ist die Bestätigung des Abschlusses nicht eindeutig, erscheint eine ausdrückliche
+Aufforderung zur Administratorprüfung statt einer Erfolgsmeldung.
+Dies ist keine Garantie für Mehrparteientransfers, externe Hook-Nebenwirkungen
+oder mehrere Datenbanken und kein manipulationssicheres Audit-System;
+Datenbanksicherungen bleiben erforderlich. Private vorbereitete Objekte oder
+Bilder außerhalb der Transaktion können nach einem Abbruch eine Bereinigung
+benötigen.
 
 Es gibt keine Oberfläche zum Überschreiben alter Protokolleinträge. Eine neue
 Korrektur erzeugt ein neues Ereignis. Szenenereignisse und Kartenbewegungen werden
-seit Version 0.12.0 geschützt protokolliert; Mitgliederverwaltung und Style-Änderungen
-werden derzeit noch nicht protokolliert.
+seit Version 0.12.0 geschützt protokolliert. Style-Änderungen sowie Name,
+Beschreibung und Archivstatus der Kampagne werden derzeit noch nicht protokolliert.
 
 ## Charaktere und Bearbeitungsrechte
 
@@ -538,11 +555,59 @@ Inhalte und werden nicht durch gettext übersetzt.
 
 ## Entwicklungstest
 
+Lokale Änderungen an vorhandenen Charakterwerten, Freigaben, Kampagnenauflagen
+und Ausrüstung verwenden eine gemeinsame Datenbanksperre je Charakter.
+Konkurrierende Schreibvorgänge warten nicht, sondern melden einen Konflikt;
+anschließend muss der aktuelle Stand neu geladen werden. Bereits gelesene
+Charaktermetadaten werden nach dem Sperrerwerb aus dem Cache entfernt, damit
+die Prüfung nicht mit einem früheren Ausrüstungsstand arbeitet.
+Interne Schreibwege verwenden dafür `ps_pen_paper_save_character()`,
+`ps_pen_paper_review_character()`, `ps_pen_paper_save_character_context()` und
+`ps_pen_paper_save_gear()`, nicht deren `_locked`-Implementierungen oder direkte
+Metadatenänderungen.
+
+Diese Absicherung benötigt MySQL-/MariaDB-Verbindungssperren (`GET_LOCK` und
+`RELEASE_LOCK`) auf der gemeinsamen Schreibverbindung. Bei nicht verfügbarer
+Sperre wird nichts geschrieben; ein Freigabefehler wird ausdrücklich als
+möglicherweise bereits gespeicherter Stand gemeldet. Datenbank-Drop-ins mit
+getrennten Lese-/Schreibverbindungen sind dafür noch nicht geprüft.
+Die Sperre ersetzt nicht die separate Transaktion der zentralen
+Dokument-/Ereignisspeicherung und sichert keine Mehrparteientransfers ab.
+Gemeinsamer Universumsfortschritt kann weiterhin eine lokale
+Ausrüstungsanpassung erfordern.
+
+`ps_pen_paper_save_document_event()` prüft die InnoDB-Tabellen, verweigert
+fremde Transaktionen und verhindert automatische Wiederverbindungen während
+der Speicherung. Die interne Funktion `ps_pen_paper_write_document_event()`
+darf nicht direkt aufgerufen werden. Cache-Ergänzungen und Abfrage-Caches
+bleiben innerhalb der Transaktion deaktiviert; nach Abschluss oder Rücknahme
+werden die betroffenen Beitrags-Caches invalidiert. Externe Objekt-Caches
+müssen die WordPress-Cache-Sperre respektieren. Ein Abbruch unmittelbar nach
+dem Commit kann noch alte Cache-Stände hinterlassen; die Datenbank enthält
+bereits Änderung und Ereignis zusammen. Fremde Hooks dürfen innerhalb der
+Speicherung keine eigenen Commit-/DDL-Anweisungen ausführen und keine bereits
+erfolgreiche Verarbeitung nach außen melden.
+
+Mitgliederänderungen verwenden `ps_pen_paper_change_membership()`. Für manuelle
+Aufnahme/Entfernung ist die aktuelle Mitgliederrevision erforderlich;
+`ps_pen_paper_request_membership()` und `ps_pen_paper_review_membership()`
+bleiben die Anfrageschnittstellen. Die vorhandenen Rollen-/Antragsmetadaten
+bleiben kompatibel. `ps_pen_paper_atomic_event()` bündelt diese zusätzlichen
+Schreibvorgänge mit dem Ereignis unter derselben Kampagnenzeilensperre und
+prüft die Berechtigung erneut mit frischen Kampagnendaten.
+Der interne Schreib-Callback liefert eine Ereignis-ID oder `0` ausschließlich
+für eine idempotente Wiederholung ohne Änderung; ein Fehler wird als `WP_Error`
+zurückgegeben. Direkte Rollen-Metadatenänderungen umgehen diese Historie und
+sind kein unterstützter Schreibweg für neue Integrationen.
+
 `tests/equipment-integration.php` prüft die Community-Sperre mit erhaltenen
 Beständen, echte Community-Profil-Tab-Schnittstellen, private Porträts und
 Freigaben, Vorlagenstände, Slot-/Besitzprüfungen, additive Boni und Grenzen,
 Wurfherkunft, gemeinsame Basisbögen, reparierbare ungültige Ausrüstung sowie
-Protokollrücknahme und Bildbereinigung. Der Test lädt die lokale
+Protokollrücknahme und Bildbereinigung. Zusätzlich prüft er ineinandergreifende
+Charakter-/Ausrüstungs- und Auflagenänderungen, veraltete Metadaten,
+Sperrkonflikte mit einer unabhängigen Datenbankverbindung und die Ablehnung
+von Änderungen bei nicht verfügbarer Sperre. Der Test lädt die lokale
 PS-Community-Profil-API; das Community-Plugin muss daneben installiert sein.
 Ausführung wie bei den übrigen Integrationstests mit
 `--skip-plugins --skip-themes eval-file`.
@@ -595,8 +660,12 @@ seine temporären Benutzer und Inhalte anschließend.
 Ressourcen und Freigabeentscheidungen, gemeinsame Anzeige vorhandener Würfe,
 historische Feldbezeichnungen, Besitzerrechte einschließlich entzogener
 Spielleiterrollen, berechtigungsabhängige Seitennavigation sowie Speicherfehler
-mit Rücknahme und Schutz gleichzeitiger Änderungen. Auch dieser Test räumt
-seine eigenen temporären Daten auf.
+mit transaktionaler Rücknahme. Zusätzlich prüft er parallele Leser, geschützte
+Cache-Zugriffe, Ausnahmen, ungeeignete Speicher-Engines und fremde Transaktionen.
+Er startet `tests/events-crash-worker.php` in separaten PHP-Prozessen, die vor
+beziehungsweise nach dem Commit ohne normale Aufräumlogik enden; dafür muss
+`proc_open` für CLI-PHP verfügbar sein. Der übergeordnete Test entfernt seine
+eigenen temporären Daten anschließend.
 
 `tests/table-integration.php` prüft Tischrechte, freiwillige Anwesenheit,
 AFK/Rückkehr, Verbindungsablauf, Zugkonflikte und Historie sowie kampagnenbezogene
@@ -606,7 +675,9 @@ Auch diese Prüfung entfernt ausschließlich ihre eigenen Testdaten.
 
 `tests/access-integration.php` prüft geschlossene Standardwerte, die ausdrückliche
 Teaserfreigabe ohne interne Daten, Anträge und Spielleiterentscheidungen,
-geschützte Bilddaten, Revisionskonflikte und den Zugriff eines Netzwerk-Superadmins
+geschützte Bilddaten, Revisionskonflikte, atomare Rollen-/Antragsänderungen bei
+Protokollfehlern, private Mitgliederhistorie und entzogene Spielleiterrechte
+einschließlich veralteter Cache-Stände sowie den Zugriff eines Netzwerk-Superadmins
 ohne Mitgliedschaft auf der Unterwebsite. Temporäre Benutzer, Kampagnen,
 Protokolle und Bilder werden anschließend entfernt.
 

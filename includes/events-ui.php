@@ -33,14 +33,22 @@ function ps_pen_paper_render_rule_snapshot( $rules ) {
 
 function ps_pen_paper_render_event_details( $event ) {
 	?>
-	<?php if ( ! in_array( $event['kind'], array( 'universe_saved', 'universe_linked' ), true ) ) : ?>
+	<?php if ( ! in_array( $event['kind'], array( 'universe_saved', 'universe_linked', 'membership_saved' ), true ) ) : ?>
 		<p><?php echo esc_html( sprintf( __( 'Objekt #%1$d · Regelrevision %2$d', 'ps-pen-paper' ), $event['object_id'], $event['rules_revision'] ) ); ?></p>
 	<?php endif; ?>
 	<div class="pspp-grid">
 		<?php foreach ( array( 'before' => __( 'Vorher', 'ps-pen-paper' ), 'after' => __( 'Nachher', 'ps-pen-paper' ) ) as $key => $label ) : ?>
 			<section class="pspp-snapshot">
 				<h4><?php echo esc_html( $label . ' · ' . sprintf( __( 'Revision %d', 'ps-pen-paper' ), $event[ $key ]['revision'] ) ); ?></h4>
-				<?php if ( in_array( $event['kind'], array( 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved' ), true ) ) : ?>
+				<?php if ( 'membership_saved' === $event['kind'] ) : ?>
+					<?php
+					$member = $event[ 'member_' . $key ];
+					$roles = array( '' => __( 'Kein Kampagnenmitglied', 'ps-pen-paper' ), 'gm' => __( 'Spielleiter', 'ps-pen-paper' ), 'player' => __( 'Spieler', 'ps-pen-paper' ) );
+					$requests = array( '' => __( 'Keine Anfrage', 'ps-pen-paper' ), 'pending' => __( 'Offene Anfrage', 'ps-pen-paper' ), 'approved' => __( 'Anfrage angenommen', 'ps-pen-paper' ), 'rejected' => __( 'Anfrage abgelehnt', 'ps-pen-paper' ) );
+					?>
+					<p><?php echo esc_html( $event['member_name'] . ' · #' . $event['member_id'] ); ?></p>
+					<p><?php echo esc_html( $roles[ $member['role'] ] . ' · ' . $requests[ $member['request'] ] ); ?></p>
+				<?php elseif ( in_array( $event['kind'], array( 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved' ), true ) ) : ?>
 					<?php ps_pen_paper_render_equipment_history( $event['kind'], $event[ $key ] ); ?>
 				<?php elseif ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) : ?>
 					<?php foreach ( array( 'draft' => __( 'Entwurf', 'ps-pen-paper' ), 'published' => __( 'Freigegebener Stand', 'ps-pen-paper' ) ) as $scope => $heading ) :
@@ -122,7 +130,7 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 	$visibility_labels = ps_pen_paper_roll_visibility_labels();
 	?>
 	<h3 id="pspp-log"><?php esc_html_e( 'Spielprotokoll', 'ps-pen-paper' ); ?></h3>
-	<p><?php esc_html_e( 'Würfe, Charakteränderungen, Freigaben und Regeländerungen. Du siehst nur Einträge, für die du berechtigt bist. Der Änderungsverlauf beginnt mit der Einführung dieser Funktion.', 'ps-pen-paper' ); ?></p>
+	<p><?php esc_html_e( 'Würfe, Charakteränderungen, Freigaben, Regeländerungen und geschützte Mitgliederverwaltung. Du siehst nur Einträge, für die du berechtigt bist. Der jeweilige Änderungsverlauf beginnt mit der Einführung seiner Protokollierung.', 'ps-pen-paper' ); ?></p>
 	<?php if ( is_wp_error( $log ) ) : ?>
 		<p role="alert"><?php echo esc_html( $log->get_error_message() ); ?></p>
 	<?php elseif ( ! $log['events'] ) : ?>
@@ -149,6 +157,8 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 							$snapshot = array( 'name' => $event['after']['draft']['title'] );
 						} elseif ( 'scene_selected' === $event['kind'] ) {
 							$snapshot = $event['after'];
+						} elseif ( 'membership_saved' === $event['kind'] ) {
+							$snapshot = array( 'name' => $event['member_name'] );
 						} elseif ( 'access_saved' === $event['kind'] ) {
 							$snapshot = array( 'name' => __( 'Zugang & Privatsphäre', 'ps-pen-paper' ) );
 						} elseif ( 'universe_linked' === $event['kind'] ) {

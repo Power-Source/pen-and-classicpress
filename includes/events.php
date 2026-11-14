@@ -9,6 +9,7 @@ function ps_pen_paper_event_labels() {
 		'rules_saved'         => __( 'Regelwerk gespeichert', 'ps-pen-paper' ),
 		'turn_changed'        => __( 'Zug gewechselt', 'ps-pen-paper' ),
 		'access_saved'        => __( 'Zugangseinstellungen geändert', 'ps-pen-paper' ),
+		'membership_saved'    => __( 'Mitgliedschaft oder Beitrittsanfrage geändert', 'ps-pen-paper' ),
 		'universe_saved'      => __( 'Universum gespeichert', 'ps-pen-paper' ),
 		'universe_linked'     => __( 'Universumszuordnung geändert', 'ps-pen-paper' ),
 		'character_created'   => __( 'Charakter angelegt', 'ps-pen-paper' ),
@@ -91,6 +92,76 @@ function ps_pen_paper_insert_record( $type, $campaign_id, $metadata, $publish = 
 }
 
 function ps_pen_paper_save_document_event( $campaign_id, $object_id, $key, $before, $after, $event, $publish_object = false ) {
+	return ps_pen_paper_atomic_event( $object_id, function () use ( $campaign_id, $object_id, $key, $before, $after, $event, $publish_object ) {
+		return ps_pen_paper_write_document_event( $campaign_id, $object_id, $key, $before, $after, $event, $publish_object );
+	} );
+}
+
+function ps_pen_paper_atomic_event( $object_id, $write ) {
+	global $wpdb;
+	$unsupported = new WP_Error( 'transaction_unavailable', __( 'Diese Änderung benötigt eine sichere Datenbanktransaktion. Sie wurde nicht übernommen. Bitte informiere den Administrator über die erforderliche InnoDB-Unterstützung und die Standard-Datenbankverbindung.', 'ps-pen-paper' ) );
+	if ( 'wpdb' !== get_class( $wpdb ) || ! ( $wpdb->dbh instanceof mysqli ) || ! is_int( $wpdb->reconnect_retries ) ) {
+		return $unsupported;
+	}
+	$tables = $wpdb->get_results( $wpdb->prepare(
+		'SELECT TABLE_NAME, ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (%s, %s)',
+		$wpdb->posts, $wpdb->postmeta
+	), ARRAY_A );
+	if ( $wpdb->last_error || ! is_array( $tables ) || 2 !== count( $tables ) || array( 'InnoDB' ) !== array_values( array_unique( array_column( $tables, 'ENGINE' ) ) ) || '1' !== $wpdb->get_var( 'SELECT @@session.autocommit' ) ) {
+		return $unsupported;
+	}
+	// This configures our next transaction and refuses an already active transaction.
+	$suppressed = $wpdb->suppress_errors( true );
+	try {
+		$ready = false !== $wpdb->query( 'SET TRANSACTION READ WRITE' );
+	} finally {
+		$wpdb->suppress_errors( $suppressed );
+	}
+	if ( ! $ready ) { return $unsupported; }
+	$connection = $wpdb->dbh;
+	$retries = $wpdb->reconnect_retries;
+	$cache_suspended = wp_suspend_cache_addition();
+	$disable_query_cache = function ( $query ) { $query->set( 'cache_results', false ); };
+	$recovery = new WP_Error( 'event_recovery_required', __( 'Der Abschluss der Änderung konnte nicht eindeutig bestätigt werden. Bitte ändere diesen Stand nicht erneut und informiere den Administrator.', 'ps-pen-paper' ), array( 'object_id' => (int) $object_id ) );
+	$result = new WP_Error( 'save_failed', __( 'Die Änderung konnte nicht innerhalb einer sicheren Datenbanktransaktion gespeichert werden. Sie wurde nicht übernommen.', 'ps-pen-paper' ) );
+	$record_id = 0;
+	$started = false;
+	// Reconnecting would continue writes outside the original transaction.
+	$wpdb->reconnect_retries = 0;
+	wp_suspend_cache_addition( true );
+	add_action( 'pre_get_posts', $disable_query_cache, PHP_INT_MAX );
+	try {
+		$started = mysqli_begin_transaction( $connection );
+		if ( $started && (int) $object_id === (int) $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE ID = %d FOR UPDATE", $object_id ) ) ) {
+			clean_post_cache( $object_id );
+			$result = $write();
+			if ( is_int( $result ) && $result >= 0 ) {
+				$record_id = $result;
+				if ( mysqli_commit( $connection ) ) {
+					$started = false;
+					$result = true;
+				} else {
+					$result = $recovery;
+				}
+			} elseif ( ! is_wp_error( $result ) ) {
+				$result = new WP_Error( 'save_failed', __( 'Der Schreibvorgang lieferte keinen gültigen Protokollstand. Die Änderung wurde nicht übernommen.', 'ps-pen-paper' ) );
+			}
+		}
+	} finally {
+		$rolled_back = ! $started || mysqli_rollback( $connection );
+		if ( ! $rolled_back ) {
+			error_log( 'PS Pen & Paper: transaction rollback failed for object #' . (int) $object_id );
+		}
+		$wpdb->reconnect_retries = $retries;
+		remove_action( 'pre_get_posts', $disable_query_cache, PHP_INT_MAX );
+		wp_suspend_cache_addition( $cache_suspended );
+		clean_post_cache( $object_id );
+		if ( $record_id ) { clean_post_cache( $record_id ); }
+	}
+	return $rolled_back ? $result : $recovery;
+}
+
+function ps_pen_paper_write_document_event( $campaign_id, $object_id, $key, $before, $after, $event, $publish_object ) {
 	$event['version'] = 1;
 	$event['actor_name'] = wp_get_current_user()->display_name;
 	$event['object_id'] = (int) $object_id;
@@ -117,16 +188,9 @@ function ps_pen_paper_save_document_event( $campaign_id, $object_id, $key, $befo
 		$result = ps_pen_paper_publish_record( $id );
 	}
 	if ( is_wp_error( $result ) ) {
-		// Restore only our own revision; never overwrite a later concurrent change.
-		$restored = $initial
-			? delete_post_meta( $object_id, $key, wp_slash( $after ) )
-			: update_post_meta( $object_id, $key, wp_slash( $before ), $after );
-		if ( ! $restored ) {
-			return new WP_Error( 'event_recovery_required', sprintf( __( 'Die Änderung wurde gespeichert, aber ihre Protokollierung ist unvollständig. Eine sichere Rücknahme war nicht möglich. Bitte informiere den Administrator über Protokolleintrag #%d.', 'ps-pen-paper' ), $id ) );
-		}
-		return ps_pen_paper_discard_record( $id, new WP_Error( 'save_failed', __( 'Die Änderung konnte nicht vollständig gespeichert werden und wurde zurückgenommen. Bitte lade die Seite neu.', 'ps-pen-paper' ) ) );
+		return $result;
 	}
-	return true;
+	return $id;
 }
 
 function ps_pen_paper_get_event( $campaign, $id ) {
@@ -149,6 +213,11 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 		return $error;
 	}
 	$event['id'] = $post->ID;
+	if ( 'membership_saved' === $event['kind'] && ( 'gm' !== $event['visibility'] || ! isset( $event['member_id'], $event['member_name'], $event['member_before'], $event['member_after'] )
+		|| ! is_int( $event['member_id'] ) || $event['member_id'] < 1 || ! is_string( $event['member_name'] )
+		|| ! ps_pen_paper_valid_membership_snapshot( $event['member_before'] ) || ! ps_pen_paper_valid_membership_snapshot( $event['member_after'] ) ) ) {
+		return new WP_Error( 'invalid_event', __( 'Die Mitgliedschaftsdaten im Protokoll sind beschädigt. Bitte informiere den Administrator.', 'ps-pen-paper' ) );
+	}
 	if ( 'character_context' === $event['kind'] && ( ! isset( $event['effective_before'], $event['effective_after'] ) || ! is_array( $event['effective_before'] ) || ! is_array( $event['effective_after'] ) ) ) {
 		return new WP_Error( 'invalid_event', __( 'Die wirksamen Kontextstände im Protokoll sind unvollständig. Bitte informiere den Administrator.', 'ps-pen-paper' ) );
 	}

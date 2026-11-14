@@ -136,6 +136,13 @@ Administratoren können alle Kampagnen verwalten.
 Netzwerk-Superadmins sehen und verwalten auch ohne Mitgliedschaft auf der
 jeweiligen Unterwebsite sämtliche dortigen Kampagnen, Bögen, Protokolle und Chats.
 
+Aufnahme und Entfernung erscheinen jetzt mit damaligem Anzeigenamen,
+Benutzerkennung und Rolle im Spielprotokoll – ausschließlich für aktuelle
+Spielleiter und Administratoren. Veraltete Mitgliederformulare werden mit
+einer Konfliktmeldung abgewiesen; dann neu laden und den aktuellen Stand prüfen.
+Scheitert die zugehörige Protokollierung, bleibt die Mitgliedschaft unverändert.
+Frühere Mitgliedschaftsänderungen werden nicht nachträglich eingetragen.
+
 ### Übersichtliche Verwaltungsbereiche
 
 Im Backend unter **Pen & Paper** und auf der Startseite des Frontend-Spielbereichs:
@@ -289,6 +296,14 @@ die Spielleitung Antragsteller als Spieler auf oder lehnt sie ab. Bereits offene
 Anfragen lassen sich auch nach Schließen der Vorschau noch entscheiden.
 Nach einer Ablehnung oder beendeten Teilnahme ist eine erneute automatische
 Anfrage gesperrt; für eine spätere Aufnahme die Spielleitung kontaktieren.
+
+Auch Anfrage, Annahme und Ablehnung werden nur für die Spielleitung protokolliert.
+Antragsstatus, gegebenenfalls erteilte Spielerrolle und Protokolleintrag werden
+als Einheit gespeichert. Scheitert die Speicherung einer Entscheidung,
+bleibt die Anfrage offen; es wird weder unbemerkt eine Rolle vergeben noch
+eine Ablehnung übernommen.
+Der Antragsteller sieht weiterhin nur den eigenen Antragsstatus, nicht die
+private Mitgliederhistorie.
 
 Einladungen und die automatische Aufnahme in eine Netzwerk-Unterwebsite sind
 noch nicht enthalten. Benutzer müssen dort bereits Mitglied sein.
@@ -514,11 +529,15 @@ an der Feldliste sowie Anwesenheit, Zugsteuerung und interaktive Karten benötig
 | Werteänderung wirkt noch nicht | Offenen Freigabeantrag prüfen |
 | Würfeln deaktiviert | Mindestens einen Würfel und eine Sichtbarkeit erlauben |
 | Speicherkonflikt | Neu laden und gültigen Stand mit eigenen Änderungen abgleichen |
+| Sichere Datenbanktransaktion nicht verfügbar | Administrator: InnoDB für Beitrags-/Metadatentabelle, Standard-Datenbankverbindung und fremde Transaktionen prüfen |
 | Administratorprüfung angefordert | Nicht blind erneut speichern; unvollständigen Vorgang prüfen lassen |
 
-Regel- und Charakteränderungen werden bei erkannten Speicherfehlern
-revisionsgeschützt zurückgenommen, soweit das ohne Überschreiben anderer
-Änderungen möglich ist. Andernfalls erscheint ein ausdrücklicher Fehler.
+Die zentrale Speicherung übernimmt Regel- und Charakteränderung samt
+Protokolleintrag als Einheit: Vor dem Datenbankabschluss werden bei Fehlern
+oder Abbruch beide zurückgenommen; nach dem Abschluss sind beide gespeichert.
+Ohne geeignete Datenbankunterstützung wird die Änderung abgewiesen. Kann der
+Abschluss nicht eindeutig bestätigt werden, erscheint ausdrücklich eine
+Aufforderung zur Administratorprüfung. Dann nicht blind erneut speichern.
 Das Protokoll ersetzt keine Datensicherung und ist kein manipulationssicheres
 Audit-System.
 

@@ -31,7 +31,7 @@ try {
 	$png = base64_decode( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0y8AAAAASUVORK5CYII=' );
 	fwrite( $file, $png );
 	$path = stream_get_meta_data( $file )['uri'];
-	foreach ( array( 'owner', 'applicant', 'rejected' ) as $role ) {
+	foreach ( array( 'owner', 'applicant', 'rejected', 'manual' ) as $role ) {
 		$id = wp_insert_user( array( 'user_login' => 'pspp-access-' . wp_generate_password( 12, false ), 'user_pass' => wp_generate_password( 40 ), 'role' => 'subscriber' ) );
 		$check( ! is_wp_error( $id ), 'Fixture user failed.' );
 		$users[ $role ] = $id;
@@ -118,6 +118,23 @@ try {
 	$check( true === ps_pen_paper_request_membership( $campaign_id ), 'Second request failed.' );
 	wp_set_current_user( $users['owner'] );
 	$check( 2 === count( ps_pen_paper_pending_memberships( $campaign ) ), 'GM cannot see pending requests.' );
+	$membership_before = ps_pen_paper_membership_revision( $campaign_id );
+	ob_start(); ps_pen_paper_render_access_settings( $campaign, $page_id ); $pending_html = ob_get_clean();
+	$check( 2 === substr_count( $pending_html, 'name="membership_revision"' ) && false !== strpos( $pending_html, 'name="membership_revision" value="' . $membership_before['revision'] . '"' ), 'Admission forms do not carry the membership revision.' );
+	$journal_before = ps_pen_paper_get_events( $campaign );
+	$fail_publish = static function ( $data ) { if ( 'pspp_event' === $data['post_type'] && 'private' === $data['post_status'] ) { $data['post_status'] = 'draft'; } return $data; };
+	add_filter( 'wp_insert_post_data', $fail_publish );
+	try {
+		$check( is_wp_error( ps_pen_paper_review_membership( $campaign_id, $users['applicant'], 'approved' ) ) && '' === ps_pen_paper_campaign_role( $campaign, $users['applicant'] ) && 'pending' === get_post_meta( $campaign_id, '_pspp_join_' . $users['applicant'], true ), 'Journal failure granted membership or retained an approval decision.' );
+		$check( is_wp_error( ps_pen_paper_review_membership( $campaign_id, $users['rejected'], 'rejected' ) ) && 'pending' === get_post_meta( $campaign_id, '_pspp_join_' . $users['rejected'], true ), 'Journal failure retained a rejection decision.' );
+		$check( is_wp_error( ps_pen_paper_change_membership( $campaign_id, $users['manual'], 'add', 'gm', (string) $membership_before['revision'] ) ) && '' === ps_pen_paper_campaign_role( $campaign, $users['manual'] ), 'Journal failure granted a manual GM role.' );
+	} finally { remove_filter( 'wp_insert_post_data', $fail_publish ); }
+	$fail_role = static function ( $check, $id, $key ) { return '_pspp_player' === $key ? false : $check; };
+	add_filter( 'add_post_metadata', $fail_role, 10, 3 );
+	try {
+		$check( is_wp_error( ps_pen_paper_review_membership( $campaign_id, $users['applicant'], 'approved' ) ) && 'pending' === get_post_meta( $campaign_id, '_pspp_join_' . $users['applicant'], true ), 'Failed role storage did not roll back the request decision.' );
+	} finally { remove_filter( 'add_post_metadata', $fail_role, 10 ); }
+	$check( $membership_before === ps_pen_paper_membership_revision( $campaign_id ) && $journal_before === ps_pen_paper_get_events( $campaign ), 'Failed membership mutations changed the revision or journal.' );
 	$check( true === ps_pen_paper_review_membership( $campaign_id, $users['applicant'], 'approved' ), 'GM approval failed.' );
 	$check( true === ps_pen_paper_review_membership( $campaign_id, $users['rejected'], 'rejected' ), 'GM rejection failed.' );
 	$check( is_wp_error( ps_pen_paper_review_membership( $campaign_id, $users['applicant'], 'rejected' ) ), 'Stale review changed an existing decision.' );
@@ -130,6 +147,40 @@ try {
 	wp_set_current_user( $users['rejected'] );
 	$check( ! ps_pen_paper_can_view_campaign( $campaign ) && ! psource_chat_session_access( $room ) && is_wp_error( ps_pen_paper_request_membership( $campaign_id ) ), 'Rejected person retained access or can spam repeated requests.' );
 	wp_set_current_user( $users['owner'] );
+	$revision = ps_pen_paper_membership_revision( $campaign_id )['revision'];
+	$check( true === ps_pen_paper_change_membership( $campaign_id, $users['manual'], 'add', 'gm', (string) $revision ), 'Manual GM admission failed.' );
+	$member_event = ps_pen_paper_get_events( $campaign )['events'][0];
+	$check( 'membership_saved' === $member_event['kind'] && 'gm' === $member_event['visibility'] && $users['manual'] === $member_event['member_id'] && '' === $member_event['member_before']['role'] && 'gm' === $member_event['member_after']['role'], 'Manual admission lost the historical role transition.' );
+	$stored_event = get_post_meta( $member_event['id'], '_pspp_event', true );
+	$damaged_event = $stored_event; $damaged_event['member_after'] = null;
+	update_post_meta( $member_event['id'], '_pspp_event', $damaged_event );
+	$check( is_wp_error( ps_pen_paper_get_event( $campaign, $member_event['id'] ) ), 'Malformed membership snapshots were accepted.' );
+	update_post_meta( $member_event['id'], '_pspp_event', $stored_event );
+	ob_start(); ps_pen_paper_render_event_details( $member_event ); $member_html = ob_get_clean();
+	$check( false !== strpos( $member_html, 'Kein Kampagnenmitglied' ) && false !== strpos( $member_html, 'Spielleiter' ), 'Membership before/after details were not rendered.' );
+	wp_set_current_user( $users['applicant'] );
+	$check( is_wp_error( ps_pen_paper_get_event( $campaign, $member_event['id'] ) ) && array() === ps_pen_paper_get_events( $campaign )['events'], 'A player sees private membership history or its counts.' );
+	$check( is_wp_error( ps_pen_paper_change_membership( $campaign_id, $users['manual'], 'remove', 'gm', (string) ( $revision + 1 ) ) ), 'A player changed another membership.' );
+	wp_set_current_user( $users['owner'] );
+	$check( is_wp_error( ps_pen_paper_change_membership( $campaign_id, $users['owner'], 'remove', 'gm', (string) ( $revision + 1 ) ) ), 'Campaign creator could be removed.' );
+	add_filter( 'wp_insert_post_data', $fail_publish );
+	try {
+		$check( is_wp_error( ps_pen_paper_change_membership( $campaign_id, $users['manual'], 'remove', 'gm', (string) ( $revision + 1 ) ) ) && 'gm' === ps_pen_paper_campaign_role( $campaign, $users['manual'] ), 'Journal failure retained a role removal.' );
+	} finally { remove_filter( 'wp_insert_post_data', $fail_publish ); }
+	$stale_member_meta = get_post_meta( $campaign_id );
+	$check( true === ps_pen_paper_change_membership( $campaign_id, $users['manual'], 'remove', 'gm', (string) ( $revision + 1 ) ), 'Manual role removal failed.' );
+	wp_set_current_user( $users['manual'] );
+	$check( ! ps_pen_paper_can_view_campaign( $campaign ) && is_wp_error( ps_pen_paper_get_event( $campaign, $member_event['id'] ) ), 'Former GM retained campaign or membership history access.' );
+	wp_cache_set( $campaign_id, $stale_member_meta, 'post_meta' );
+	$revoked = ps_pen_paper_change_membership( $campaign_id, $users['applicant'], 'remove', 'player', (string) ( $revision + 2 ) );
+	$check( is_wp_error( $revoked ) && 'forbidden' === $revoked->get_error_code() && 'player' === ps_pen_paper_campaign_role( $campaign, $users['applicant'] ), 'Cached former GM rights bypassed the transactional authorization check.' );
+	wp_set_current_user( $users['owner'] );
+	$check( true === ps_pen_paper_change_membership( $campaign_id, $users['manual'], 'add', 'player', (string) ( $revision + 2 ) ), 'Manual player re-admission failed.' );
+	$journal_before = ps_pen_paper_get_events( $campaign );
+	$stale = ps_pen_paper_change_membership( $campaign_id, $users['manual'], 'remove', 'player', (string) ( $revision + 2 ) );
+	$check( is_wp_error( $stale ) && 'conflict' === $stale->get_error_code() && 'player' === ps_pen_paper_campaign_role( $campaign, $users['manual'] ) && $journal_before === ps_pen_paper_get_events( $campaign ), 'A stale membership form removed a newer admission or wrote a success event.' );
+	ob_start(); ps_pen_paper_render_access_settings( $campaign, $page_id ); $settings_html = ob_get_clean();
+	$check( false === strpos( $settings_html, 'value="review_membership"' ), 'Decided requests still render review controls.' );
 	$access['visibility'] = 'private';
 	$check( ! is_wp_error( ps_pen_paper_save_access( $campaign_id, $access, '1' ) ), 'Could not close preview.' );
 	$check( ! is_wp_error( ps_pen_paper_save_backdrop( $campaign_id, null, '2' ) ) && ! get_post( $asset_id ), 'Removing backdrop left stored private bytes.' );
@@ -165,4 +216,4 @@ try {
 	}
 	if ( $errors ) { WP_CLI::error( implode( ' ', $errors ) ); }
 }
-WP_CLI::success( 'Private defaults, explicit teaser boundaries, GM approvals, chat admission, protected images and revision conflicts passed.' );
+WP_CLI::success( 'Private defaults, teaser boundaries, admission/role audit snapshots, atomic membership rollback, stale-form conflicts, GM-only history, chat admission, protected images and revision conflicts passed.' );

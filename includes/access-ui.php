@@ -15,7 +15,7 @@ function ps_pen_paper_handle_access_action( $operation ) {
 	if ( 'request_membership' === $operation ) {
 		$result = ps_pen_paper_request_membership( $campaign_id );
 	} elseif ( 'review_membership' === $operation ) {
-		$result = ps_pen_paper_review_membership( $campaign_id, ps_pen_paper_posted_id( 'user_id' ), ps_pen_paper_posted_text( 'decision' ) );
+		$result = ps_pen_paper_review_membership( $campaign_id, ps_pen_paper_posted_id( 'user_id' ), ps_pen_paper_posted_text( 'decision' ), ps_pen_paper_posted_text( 'membership_revision' ) );
 	} elseif ( 'save_access' === $operation ) {
 		if ( 'complete' !== ps_pen_paper_posted_text( 'settings_complete' ) ) {
 			ps_pen_paper_fail( __( 'Die Einstellungen wurden nicht vollständig übertragen. Es wurde nichts gespeichert.', 'ps-pen-paper' ) );
@@ -65,7 +65,7 @@ function ps_pen_paper_render_campaign_preview( $campaign, $page_id ) {
 				<p><?php esc_html_e( 'Deine Anfrage wurde bereits entschieden. Falls du noch keinen Zugriff hast, kontaktiere bitte die Spielleitung.', 'ps-pen-paper' ); ?></p>
 			<?php else : ?>
 				<?php ps_pen_paper_form_start( 'request_membership', 'pspp_join_' . $campaign->ID, $campaign->ID, $page_id ); ?>
-					<p><?php esc_html_e( 'Mit der Anfrage teilst du der Spielleitung deinen Anzeigenamen mit. Sie entscheidet über die Aufnahme als Spieler.', 'ps-pen-paper' ); ?></p>
+					<p><?php esc_html_e( 'Mit der Anfrage teilst du der Spielleitung deinen Anzeigenamen mit. Sie entscheidet über die Aufnahme als Spieler. Anfrage und Entscheidung werden nur für die Spielleitung protokolliert.', 'ps-pen-paper' ); ?></p>
 					<button type="submit" class="button button-primary"><?php esc_html_e( 'Teilnahme beantragen', 'ps-pen-paper' ); ?></button>
 				</form>
 			<?php endif; ?>
@@ -83,10 +83,12 @@ function ps_pen_paper_render_access_settings( $campaign, $page_id = 0 ) {
 	}
 	$access = ps_pen_paper_get_access( $campaign->ID );
 	$backdrop = ps_pen_paper_get_backdrop( $campaign->ID );
-	if ( is_wp_error( $access ) || is_wp_error( $backdrop ) ) {
-		$error = is_wp_error( $access ) ? $access : $backdrop;
-		echo '<p role="alert">' . esc_html( $error->get_error_message() ) . '</p>';
-		return;
+	$membership = ps_pen_paper_membership_revision( $campaign->ID );
+	foreach ( array( $access, $backdrop, $membership ) as $error ) {
+		if ( is_wp_error( $error ) ) {
+			echo '<p role="alert">' . esc_html( $error->get_error_message() ) . '</p>';
+			return;
+		}
 	}
 	?>
 	<h2><?php esc_html_e( 'Deine Runde einrichten', 'ps-pen-paper' ); ?></h2>
@@ -125,6 +127,7 @@ function ps_pen_paper_render_access_settings( $campaign, $page_id = 0 ) {
 			<div class="pspp-admission">
 				<strong><?php echo esc_html( $user->display_name . ' · #' . $user->ID ); ?></strong>
 				<?php ps_pen_paper_form_start( 'review_membership', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
+					<input type="hidden" name="membership_revision" value="<?php echo esc_attr( $membership['revision'] ); ?>">
 					<input type="hidden" name="user_id" value="<?php echo esc_attr( $user->ID ); ?>">
 					<button type="submit" name="decision" value="approved"><?php esc_html_e( 'Als Spieler aufnehmen', 'ps-pen-paper' ); ?></button>
 					<button type="submit" name="decision" value="rejected"><?php esc_html_e( 'Ablehnen', 'ps-pen-paper' ); ?></button>

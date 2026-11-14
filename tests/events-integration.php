@@ -5,6 +5,7 @@ if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
 }
 
 require_once dirname( __DIR__ ) . '/ps-pen-paper.php';
+global $wpdb;
 require_once ABSPATH . 'wp-admin/includes/user.php';
 if ( is_multisite() ) {
 	require_once ABSPATH . 'wp-admin/includes/ms.php';
@@ -189,7 +190,8 @@ try {
 	$page2 = ps_pen_paper_get_events( $campaign, 2 );
 	pspp_event_assert( 20 === count( $page1['events'] ) && 10 === count( $page2['events'] ) && 2 === $page1['pages'] && ! array_intersect( array_column( $page1['events'], 'id' ), array_column( $page2['events'], 'id' ) ), 'Mixed journal pagination duplicates, omits or counts unauthorized records.' );
 	wp_set_current_user( $users['gm'] );
-	$concurrent = get_post_meta( $character_id, '_pspp_character', true );
+	$before_concurrent = get_post_meta( $character_id, '_pspp_character', true );
+	$concurrent = $before_concurrent;
 	$concurrent['revision'] += 2;
 	$concurrent['active']['values'][ $attribute ] = 9;
 	$race = static function( $data ) use ( $character_id, $concurrent ) {
@@ -202,12 +204,92 @@ try {
 	add_filter( 'wp_insert_post_data', $race );
 	try {
 		$result = ps_pen_paper_save_character( $campaign_id, $character_id, $users['player'], $character_input, '26', '2' );
-		pspp_event_assert( is_wp_error( $result ) && 'event_recovery_required' === $result->get_error_code() && $concurrent === get_post_meta( $character_id, '_pspp_character', true ), 'Recovery overwrote a concurrent revision or hid a partial failure.' );
+		pspp_event_assert( is_wp_error( $result ) && 'save_failed' === $result->get_error_code() && $before_concurrent === get_post_meta( $character_id, '_pspp_character', true ), 'A failed transaction retained state changes made by a publication hook.' );
 	} finally {
 		remove_filter( 'wp_insert_post_data', $race );
 	}
 	$drafts = get_posts( array( 'post_type' => 'pspp_event', 'post_status' => 'draft', 'post_parent' => $campaign_id, 'posts_per_page' => -1 ) );
-	pspp_event_assert( 1 === count( $drafts ) && is_wp_error( ps_pen_paper_get_event( $campaign, $drafts[0]->ID ) ), 'Recovery evidence was discarded or an incomplete event became readable.' );
+	pspp_event_assert( array() === $drafts, 'A rolled-back transaction retained an incomplete event.' );
+
+	$unsupported_engine = static function ( $query ) use ( $wpdb ) {
+		return 0 === strpos( $query, 'SELECT TABLE_NAME, ENGINE FROM information_schema.TABLES' )
+			? $wpdb->prepare( "SELECT %s AS TABLE_NAME, 'MyISAM' AS ENGINE UNION ALL SELECT %s, 'InnoDB'", $wpdb->posts, $wpdb->postmeta )
+			: $query;
+	};
+	$baseline = ps_pen_paper_get_events( $campaign );
+	add_filter( 'query', $unsupported_engine );
+	try {
+		$result = ps_pen_paper_save_character( $campaign_id, $character_id, $users['player'], $character_input, '26', '2' );
+		pspp_event_assert( is_wp_error( $result ) && 'transaction_unavailable' === $result->get_error_code(), 'Nontransactional storage did not block the change.' );
+	} finally { remove_filter( 'query', $unsupported_engine ); }
+	pspp_event_assert( $before_concurrent === get_post_meta( $character_id, '_pspp_character', true ) && $baseline === ps_pen_paper_get_events( $campaign ), 'Unsupported storage changed data or journal entries.' );
+	$observer = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+	try {
+		pspp_event_assert( false !== $wpdb->query( 'START TRANSACTION' ), 'Could not prepare an unrelated transaction.' );
+		try {
+			add_post_meta( $character_id, '_pspp_transaction_fixture', 'uncommitted', true );
+			$result = ps_pen_paper_save_character( $campaign_id, $character_id, $users['player'], $character_input, '26', '2' );
+			pspp_event_assert( is_wp_error( $result ) && 'transaction_unavailable' === $result->get_error_code() && null === $observer->get_var( $observer->prepare( "SELECT meta_value FROM $wpdb->postmeta WHERE post_id = %d AND meta_key = '_pspp_transaction_fixture'", $character_id ) ), 'The event helper committed or joined an unrelated transaction.' );
+		} finally {
+			pspp_event_assert( false !== $wpdb->query( 'ROLLBACK' ), 'Could not roll back the unrelated fixture transaction.' );
+			wp_cache_delete( $character_id, 'post_meta' );
+		}
+		$inspect = static function ( $status, $old_status, $post ) use ( $campaign, $character_id, $before_concurrent, $observer, $wpdb ) {
+			if ( 'pspp_event' !== $post->post_type || 'private' !== $status || (int) $post->post_parent !== $campaign->ID ) { return; }
+			pspp_event_assert( $before_concurrent === maybe_unserialize( $observer->get_var( $observer->prepare( "SELECT meta_value FROM $wpdb->postmeta WHERE post_id = %d AND meta_key = '_pspp_character'", $character_id ) ) ), 'Another connection observed an uncommitted character value.' );
+			pspp_event_assert( null === $observer->get_var( $observer->prepare( "SELECT ID FROM $wpdb->posts WHERE ID = %d", $post->ID ) ), 'Another connection observed an uncommitted event.' );
+			get_post_meta( $character_id, '_pspp_character', true );
+			get_post( $post->ID );
+			ps_pen_paper_get_events( $campaign );
+			pspp_event_assert( false === wp_cache_get( $character_id, 'post_meta' ) && false === wp_cache_get( $post->ID, 'posts' ), 'Uncommitted values were added to the object cache.' );
+		};
+		add_action( 'transition_post_status', $inspect, 10, 3 );
+		try {
+			pspp_event_assert( $character_id === ps_pen_paper_save_character( $campaign_id, $character_id, $users['player'], $character_input, '26', '2' ), 'Observed transaction could not commit.' );
+		} finally { remove_action( 'transition_post_status', $inspect, 10 ); }
+	} finally { $observer->close(); }
+	pspp_event_assert( ! wp_suspend_cache_addition(), 'Transaction cleanup left cache additions disabled.' );
+
+	$before_exception = get_post_meta( $character_id, '_pspp_character', true );
+	$baseline = ps_pen_paper_get_events( $campaign );
+	$retries = $wpdb->reconnect_retries;
+	$exception = new RuntimeException( 'Transaction exception fixture' );
+	$throw_on_publish = static function ( $status, $old_status, $post ) use ( $exception ) {
+		if ( 'pspp_event' === $post->post_type && 'private' === $status ) { throw $exception; }
+	};
+	$caught = false;
+	add_action( 'transition_post_status', $throw_on_publish, 10, 3 );
+	try {
+		ps_pen_paper_save_character( $campaign_id, $character_id, $users['player'], $character_input, '27', '2' );
+	} catch ( RuntimeException $error ) {
+		$caught = $error === $exception;
+	} finally { remove_action( 'transition_post_status', $throw_on_publish, 10 ); }
+	pspp_event_assert( $caught && $before_exception === get_post_meta( $character_id, '_pspp_character', true ) && $baseline === ps_pen_paper_get_events( $campaign ) && ! wp_suspend_cache_addition() && $retries === $wpdb->reconnect_retries, 'An exception was hidden or left partial writes or altered connection/cache settings.' );
+
+	$crash_input = $character_input; $crash_input['name'] = 'PSPP transaction crash fixture ' . $suffix;
+	$crash_id = ps_pen_paper_save_character( $campaign_id, 0, $users['player'], $crash_input, '0', '2' );
+	pspp_event_assert( is_int( $crash_id ), 'Could not create crash-test character.' );
+	$crash_before = get_post_meta( $crash_id, '_pspp_character', true );
+	foreach ( array( 'before_commit' => 91, 'after_commit' => 92 ) as $stage => $exit_code ) {
+		$events_before = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $wpdb->posts WHERE post_parent = %d AND post_type = 'pspp_event' AND post_status = 'private'", $campaign_id ) );
+		$command = array( PHP_BINARY, '-d', 'mysqli.default_socket=' . ini_get( 'mysqli.default_socket' ), $_SERVER['argv'][0], '--path=' . ABSPATH, '--url=' . home_url( '/' ), '--skip-plugins', '--skip-themes', 'eval-file', __DIR__ . '/events-crash-worker.php', (string) $crash_id, (string) $users['gm'], $stage );
+		$process = proc_open( implode( ' ', array_map( 'escapeshellarg', $command ) ), array( 0 => array( 'pipe', 'r' ), 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ), $pipes );
+		pspp_event_assert( is_resource( $process ), 'Could not start transaction crash worker.' );
+		fclose( $pipes[0] );
+		$output = stream_get_contents( $pipes[1] ); fclose( $pipes[1] );
+		$error_output = stream_get_contents( $pipes[2] ); fclose( $pipes[2] );
+		pspp_event_assert( $exit_code === proc_close( $process ), 'Crash worker did not reach ' . $stage . ': ' . $output . $error_output );
+		clean_post_cache( $crash_id );
+		$crash_after = get_post_meta( $crash_id, '_pspp_character', true );
+		$events_after = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM $wpdb->posts WHERE post_parent = %d AND post_type = 'pspp_event' AND post_status = 'private'", $campaign_id ) );
+		if ( 'before_commit' === $stage ) {
+			pspp_event_assert( $crash_before === $crash_after && $events_before === $events_after, 'An interrupted transaction retained a partial character change or event.' );
+		} else {
+			pspp_event_assert( 2 === $crash_after['revision'] && $crash_before['active']['name'] . ' updated' === $crash_after['active']['name'] && $events_before + 1 === $events_after, 'A process exit after commit did not retain both state and event.' );
+			$committed = ps_pen_paper_get_events( $campaign )['events'][0];
+			pspp_event_assert( $crash_id === $committed['object_id'] && $crash_before === $committed['before'] && $crash_after === $committed['after'], 'The committed crash-test event does not match the saved state.' );
+		}
+	}
 	wp_set_current_user( $users['player'] );
 	$pending_id = ps_pen_paper_save_character( $campaign_id, 0, $users['player'], $character_input, '0', '2' );
 	pspp_event_assert( ! is_wp_error( $pending_id ), 'Could not create an initial approval request.' );
@@ -231,4 +313,4 @@ try {
 	}
 	if ( $errors ) { WP_CLI::error( implode( '; ', $errors ) ); }
 }
-WP_CLI::success( 'Event snapshots, mixed history, recipient privacy, pagination, failure rollback and concurrent recovery passed.' );
+WP_CLI::success( 'Event snapshots, mixed history, recipient privacy, pagination, transactional rollback, isolation/cache protection, unsupported-storage rejection and separate-process exits before/after commit passed.' );

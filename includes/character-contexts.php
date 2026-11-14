@@ -184,6 +184,12 @@ function ps_pen_paper_attach_base_character( $campaign_id, $source_id, $source_r
 }
 
 function ps_pen_paper_save_character_context( $campaign_id, $id, $revision, $base_revision, $rules_revision, $overrides, $note ) {
+	return ps_pen_paper_with_character_lock( $id, function () use ( $campaign_id, $id, $revision, $base_revision, $rules_revision, $overrides, $note ) {
+		return ps_pen_paper_save_character_context_locked( $campaign_id, $id, $revision, $base_revision, $rules_revision, $overrides, $note );
+	} );
+}
+
+function ps_pen_paper_save_character_context_locked( $campaign_id, $id, $revision, $base_revision, $rules_revision, $overrides, $note ) {
 	$campaign = ps_pen_paper_get_campaign( $campaign_id );
 	$character = $campaign ? ps_pen_paper_get_character( $campaign, $id ) : null;
 	if ( ! ps_pen_paper_can_access_site() || ! $character || ! ps_pen_paper_can_manage_campaign( $campaign ) ) {

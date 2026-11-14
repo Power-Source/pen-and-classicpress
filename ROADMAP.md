@@ -42,8 +42,10 @@ einen endgültigen Funktionsumfang.
 - Ein gemeinsames Ereignisprotokoll verbindet bestehende Würfe mit neuen Regel-
   und Charakteränderungen, Anträgen und Freigabeentscheidungen. Vorher-/Nachher-
   Stände bleiben erhalten; Charaktereinträge sind nur für Besitzer und aktuelle
-  Spielleiter sichtbar. Erkannte Speicherfehler führen zu einer revisionsgeschützten
-  Rücknahme oder einer ausdrücklichen Aufforderung zur Administratorprüfung.
+  Spielleiter sichtbar. Die zentrale Dokument-/Ereignisspeicherung verwendet
+  inzwischen eine gemeinsame InnoDB-Transaktion; fehlende Voraussetzungen
+  blockieren Änderungen. Unklare Abschlussbestätigungen führen ausdrücklich
+  zur Administratorprüfung statt zu einer Erfolgsmeldung.
 - Seit Version 0.8.0 gibt es einen digitalen Spieltisch mit Teilnehmerleiste,
   lesbaren Charakterbögen, mobilen Bereichen und getrenntem Würfel-/Protokollbereich.
   Freiwillige Anwesenheit, manuelles AFK und ein revisionsgeschützter,
@@ -304,6 +306,49 @@ Das Handbuch beschreibt bereits die erste Spieltisch-Oberfläche.
 Die Module beschreiben fachliche Bereiche und müssen nicht als separate Plugins
 oder als komplizierte technische Architektur umgesetzt werden.
 
+## Aktuelle Priorität: Stabilisierung
+
+Vor Handel, Währung und automatisierten Abenteuern werden die vorhandenen
+Schreibwege und ihre Konsistenz abgesichert:
+
+- [x] Lokale Änderungen an vorhandenen Charakterbögen, Freigaben,
+  Kampagnenauflagen und Inventaren verwenden dieselbe Datenbanksperre je
+  Charakter, bevor sie abhängige Stände lesen. Ein konkurrierender Vorgang
+  wird ohne Wartezeit mit ausdrücklicher Konfliktmeldung abgewiesen.
+  Regressionstests prüfen beide Änderungsrichtungen, veraltete Metadaten,
+  konkurrierende Datenbankverbindungen und nicht verfügbare Sperren.
+- [x] Manuelle Mitgliederaufnahme und -entfernung sowie Beitrittsanfragen
+  einschließlich Annahme/Ablehnung werden mit Rollen- und Antragsständen
+  ausschließlich für die aktuelle Spielleitung protokolliert. Mitgliedschaft,
+  Antragsstatus und Ereignis werden gemeinsam gespeichert oder zurückgenommen.
+  Verwaltungsformulare prüfen den Revisionsstand; bestehende Zuordnungen
+  bleiben ohne nachträglich erfundene Historie erhalten.
+- [ ] Einen bedienbaren Wiederherstellungsablauf für unklar bestätigte Vorgänge
+  und unvollständige Altbestände schaffen. Weitere protokollpflichtige
+  Verwaltungsänderungen ausdrücklich festlegen.
+- [x] Die zentrale Dokument-/Ereignisspeicherung hält Änderungen und Ereignisse
+  mit einer gemeinsamen InnoDB-Transaktion zusammen. Ungeeignete Speicherwege
+  und fremde Transaktionen werden abgewiesen; unbestätigte Cache-Ergänzungen
+  und automatische Wiederverbindungen sind während der Speicherung gesperrt.
+  Tests prüfen getrennte Leser, Fehler, Ausnahmen und separate Prozesse, die
+  vor beziehungsweise nach dem Commit enden.
+- [ ] Mehrparteientransfers und deren Wiederholbarkeit gesondert absichern.
+  Die Dokumenttransaktion ist keine atomare Übertragung zwischen mehreren
+  Charakteren und deckt keine externen Hook-Nebenwirkungen ab.
+- [ ] Echte Mehrprozess- und Zwei-Subsite-Tests sowie die unterstützte
+  WordPress-/ClassicPress-/PHP-Matrix ergänzen.
+- [ ] Vollständigen, versionierten Kampagnenexport mit Regeln, Charakteren,
+  Szenen und geschützten Assets sowie die Wiederherstellung einzelner
+  Kampagnen vorziehen. Universumsbezüge und Benutzerzuordnungen ausdrücklich
+  behandeln; keine fremden oder nicht freigegebenen Daten mitexportieren.
+- [ ] Interne Lese-/Schreibschnittstellen und kontrollierte Fach-Hooks
+  dokumentieren; Tastatur- und Screenreader-Bedienung weiter prüfen.
+
+Gemeinsamer Basisfortschritt aus einem Universum bleibt ein eigener Vorgang:
+Er kann weiterhin eine lokale Ausrüstungsanpassung erfordern. Die Sperre
+verspricht weder atomare universumsweite Änderungen noch einen sicheren
+Geld- oder Gegenstandstransfer zwischen mehreren Charakteren.
+
 ## Phase 0: Grundlagen und Entscheidungen
 
 - Unterstützte Versionen von WordPress, ClassicPress und PHP festlegen und
@@ -436,7 +481,7 @@ Rundenteilnehmer.
 
 ### PS Community: Charakterprofil und optionale Ausrüstung
 
-**Grundlage seit 0.14.0 implementiert; Handel bleibt der nächste Ausbau:**
+**Grundlage seit 0.14.0 implementiert; Währung, Bindung und Handel sind geplant:**
 
 - Ein eigener Profil-Tab „Pen & Paper“ bündelt die eigenen Charaktere mit
   ausdrücklicher Auswahl des Kampagnenkontexts. Charakterbearbeitung verwendet
@@ -461,11 +506,17 @@ Bei inaktiver Community werden keine Ausrüstungsboni angewandt; gespeicherte
 Würfe behalten ihre damaligen Werte. Direkte und native Community-AJAX-Aufrufe
 fremder Profilbereiche geben keine Inventare aus.
 
-**Als Nächstes:** revisionssichere Handelsangebote mit ausdrücklich geprüften
-Teilnehmern und Beständen, bewusster Annahme/Ablehnung und sicherem Abbruch
-bei Deaktivierung. Freundschaften dürfen höchstens die Auswahl unterstützen,
-nicht Kampagnen- oder Handelsrechte ersetzen. Außerdem fehlen Entzug/Entfernen
-von Exemplaren, Mengen und ein grafischer, frei positionierbarer Slotdesigner.
+**Geplanter Ausbau:** Universumswährung, handelbare beziehungsweise
+charaktergebundene Exemplare und revisionssichere Handelsangebote. Beteiligte
+stimmen ausdrücklich zu; eine zusätzliche Spielleiterfreigabe ist einstellbar
+und standardmäßig erforderlich. Handelsgrundregeln gehören zum Universum;
+Kampagnen ohne Universum benötigen eine eigene Einstellung. Vererbung,
+Abweichungsrechte und kampagnenübergreifender Handel sind noch festzulegen.
+Freundschaften dürfen höchstens die Auswahl unterstützen, nicht Kampagnen-
+oder Handelsrechte ersetzen. Außerdem fehlen Entzug/Entfernen von Exemplaren,
+Mengen und ein grafischer, frei positionierbarer Slotdesigner.
+Die weiteren Grundlagen stehen in Phase 6, vorbereitete automatische
+Abenteuerabläufe in Phase 7.
 
 ### PS Wiki
 
@@ -476,6 +527,19 @@ Attributen, Orte, Fraktionen, Gegenstände und bekannte Figuren.
 
 - Wiki-Seiten mit einer Kampagne, einem Charakterfeld oder einer Szene
   verknüpfen, damit die passenden Erläuterungen schnell erreichbar sind.
+- Universen automatisch eindeutig mit ihrem Lexikon verknüpfen. Nach
+  ausdrücklicher Freigabe der Wiki-Anbindung Kategorien und Unterkategorien
+  für beispielsweise Personen, Fraktionen, Gegner, Gegenstände und Orte
+  anlegen; Bezeichnungen und Gliederung bleiben konfigurierbar.
+- Kampagnen-NPCs und Gegner nach bewusster Aufnahme ins Universum als
+  wiederverwendbare Vorlagen mit Wiki-Artikeln verbinden. Stabile Zuordnungen
+  verhindern Duplikate bei Umbenennung oder erneuter Synchronisierung.
+- Automatische Artikelentwürfe von bewusster Veröffentlichung trennen.
+  Bereits private Universums- und Kategorienamen dürfen nicht ungefragt
+  öffentlich werden. Redaktionelle Ergänzungen nicht still überschreiben.
+- Freigegebene Beschreibungen von geheimen Identitäten, Gegnerwerten,
+  Beutetabellen und Lootchancen trennen. Mechanische Daten bleiben im
+  Pen-&-Paper-Plugin; Wiki-Artikel sind keine zweite Regel-Datenquelle.
 - Klar trennen: **PS Wiki erklärt Regeln in Textform; die überprüfbaren
   Spielregeln und Charakterwerte liegen im Pen-&-Paper-Plugin.** Eine Änderung
   eines Wiki-Artikels verändert nicht automatisch die Spielmechanik.
@@ -529,7 +593,143 @@ ausdrücklich gemeldet und lassen sich durch Ablegen reparieren.
 - Über ein geeignetes Schutzkonzept für private Dateien entscheiden: Normale
   Upload-URLs können direkt erreichbar sein und sind nicht automatisch privat.
 
-## Phase 7: Mögliche spätere Erweiterungen
+### Geplant: Universumswährung, Gegenstandsbindung und Handel
+
+**Noch nicht implementiert.** Die seit 0.14.0 vorhandenen Inventare und
+Ausrüstungsboni sind dafür nur die Grundlage.
+
+- Pro Universum eine frei benennbare Spielwährung mit Kürzel festlegen.
+  Keine feste Gold-/Silber-/Kupfer-Währung oder Echtgeldanbindung voraussetzen.
+  Stückelung, Genauigkeit und Betragsgrenzen vor der Umsetzung bestimmen.
+- Die berechtigte Spielleitung kann Beträge ausdrücklich vergeben und
+  Korrekturen nachvollziehbar protokollieren. Vergaberechte müssen zum
+  Geltungsbereich des Guthabens passen; eine Kampagnenleitung erhält nicht
+  automatisch Zugriff auf die gesamte Universumswirtschaft.
+- Gegenstandsvorlagen als **handelbar** oder **charaktergebunden** kennzeichnen.
+  Die Eigenschaft beim Ausgeben im konkreten Exemplar festhalten.
+  Vorlagenänderungen dürfen bestehende Bindungen nicht still verändern.
+  Den Umgang mit bereits vorhandenen Exemplaren ausdrücklich festlegen.
+- Verschenken, Tauschen sowie Kaufen und Verkaufen mit vereinbartem Betrag
+  ermöglichen. Beide Besitzer müssen den konkreten Bedingungen zustimmen;
+  unbekannte Gegenleistungen dürfen nicht automatisch als angenommen gelten.
+- Handelsangebote reservieren die angebotenen Exemplare. Besitz, Bindung,
+  Guthaben, Reservierung, Mitgliedschaft und aktuelle Rechte serverseitig
+  prüfen. Ein Angebot öffnet nicht das gesamte fremde Inventar.
+- Gegenstände und gegebenenfalls Geld gemeinsam übertragen oder gar nicht.
+  Gleichzeitige Annahmen, wiederholte Anfragen und Neuladen dürfen weder
+  Gegenstände vervielfachen noch Guthaben doppelt abbuchen oder auszahlen.
+  Negative Guthaben nicht durch einen unvollständigen Handel erzeugen.
+- Ablehnen, Zurückziehen und Spielleiterentscheidungen nachvollziehbar
+  behandeln. Bei fehlendem PS Community keine wirtschaftlichen Änderungen
+  oder unvollständigen Übertragungen ausführen; vorhandene Daten erhalten.
+
+**Noch offen:** getrennte Guthaben je Kampagnencharakter oder gemeinsames
+Guthaben je Universumscharakter; erlaubte Abweichungen von Universumsregeln;
+Handel nur innerhalb einer Kampagne oder auch zwischen Kampagnen desselben
+Universums. Gemeinsame Kataloge allein erlauben keine Übertragung.
+
+### Geplant: Strukturierte Gegner, NPCs und Universumsvorlagen
+
+- Gegner und NPCs pro Kampagne mit Name, Beschreibung, geschütztem Bild,
+  frei definierten Eigenschaften, Werten und getrennten Geheimnissen erstellen.
+  Die vorhandenen Personenkarten bleiben erzählerische Notizen und werden
+  nicht ungefragt in ein festes Gegner- oder Kampfsystem umgewandelt.
+- Über **Ins Universum aufnehmen** bewusst eine wiederverwendbare Vorlage
+  erstellen beziehungsweise zuordnen. Die Universumsleitung entscheidet
+  über die Aufnahme, falls der Ersteller diese Berechtigung nicht besitzt.
+- Vorlagen von konkreten Figuren und Begegnungen unterscheiden. Lokale
+  Verletzungen, Ressourcen oder andere Zustandsänderungen verändern nicht
+  alle Exemplare oder die Universumsvorlage.
+- Gegnern, NPCs und Begegnungen optionale Beutetabellen zuordnen.
+  Keine fest vorgeschriebenen Attribute, Gegnerklassen oder Kampfabläufe.
+- Freigegebene Lexikonbeschreibungen über die optionale PS-Wiki-Anbindung
+  zugänglich machen; geheime Werte und Beuteinformationen bleiben geschützt.
+  Gegnerverwaltung und Spielregeln funktionieren auch ohne PS Wiki.
+
+### Geplant: Würfelbasierte Beutetabellen
+
+- Die bestehende serverseitige Würfelmechanik für frei definierte
+  Ergebnisbereiche verwenden, etwa W100 mit unterschiedlichen Beuteausgängen.
+- Je Ergebnis keine Beute, bestimmte Gegenstände, Auswahlen aus einer
+  Gegenstandsgruppe, Währungsbeträge oder Kombinationen davon vorsehen.
+  Mengen und Beträge können feste Werte oder begrenzte Würfelausdrücke wie
+  `1W3` beziehungsweise `2W6` sein.
+- Verweise auf weitere Beutetabellen ermöglichen, ohne unbegrenzte
+  Verschachtelung oder zyklische Aufrufe zuzulassen. Bereichsüberschneidungen,
+  Lücken und die Bedeutung von Chancen vor der Ausführung eindeutig prüfen.
+- Die Spielleitung wählt zunächst bewusst den Anlass und die Tabelle.
+  Den Wurf einschließlich verwendetem Tabellenstand und ermittelter Beute
+  speichern; Neuladen zeigt denselben Vorgang und würfelt nicht erneut.
+- Beute zunächst als Vorschlag anzeigen. Empfänger und Vergabe bestätigt
+  die Spielleitung; konkrete Exemplare übernehmen ihre Gegenstandsbindung.
+  Währungsvergaben verwenden dieselben geprüften Guthabenregeln wie manuelle
+  Vergaben.
+- Eine Belohnung darf pro vorgesehenem Vorgang nur einmal vergeben werden.
+  Bestände, Beträge und Vergabezustand gemeinsam und nachvollziehbar sichern;
+  Wiederholungsanfragen dürfen keine zweite Auszahlung erzeugen.
+- Automatische Vergabe erst im ausdrücklich dafür freigegebenen
+  Abenteuerablauf erlauben. Verdeckte Beuteinformationen nicht über Wiki,
+  Spielerprotokolle oder Vorschauen verraten.
+
+### Geplante Umsetzungsreihenfolge
+
+1. Geltungsbereiche und Rechte der Universumswirtschaft klären;
+   Währung, Guthaben und Gegenstandsbindung ergänzen.
+2. Strukturierte Gegner-/NPC-Vorlagen und kontrollierte Beutetabellen
+   auf Grundlage der vorhandenen Würfelmechanik aufbauen.
+3. Die optionale PS-Wiki-Anbindung mit geschützter Zuordnung und bewusst
+   veröffentlichten Lexikoninhalten ergänzen.
+4. Darauf aufbauend sicheren Handel mit optionaler Spielleiterfreigabe umsetzen.
+5. Erst anschließend vorbereitete Solo-/Gruppenabenteuer automatisieren.
+
+## Phase 7: Geleitete, hybride und automatisierte Abenteuer
+
+**Konzeptionell vorgemerkt, noch nicht implementiert.** Dies ist ein eigener
+größerer Ausbau nach zuverlässigen Fortschritts- und Belohnungsgrundlagen,
+kein bereits vorhandener Automatikmodus.
+
+Die Spielleitung bleibt Abenteuerautor und bestimmt je Kampagne den Modus:
+
+| Modus | Ablauf |
+|---|---|
+| Geleitet | Die Spielleitung erzählt, entscheidet und vergibt Belohnungen. |
+| Hybrid | Vorbereitete Abschnitte laufen automatisch; festgelegte Entscheidungen benötigen die Spielleitung. |
+| Automatisiert | Spieler durchlaufen ausdrücklich vorbereitete Abenteuer solo oder gemeinsam, auch während die Spielleitung abwesend ist. |
+
+- Mit einem kleinen Szenen- und Entscheidungsablauf beginnen: Die
+  Spielleitung definiert Texte, Auswahlmöglichkeiten, Voraussetzungen,
+  Proben, Erfolgs-/Misserfolgsfolgen und erlaubte Übergänge.
+- Vorbereitete Komplikationen statt automatisch erfundener Ergebnisse
+  verwenden. Beispiel: Ein Schloss untersuchen, eine Verstandprobe ausführen
+  und je Ergebnis eine freigegebene Folgeszene öffnen.
+- Eigene Abenteuer-Spielstände je Solodurchlauf beziehungsweise Gruppe
+  führen. Der Fortschritt einer Gruppe darf keine andere Gruppe oder die
+  gemeinsame Kampagnenszene ungefragt verändern.
+- Für Teams ausdrücklich festlegen, wer Entscheidungen trifft, welche
+  Figuren würfeln und wie Teilnahme, Wiedereinstieg sowie gemeinsame
+  Belohnungen behandelt werden. Keine stillschweigende Mehrheits- oder
+  Gruppenführerregel voraussetzen.
+- Voraussetzungen, Ressourcenverbrauch, Würfe, Fortschritt und Übergänge
+  auf dem Server prüfen. Parallele Aktionen und wiederholte Anfragen dürfen
+  keinen mehrfachen Verbrauch, übersprungene Voraussetzungen oder doppelte
+  Belohnungen auslösen.
+- Die Spielleitung legt fest, welche Belohnungen wann, wie oft und an wen
+  automatisch vergeben werden dürfen. Keine unbegrenzten Geld- oder
+  Gegenstandsquellen durch Wiederholen eines Abschnitts schaffen.
+- Übernahme von Gegenständen, Währung und Fortschritt zwischen automatisierten
+  und geleiteten Kampagnen nur nach ausdrücklich festgelegten Regeln und
+  Berechtigungsprüfungen ermöglichen.
+- Bei fehlenden Integrationen oder unvollständigen Änderungen keine
+  erfolgreiche Ressourcen- oder Belohnungsvergabe vortäuschen.
+  Wirtschaftliche Funktionen bleiben an PS Community gebunden; ein
+  erzählerischer Ablauf ohne solche Funktionen benötigt es nicht.
+- Spielleiterkorrekturen und bei Bedarf Pausieren/Freigeben des Ablaufs
+  vorsehen, ohne historische Würfe oder Vergaben umzuschreiben.
+- Keine automatische Kampf-Engine, Echtzeitpflicht oder KI-Abhängigkeit
+  voraussetzen. Der Schwerpunkt bleibt ein systemoffener Pen-and-Paper-
+  Baukasten, kein MMORPG und keine vollständige Tabletop-Engine.
+
+## Phase 8: Mögliche spätere Erweiterungen
 
 Diese Ideen sind bewusst noch nicht Teil der ersten spielbaren Version:
 
@@ -543,8 +743,8 @@ Diese Ideen sind bewusst noch nicht Teil der ersten spielbaren Version:
 - Optionales Level- oder Rangsystem, Erfahrungspunkte und weitere
   Freigabeabläufe entsprechend dem gewählten Kampagnenregelwerk.
 - Sitzungsnotizen, Terminübersicht und Zusammenfassungen vergangener Sitzungen.
-- Gruppeninventar und Handel zwischen Charakteren, sofern das Regelwerk es
-  erlaubt.
+- Gruppeninventar mit eigenen Zugriffs- und Vergaberechten; der geplante
+  Handel zwischen Charakteren wird bereits in Phase 6 behandelt.
 - Import und Export eigener Kampagnen- oder Regelvorlagen mit klaren Optionen
   für private Inhalte und personenbezogene Daten.
 - Druckansicht oder PDF-Export für Charakterbögen und Spielleiternotizen.
@@ -581,3 +781,11 @@ Diese Ideen sind bewusst noch nicht Teil der ersten spielbaren Version:
    gegebenenfalls Erweiterungen der anderen Plugins benötigt?
 6. Welche weiteren Handoutformate und Empfängerkreise werden neben den
    geschützten Text-/Bild-Handouts für die gesamte Runde benötigt?
+7. Wie gelten Universums-Handelsregeln in Kampagnen: verbindliche Vererbung,
+   ausschließlich strengere lokale Regeln oder frei erlaubte Abweichungen?
+8. Bleiben Guthaben kampagnenbezogen oder werden sie je Universumscharakter
+   geteilt? Welche Leitungen dürfen dann Beträge vergeben und korrigieren?
+9. Welche Übertragungen von Gegenständen und Währung zwischen Kampagnen
+   sind zulässig, insbesondere bei automatisierten Abenteuerdurchläufen?
+10. Wie werden Entscheidungen, Proben, Wiedereinstieg und Belohnungen in
+    automatisch spielenden Gruppen geregelt?

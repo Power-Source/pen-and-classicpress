@@ -172,7 +172,88 @@ try {
 	$check( $base_id === ps_pen_paper_save_character( $universe_id, $base_id, $users['player'], $world_input, '1', '1' ), 'Shared base progress failed.' );
 	$check( is_wp_error( ps_pen_paper_character_state( $linked, get_post( $alias_id ) ) ), 'Invalid dependent equipment silently dropped or exceeded bounds.' );
 	$check( true === ps_pen_paper_save_gear( $linked, $alias_id, 'equip_items', array(), '2' ) && 9 === ps_pen_paper_character_state( $linked, get_post( $alias_id ) )['active']['values'][ $world_field ], 'Shared-base progress stranded loadout repair.' );
-	WP_CLI::success( 'Community gating, real profile API ownership, core portrait approvals/privacy, private images, slots/rarity, frozen issuance, forged/duplicate/type guards, effective bonuses, stale dice tokens, immutable roll provenance, bounds, recovery, journal rollback and image cleanup passed.' );
+
+	$race_id = ps_pen_paper_save_character( $campaign->ID, 0, $users['player'], $base_input, '0', '1' );
+	$race_item_input = $item_input; $race_item_input['bonuses'] = array( $field => '2' );
+	$race_item = ps_pen_paper_save_item( $campaign, 0, $race_item_input, '0' );
+	$check( is_int( $race_id ) && is_int( $race_item ), 'Concurrency fixtures failed.' );
+	$check( true === ps_pen_paper_save_gear( $campaign, $race_id, 'grant_item', array( 'item_id' => (string) $race_item, 'item_revision' => '1' ), '0' ), 'Concurrency issuance failed.' );
+	$race_instance = array_key_first( ps_pen_paper_gear_state( $race_id )['active']['items'] );
+	$race_equip = array( 'slots' => array( 'kopf' => $race_instance ) );
+	$stale_meta = get_post_meta( $race_id );
+	$nested_result = null;
+	$interleave = function ( $check, $object_id, $key ) use ( $campaign, $race_id, $users, $bad_base, &$nested_result ) {
+		if ( $object_id === $race_id && '_pspp_gear' === $key ) {
+			$nested_result = ps_pen_paper_save_character( $campaign->ID, $race_id, $users['player'], $bad_base, '1', '1' );
+		}
+		return $check;
+	};
+	add_filter( 'update_post_metadata', $interleave, 10, 3 );
+	try {
+		$race_result = ps_pen_paper_save_gear( $campaign, $race_id, 'equip_items', $race_equip, '1' );
+	} finally { remove_filter( 'update_post_metadata', $interleave, 10 ); }
+	$check( true === $race_result && is_wp_error( $nested_result ) && 'conflict' === $nested_result->get_error_code(), 'Character edit during equipment storage was not rejected as a conflict.' );
+	$check( 7 === ps_pen_paper_character_state( $campaign, get_post( $race_id ) )['active']['values'][ $field ], 'Interleaved equipment/character edit exceeded the field maximum of 10.' );
+	wp_cache_set( $race_id, $stale_meta, 'post_meta' );
+	$stale_result = ps_pen_paper_save_character( $campaign->ID, $race_id, $users['player'], $bad_base, '1', '1' );
+	$check( is_wp_error( $stale_result ) && 'equipment_range' === $stale_result->get_error_code() && 7 === ps_pen_paper_character_state( $campaign, get_post( $race_id ) )['active']['values'][ $field ], 'Cached pre-lock equipment allowed an invalid base edit.' );
+	$check( true === ps_pen_paper_save_gear( $campaign, $race_id, 'equip_items', array(), '2' ), 'Concurrency unequip failed.' );
+	$interleave = function ( $check, $object_id, $key ) use ( $campaign, $race_id, $race_equip, &$nested_result ) {
+		if ( $object_id === $race_id && '_pspp_character' === $key ) {
+			$nested_result = ps_pen_paper_save_gear( $campaign, $race_id, 'equip_items', $race_equip, '3' );
+		}
+		return $check;
+	};
+	add_filter( 'update_post_metadata', $interleave, 10, 3 );
+	try {
+		$race_result = ps_pen_paper_save_character( $campaign->ID, $race_id, $users['player'], $bad_base, '1', '1' );
+	} finally { remove_filter( 'update_post_metadata', $interleave, 10 ); }
+	$check( $race_id === $race_result && is_wp_error( $nested_result ) && 'conflict' === $nested_result->get_error_code() && 9 === ps_pen_paper_character_state( $campaign, get_post( $race_id ) )['active']['values'][ $field ], 'Equipment edit during character storage was not rejected safely.' );
+
+	wp_set_current_user( $users['player'] );
+	$check( $race_id === ps_pen_paper_save_character( $campaign->ID, $race_id, $users['player'], $base_input, '2', '1' ), 'Concurrent approval fixture failed.' );
+	wp_set_current_user( $users['gm'] );
+	$before_race_meta = get_post_meta( $race_id );
+	$before_race_events = ps_pen_paper_get_events( $campaign );
+	$blocker = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+	$lock_name = ps_pen_paper_character_lock_name( $race_id );
+	try {
+		$check( '1' === $blocker->get_var( $blocker->prepare( 'SELECT GET_LOCK(%s, 0)', $lock_name ) ), 'Independent database lock failed.' );
+		foreach ( array(
+			function () use ( $campaign, $race_id, $users, $base_input ) { return ps_pen_paper_save_character( $campaign->ID, $race_id, $users['player'], $base_input, '3', '1' ); },
+			function () use ( $campaign, $race_id ) { return ps_pen_paper_review_character( $campaign->ID, $race_id, 'approve', '3' ); },
+			function () use ( $campaign, $race_id ) { return ps_pen_paper_save_gear( $campaign, $race_id, 'equip_items', array(), '3' ); },
+		) as $operation ) {
+			$result = $operation();
+			$check( is_wp_error( $result ) && 'conflict' === $result->get_error_code(), 'A competing database connection did not block a character mutation.' );
+		}
+		$check( $before_race_meta === get_post_meta( $race_id ) && $before_race_events === ps_pen_paper_get_events( $campaign ), 'Rejected competing mutations changed character data or journal entries.' );
+	} finally {
+		$released = $blocker->get_var( $blocker->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+		$blocker->close();
+		$check( '1' === $released, 'Independent database lock cleanup failed.' );
+	}
+	$fail_lock = function ( $query ) { return 0 === strpos( $query, 'SELECT GET_LOCK(' ) ? 'SELECT NULL' : $query; };
+	add_filter( 'query', $fail_lock );
+	try {
+		$result = ps_pen_paper_save_character( $campaign->ID, $race_id, $users['player'], $base_input, '3', '1' );
+		$check( is_wp_error( $result ) && 'character_lock_failed' === $result->get_error_code() && $before_race_meta === get_post_meta( $race_id ) && $before_race_events === ps_pen_paper_get_events( $campaign ), 'Unavailable database locks allowed an unprotected mutation.' );
+	} finally { remove_filter( 'query', $fail_lock ); }
+	$check( true === ps_pen_paper_review_character( $campaign->ID, $race_id, 'approve', '3' ) && 5 === ps_pen_paper_character_state( $campaign, get_post( $race_id ) )['active']['values'][ $field ], 'Character approval stayed blocked after lock release.' );
+	$check( true === ps_pen_paper_save_character_context( $linked_id, $alias_id, '1', '2', '1', array( $world_field => '5' ), '' ), 'Context concurrency fixture failed.' );
+	$nested_result = null;
+	$interleave = function ( $check, $object_id, $key ) use ( $linked_id, $alias_id, $world_field, &$nested_result ) {
+		if ( $object_id === $alias_id && '_pspp_gear' === $key ) {
+			$nested_result = ps_pen_paper_save_character_context( $linked_id, $alias_id, '2', '2', '1', array( $world_field => '9' ), '' );
+		}
+		return $check;
+	};
+	add_filter( 'update_post_metadata', $interleave, 10, 3 );
+	try {
+		$race_result = ps_pen_paper_save_gear( $linked, $alias_id, 'equip_items', array( 'slots' => array( 'kopf' => $world_instance ) ), '3' );
+	} finally { remove_filter( 'update_post_metadata', $interleave, 10 ); }
+	$check( true === $race_result && is_wp_error( $nested_result ) && 'conflict' === $nested_result->get_error_code() && 7 === ps_pen_paper_character_state( $linked, get_post( $alias_id ) )['active']['values'][ $world_field ], 'Context edit bypassed the equipment consistency lock.' );
+	WP_CLI::success( 'Community gating, real profile API ownership, core portrait approvals/privacy, private images, slots/rarity, frozen issuance, forged/duplicate/type guards, effective bonuses, stale dice tokens, immutable roll provenance, bounds, recovery, journal rollback, image cleanup and cross-document character/equipment conflicts passed.' );
 } finally {
 	wp_set_current_user( $original_user );
 	foreach ( $parents as $parent ) {

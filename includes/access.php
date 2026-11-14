@@ -45,48 +45,14 @@ function ps_pen_paper_save_access( $campaign_id, $input, $revision ) {
 }
 
 function ps_pen_paper_request_membership( $campaign_id ) {
-	$campaign = ps_pen_paper_get_campaign( $campaign_id );
-	$user_id = get_current_user_id();
-	if ( ! current_user_can( 'read' ) || ! ps_pen_paper_site_user( $user_id ) || ! $campaign ) {
-		return new WP_Error( 'forbidden', __( 'Bitte melde dich mit einem Benutzerkonto dieser Website an.', 'ps-pen-paper' ) );
-	}
-	$access = ps_pen_paper_get_access( $campaign_id );
-	if ( is_wp_error( $access ) ) {
-		return $access;
-	}
-	if ( 'teaser' !== $access['visibility'] || 'approval' !== $access['admission'] || ps_pen_paper_can_view_campaign( $campaign ) ) {
-		return new WP_Error( 'forbidden', __( 'Für diese Runde ist keine Beitrittsanfrage möglich.', 'ps-pen-paper' ) );
-	}
-	$key = '_pspp_join_' . $user_id;
-	if ( 'pending' === get_post_meta( $campaign_id, $key, true ) ) {
-		return true;
-	}
-	if ( ! add_post_meta( $campaign_id, $key, 'pending', true ) ) {
-		return new WP_Error( 'request_failed', __( 'Die Anfrage konnte nicht angelegt werden oder wurde bereits entschieden. Bitte kontaktiere die Spielleitung.', 'ps-pen-paper' ) );
-	}
-	return true;
+	return ps_pen_paper_change_membership( $campaign_id, get_current_user_id(), 'request' );
 }
 
-function ps_pen_paper_review_membership( $campaign_id, $user_id, $decision ) {
-	$campaign = ps_pen_paper_get_campaign( $campaign_id );
-	if ( ! current_user_can( 'read' ) || ! $campaign || ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
-		return new WP_Error( 'forbidden', __( 'Nur die Spielleitung darf Beitrittsanfragen entscheiden.', 'ps-pen-paper' ) );
-	}
-	$user = ps_pen_paper_site_user( $user_id );
-	if ( ! $user || ! user_can( $user, 'read' ) || ! in_array( $decision, array( 'approved', 'rejected' ), true ) ) {
+function ps_pen_paper_review_membership( $campaign_id, $user_id, $decision, $revision = null ) {
+	if ( ! in_array( $decision, array( 'approved', 'rejected' ), true ) ) {
 		return new WP_Error( 'invalid_request', __( 'Die Person oder Entscheidung ist ungültig.', 'ps-pen-paper' ) );
 	}
-	$key = '_pspp_join_' . $user_id;
-	if ( 'pending' !== get_post_meta( $campaign_id, $key, true ) || ! update_post_meta( $campaign_id, $key, $decision, 'pending' ) ) {
-		return new WP_Error( 'conflict', __( 'Diese Anfrage wurde bereits entschieden. Bitte lade die Seite neu.', 'ps-pen-paper' ) );
-	}
-	if ( 'approved' === $decision && ! ps_pen_paper_campaign_role( $campaign, $user_id ) && ! add_post_meta( $campaign_id, '_pspp_player', (string) $user_id ) ) {
-		if ( ! update_post_meta( $campaign_id, $key, 'pending', $decision ) ) {
-			return new WP_Error( 'recovery_required', __( 'Die Mitgliedschaft und der Antragsstatus konnten nicht konsistent gespeichert werden. Bitte prüfe die Mitgliederverwaltung.', 'ps-pen-paper' ) );
-		}
-		return new WP_Error( 'save_failed', __( 'Die Mitgliedschaft konnte nicht gespeichert werden. Die Anfrage bleibt offen.', 'ps-pen-paper' ) );
-	}
-	return true;
+	return ps_pen_paper_change_membership( $campaign_id, $user_id, $decision, '', $revision );
 }
 
 function ps_pen_paper_pending_memberships( $campaign ) {

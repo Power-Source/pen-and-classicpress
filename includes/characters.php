@@ -108,6 +108,38 @@ function ps_pen_paper_can_edit_character( $campaign, $character = null ) {
 	return ps_pen_paper_can_manage_character_scope( $campaign ) || 'gm_only' !== ps_pen_paper_character_mode( ps_pen_paper_get_rules( $campaign->ID ) );
 }
 
+function ps_pen_paper_character_lock_name( $character_id ) {
+	global $wpdb;
+	return 'pspp_character_' . md5( DB_NAME . ':' . $wpdb->postmeta . ':' . (int) $character_id );
+}
+
+function ps_pen_paper_with_character_lock( $character_id, $callback ) {
+	if ( ! $character_id ) { return $callback(); }
+	global $wpdb;
+	static $active = array();
+	$name = ps_pen_paper_character_lock_name( $character_id );
+	$conflict = new WP_Error( 'conflict', __( 'Dieser Charakter oder seine Ausrüstung wird gerade geändert. Es wurde nichts übernommen. Bitte lade den aktuellen Stand neu.', 'ps-pen-paper' ) );
+	// Named database locks are reentrant; hooks must not re-enter the same mutation.
+	if ( isset( $active[ $name ] ) ) { return $conflict; }
+	$acquired = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 0)', $name ) );
+	if ( '1' !== $acquired ) {
+		return '0' === $acquired ? $conflict : new WP_Error( 'character_lock_failed', __( 'Die Datenbanksperre für diesen Charakter ist nicht verfügbar. Es wurde nichts übernommen. Bitte informiere den Administrator.', 'ps-pen-paper' ) );
+	}
+	$active[ $name ] = true;
+	try {
+		// Earlier reads in this request may predate another writer's completed change.
+		wp_cache_delete( (int) $character_id, 'post_meta' );
+		$result = $callback();
+	} finally {
+		$released = $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $name ) );
+		unset( $active[ $name ] );
+	}
+	if ( '1' !== $released ) {
+		return new WP_Error( 'character_lock_recovery_required', __( 'Die Datenbanksperre konnte nicht freigegeben werden. Änderungen können bereits gespeichert sein. Bitte lade den aktuellen Stand neu und informiere den Administrator.', 'ps-pen-paper' ) );
+	}
+	return $result;
+}
+
 function ps_pen_paper_character_values( $rules ) {
 	$values = array();
 	foreach ( $rules['fields'] as $field ) {
@@ -164,6 +196,12 @@ function ps_pen_paper_validate_character( $input, $rules ) {
 }
 
 function ps_pen_paper_save_character( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision ) {
+	return ps_pen_paper_with_character_lock( $character_id, function () use ( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision ) {
+		return ps_pen_paper_save_character_locked( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision );
+	} );
+}
+
+function ps_pen_paper_save_character_locked( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision ) {
 	$campaign = ps_pen_paper_get_character_scope( $campaign_id );
 	$character = $campaign && $character_id ? ps_pen_paper_get_character( $campaign, $character_id ) : null;
 	if ( ! $campaign || ( $character_id && ! $character ) || ! ps_pen_paper_can_edit_character( $campaign, $character ) ) {
@@ -222,6 +260,7 @@ function ps_pen_paper_save_character( $campaign_id, $character_id, $owner_id, $i
 		'rules_revision' => $rules['revision'], 'fields' => $rules['fields'],
 	), ! $character );
 	if ( is_wp_error( $saved ) ) {
+		if ( 'event_recovery_required' === $saved->get_error_code() ) { return $saved; }
 		if ( ! $character && ! metadata_exists( 'post', $character_id, '_pspp_character' ) && ! wp_delete_post( $character_id, true ) ) {
 			return new WP_Error( 'cleanup_failed', __( 'Der Charakter ist unvollständig gespeichert und konnte nicht entfernt werden. Bitte informiere den Administrator.', 'ps-pen-paper' ) );
 		}
@@ -231,6 +270,12 @@ function ps_pen_paper_save_character( $campaign_id, $character_id, $owner_id, $i
 }
 
 function ps_pen_paper_review_character( $campaign_id, $character_id, $decision, $revision ) {
+	return ps_pen_paper_with_character_lock( $character_id, function () use ( $campaign_id, $character_id, $decision, $revision ) {
+		return ps_pen_paper_review_character_locked( $campaign_id, $character_id, $decision, $revision );
+	} );
+}
+
+function ps_pen_paper_review_character_locked( $campaign_id, $character_id, $decision, $revision ) {
 	$campaign = ps_pen_paper_get_character_scope( $campaign_id );
 	$character = $campaign ? ps_pen_paper_get_character( $campaign, $character_id ) : null;
 	if ( ! $character || ! ps_pen_paper_can_manage_character_scope( $campaign ) || ! ps_pen_paper_can_edit_character( $campaign, $character ) ) {

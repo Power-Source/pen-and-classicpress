@@ -239,6 +239,12 @@ function ps_pen_paper_apply_gear( $scope, $character, $state ) {
 }
 
 function ps_pen_paper_save_gear( $campaign, $character_id, $operation, $input, $revision ) {
+	return ps_pen_paper_with_character_lock( $character_id, function () use ( $campaign, $character_id, $operation, $input, $revision ) {
+		return ps_pen_paper_save_gear_locked( $campaign, $character_id, $operation, $input, $revision );
+	} );
+}
+
+function ps_pen_paper_save_gear_locked( $campaign, $character_id, $operation, $input, $revision ) {
 	if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
 	$character = ps_pen_paper_get_character( $campaign, $character_id );
 	if ( ! ps_pen_paper_can_access_site() || ! $character ) { return ps_pen_paper_equipment_error( 'forbidden' ); }

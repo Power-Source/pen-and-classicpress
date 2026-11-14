@@ -1,0 +1,71 @@
+<?php
+/**
+ * Plugin Name: PS Pen & Paper
+ * Description: Ein universeller Baukasten für Pen-and-Paper-Kampagnen.
+ * Version: 0.12.0
+ * Author: PSOURCE
+ * Text Domain: ps-pen-paper
+ * Domain Path: /languages
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+require_once __DIR__ . '/includes/campaigns.php';
+require_once __DIR__ . '/includes/rules.php';
+require_once __DIR__ . '/includes/rules-admin.php';
+require_once __DIR__ . '/includes/characters.php';
+require_once __DIR__ . '/includes/characters-admin.php';
+require_once __DIR__ . '/includes/events.php';
+require_once __DIR__ . '/includes/events-ui.php';
+require_once __DIR__ . '/includes/dice.php';
+require_once __DIR__ . '/includes/dice-ui.php';
+require_once __DIR__ . '/includes/styles.php';
+require_once __DIR__ . '/includes/access.php';
+require_once __DIR__ . '/includes/access-ui.php';
+require_once __DIR__ . '/includes/backdrop.php';
+require_once __DIR__ . '/includes/maps.php';
+require_once __DIR__ . '/includes/maps-ui.php';
+require_once __DIR__ . '/includes/universes.php';
+require_once __DIR__ . '/includes/character-contexts.php';
+require_once __DIR__ . '/includes/character-contexts-ui.php';
+require_once __DIR__ . '/includes/universes-ui.php';
+require_once __DIR__ . '/includes/dashboard.php';
+require_once __DIR__ . '/includes/chat.php';
+require_once __DIR__ . '/includes/table.php';
+require_once __DIR__ . '/includes/table-ui.php';
+require_once __DIR__ . '/includes/frontend.php';
+require_once __DIR__ . '/includes/admin.php';
+
+add_action( 'plugins_loaded', 'ps_pen_paper_load_textdomain' );
+add_action( 'init', 'ps_pen_paper_register_campaign_type' );
+add_action( 'init', 'ps_pen_paper_register_character_type' );
+add_action( 'init', 'ps_pen_paper_register_roll_type' );
+add_action( 'init', 'ps_pen_paper_register_event_type' );
+add_action( 'init', 'ps_pen_paper_register_asset_type' );
+add_action( 'init', 'ps_pen_paper_register_scene_type' );
+add_action( 'init', 'ps_pen_paper_register_universe_type' );
+add_action( 'before_delete_post', 'ps_pen_paper_delete_campaign_assets', 10, 2 );
+add_action( 'admin_menu', 'ps_pen_paper_register_admin_menu' );
+add_action( 'admin_enqueue_scripts', 'ps_pen_paper_enqueue_admin_assets' );
+add_action( 'admin_post_ps_pen_paper', 'ps_pen_paper_handle_admin_action' );
+add_action( 'template_redirect', 'ps_pen_paper_prepare_frontend', 0 );
+add_action( 'template_redirect', 'ps_pen_paper_handle_frontend_action', 5 );
+add_action( 'wp_enqueue_scripts', 'ps_pen_paper_enqueue_frontend' );
+add_action( 'rest_api_init', 'ps_pen_paper_register_table_routes' );
+add_action( 'rest_api_init', 'ps_pen_paper_register_map_routes' );
+add_shortcode( 'ps_pen_paper', 'ps_pen_paper_frontend_shortcode' );
+add_filter( 'theme_page_templates', 'ps_pen_paper_page_templates' );
+add_filter( 'template_include', 'ps_pen_paper_frontend_template' );
+add_filter( 'psource_chat_session_access', 'ps_pen_paper_chat_access', 10, 2 );
+add_filter( 'psource_chat_session_moderator', 'ps_pen_paper_chat_moderator', 10, 2 );
+
+function ps_pen_paper_load_textdomain() {
+	load_plugin_textdomain(
+		'ps-pen-paper',
+		false,
+		dirname( plugin_basename( __FILE__ ) ) . '/languages'
+	);
+}
+

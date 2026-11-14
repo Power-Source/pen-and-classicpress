@@ -1,0 +1,993 @@
+/**
+ * Campaign Import Service
+ * Securely imports a .cozyvtt archive into a new campaign.
+ *
+ * Security mitigations:
+ * - Path traversal: every entry path is checked, and files are written under
+ *   new names of the importer's choosing
+ * - Zip bombs: the archive is read from disk, and each entry is unpacked
+ *   through a counter that stops it at its own limit (10 MB for a data file,
+ *   the upload limit of its type for a picture or track) and stops the import
+ *   once everything unpacked passes the archive limit
+ * - Resource exhaustion: the entry count is read from the archive's end and
+ *   refused before its directory is read; manifest counts are capped
+ * - Malicious files: every asset must be a MAP, TOKEN or AUDIO file whose
+ *   bytes are a format the upload route allows for that type, and is stored
+ *   under the format and extension its bytes show
+ * - Pictures that unpack to gigabytes in a browser: a map or token picture
+ *   over the picture limits (utils/pictureLimits.ts) is left out
+ * - JSON injection: size limits, Zod schema validation, and a limit on how
+ *   deeply a data file nests (IMPORT_LIMITS.MAX_JSON_DEPTH), checked on its
+ *   text before it is parsed
+ * - Scope isolation: new IDs for everything, no references to existing data
+ *
+ * All or nothing: the pictures and tracks are unpacked into a staging folder,
+ * every row is written in one transaction, and the files are moved to where
+ * the upload system keeps them only once that has committed. An import that
+ * fails at any point leaves no campaign and no files.
+ */
+
+import { randomUUID } from 'crypto';
+import { z } from 'zod';
+import path from 'path';
+import { shortenFileName, MAX_ORIGINAL_NAME_LENGTH } from '../validators/assets';
+import { ASSET_LIMITS } from '../validators/assetLimits';
+import { cutText } from '../utils/cutText';
+import { removeNulCharacters } from '../validators/nulCharacter';
+import fs from 'fs';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../config/database';
+import { fileTypeFromFile } from 'file-type';
+import {
+  ManifestSchema,
+  CampaignSettingsSchema,
+  AssetManifestSchema,
+  AssetEntrySchema,
+  IMPORT_LIMITS,
+  IMPORTABLE_ASSET_TYPES,
+} from '../validators/campaignImport';
+import type { AssetManifestData, AssetEntryData } from '../validators/campaignImport';
+import {
+  ImportReport,
+  prepareMap,
+  prepareCreature,
+  prepareTokenTemplate,
+  importedGameSystem,
+  label,
+  type SkippedItem,
+  type SkippedKind,
+} from './campaignImportContent';
+import { preserveAtmosphereAudio, DEFAULT_VIBE_SETTINGS } from '../utils/vibe-presets';
+import { vibePeriodAudioAssetId } from '../utils/vibeAudio';
+import {
+  isSafeArchivePath,
+  openArchiveFile,
+  readArchiveEntry,
+  writeArchiveEntry,
+  ArchiveLimitError,
+  ArchiveRefusedError,
+  type ArchiveEntry,
+  UnpackedTotal,
+} from '../utils/archive';
+import { getFileSizeLimit, getTempDirectory, isAcceptedContent, isAllowedExtension, storedFileType, ALLOWED_EXTENSIONS, uploadsDirectorySetting } from '../utils/fileUtils';
+import { errorMessage } from '../utils/errors';
+import { startsWithMp3Header } from '../middleware/fileValidation';
+import { isPictureAssetType, pictureLimitProblem } from '../utils/pictureLimits';
+import { getCampaignArchiveSizeLimit, megabytes } from '../utils/campaignArchiveSize';
+import logger from '../utils/logger';
+
+// Unresolved: the paths built from it are stored (utils/fileUtils.ts).
+const UPLOADS_BASE = uploadsDirectorySetting();
+
+type ImportableAssetType = (typeof IMPORTABLE_ASSET_TYPES)[number];
+
+/**
+ * Where an import keeps what it is still working on: the uploaded archive,
+ * and a staging folder for the files it unpacks. Inside the uploads volume,
+ * so moving a file into place is a rename, never a copy.
+ */
+export function importTempDirectory(): string {
+  return path.join(getTempDirectory(), 'campaign-imports');
+}
+
+/**
+ * How long the transaction that writes an import may stay open. It reads
+ * each map from the archive as it writes it, so a large archive's maps are
+ * never held in memory together; fifty 10 MB maps take well under a minute.
+ */
+const IMPORT_TRANSACTION_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** What an import that failed for a reason of the server's own answers. */
+export const IMPORT_FAILED_MESSAGE =
+  'The campaign could not be saved, so nothing was imported. The server log has the details.';
+
+/**
+ * The import failed for a reason the archive did not cause, such as a
+ * database or disk error, and nothing of it was kept.
+ */
+export class CampaignImportFailedError extends Error {
+  constructor() {
+    super(IMPORT_FAILED_MESSAGE);
+    this.name = 'CampaignImportFailedError';
+  }
+}
+
+// ── Types ───────────────────────────────────────────────────────────────────
+
+export interface CampaignImportPreview {
+  formatVersion: number;
+  exportedAt: string;
+  exportedFrom: string;
+  campaignName: string;
+  gameSystem: string;
+  mapCount: number;
+  tokenCount: number;
+  creatureCount: number;
+  tokenTemplateCount: number;
+  assetCount: number;
+  includesAudio: boolean;
+  totalSizeBytes: number;
+}
+
+export interface ImportOptions {
+  importTokens?: boolean;
+  campaignName?: string;
+}
+
+export interface ImportResult {
+  campaignId: string;
+  campaignName: string;
+  /** What was created, which may be fewer than the archive held. */
+  mapCount: number;
+  tokenCount: number;
+  creatureCount: number;
+  tokenTemplateCount: number;
+  /** What was imported in a changed form, in words. */
+  warnings: string[];
+  /** What was left out, and why. */
+  skipped: SkippedItem[];
+}
+
+// ── Security helpers ────────────────────────────────────────────────────────
+
+/**
+ * Unpack one of the archive's data files and parse it, within the data-file
+ * limit and the archive's running total.
+ */
+async function readEntryText(archivePath: string, entry: ArchiveEntry, total: UnpackedTotal): Promise<string> {
+  let bytes: Buffer;
+  try {
+    bytes = await readArchiveEntry(archivePath, entry, { maxEntryBytes: IMPORT_LIMITS.MAX_JSON_SIZE_BYTES, total });
+  } catch (error) {
+    throw describeLimit(error, entry, total);
+  }
+  const text = bytes.toString('utf-8');
+  // Checked on the text, before parsing: nothing that walks the parsed data
+  // later, the validation or the database's own encoder, then meets more
+  // levels than an export ever writes.
+  if (jsonNestsDeeperThan(text, IMPORT_LIMITS.MAX_JSON_DEPTH)) throw new NestedTooDeepError(entry.path);
+  return text;
+}
+
+/**
+ * A data file's text, parsed. U+0000 is taken out of every text in it, keys
+ * included, as it is read: PostgreSQL cannot store the character
+ * (validators/nulCharacter.ts), and one anywhere in an archive failed the
+ * whole import. The report, when there is one, says how many were taken.
+ */
+function parseEntryText(text: string, entry: ArchiveEntry, report?: ImportReport): unknown {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new ArchiveRefusedError(`${entry.path} in the archive is damaged: it is not readable data.`);
+  }
+  const { value, removed } = removeNulCharacters(data);
+  if (removed > 0) {
+    report?.warn(
+      `${entry.path}: removed ${removed.toLocaleString('en-US')} null ${removed === 1 ? 'character' : 'characters'} (U+0000) from its text, which the app cannot store.`
+    );
+  }
+  return value;
+}
+
+/** Why a map holding more values than an export ever writes is left out. */
+const TOO_MANY_VALUES_REASON = `It holds more than ${IMPORT_LIMITS.MAX_MAP_VALUES.toLocaleString('en-US')} values, far more than CozyVTT ever writes for one map.`;
+
+async function readJsonEntry(archivePath: string, entry: ArchiveEntry, total: UnpackedTotal, report?: ImportReport): Promise<unknown> {
+  return parseEntryText(await readEntryText(archivePath, entry, total), entry, report);
+}
+
+/** Why an item whose data nests too deeply is left out. */
+const NESTED_TOO_DEEP_REASON = `Its data nests more than ${IMPORT_LIMITS.MAX_JSON_DEPTH} levels deep, far deeper than CozyVTT ever writes.`;
+
+/**
+ * A data file nests deeper than an export ever writes. Refuses the archive,
+ * unless the file holds one map, or the creatures or templates, which are
+ * then left out.
+ */
+class NestedTooDeepError extends ArchiveRefusedError {
+  constructor(file: string) {
+    super(
+      `${file} in the archive nests more than ${IMPORT_LIMITS.MAX_JSON_DEPTH} levels deep, far deeper than CozyVTT ever writes. ` +
+        'It may be damaged, or not a CozyVTT export.'
+    );
+    this.name = 'NestedTooDeepError';
+  }
+}
+
+/**
+ * Whether JSON text nests objects and lists more than `max` deep, read
+ * without parsing it: a bracket inside a string does not count.
+ */
+export function jsonNestsDeeperThan(text: string, max: number): boolean {
+  let depth = 0;
+  let inString = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (inString) {
+      if (c === 0x5c) i++; // a backslash escapes the next character
+      else if (c === 0x22) inString = false;
+    } else if (c === 0x22) {
+      inString = true;
+    } else if (c === 0x7b || c === 0x5b) {
+      if (++depth > max) return true;
+    } else if (c === 0x7d || c === 0x5d) {
+      depth--;
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether JSON text holds more than `max` values and members, read without
+ * parsing it: each comma outside a string separates two, so the count stops
+ * as soon as it passes `max`.
+ */
+export function jsonHoldsMoreValuesThan(text: string, max: number): boolean {
+  let separators = 0;
+  let inString = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (inString) {
+      if (c === 0x5c) i++; // a backslash escapes the next character
+      else if (c === 0x22) inString = false;
+    } else if (c === 0x22) {
+      inString = true;
+    } else if (c === 0x2c && ++separators >= max) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * How many items JSON text's top-level list holds, and where the `max`th one
+ * ends (the comma after it), when there are more; null when the text is not a
+ * list. Read without parsing, as jsonNestsDeeperThan reads: a list of tens of
+ * thousands of items costs far more parsed than its text.
+ */
+export function jsonListCut(text: string, max: number): { items: number; cutAt: number | null } | null {
+  let i = 0;
+  while (i < text.length && /\s/.test(text[i])) i++;
+  if (text.charCodeAt(i) !== 0x5b) return null;
+  let depth = 0;
+  let inString = false;
+  let items = 0;
+  let holdsValue = false;
+  let cutAt: number | null = null;
+  for (; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (inString) {
+      if (c === 0x5c) i++; // a backslash escapes the next character
+      else if (c === 0x22) inString = false;
+      continue;
+    }
+    if (c === 0x22) {
+      inString = true;
+      holdsValue = true;
+    } else if (c === 0x7b || c === 0x5b) {
+      depth++;
+      if (depth > 1) holdsValue = true;
+    } else if (c === 0x7d || c === 0x5d) {
+      depth--;
+      if (depth === 0) {
+        if (holdsValue) items++;
+        break;
+      }
+    } else if (depth === 1) {
+      if (c === 0x2c) {
+        items++;
+        holdsValue = false;
+        if (items === max && cutAt === null) cutAt = i;
+      } else if (c !== 0x20 && c !== 0x0a && c !== 0x0d && c !== 0x09) {
+        holdsValue = true;
+      }
+    }
+  }
+  return { items, cutAt: items > max ? cutAt : null };
+}
+
+/**
+ * Read the archive's creatures or templates, or nothing, listed as left
+ * out, when the file nests deeper than an export ever writes. Only the first
+ * `max` items are parsed; the rest are listed as left out.
+ */
+async function readListEntry(
+  archivePath: string,
+  entry: ArchiveEntry,
+  total: UnpackedTotal,
+  kind: SkippedKind,
+  what: string,
+  report: ImportReport,
+  limit: { max: number; one: string; many: string }
+): Promise<unknown> {
+  let text: string;
+  try {
+    text = await readEntryText(archivePath, entry, total);
+  } catch (error) {
+    if (!(error instanceof NestedTooDeepError)) throw error;
+    report.skip(kind, `${what} in the archive`, NESTED_TOO_DEEP_REASON);
+    return [];
+  }
+  const cut = jsonListCut(text, limit.max);
+  if (cut?.cutAt == null) return parseEntryText(text, entry, report);
+  const over = cut.items - limit.max;
+  report.skip(
+    kind,
+    `${over.toLocaleString('en-US')} ${over === 1 ? limit.one : limit.many}`,
+    `An archive can carry ${limit.max.toLocaleString('en-US')} ${limit.many}. These were the last in its list.`
+  );
+  return parseEntryText(`${text.slice(0, cut.cutAt)}]`, entry, report);
+}
+
+/** Say in words which limit an archive passed, or pass any other error on. */
+function describeLimit(error: unknown, entry: ArchiveEntry, total: UnpackedTotal): unknown {
+  if (!(error instanceof ArchiveLimitError)) return error;
+  if (error.limit === 'total') {
+    return new ArchiveRefusedError(
+      `The archive unpacks to more than ${megabytes(total.maxBytes)}, the most this server accepts for one campaign. ` +
+        'It may be damaged, or not a CozyVTT export.'
+    );
+  }
+  return new ArchiveRefusedError(
+    `${entry.path} in the archive unpacks to more than ${megabytes(IMPORT_LIMITS.MAX_JSON_SIZE_BYTES)}, ` +
+      'more than a campaign archive ever holds there. It may be damaged, or not a CozyVTT export.'
+  );
+}
+
+/** Parse one of the archive's own files with `schema`, refusing the archive in words when it does not fit. */
+function parseArchiveFile<T>(schema: z.ZodType<T>, value: unknown, file: string): T {
+  const parsed = schema.safeParse(value);
+  if (parsed.success) return parsed.data;
+  const issue = parsed.error.issues[0];
+  const where = issue?.path.length ? ` (${issue.path.join('.')})` : '';
+  throw new ArchiveRefusedError(`${file} in the archive is not one CozyVTT can read${where}: ${issue?.message ?? 'invalid'}`);
+}
+
+/** The archive's size on disk, refused when it is over the limit. */
+async function checkArchiveSize(archivePath: string, maxSize: number): Promise<void> {
+  const { size } = await fs.promises.stat(archivePath);
+  if (size > maxSize) {
+    throw new ArchiveRefusedError(`The archive is ${megabytes(size)}, more than the ${megabytes(maxSize)} this server accepts.`);
+  }
+}
+
+/**
+ * What an imported asset file is, by its bytes, when that is a format the
+ * upload route accepts for its type; null otherwise. The same rule as an
+ * upload (middleware/fileValidation.ts): the detected type, and the extension
+ * it is stored under, must be ones the type allows (isAcceptedContent), and
+ * an MP3 the detector does not know is accepted on its header when its name
+ * says it is one.
+ */
+async function identifyAsset(
+  filePath: string,
+  type: ImportableAssetType,
+  originalName: string
+): Promise<{ mime: string; ext: string } | null> {
+  const found = await fileTypeFromFile(filePath);
+  if (found) {
+    const detected = storedFileType(found);
+    return isAcceptedContent(type, detected) ? detected : null;
+  }
+  const named = path.extname(originalName).toLowerCase();
+  if (type === 'AUDIO' && named === '.mp3' && (await startsWithMp3Header(filePath))) return { mime: 'audio/mpeg', ext: 'mp3' };
+  return null;
+}
+
+/**
+ * The name an imported asset is shown and downloaded under: the archive's,
+ * unless its extension is not one its type allows, when the extension its
+ * bytes call for replaces it. A picture named `rules.exe` downloads as
+ * `rules.png`.
+ */
+function displayName(originalName: string, type: ImportableAssetType, ext: string): string {
+  // Cut to what an upload keeps, extension kept: the archive allows longer.
+  if (isAllowedExtension(type, path.extname(originalName))) return shortenFileName(originalName, MAX_ORIGINAL_NAME_LENGTH);
+  const base = originalName.replace(/\.[^.]*$/, '') || 'asset';
+  return shortenFileName(`${base}.${ext}`, MAX_ORIGINAL_NAME_LENGTH);
+}
+
+/** Rows written to the database in one statement, so a long list is never held as one. */
+const WRITE_BATCH = 500;
+
+/**
+ * Prepare each item and write the rows in batches, returning how many were
+ * written. Written whole, a list as long as its 10 MB file allows (some
+ * 65,000 creatures) took the heap to about a gigabyte in one createMany and
+ * stopped the server.
+ */
+export async function inBatches<Row>(
+  items: unknown[],
+  prepare: (item: unknown) => Row | null,
+  write: (rows: Row[]) => Promise<unknown>
+): Promise<number> {
+  let written = 0;
+  let batch: Row[] = [];
+  for (const item of items) {
+    const row = prepare(item);
+    if (row) batch.push(row);
+    if (batch.length === WRITE_BATCH) {
+      await write(batch);
+      written += batch.length;
+      batch = [];
+    }
+  }
+  if (batch.length > 0) {
+    await write(batch);
+    written += batch.length;
+  }
+  return written;
+}
+
+// ── Preview ───────────────────────────────────────────────────────
+
+/**
+ * Point each vibe period's audio at the imported copy of its asset.
+ *
+ * Returns the settings to store, or null when the archive's settings name no
+ * audio at all (nothing to change). A value that is not an asset id, or an
+ * id the archive's asset manifest does not carry, becomes no audio.
+ */
+export function remapVibePeriodAudio(
+  vibeSettings: unknown,
+  assetIdMap: Map<string, string>,
+): Record<string, unknown> | null {
+  if (!vibeSettings || typeof vibeSettings !== 'object' || Array.isArray(vibeSettings)) return null;
+  const settings = vibeSettings as Record<string, unknown>;
+  if (!Array.isArray(settings.periods)) return null;
+
+  let touched = false;
+  const periods = settings.periods.map((period) => {
+    if (!period || typeof period !== 'object' || Array.isArray(period)) return period;
+    const p = period as Record<string, unknown>;
+    if (p.audio == null) return period;
+    touched = true;
+    const oldId = vibePeriodAudioAssetId(p.audio);
+    return { ...p, audio: (oldId && assetIdMap.get(oldId)) ?? null };
+  });
+
+  return touched ? { ...settings, periods } : null;
+}
+
+/**
+ * The campaign's ambient track, pointed at the imported copy of its file,
+ * with its volume and looping as the Atmosphere panel stores them; or
+ * undefined when the archive names no track this import brought in.
+ */
+export function remapAtmosphereAudio(
+  vibeSettings: unknown,
+  audioIdMap: Map<string, string>,
+): { assetId: string; volume: number; loop: boolean } | undefined {
+  if (!vibeSettings || typeof vibeSettings !== 'object' || Array.isArray(vibeSettings)) return undefined;
+  const ambient = (vibeSettings as Record<string, unknown>).atmosphereAudio;
+  if (!ambient || typeof ambient !== 'object' || Array.isArray(ambient)) return undefined;
+  const { assetId, volume, loop } = ambient as Record<string, unknown>;
+  const oldId = vibePeriodAudioAssetId(assetId);
+  const newId = oldId ? audioIdMap.get(oldId) : undefined;
+  if (!newId) return undefined;
+  return {
+    assetId: newId,
+    volume: typeof volume === 'number' && Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 0.5,
+    loop: loop !== false,
+  };
+}
+
+/**
+ * Say which atmosphere tracks the archive names but does not hold: an
+ * export made without "Include audio assets", or by a version whose export
+ * never included sound.
+ */
+function sayMissingTracks(vibeSettings: unknown, audioIdMap: Map<string, string>, ambientKept: boolean, report: ImportReport): void {
+  if (!vibeSettings || typeof vibeSettings !== 'object' || Array.isArray(vibeSettings)) return;
+  const settings = vibeSettings as Record<string, unknown>;
+  const periods = Array.isArray(settings.periods) ? settings.periods : [];
+  const missing = periods
+    .filter((p): p is Record<string, unknown> => p !== null && typeof p === 'object' && !Array.isArray(p))
+    .filter((p) => {
+      const id = vibePeriodAudioAssetId(p.audio);
+      return id !== null && !audioIdMap.has(id);
+    })
+    .map((p) => label(p.name, 'unnamed'));
+  if (missing.length > 0) {
+    const names = missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`;
+    report.warn(
+      `The archive holds no track for the atmosphere's ${names} ${missing.length === 1 ? 'period' : 'periods'}, so ${missing.length === 1 ? 'it has' : 'they have'} none. ` +
+        'Export with Include audio assets ticked to bring tracks across.'
+    );
+  }
+  const ambient = settings.atmosphereAudio;
+  const ambientId = ambient && typeof ambient === 'object' ? vibePeriodAudioAssetId((ambient as Record<string, unknown>).assetId) : null;
+  if (ambientId && !ambientKept) {
+    report.warn('The archive holds no file for the ambient track, so none is playing. Export with Include audio assets ticked to bring it across.');
+  }
+}
+
+export async function previewCampaignImport(
+  archivePath: string
+): Promise<CampaignImportPreview> {
+  const maxSize = await getCampaignArchiveSizeLimit();
+  await checkArchiveSize(archivePath, maxSize);
+
+  // Extract only manifest.json
+  const directory = await openArchiveFile(archivePath, IMPORT_LIMITS.MAX_FILE_COUNT);
+  const manifestEntry = directory.files.find((f) => f.path === 'manifest.json');
+  if (!manifestEntry) {
+    throw new ArchiveRefusedError('Invalid archive: missing manifest.json');
+  }
+
+  const manifestRaw = await readJsonEntry(archivePath, manifestEntry, new UnpackedTotal(maxSize));
+  const parsed = ManifestSchema.safeParse(manifestRaw);
+  if (!parsed.success) {
+    throw new ArchiveRefusedError(`Invalid manifest: ${parsed.error.issues.map((i) => i.message).join('; ')}`);
+  }
+
+  return parsed.data;
+}
+
+// ── Import ────────────────────────────────────────────────────────
+
+/** A picture or track unpacked into the staging folder, waiting for the campaign to be saved. */
+interface StagedAsset {
+  oldId: string;
+  newId: string;
+  type: ImportableAssetType;
+  /** The folder its kind lives in under the uploads folder, and in its address. */
+  typeDir: 'maps' | 'tokens' | 'audio';
+  stagedPath: string;
+  /** Where it is moved once the campaign is saved, as the asset row records it. */
+  finalPath: string;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  fileSize: number;
+  /** Its own name and description, when its entry gives them. */
+  name?: string;
+  description?: string;
+  tags: string[];
+}
+
+/** Each kind of asset an archive carries, in words. */
+const ASSET_KIND_WORDS: Record<ImportableAssetType, string> = {
+  MAP: 'a map picture',
+  TOKEN: 'a token picture',
+  AUDIO: 'a sound file',
+};
+
+/** The folder each kind of imported asset is kept in, as uploads keep them. */
+function folderFor(type: ImportableAssetType): StagedAsset['typeDir'] {
+  return type === 'MAP' ? 'maps' : type === 'AUDIO' ? 'audio' : 'tokens';
+}
+
+/**
+ * Unpack every asset the manifest lists into `staging`, identify each by its
+ * bytes, and name it after what it is. An asset that is missing, over its
+ * type's upload limit, not a format its type allows, or a picture over the
+ * picture limits (utils/pictureLimits.ts) is left out.
+ */
+async function stageAssets(
+  archivePath: string,
+  files: ArchiveEntry[],
+  assetManifest: AssetManifestData,
+  total: UnpackedTotal,
+  staging: string,
+  campaignId: string,
+  report: ImportReport
+): Promise<StagedAsset[]> {
+  const staged: StagedAsset[] = [];
+  for (const [oldId, rawInfo] of Object.entries(assetManifest)) {
+    const fields = rawInfo !== null && typeof rawInfo === 'object' ? (rawInfo as Record<string, unknown>) : {};
+    const parsedInfo = AssetEntrySchema.safeParse(rawInfo);
+    if (!parsedInfo.success) {
+      const notCarried = typeof fields.type === 'string' && !(IMPORTABLE_ASSET_TYPES as readonly string[]).includes(fields.type);
+      report.skip(
+        'asset',
+        label(fields.originalName, oldId),
+        notCarried
+          ? 'A campaign archive carries map pictures, token pictures and audio, and this is none of them.'
+          : 'Its entry in the archive cannot be read.'
+      );
+      continue;
+    }
+    const assetInfo: AssetEntryData = parsedInfo.data;
+    const assetEntry = files.find((f) => f.path.startsWith(`assets/${oldId}`));
+    if (!assetEntry) {
+      report.skip('asset', label(assetInfo.originalName, oldId), 'Its file is missing from the archive.');
+      continue;
+    }
+
+    const newId = randomUUID();
+    // Unpacked under a name with no extension a serving route knows, and
+    // named after its content once that is known.
+    const unpackedPath = path.join(staging, `${newId}.importing`);
+
+    // A picture or track may be as large as an upload of its type, and no larger.
+    let fileSize: number;
+    try {
+      fileSize = await writeArchiveEntry(archivePath, assetEntry, unpackedPath, {
+        maxEntryBytes: getFileSizeLimit(assetInfo.type),
+        total,
+      });
+    } catch (error) {
+      if (error instanceof ArchiveLimitError && error.limit === 'entry') {
+        report.skip(
+          'asset',
+          label(assetInfo.originalName, oldId),
+          `It is larger than the ${megabytes(getFileSizeLimit(assetInfo.type))} an upload of its kind may be.`
+        );
+        continue;
+      }
+      throw describeLimit(error, assetEntry, total);
+    }
+
+    const content = await identifyAsset(unpackedPath, assetInfo.type, assetInfo.originalName);
+    if (!content) {
+      logger.warn('Skipping asset whose content is not a format its type allows', { oldId, type: assetInfo.type, declaredMime: assetInfo.mimeType });
+      report.skip(
+        'asset',
+        label(assetInfo.originalName, oldId),
+        `Its content is not a format ${ASSET_KIND_WORDS[assetInfo.type]} can be (${ALLOWED_EXTENSIONS[assetInfo.type].join(', ')}).`
+      );
+      await fs.promises.rm(unpackedPath, { force: true });
+      continue;
+    }
+    // A picture is held to the limits an upload of its kind is.
+    const tooLarge = isPictureAssetType(assetInfo.type) ? await pictureLimitProblem(unpackedPath, assetInfo.type) : null;
+    if (tooLarge) {
+      report.skip('asset', label(assetInfo.originalName, oldId), tooLarge);
+      await fs.promises.rm(unpackedPath, { force: true });
+      continue;
+    }
+    const filename = `${newId}.${content.ext}`;
+    const stagedPath = path.join(staging, filename);
+    await fs.promises.rename(unpackedPath, stagedPath);
+    const typeDir = folderFor(assetInfo.type);
+    // Its own name and description, held to what an upload may set: one an
+    // older release stored longer is cut to fit, and the import says so.
+    const fit = (text: string | undefined, max: number, what: string): string | undefined => {
+      if (text === undefined || text.length <= max) return text;
+      report.warn(`Asset "${label(assetInfo.originalName, oldId)}": shortened its ${what} to ${max.toLocaleString('en-US')} characters.`);
+      return cutText(text, max);
+    };
+    staged.push({
+      oldId,
+      newId,
+      type: assetInfo.type,
+      typeDir,
+      stagedPath,
+      // Stored under uploads/{type}/campaigns/{campaignId}/, as the upload system stores them.
+      finalPath: path.join(UPLOADS_BASE, typeDir, 'campaigns', campaignId, filename),
+      filename,
+      originalName: displayName(assetInfo.originalName, assetInfo.type, content.ext),
+      mimeType: content.mime,
+      fileSize,
+      name: fit(assetInfo.name, ASSET_LIMITS.maxNameLength, 'name'),
+      description: fit(assetInfo.description, ASSET_LIMITS.maxDescriptionLength, 'description'),
+      tags: assetInfo.tags ?? [],
+    });
+  }
+  return staged;
+}
+
+/** Move a file, copying it when it has to cross from one disk to another. */
+async function moveFile(from: string, to: string): Promise<void> {
+  try {
+    await fs.promises.rename(from, to);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
+    await fs.promises.copyFile(from, to);
+    await fs.promises.rm(from, { force: true });
+  }
+}
+
+/** Move every staged file to where its asset row says it is. */
+async function moveIntoPlace(assets: StagedAsset[]): Promise<void> {
+  for (const asset of assets) {
+    await fs.promises.mkdir(path.resolve(path.dirname(asset.finalPath)), { recursive: true });
+    await moveFile(asset.stagedPath, path.resolve(asset.finalPath));
+  }
+}
+
+/**
+ * Take back a campaign whose rows were saved but whose files could not be
+ * put in place: its asset rows (which outlive a deleted campaign), the
+ * campaign with everything that cascades from it, and its folders.
+ */
+async function undoImport(campaignId: string): Promise<void> {
+  try {
+    await prisma.$transaction([
+      prisma.asset.deleteMany({ where: { campaignId } }),
+      prisma.campaign.deleteMany({ where: { id: campaignId } }),
+    ]);
+  } catch (error) {
+    logger.error('Could not remove a campaign whose import failed after it was saved', { campaignId, error: errorMessage(error) });
+  }
+  for (const typeDir of ['maps', 'tokens', 'audio'] as const) {
+    await fs.promises
+      .rm(path.resolve(UPLOADS_BASE, typeDir, 'campaigns', campaignId), { recursive: true, force: true })
+      .catch(() => undefined);
+  }
+}
+
+export async function importCampaign(
+  archivePath: string,
+  importingUserId: string,
+  options: ImportOptions = {}
+): Promise<ImportResult> {
+  const { importTokens = true, campaignName } = options;
+  const maxSize = await getCampaignArchiveSizeLimit();
+  await checkArchiveSize(archivePath, maxSize);
+
+  // 1. Open ZIP and validate structure
+  const directory = await openArchiveFile(archivePath, IMPORT_LIMITS.MAX_FILE_COUNT);
+
+  // Enforce max file count
+  if (directory.files.length > IMPORT_LIMITS.MAX_FILE_COUNT) {
+    throw new ArchiveRefusedError(`Archive contains too many files (${directory.files.length}, max ${IMPORT_LIMITS.MAX_FILE_COUNT})`);
+  }
+
+  // Validate all paths are safe
+  for (const file of directory.files) {
+    if (!isSafeArchivePath(file.path)) {
+      throw new ArchiveRefusedError(`Unsafe file path detected: ${file.path}`);
+    }
+  }
+
+  // 2. Extract and validate manifest
+  const manifestEntry = directory.files.find((f) => f.path === 'manifest.json');
+  if (!manifestEntry) throw new ArchiveRefusedError('Invalid archive: missing manifest.json');
+
+  // Everything unpacked from the archive, against its limit (zip bomb protection).
+  const total = new UnpackedTotal(maxSize);
+  const report = new ImportReport();
+
+  const manifestData = parseArchiveFile(ManifestSchema, await readJsonEntry(archivePath, manifestEntry, total, report), 'manifest.json');
+
+  // 3. Extract campaign settings
+  const campaignEntry = directory.files.find((f) => f.path === 'campaign.json');
+  if (!campaignEntry) throw new ArchiveRefusedError('Invalid archive: missing campaign.json');
+
+  const campaignSettings = parseArchiveFile(CampaignSettingsSchema, await readJsonEntry(archivePath, campaignEntry, total, report), 'campaign.json');
+
+  // 4. Extract asset manifest
+  const assetManifestEntry = directory.files.find((f) => f.path === 'assets/asset-manifest.json');
+  let assetManifest: AssetManifestData = {};
+  if (assetManifestEntry) {
+    assetManifest = parseArchiveFile(
+      AssetManifestSchema,
+      await readJsonEntry(archivePath, assetManifestEntry, total, report),
+      'assets/asset-manifest.json'
+    );
+  }
+
+  const newCampaignId = randomUUID();
+  const staging = path.join(importTempDirectory(), `${newCampaignId}.staging`);
+  await fs.promises.mkdir(path.resolve(staging), { recursive: true });
+
+  try {
+    // 5. Unpack the pictures and tracks, so their new ids are known.
+    const assets = await stageAssets(archivePath, directory.files, assetManifest, total, path.resolve(staging), newCampaignId, report);
+    const assetRefMap = new Map(assets.map((a) => [a.oldId, `/api/assets/${a.typeDir}/${a.newId}`])); // old id → new address
+    // Old id → new id, for the sound files this import brought in: the only
+    // assets the atmosphere may name.
+    const audioIdMap = new Map(assets.filter((a) => a.type === 'AUDIO').map((a) => [a.oldId, a.newId]));
+
+    /** Remap an asset reference from the archive to the new URL. */
+    const remapAsset = (ref: string | null | undefined): string | null => (ref ? (assetRefMap.get(ref) ?? null) : null);
+    const mapPictureIds = new Set(assets.filter((a) => a.type === 'MAP').map((a) => a.oldId));
+    const isMapPicture = (ref: string): boolean => mapPictureIds.has(ref);
+    const tokenPictureIds = new Set(assets.filter((a) => a.type === 'TOKEN').map((a) => a.oldId));
+    const isTokenPicture = (ref: string): boolean => tokenPictureIds.has(ref);
+
+    // The same presets a new campaign gets, so an archive with no atmosphere
+    // settings imports with the atmosphere the allowlists accept.
+    const defaultVibeSettings = JSON.parse(JSON.stringify(DEFAULT_VIBE_SETTINGS)) as Prisma.InputJsonValue;
+    // Vibe periods name audio assets by id; point them at the imported copies.
+    // A track the archive does not carry becomes no audio, so an old note or a
+    // reference to an asset left out of the export never dangles.
+    const periodsRemapped =
+      remapVibePeriodAudio(campaignSettings.vibeSettings, audioIdMap) ?? campaignSettings.vibeSettings;
+    // The archive is a file the importer chose, so its ambient track is a
+    // client-supplied asset id like any other and is never kept as it is.
+    // It is pointed at this import's own copy of the file instead, an asset
+    // of the new campaign, or dropped.
+    const ambient = remapAtmosphereAudio(campaignSettings.vibeSettings, audioIdMap);
+    sayMissingTracks(campaignSettings.vibeSettings, audioIdMap, ambient !== undefined, report);
+    const keptVibe = preserveAtmosphereAudio(periodsRemapped);
+    const vibeSettings =
+      keptVibe && typeof keptVibe === 'object' && ambient ? { ...(keptVibe as Record<string, unknown>), atmosphereAudio: ambient } : keptVibe;
+    const name = campaignName || campaignSettings.name;
+    const gameSystem = importedGameSystem(
+      campaignSettings.gameSystem,
+      "The campaign's",
+      "The archive's game system is no longer supported, so the campaign has none.",
+      report,
+    );
+
+    // 6. Every row in one transaction: a failure anywhere leaves none of them.
+    // A row's creation time is the transaction's own start unless it is
+    // given one, and the Map Library and the asset library list by it, so
+    // each asset and map is given its own, a millisecond apart, in the
+    // archive's order.
+    const importedAt = Date.now();
+    let counts: Pick<ImportResult, 'mapCount' | 'tokenCount' | 'creatureCount' | 'tokenTemplateCount'>;
+    try {
+      counts = await prisma.$transaction(
+        async (tx) => {
+          await tx.campaign.create({
+            data: {
+              id: newCampaignId,
+              name,
+              description: campaignSettings.description || null,
+              gameSystem,
+              status: 'PREPARATION',
+              ownerId: importingUserId,
+              vibeSettings: (vibeSettings as Prisma.InputJsonValue) || defaultVibeSettings,
+              currentVibe: campaignSettings.currentVibe || null,
+              spiritLayerEnabled: campaignSettings.spiritLayerEnabled ?? false,
+              spiritLayerStyle: campaignSettings.spiritLayerStyle ?? 'wispy',
+              playersMayDraw: campaignSettings.playersMayDraw ?? true,
+            },
+          });
+          await tx.campaignMembership.create({
+            data: { id: randomUUID(), userId: importingUserId, campaignId: newCampaignId, role: 'GM' },
+          });
+          if (assets.length > 0) {
+            await tx.asset.createMany({
+              data: assets.map((a, i) => ({
+                id: a.newId,
+                type: a.type,
+                scope: 'CAMPAIGN' as const,
+                uploadedById: importingUserId,
+                campaignId: newCampaignId,
+                filename: a.filename,
+                originalName: a.originalName,
+                mimeType: a.mimeType,
+                fileSize: a.fileSize,
+                filePath: a.finalPath.replace(/\\/g, '/'),
+                // An archive made before names were carried has none: the
+                // asset is named after its file.
+                name: a.name ?? cutText(a.originalName.replace(/\.[^.]+$/, ''), ASSET_LIMITS.maxNameLength),
+                description: a.description ?? null,
+                tags: a.tags,
+                createdAt: new Date(importedAt + i),
+              })),
+            });
+          }
+
+          // Maps are read from the archive one at a time as they are written,
+          // so no more than one is in memory.
+          let mapCount = 0;
+          let tokenCount = 0;
+          let firstMapId: string | null = null;
+          for (let i = 0; i < manifestData.mapCount; i++) {
+            const mapEntry = directory.files.find((f) => f.path === `maps/map-${i}.json`);
+            if (!mapEntry) {
+              report.skip('map', `Map ${i + 1}`, 'Its file is missing from the archive.');
+              continue;
+            }
+            let mapRaw: unknown;
+            try {
+              // Counted on the text first: 10 MB of tiny walls costs several
+              // times what the largest real map does to parse.
+              const mapText = await readEntryText(archivePath, mapEntry, total);
+              if (jsonHoldsMoreValuesThan(mapText, IMPORT_LIMITS.MAX_MAP_VALUES)) {
+                report.skip('map', `Map ${i + 1}`, TOO_MANY_VALUES_REASON);
+                continue;
+              }
+              mapRaw = parseEntryText(mapText, mapEntry, report);
+            } catch (error) {
+              if (!(error instanceof NestedTooDeepError)) throw error;
+              report.skip('map', `Map ${i + 1}`, NESTED_TOO_DEEP_REASON);
+              continue;
+            }
+            const prepared = prepareMap(mapRaw, { index: i, importTokens, remapAsset, isMapPicture, isTokenPicture, report });
+            if (!prepared) continue;
+
+            const mapId = randomUUID();
+            await tx.map.create({
+              data: { ...prepared.data, id: mapId, campaignId: newCampaignId, createdAt: new Date(importedAt + assets.length + i) },
+            });
+            // In one statement, after their map, with no author and each a
+            // millisecond after the last, so drawings with the same sortKey
+            // keep the archive's order.
+            if (prepared.drawings.length > 0) {
+              await tx.mapDrawing.createMany({
+                // The GM's share goes back to the importing GM, the players' with no author.
+                data: prepared.drawings.map(({ share, ...drawing }, n) => ({
+                  ...drawing, mapId, authorId: share === 'GM' ? importingUserId : null, createdAt: new Date(importedAt + n),
+                })),
+              });
+            }
+            firstMapId ??= mapId;
+            mapCount++;
+            tokenCount += prepared.tokenCount;
+          }
+          // The first map imported is the one the campaign opens on.
+          if (firstMapId) {
+            await tx.campaign.update({ where: { id: newCampaignId }, data: { currentMapId: firstMapId } });
+          }
+
+          // Creatures
+          let creatureCount = 0;
+          const creaturesEntry = directory.files.find((f) => f.path === 'creatures/creatures.json');
+          if (creaturesEntry) {
+            const creaturesRaw = await readListEntry(archivePath, creaturesEntry, total, 'creature', 'Creatures', report,
+              { max: IMPORT_LIMITS.MAX_CREATURES, one: 'creature', many: 'creatures' });
+            if (Array.isArray(creaturesRaw)) {
+              creatureCount = await inBatches(creaturesRaw, (raw) => {
+                const row = prepareCreature(raw, { remapAsset, isTokenPicture, report });
+                return row ? { ...row, id: randomUUID(), createdById: importingUserId, campaignId: newCampaignId } : null;
+              }, (data: Prisma.CreatureTemplateCreateManyInput[]) => tx.creatureTemplate.createMany({ data }));
+            }
+          }
+
+          // Token templates
+          let tokenTemplateCount = 0;
+          const templatesEntry = directory.files.find((f) => f.path === 'token-templates/templates.json');
+          if (templatesEntry) {
+            const templatesRaw = await readListEntry(archivePath, templatesEntry, total, 'tokenTemplate', 'Token templates', report,
+              { max: IMPORT_LIMITS.MAX_TOKEN_TEMPLATES, one: 'token template', many: 'token templates' });
+            if (Array.isArray(templatesRaw)) {
+              tokenTemplateCount = await inBatches(templatesRaw, (raw) => {
+                const row = prepareTokenTemplate(raw, { remapAsset, isTokenPicture, report });
+                return row ? { ...row, id: randomUUID(), createdById: importingUserId, campaignId: newCampaignId } : null;
+              }, (data: Prisma.TokenTemplateCreateManyInput[]) => tx.tokenTemplate.createMany({ data }));
+            }
+          }
+
+          return { mapCount, tokenCount, creatureCount, tokenTemplateCount };
+        },
+        { maxWait: 10_000, timeout: IMPORT_TRANSACTION_TIMEOUT_MS }
+      );
+    } catch (error) {
+      // Nothing was written. A problem with the archive is said in words;
+      // anything else is the server's, and its detail is for the log.
+      if (error instanceof ArchiveRefusedError) throw error;
+      logger.error('Campaign import could not be saved', { error: errorMessage(error), importingUserId });
+      throw new CampaignImportFailedError();
+    }
+
+    // 7. The rows are saved: put the files where they say they are.
+    try {
+      await moveIntoPlace(assets);
+    } catch (error) {
+      logger.error('Campaign import could not move its files into place', { campaignId: newCampaignId, error: errorMessage(error) });
+      await undoImport(newCampaignId);
+      throw new CampaignImportFailedError();
+    }
+
+    const { warnings, skipped } = report.result();
+    logger.info('Campaign imported', {
+      campaignId: newCampaignId, campaignName: name, ...counts, importingUserId, warnings: warnings.length, skipped: skipped.length,
+    });
+    // What was changed or left out, for whoever runs the server as well.
+    for (const warning of warnings) logger.warn('Campaign import changed', { campaignId: newCampaignId, warning });
+    for (const item of skipped) logger.warn('Campaign import left out', { campaignId: newCampaignId, ...item });
+
+    return { campaignId: newCampaignId, campaignName: name, ...counts, warnings, skipped };
+  } finally {
+    await fs.promises.rm(path.resolve(staging), { recursive: true, force: true }).catch(() => undefined);
+  }
+}

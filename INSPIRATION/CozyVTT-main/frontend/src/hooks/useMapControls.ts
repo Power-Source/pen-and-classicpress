@@ -1,0 +1,334 @@
+// ============================================
+// useMapControls Hook
+// Manages zoom, pan, and coordinate conversions for map canvas
+// ============================================
+
+import { useState, useCallback, useRef } from 'react';
+import { flipGridY } from '@/components/campaign/map/coords';
+
+interface MapControlsConfig {
+  /** Grid size in pixels (e.g., 50 means each grid cell is 50x50 pixels at 1x zoom) */
+  gridSize: number;
+  /** Map width in grid cells */
+  mapWidth: number;
+  /** Map height in grid cells */
+  mapHeight: number;
+  /** Minimum zoom level */
+  minZoom?: number;
+  /** Maximum zoom level */
+  maxZoom?: number;
+}
+
+interface GridCoordinates {
+  x: number;
+  y: number;
+}
+
+interface ScreenCoordinates {
+  x: number;
+  y: number;
+}
+
+interface PanOffset {
+  x: number;
+  y: number;
+}
+
+/**
+ * The pan that keeps the map point under the screen point `about` where it
+ * is when the zoom is multiplied by `ratio`:
+ * (about - pan) / zoom = (about - newPan) / newZoom.
+ */
+function panKeeping(about: ScreenCoordinates, pan: PanOffset, ratio: number): PanOffset {
+  return { x: about.x + (pan.x - about.x) * ratio, y: about.y + (pan.y - about.y) * ratio };
+}
+
+export function useMapControls(config: MapControlsConfig) {
+  const {
+    gridSize,
+    mapWidth,
+    mapHeight,
+    minZoom = 0.5,
+    maxZoom = 3,
+  } = config;
+
+  // State
+  const [zoom, setZoom] = useState<number>(1);
+  const [panOffset, setPanOffset] = useState<PanOffset>({ x: 0, y: 0 });
+
+  // Refs for drag tracking
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef<ScreenCoordinates>({ x: 0, y: 0 });
+  const panStartRef = useRef<PanOffset>({ x: 0, y: 0 });
+
+  /**
+   * Clamp zoom level to min/max bounds
+   */
+  const clampZoom = useCallback(
+    (value: number): number => {
+      return Math.max(minZoom, Math.min(maxZoom, value));
+    },
+    [minZoom, maxZoom]
+  );
+
+  // The view as it was last set, which every change works from. State only
+  // updates on the next render, so two wheel notches before it both read the
+  // old zoom and the second undid the first.
+  const viewRef = useRef<{ zoom: number; pan: PanOffset }>({ zoom: 1, pan: { x: 0, y: 0 } });
+  const setView = useCallback((nextZoom: number, nextPan: PanOffset) => {
+    viewRef.current = { zoom: nextZoom, pan: nextPan };
+    setZoom(nextZoom);
+    setPanOffset(nextPan);
+  }, []);
+
+  /**
+   * Zoom to `value`, keeping the screen point `about` where it is. Without
+   * one the pan is left alone, which zooms about the map's top-left corner.
+   */
+  const zoomTo = useCallback(
+    (value: number, about?: ScreenCoordinates) => {
+      const { zoom: current, pan } = viewRef.current;
+      const next = clampZoom(value);
+      if (!about) {
+        setView(next, pan);
+        return;
+      }
+      setView(next, panKeeping(about, pan, next / current));
+    },
+    [clampZoom, setView]
+  );
+
+  /** Zoom in by 0.25, about `about` (the canvas centre, for the button). */
+  const zoomIn = useCallback((about?: ScreenCoordinates) => {
+    zoomTo(viewRef.current.zoom + 0.25, about);
+  }, [zoomTo]);
+
+  /** Zoom out by 0.25, about `about` (the canvas centre, for the button). */
+  const zoomOut = useCallback((about?: ScreenCoordinates) => {
+    zoomTo(viewRef.current.zoom - 0.25, about);
+  }, [zoomTo]);
+
+  /**
+   * Set zoom to specific value
+   */
+  const setZoomLevel = useCallback(
+    (value: number) => {
+      zoomTo(value);
+    },
+    [zoomTo]
+  );
+
+  /**
+   * Fit the entire map within the canvas, centered with a small margin.
+   * This is the preferred "reset view" for map switches and the Reset button.
+   */
+  const fitToScreen = useCallback(
+    (canvasWidth: number, canvasHeight: number) => {
+      if (!canvasWidth || !canvasHeight) return;
+
+      const mapWidthPx = mapWidth * gridSize;
+      const mapHeightPx = mapHeight * gridSize;
+      if (!mapWidthPx || !mapHeightPx) return;
+
+      // Scale down to fit entirely inside the canvas with a 5% margin on each side
+      const fitZoom = clampZoom(
+        Math.min(
+          (canvasWidth * 0.9) / mapWidthPx,
+          (canvasHeight * 0.9) / mapHeightPx
+        )
+      );
+
+      // Center the scaled map in the canvas
+      const panX = (canvasWidth - mapWidthPx * fitZoom) / 2;
+      const panY = (canvasHeight - mapHeightPx * fitZoom) / 2;
+
+      setView(fitZoom, { x: panX, y: panY });
+    },
+    [mapWidth, mapHeight, gridSize, clampZoom, setView]
+  );
+
+  /**
+   * Handle mouse wheel zoom
+   * Zooms towards mouse cursor position
+   */
+  const handleWheel = useCallback(
+    (e: WheelEvent, canvasRect: DOMRect) => {
+      e.preventDefault();
+
+      // Calculate mouse position relative to canvas
+      const mouseX = e.clientX - canvasRect.left;
+      const mouseY = e.clientY - canvasRect.top;
+
+      // A tenth per mouse notch, which browsers send as 100 pixels or 3
+      // lines; a trackpad's small deltas zoom a little each. Capped at a
+      // button's step, for a hard flick.
+      const pixels = e.deltaMode === 1 ? e.deltaY * (100 / 3) : e.deltaMode === 2 ? e.deltaY * 800 : e.deltaY;
+      const step = Math.max(-0.25, Math.min(0.25, -pixels / 1000));
+
+      // Zoom towards the cursor: the world coordinate under the mouse stays fixed.
+      zoomTo(viewRef.current.zoom + step, { x: mouseX, y: mouseY });
+    },
+    [zoomTo]
+  );
+
+  // The zoom a two-finger pinch began at, which each step of it scales.
+  const pinchZoomRef = useRef(1);
+
+  /** A pinch begins: its scale is measured from the zoom now. */
+  const pinchStart = useCallback(() => {
+    pinchZoomRef.current = viewRef.current.zoom;
+  }, []);
+
+  /**
+   * A step of a pinch: the pan follows the fingers' centre by `dx`, `dy`, then
+   * the zoom becomes the pinch's starting zoom times `scale`, about `centre`,
+   * clamped as the wheel's is. Moving the pan first keeps the map under the
+   * fingers; zooming about the new centre first would drift by the centre's
+   * move times the change in zoom. All in canvas pixels.
+   */
+  const pinchBy = useCallback(
+    (scale: number, centre: ScreenCoordinates, dx: number, dy: number) => {
+      const { zoom: current, pan } = viewRef.current;
+      const next = clampZoom(pinchZoomRef.current * scale);
+      setView(next, panKeeping(centre, { x: pan.x + dx, y: pan.y + dy }, next / current));
+    },
+    [clampZoom, setView]
+  );
+
+  /** Pan the view by `dx`, `dy` canvas pixels, keeping the zoom. */
+  const panBy = useCallback((dx: number, dy: number) => {
+    const { zoom: current, pan } = viewRef.current;
+    setView(current, { x: pan.x + dx, y: pan.y + dy });
+  }, [setView]);
+
+  /**
+   * Start dragging (pan) from a pointer's page position
+   */
+  const startDrag = useCallback(
+    (e: { clientX: number; clientY: number }) => {
+      isDraggingRef.current = true;
+      dragStartRef.current = { x: e.clientX, y: e.clientY };
+      panStartRef.current = { ...viewRef.current.pan };
+    },
+    []
+  );
+
+  /**
+   * Handle drag movement (pan)
+   */
+  const handleDrag = useCallback((e: { clientX: number; clientY: number }) => {
+    if (!isDraggingRef.current) return;
+
+    const deltaX = e.clientX - dragStartRef.current.x;
+    const deltaY = e.clientY - dragStartRef.current.y;
+
+    setView(viewRef.current.zoom, {
+      x: panStartRef.current.x + deltaX,
+      y: panStartRef.current.y + deltaY,
+    });
+  }, [setView]);
+
+  /**
+   * Stop dragging (pan)
+   */
+  const stopDrag = useCallback(() => {
+    isDraggingRef.current = false;
+  }, []);
+
+  /**
+   * Convert screen coordinates to grid coordinates
+   * Screen coords = mouse position on canvas
+   * Grid coords = grid cell position (0,0 = bottom-left, the usual VTT convention)
+   */
+  const screenToGrid = useCallback(
+    (screen: ScreenCoordinates): GridCoordinates => {
+      // Remove pan offset and zoom to get world coordinates
+      const worldX = (screen.x - panOffset.x) / zoom;
+      const worldY = (screen.y - panOffset.y) / zoom;
+
+      // Convert world coordinates to grid coordinates (top-left based)
+      const gridX = Math.floor(worldX / gridSize);
+      const gridYFromTop = Math.floor(worldY / gridSize);
+
+      // Invert Y to use bottom-left origin (the usual VTT convention) — see map/coords.ts
+      const gridY = flipGridY(gridYFromTop, mapHeight);
+
+      return { x: gridX, y: gridY };
+    },
+    [zoom, panOffset, gridSize, mapHeight]
+  );
+
+  /**
+   * Convert grid coordinates to screen coordinates
+   * Grid coords = grid cell position (0,0 = bottom-left)
+   * Screen coords = top-left pixel position on canvas (accounting for zoom and pan)
+   */
+  const gridToScreen = useCallback(
+    (grid: GridCoordinates): ScreenCoordinates => {
+      // Convert bottom-left grid Y to top-left world Y (flipGridY is its own inverse)
+      const gridYFromTop = flipGridY(grid.y, mapHeight);
+
+      // Convert grid coordinates to world coordinates (top-left of cell)
+      const worldX = grid.x * gridSize;
+      const worldY = gridYFromTop * gridSize;
+
+      // Apply zoom and pan to get screen coordinates
+      const screenX = worldX * zoom + panOffset.x;
+      const screenY = worldY * zoom + panOffset.y;
+
+      return { x: screenX, y: screenY };
+    },
+    [zoom, panOffset, gridSize, mapHeight]
+  );
+
+  /**
+   * Check if grid coordinates are within map bounds
+   */
+  const isWithinBounds = useCallback(
+    (grid: GridCoordinates): boolean => {
+      return grid.x >= 0 && grid.x < mapWidth && grid.y >= 0 && grid.y < mapHeight;
+    },
+    [mapWidth, mapHeight]
+  );
+
+  /**
+   * Get current scaled grid size (accounting for zoom)
+   */
+  const getScaledGridSize = useCallback((): number => {
+    return gridSize * zoom;
+  }, [gridSize, zoom]);
+
+  return {
+    // State
+    zoom,
+    panOffset,
+    isDragging: isDraggingRef.current,
+
+    // Zoom controls
+    zoomIn,
+    zoomOut,
+    setZoomLevel,
+    fitToScreen,
+
+    // Pan controls
+    panBy,
+    startDrag,
+    handleDrag,
+    stopDrag,
+
+    // Coordinate conversion
+    screenToGrid,
+    gridToScreen,
+    isWithinBounds,
+    getScaledGridSize,
+
+    // Event handlers
+    handleWheel,
+    pinchStart,
+    pinchBy,
+
+    // Bounds
+    minZoom,
+    maxZoom,
+  };
+}

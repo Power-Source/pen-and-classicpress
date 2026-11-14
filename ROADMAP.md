@@ -1,0 +1,481 @@
+# Roadmap: PS Pen & Paper
+
+## Vision
+
+PS Pen & Paper wird ein universeller Baukasten für Pen-and-Paper-Rollenspiele
+auf WordPress und ClassicPress. Spielleiter erschaffen eigene Kampagnen, Regeln,
+Charakterbögen und Abenteuer. Das Plugin schreibt weder eine Spielwelt noch ein
+bestimmtes Regelsystem vor.
+
+Mehrere Kampagnen mit unterschiedlichen Regeln können auf derselben Website
+nebeneinander bestehen. Das Plugin soll ohne externe Spieleplattform,
+Echtzeitpflicht oder große Game-Engine nutzbar sein.
+
+Diese Roadmap ist ein Arbeitsentwurf, keine Zusage für bestimmte Termine oder
+einen endgültigen Funktionsumfang.
+
+## Entwicklungsstand
+
+- Kampagnenverwaltung mit kampagnenbezogenen Spielleiter- und Spielerrechten
+  sowie ausdrücklich vergebener Erstellberechtigung ist vorhanden.
+- Der erste Regelwerks-Editor unterstützt erlaubte Würfel und frei benennbare
+  Charakterfelder mit Startwerten und Grenzen.
+- Charaktere können aus der Vorlage erstellt werden. Spielleiter konfigurieren
+  pro Kampagne direkte Spielerbearbeitung, Freigabepflicht oder ausschließliche
+  Spielleiterbearbeitung. Gültige Werte und offene Anträge werden getrennt
+  gespeichert; Charaktere sind nur für Besitzer und Spielleiter sichtbar.
+- Änderungen an verwendeten Feldstrukturen sind zunächst gesperrt. Eine
+  kontrollierte Übernahme solcher Änderungen folgt später.
+- Die Verwaltung verwendet responsives CSS und Vanilla JavaScript; die
+  Einrichtung auf Handy und Tablet wird bei weiteren Schritten mitgeprüft.
+- Der geschützte Frontend-Spielbereich per `[ps_pen_paper]` zeigt Kampagnen,
+  Regeln und Charaktere mit denselben Bearbeitungs- und Freigaberechten.
+  Eine optionale Spielbereich-Seitenvorlage ist unabhängig vom Theme-Layout.
+- Spielleiter passen Farben pro Kampagne über „Style“ an, einschließlich
+  Live-Vorschau, Standardfarben und Kontrasthinweisen. Freies CSS ist dafür
+  nicht nötig.
+- Die erste Würfelmechanik unterstützt begrenzte W-/D-Ausdrücke, optionale
+  freigegebene Attributwerte und ein geschütztes Wurfprotokoll. Spielleiter
+  bestimmen erlaubte Gruppen-, Privat- und verdeckte Würfe pro Kampagne.
+- SVG-Würfelformen und eine reduzierte Bewegung respektierende Wurfanimation
+  visualisieren ausschließlich bereits gespeicherte Serverergebnisse.
+- Ein gemeinsames Ereignisprotokoll verbindet bestehende Würfe mit neuen Regel-
+  und Charakteränderungen, Anträgen und Freigabeentscheidungen. Vorher-/Nachher-
+  Stände bleiben erhalten; Charaktereinträge sind nur für Besitzer und aktuelle
+  Spielleiter sichtbar. Erkannte Speicherfehler führen zu einer revisionsgeschützten
+  Rücknahme oder einer ausdrücklichen Aufforderung zur Administratorprüfung.
+- Seit Version 0.8.0 gibt es einen digitalen Spieltisch mit Teilnehmerleiste,
+  lesbaren Charakterbögen, mobilen Bereichen und getrenntem Würfel-/Protokollbereich.
+  Freiwillige Anwesenheit, manuelles AFK und ein revisionsgeschützter,
+  protokollierter Zugmarker sind vorhanden.
+- PS Chat ist optional als einklappbare Chatbox eingebettet. Die ergänzten
+  Chat-Schnittstellen prüfen aktuelle Kampagnenmitgliedschaften und vergeben
+  Moderation an die Spielleitung, ohne globale Benutzerrollen zu erweitern.
+- Version 0.9.0 trennt die große Erzählfläche, die kompakte Gruppenleiste und
+  den gegliederten Charakterbogen. Übersicht, Kampagnen, Charakterverwaltung
+  und Einstellungen sind eigene Verwaltungsbereiche.
+- Zugang und optionaler öffentlicher Teaser sind ausdrücklich konfigurierbar.
+  Angemeldete Website-Mitglieder können eine Aufnahme beantragen; nur die
+  Spielleitung entscheidet. Die interne Beschreibung wird nie zum Teaser.
+- Eigene Hintergrundbilder der Spielfläche werden ohne öffentliche Medien-URL
+  geschützt gespeichert. Bild-Avatare und Bogen-Hintergründe sind noch offen.
+- Netzwerk-Superadmins behalten auch ohne Unterwebsite-Mitgliedschaft Zugriff
+  auf sämtliche dortigen Spielinhalte und die Chat-Moderation.
+- Version 0.10.0 ergänzt die private Universumsverwaltung im Backend und Frontend.
+  Universen besitzen Name, interne Weltbeschreibung und revisionsgeschützte
+  Historie. Kampagnen lassen sich nach Vorschau und Bestätigung zuordnen oder
+  lösen, ohne ihre Regeln, Bögen, Freigaben oder Rechte zu verändern.
+- Die Textdomain `ps-pen-paper` ist eingebunden; ein POT-Katalog im Verzeichnis
+  `languages/` dient als Grundlage für spätere PO/MO-Übersetzungen.
+
+### Universum vor Kampagne: Grundmodell seit Version 0.11.0
+
+- Universen besitzen Regelvorlage und leitungsverwaltete Basisbögen.
+  Leere Kampagnen übernehmen die Vorlage ausdrücklich mit stabilen Feldkennungen;
+  spätere Regeländerungen werden nicht automatisch synchronisiert.
+- Bei der Aufnahme eines bereits zugelassenen Besitzers wählt die Spielleitung
+  **gemeinsamen Basisstand oder unabhängige Kampagnenkopie**. Beide Varianten sind
+  vorhanden; bestehende Kampagnenbögen bleiben unverändert.
+- Kampagnenleitungen können eigene ganzzahlige Attribut- und Zahlenauflagen
+  unmittelbar freigeben. Ein frei benanntes Stufenfeld ist möglich, aber kein
+  festes Levelsystem. Basiswerte und andere Kampagnen werden nicht überschrieben.
+- Basisfortschritt und lokale Auflagen besitzen Revisionen und geschützte
+  Historien. Würfe speichern tatsächlich verwendete Werte sowie Basis- und
+  Kontextrevisionen; alte Würfe werden nicht nachträglich berechnet.
+- Geschichten, Teilnehmer, Chat und Protokolle bleiben kampagnengetrennt.
+  Universumsbesitz oder Bogenbesitz gewährt keine zusätzliche Teilnahme.
+
+### Weitere strukturelle Schritte
+
+- Kontrollierte Migration bestehender Kampagnen mit Vorschau, eindeutiger
+  Zuordnung und Konfliktauflösung; keine stillschweigende Zusammenführung.
+- Kontrollierter Wechsel zwischen gemeinsamem Stand und Kopie sowie Ablösen
+  gemeinsamer Bögen. Solange das fehlt, sperren gemeinsame Bögen einen
+  Universumswechsel beziehungsweise das Lösen der Zuordnung.
+- Konfigurierbare universumsweite Teilnahme und zusätzliche kampagnenbezogene
+  Freigaben. Aktuell entscheidet weiterhin jede Kampagne über ihre Mitglieder;
+  eine spätere Universumsmitgliedschaft darf keine Geschichten ungefragt öffnen.
+- Spielerbearbeitung von Basisbögen mit passendem Antrags- und Freigabemodell.
+- Ressourcenauflagen, optionaler XP-/Levelautomatismus und getrennte Spielsitzungen.
+
+## Grundprinzipien
+
+- **Kampagnen sind getrennte Spielräume:** Mitglieder, Regeln, Inhalte und
+  Spielereignisse bleiben getrennt. Gemeinsame Basisbögen werden ausdrücklich
+  eingebunden; kampagnenbezogene Auflagen ändern ihren Ursprung nicht.
+- **Das Regelwerk ist konfigurierbar:** Begriffe wie Klasse, Rasse oder Mana
+  sind nicht verpflichtend. Vorlagen sind Angebote, keine Vorgaben.
+- **Felder sind umbenennbar:** Ein Ressourcenfeld kann beispielsweise „Mana“,
+  „Wut“ oder „Glück“ heißen. Seine interne Kennung bleibt beim Umbenennen
+  erhalten, damit Werte und Verknüpfungen bestehen bleiben.
+- **Sichtbarkeit ist eine Berechtigung:** Geheime Inhalte werden nicht nur
+  optisch versteckt, sondern bei jedem Zugriff geschützt.
+- **Erweiterungen sind optional:** Das Grundsystem funktioniert auch ohne
+  PS Chat, PS Wiki oder andere Plugins.
+- **Gemeinsam und zeitversetzt spielbar:** Die Gruppe kann live spielen,
+  Echtzeitkommunikation ist aber keine Voraussetzung.
+- **Einfach bedienen:** Theme-unabhängige Frontend-Ausgabe, zugängliche
+  Oberflächen und möglichst wenige zusätzliche Abhängigkeiten.
+
+## Prioritäten für die nächsten Entwicklungsschritte
+
+### 1. Regeländerungen ohne Datenverlust
+
+Stabile Feldkennungen und eine Sperre für Änderungen an verwendeten
+Feldstrukturen schützen bestehende Charaktere bereits. Umbenennungen ändern
+keine Feldkennung; neue Startwerte überschreiben keine bestehenden Werte.
+Neue Regeländerungen besitzen inzwischen zusätzlich einen Vorher-/Nachher-Verlauf.
+Eine Änderungsvorschau und kontrollierte strukturelle Übernahme stehen noch aus.
+
+- Vor Änderungen an Wertebereichen, Feldtypen oder der Feldliste betroffene
+  Charaktere und offene Freigabeanträge in einer Änderungsvorschau zeigen.
+- Ungültig werdende Werte ausdrücklich auflösen lassen, statt sie automatisch
+  abzuschneiden, zurückzusetzen oder zu löschen. Bis eine kontrollierte
+  Übernahme vorhanden ist, bleibt die bestehende Sperre erhalten.
+- Regeländerungen mit Revision und verantwortlichem Spielleiter dokumentieren.
+  Bereits gespeicherte Würfe behalten ihre damaligen Werte und Bezeichnungen.
+
+### 2. Ein gemeinsames, geschütztes Spielprotokoll
+
+Die gemeinsame Grundlage für Würfe, Charakter- und Regeländerungen ist
+vorhanden. Weitere schreibende Module müssen daran anschließen, ohne den
+Schutz bestehender Ereignisse aufzuweichen.
+
+- Würfe, Charaktererstellung, Attribut- und Ressourcenänderungen,
+  Freigabeanträge, Freigaben, Ablehnungen und Regeländerungen nachvollziehen.
+  Der Story Builder ergänzt später Szenenveröffentlichungen und Rücknahmen.
+- Zeitpunkt, handelnde Person, betroffene Kennungen und Revisionen festhalten;
+  bei Wertänderungen Vorher/Nachher und bei Freigaben die Entscheidung.
+- Ereignisse erst für tatsächlich gespeicherte Aktionen erfassen.
+  Fehler zwischen Änderung und Protokollierung dürfen nicht unbemerkt bleiben.
+- Sichtbarkeit pro Ereignis durchsetzen: Ein privater Charakterwert oder eine
+  Spielleiteraktion wird nicht durch einen allgemeinen Protokolleintrag öffentlich.
+  Auch Filter, Seitenzahlen und Vorschauen dürfen keine Geheimnisse verraten.
+- Historische Einträge nicht nachträglich überschreiben; Korrekturen als neue
+  Ereignisse erfassen. Das Protokoll ergänzt Datensicherungen, ersetzt sie aber nicht.
+
+### 3. Den Story Builder als Herzstück entwickeln
+
+Nach diesen Grundlagen hat der durchgängige Erzählablauf Vorrang vor weiteren
+Zusatzmodulen: Kapitel anlegen, Szene vorbereiten, Spielervorschau prüfen,
+freigeben und im Spielbereich lesen.
+
+- Spielertext und Spielleitergeheimnisse klar getrennt bearbeiten und speichern.
+- Entwurf, Veröffentlichung und Rücknahme bewusst unterscheiden; Änderungen
+  an einer bereits veröffentlichten Szene nicht versehentlich sofort ausliefern.
+- Den ersten vollständigen Ablauf einschließlich Rechteprüfung und
+  Protokolleintrag umsetzen, bevor NPC-Verwaltung oder komplexe Begegnungen folgen.
+- Einrichtung und Bedienung auch auf Handy und Tablet ermöglichen, ohne
+  verpflichtendes Drag-and-drop oder einen großen visuellen Abenteuergraphen.
+
+## Der digitale Spieltisch und sein weiterer Ausbau
+
+Eine erste Oberfläche, Zugsteuerung, Anwesenheit, AFK und Chat-Anbindung sind
+vorhanden. Eigene Bildhintergründe, Bild-Avatare, Levelregeln und die Anbindung
+an den noch fehlenden Story Builder bleiben Entwicklungsziele.
+Vorbereitung und Spiel werden getrennt: Im Spielbereich stehen
+Gruppe, eigener Charakterbogen, Würfel und später die freigegebene Szene im
+Vordergrund, nicht dauerhaft geöffnete Einstellungsformulare.
+
+### Aufgeräumte Spieloberfläche
+
+- Teilnehmerleiste mit Spielleitung und Spielern; ausdrücklich freigegebene
+  Charakternamen und Porträts ergänzen die Darstellung, ohne private Bögen
+  für die ganze Gruppe zu öffnen.
+- Eigener Charakterbogen mit lesbaren Attributfeldern und Ressourcenanzeigen.
+  Eingaben erst beim bewussten Bearbeiten öffnen.
+- Kompakte Würfelablage und bei Bedarf aufklappbares Spielprotokoll statt
+  einer langen Seite mit allen Formularen und Ereignissen.
+- Optionaler, gespeicherter Zugmarker: Die Spielleitung bestimmt, wer am Zug
+  ist. Freies Spiel ohne feste Reihenfolge bleibt möglich.
+- Auf dem Handy zwischen „Spiel“, „Mein Bogen“, „Würfel“ und „Gruppe“ wechseln,
+  statt eine Desktop-Spaltenansicht lediglich schmaler zu machen.
+- Die Szenenfläche an den Story Builder anschließen, sobald echte Entwürfe,
+  Rechte und Freigaben vorhanden sind; keine vermeintlich geschützten
+  Spielleiterinhalte in gemeinsam sichtbaren Beschreibungen ablegen.
+
+### Eigene Hintergründe und Charaktergestaltung
+
+- Spielleiter können eigene Bilder oder Grafiken für den Kampagnenhintergrund
+  und die Gestaltung der Charakterbögen verwenden.
+- Bildausschnitt, Position und eine abdunkelnde oder aufhellende Auflage
+  vorsehen; Texte und Bedienelemente müssen unabhängig vom Bild lesbar bleiben.
+- Eine schlichte Darstellung ohne Hintergrundbild anbieten. Kleine,
+  passende Bildgrößen und mobile Alternativen vermeiden unnötige Ladezeiten.
+- Ein internes Porträtsystem pro Charakter schaffen, unabhängig vom
+  Benutzeravatar und ohne verpflichtenden externen Avatar-Dienst.
+- Spieler dürfen im Rahmen der Kampagnenrechte eigene Porträts wählen;
+  gegebenenfalls gilt die Freigabe durch die Spielleitung.
+- Upload- und Auswahlrechte kampagnenbezogen prüfen, Dateitypen und Größen
+  begrenzen. Nicht pauschal Zugriff auf die gesamte Website-Mediathek vergeben.
+- Öffentlich verwendbare Dekoration von privaten Charakterbildern und
+  Spielleitergrafiken unterscheiden. Normale Medien-URLs sind nicht privat;
+  vertrauliche Bilder erst mit geschützter Auslieferung verwenden.
+
+### Optionale Charakterentwicklung
+
+- Level beziehungsweise frei benennbare Ränge als optionale Kampagnenregel
+  anbieten; nicht jedes Spielsystem verwendet Stufen.
+- Zunächst nachvollziehbare Änderungen durch die Spielleitung oder einen
+  Freigabeantrag ermöglichen. Erfahrungspunkte und automatische Schwellen
+  sind ein späterer Ausbau, keine fest eingebaute Fortschrittskurve.
+- Entwicklung im Spielprotokoll dokumentieren; ein höherer Level verändert
+  nicht automatisch Attribute, Ressourcen oder andere Regeln.
+
+### Kampagnenbezogene Anwesenheit
+
+- Mitgliedschaft, aktuelle Anwesenheit und „am Zug“ getrennt anzeigen.
+  Ein WordPress-Login allein bedeutet nicht, dass jemand am Spieltisch ist.
+- Anwesenheit anhand kürzlicher Meldungen aus dem geöffneten Kampagnenbereich
+  bestimmen; nach Verbindungsabbruch oder geschlossenem Tab läuft der Status aus.
+  Die Anzeige ist eine zeitlich angenäherte Information, keine Echtzeitgarantie.
+- Manuell „AFK / kurze Pause“ und „Wieder da“ melden können. Eine optionale
+  kurze Notiz wie „Küche“ erklärt der Gruppe die Pause, ist aber keine Pflicht.
+  Eingaben begrenzen und als Text ausgeben.
+- Solange die Verbindung aktiv ist, bleibt der bewusst gesetzte AFK-Status
+  erhalten; Hintergrundaktualisierungen setzen ihn nicht auf „anwesend“ zurück.
+  Läuft die Verbindung aus, nicht weiter eine aktive AFK-Verbindung behaupten.
+- AFK sichtbar in der Teilnehmerleiste kennzeichnen. Ein aktiver Zug wird
+  dadurch nicht automatisch weitergeschaltet; darüber entscheidet die Spielleitung.
+- Status auch mit Text kennzeichnen, nicht allein durch farbige Punkte.
+- Nur berechtigte Kampagnenmitglieder dürfen den Status ihrer Gruppe lesen;
+  Benutzer dürfen ausschließlich ihre eigene Anwesenheit melden.
+- Anwesenheitsanzeige optional halten. Wer keinen Status teilt, wird nicht
+  fälschlich als offline dargestellt. Keine Bewegungsprofile oder dauerhaften
+  Anwesenheitsverläufe sammeln.
+- Ohne optionale Chat-Integration und ohne WebSocket-Pflicht funktionieren.
+  Häufigkeit der Aktualisierung und Ablaufzeit vor der Umsetzung festlegen.
+
+**Weiterer Ausbau:** Bild-Avatare und Bogen-Hintergründe folgen mit den nötigen
+Medienrechten und Schutzregeln. Bilder für die Spielfläche sind seit 0.9.0
+geschützt möglich. Die zentrale Szenenfläche braucht den
+Story Builder. Das optionale Levelsystem bleibt ein gesonderter Ausbau.
+Das Handbuch beschreibt bereits die erste Spieltisch-Oberfläche.
+
+## Module
+
+| Modul | Aufgabe |
+|---|---|
+| Core | Installation, Kampagnen, Mitglieder, Rechte und Sitzungen |
+| Character System | Charakterbögen, Felder, Attribute und Ressourcen |
+| Dice Engine | Würfelwürfe, Modifikatoren und Ergebnisse |
+| Story Builder | Kapitel, Szenen und freigegebene Inhalte |
+| Game Master | Spielleitung, Freigaben und Kontrolle |
+| Inventory | Gegenstände und Ausrüstung |
+| Communication | Spielprotokoll und optionale Chat-Anbindung |
+| Frontend / Templates | Spielbereich, Charakterbögen und Shortcodes |
+| Integrationen | Optionale Anbindungen an PSOURCE-Plugins |
+
+Die Module beschreiben fachliche Bereiche und müssen nicht als separate Plugins
+oder als komplizierte technische Architektur umgesetzt werden.
+
+## Phase 0: Grundlagen und Entscheidungen
+
+- Unterstützte Versionen von WordPress, ClassicPress und PHP festlegen und
+  anhand einer Testmatrix überprüfen.
+- Kernablauf und Datenmodell für mehrere getrennte Kampagnen definieren.
+- Berechtigungen und Sichtbarkeit für Kampagnen, Charaktere, Würfe und Inhalte
+  festlegen.
+- Datenhaltung anhand konkreter Anforderungen entscheiden: Inhaltstypen für
+  geeignete redaktionelle Inhalte, eigene Tabellen dort, wo strukturierte
+  Werte und Ereignisse sie sinnvoll machen.
+- Installations-, Aktualisierungs-, Deinstallations- und Datensicherungskonzept
+  festlegen. Nutzerdaten nicht ohne ausdrückliche Entscheidung löschen.
+- Früh prüfen, wie Shortcodes, Templates und der klassische Editor auf beiden
+  Plattformen funktionieren.
+
+**Ergebnis:** Ein abgestimmtes Fundament und ein klarer Umfang für die erste
+spielbare Version.
+
+## Phase 1: Kampagnen und Rechte
+
+- Kampagnen anlegen, bearbeiten und archivieren.
+- Kampagnenmitglieder verwalten und Spieler einladen beziehungsweise aufnehmen.
+- Website-Administration von kampagnenbezogenen Rollen trennen.
+- Spielleiter und Spieler pro Kampagne zuordnen. Eine Person kann in
+  verschiedenen Kampagnen unterschiedliche Rollen haben.
+- Einen geschützten Kampagnenbereich im Frontend bereitstellen.
+
+**Ergebnis:** Zwei Kampagnen können unabhängig voneinander betrieben werden;
+Nichtmitglieder erhalten keinen Zugriff auf geschützte Inhalte.
+
+## Phase 2: Regeln und Charaktere
+
+- Pro Kampagne eine Charakterbogen-Vorlage erstellen und bearbeiten.
+- Frei benennbare Felder für Texte, Zahlen, Auswahlmöglichkeiten, Attribute
+  und Ressourcen vorsehen; bei Ressourcen aktuelle und maximale Werte
+  unterstützen.
+- Reihenfolge, Beschreibung, Pflichtangaben und zulässige Werte konfigurieren.
+- Attribute mit Startwerten und optionalem Punktepool anlegen.
+- Festlegen, ob Spieler Werte selbst verteilen oder ändern dürfen und ob eine
+  Freigabe durch den Spielleiter nötig ist.
+- Charaktere erstellen, ansehen und nach den Kampagnenregeln bearbeiten;
+  Spielleiter können Werte korrigieren.
+- Alle Eingaben und Punkteverteilungen serverseitig prüfen.
+- Regeländerungen entsprechend den obigen Prioritäten nachvollziehbar machen.
+  Umbenennungen von strukturellen Änderungen unterscheiden; bestehende Werte
+  und offene Freigaben nicht stillschweigend verändern. Die Sperre verwendeter
+  Feldstrukturen erst durch eine geprüfte Übernahme mit Änderungsvorschau ersetzen.
+
+**Beispiel:** Eine Kampagne verteilt 30 Punkte auf vier selbst benannte
+Attribute; eine andere nutzt stattdessen eigene Werte und eine Ressource „Wut“.
+
+**Ergebnis:** Unterschiedliche Charakterbögen und Attributsysteme sind pro
+Kampagne nutzbar, einschließlich kontrollierter Spieleränderungen.
+
+## Phase 3: Würfel und Spielprotokoll
+
+- W4, W6, W8, W10, W12, W20 und W100 unterstützen.
+- Mehrere Würfel und einfache Ausdrücke wie `3W6 + 2` serverseitig auswerten.
+- Würfe mit Attributen kombinieren; den verwendeten Wert zum Zeitpunkt des
+  Wurfs dokumentieren.
+- Öffentliche und private Würfe sowie Würfe des Spielleiters für Spieler
+  ermöglichen. Gruppenwürfe sind für Kampagnenmitglieder sichtbar, private
+  Würfe für Ausführenden, betroffenen Charakterbesitzer und Spielleiter;
+  verdeckte Würfe ausschließlich für Spielleiter. Die erlaubten Varianten
+  wählt der Spielleiter pro Kampagne.
+- Einzelwürfe, Modifikatoren und Ergebnis nachvollziehbar im Spielprotokoll
+  speichern.
+- Das Wurfprotokoll zu einem gemeinsamen Ereignisprotokoll für Charakter-,
+  Freigabe- und Regeländerungen ausbauen; Sichtbarkeit pro Ereignis erhalten.
+- Eingaben und Umfang von Würfelwürfen begrenzen und ungültige Ausdrücke
+  verständlich ablehnen.
+
+**Ergebnis:** Die Gruppe kann Würfe sicher ausführen und entsprechend ihrer
+Berechtigung nachvollziehen.
+
+## Phase 4: Abenteuer und Szenen
+
+- Kampagnen in Kapitel und Szenen gliedern.
+- Beschreibungen und geeignete Medien einbinden.
+- Szenen vorbereiten und gezielt für Spieler freigeben.
+- Spielervorschau, geschützte Entwürfe für Überarbeitungen und bewusstes
+  Zurückziehen veröffentlichter Szenen vorsehen.
+- Spielleiternotizen und Geheimnisse getrennt von sichtbaren Inhalten halten.
+- Szenenfreigaben im Spielprotokoll festhalten.
+
+**Ergebnis – erste spielbare Version:** Ein Spielleiter legt eine Kampagne
+und deren Regeln an, nimmt Spieler auf, prüft Charaktere und gibt eine Szene
+frei. Die Gruppe kann die Szene ansehen und würfeln.
+
+## Phase 5: PSOURCE-Integrationen
+
+### PS Chat
+
+PS Chat ist über ergänzte Zugangs- und Moderationsschnittstellen als
+optionale Chatbox in den Spieltisch integriert. Die Runde entspricht derzeit
+den eingetragenen Kampagnenmitgliedern, nicht einer separaten Sitzungsanmeldung.
+Eine Übertragung freigegebener Gruppenwürfe ist noch nicht vorhanden.
+PS Chat übernimmt Nachrichten und Moderation; das
+Pen-&-Paper-Plugin ergänzt die grafische Einbettung und die Zuordnung der
+Rundenteilnehmer.
+
+- Die Spielleitung ist immer Moderator des zugehörigen Chatraums. Dafür die
+  vorhandene PS-Chat-Moderation verwenden, kein zweites Moderationssystem bauen
+  und keine pauschalen websiteweiten Moderationsrechte vergeben.
+- Ausschließlich die für diese Runde angemeldeten Spieler als Teilnehmer
+  hinzufügen, nicht sämtliche Website-Benutzer. Die Spielleitung erhält
+  zusätzlich ihren Moderatorzugang.
+- Änderungen an Rundenanmeldung und Spielleitung mit Raumzugang und
+  Moderatorzuordnung abgleichen; entzogene Berechtigungen müssen auch im
+  Chat wirksam werden. AFK oder vorübergehend offline zu sein beendet die
+  Rundenmitgliedschaft nicht.
+- Am Desktop eine kompakte Chatbox in einer Bildschirmecke vorsehen, ähnlich
+  einem MMO-Chat: einklappbar, mit Hinweis auf ungelesene Nachrichten und ohne
+  Charakterbogen, Würfelablage oder wichtige Bedienelemente zu verdecken.
+- Auf Handy und Tablet ein passend großes, bewusst geöffnetes Panel statt
+  eines dauerhaft über dem Spiel liegenden Chatfensters anbieten. Die
+  Bildschirmtastatur berücksichtigen; Fokus beim Öffnen und Schließen führen
+  und neue Nachrichten nicht ständig für Screenreader dazwischenrufen lassen.
+- Vor der Umsetzung vorhandene PS-Chat-Schnittstellen für Einbettung,
+  Teilnehmer und Moderatoren prüfen und verwenden, statt Nachrichtenverwaltung
+  oder ein zweites Chatsystem nachzubauen.
+- Vorher prüfen, ob und wie die Rundenmitgliedschaft bei **jedem**
+  Chat-Zugriff durchgesetzt werden kann, auch bei direktem Abruf oder Senden.
+  Eine geschützte Einbettungsseite oder ein schwer erratbarer Raumname allein
+  genügt nicht.
+- Private Würfe niemals in einen für andere sichtbaren Chat übertragen.
+- Würfelergebnisse bleiben im Pen-&-Paper-Protokoll die maßgebliche Quelle;
+  Chat-Nachrichten sind eine optionale Anzeige, kein Ersatz für echte Würfe.
+- Ist PS Chat nicht verfügbar, bleibt das Grundsystem nutzbar.
+
+### PS Wiki
+
+PS Wiki eignet sich als optionales **Regel- und Weltlexikon**: Es bietet laut
+Dokumentation unter anderem Frontend-Bearbeitung, Kategorien, Suche und einen
+Verlauf mit Revisionen. Denkbare Inhalte sind Hausregeln, Beschreibungen von
+Attributen, Orte, Fraktionen, Gegenstände und bekannte Figuren.
+
+- Wiki-Seiten mit einer Kampagne, einem Charakterfeld oder einer Szene
+  verknüpfen, damit die passenden Erläuterungen schnell erreichbar sind.
+- Klar trennen: **PS Wiki erklärt Regeln in Textform; die überprüfbaren
+  Spielregeln und Charakterwerte liegen im Pen-&-Paper-Plugin.** Eine Änderung
+  eines Wiki-Artikels verändert nicht automatisch die Spielmechanik.
+- Vor einer privaten oder kampagnenspezifischen Nutzung prüfen, ob PS Wiki die
+  notwendigen Lese- und Bearbeitungsrechte auf allen Zugriffswegen unterstützt.
+  Kategorien oder Links allein schützen keine Geheimnisse.
+- Ist PS Wiki nicht verfügbar, bleibt die Kampagne spielbar; Wiki-Verknüpfungen
+  sind dann nicht nutzbar.
+
+**Ergebnis:** Geprüfte Integrationen ergänzen das Spiel, ohne das Kernsystem
+oder seine Berechtigungen von ihnen abhängig zu machen.
+
+## Phase 6: Spielwelt und Ausrüstung
+
+- NPCs mit frei definierbaren Eigenschaften anlegen.
+- Begegnungen, Gegner und Ereignisse für Szenen vorbereiten.
+- Gegenstände, Inventare und Ausrüstung verwalten.
+- Handouts und Hinweise gezielt freigeben.
+- Über ein geeignetes Schutzkonzept für private Dateien entscheiden: Normale
+  Upload-URLs können direkt erreichbar sein und sind nicht automatisch privat.
+
+## Phase 7: Mögliche spätere Erweiterungen
+
+Diese Ideen sind bewusst noch nicht Teil der ersten spielbaren Version:
+
+- Kampagnen- und Charakterbogen-Vorlagen kopieren und zwischen eigenen
+  Kampagnen übernehmen.
+- Erweiterte Würfelmechaniken wie Erfolgswürfe, Würfelpools oder explodierende
+  Würfel als optionale Regeln.
+- Komfortfunktionen für den Vergleich von Regelversionen und die gebündelte
+  Übernahme umfangreicher Änderungen. Die grundlegende Absicherung und
+  Nachvollziehbarkeit von Regeländerungen gehört bereits in die frühen Phasen.
+- Optionales Level- oder Rangsystem, Erfahrungspunkte und weitere
+  Freigabeabläufe entsprechend dem gewählten Kampagnenregelwerk.
+- Sitzungsnotizen, Terminübersicht und Zusammenfassungen vergangener Sitzungen.
+- Gruppeninventar und Handel zwischen Charakteren, sofern das Regelwerk es
+  erlaubt.
+- Import und Export eigener Kampagnen- oder Regelvorlagen mit klaren Optionen
+  für private Inhalte und personenbezogene Daten.
+- Druckansicht oder PDF-Export für Charakterbögen und Spielleiternotizen.
+- Optionale Benachrichtigungen bei Einladungen, Freigaben und neuen Szenen.
+- Karten, Marker oder ein einfacher Initiative-Tracker als optionale Hilfen –
+  ohne eine vollständige virtuelle Spieltisch-Engine vorauszusetzen.
+
+## Übergreifende Qualitätsanforderungen
+
+- Rechte auf jeder relevanten Lese- und Schreibschnittstelle prüfen, auch bei
+  direkten URLs, Suche, Feeds, REST- und AJAX-Anfragen.
+- Kampagnendaten konsequent voneinander trennen; private Würfe und
+  Spielleitergeheimnisse nicht an Unberechtigte ausliefern.
+- Daten validieren, Ausgaben passend absichern und Änderungen gegen
+  unberechtigte Anfragen schützen.
+- Konflikte bei gleichzeitigen Änderungen erkennbar behandeln, statt Werte
+  unbemerkt zu überschreiben.
+- Mobil nutzbare, barrierearme und übersetzbare Oberflächen anstreben.
+- Funktionen auf den festgelegten WordPress- und ClassicPress-Versionen testen,
+  einschließlich Betrieb mit und ohne optionale Integrationen.
+
+## Offene Entscheidungen
+
+1. Welche Versionen von WordPress, ClassicPress und PHP sollen mindestens
+   unterstützt werden?
+2. Administratoren und ausdrücklich berechtigte Benutzer dürfen Kampagnen
+   erstellen. Wie sollen Einladungen und die Aufnahme neuer Spieler ablaufen?
+3. Welche konkreten Änderungen an Charakteren benötigen eine Freigabe, und
+   wer darf private Würfe sehen?
+4. Wie sollen Änderungen an bereits verwendeten Feldern und Regeln bestehende
+   Charaktere und offene Freigaben beeinflussen?
+5. Welche Wiki- und Chat-Zugriffsrechte sind bereits vorhanden, und wo werden
+   gegebenenfalls Erweiterungen der anderen Plugins benötigt?
+6. Wann und wie sollen private Handouts sicher bereitgestellt werden?

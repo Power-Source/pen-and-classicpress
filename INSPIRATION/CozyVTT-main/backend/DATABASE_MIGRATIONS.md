@@ -1,0 +1,518 @@
+# Database Migrations
+
+## Overview
+
+CozyVTT uses Prisma 7 for database management and migrations. Database migrations are automatically run when the backend container starts.
+
+The `prisma` commands below read their settings from `backend/prisma.config.ts`:
+where the schema and the migrations are, and the database address, taken from
+`DATABASE_URL` (in the container's environment, or in `backend/.env` outside
+Docker). The app itself connects through the `pg` driver, with the same
+`DATABASE_URL`.
+
+## Automatic Migrations (Default)
+
+When you start CozyVTT with Docker Compose, the backend container will automatically:
+
+1. Wait for the PostgreSQL database to be ready
+2. Run all pending migrations with `prisma migrate deploy`
+3. Start the application
+
+This ensures that your database schema is always up-to-date.
+
+Since 1.7.0 the application does one more thing before it takes requests, with
+or without Docker: it converts every stored Horror d100 character and character
+template still in the shape versions before 1.7.0 stored to the sheet rebuilt on
+the open d100 rules (`src/legacy/storedHorrorD100Sheets.ts`). PostgreSQL picks
+those sheets out by the keys only the old shape has and answers with their ids,
+so the backend loads one sheet at a time and never one made on 1.7.0 or later,
+however many or large they are. Each sheet is
+converted in a transaction of its own and keeps its old values in its
+`converted` record, which also marks it as done, so a later start reads none of
+them again. A sheet that fails is logged and left as it was, the backend starts
+all the same and answers that sheet converted, and the next start tries it
+again.
+
+A restore from the Admin Panel also runs `prisma migrate deploy` once the
+backup has loaded, and then the same conversion, so a backup taken on an older
+release is brought up to the running version without a restart. If either step
+fails the restore reports it and asks for a backend restart, which runs both.
+
+## Manual Migration Commands
+
+If you need to run migrations manually, you can use these commands:
+
+### Inside Docker Container
+
+Run commands in the backend container as its own user, `appuser`, with
+`-u appuser`. Root in that container holds none of the powers that would let it
+write the backend's files, so a command run as root cannot write the backend's
+logs.
+
+```bash
+# Enter the backend container
+docker compose exec -u appuser backend bash
+
+# Run migrations
+./node_modules/.bin/prisma migrate deploy
+
+# View migration status
+./node_modules/.bin/prisma migrate status
+```
+
+In the container, call Prisma from `./node_modules/.bin/` as shown. `npx`
+writes to the home folder, and the backend container's files are read-only
+apart from its data folders and `/tmp`.
+
+### Local Development
+
+```bash
+cd backend
+
+# Create a new migration (development only)
+npm run prisma:migrate
+
+# Deploy migrations to production database
+npx prisma migrate deploy
+
+# View migration status
+npx prisma migrate status
+
+# Open Prisma Studio to view database
+npm run prisma:studio
+```
+
+## Migration Files
+
+Migration files are located in `backend/prisma/migrations/`. Each migration is a timestamped folder holding one `migration.sql`.
+
+`backend/prisma/migrations/` is the authoritative list — the folder names are in
+order and `npx prisma migrate status` tells you what a given database has
+applied. The ones below are called out because they are the ones people ask
+about; the list is not exhaustive.
+
+- `20260211040616_init` - Initial database schema
+- `20260211043730_add_system_settings` - System settings table for setup wizard
+- `20260215000000_add_password_reset` - Password reset tokens
+- `20260220041038_add_game_system_support` - The `GameSystem` enum, and a `gameSystem` column on campaigns and characters
+- `20260417000000_migrate_light_bright_dim` - Rewrites the `lights` of every map
+  from the old radius-and-intensity form to a bright radius and a dim radius
+  (bright is half the old radius, dim is the old radius, so the area lit stays
+  the same). This one changes rows, and like every migration it runs by itself
+  when the backend starts. It is safe to run twice: it touches only a light that
+  still has a `radius` and no `brightRadius`, so lights already in the new form
+  are left alone.
+- `20260902204427_add_personal_notes` - `PersonalNote` table for per-user
+  Markdown notes. Purely additive: one `CREATE TABLE` with two foreign keys and
+  an index, and no `ALTER` on any existing table, so upgrading cannot touch
+  data you already have. New installs and upgrades both start with it empty.
+- `20260910195739_add_dice_macros` - `DiceMacro` table for a player's saved
+  dice rolls in one campaign. Additive in the same way: one `CREATE TABLE`, an
+  index and two foreign keys, with no `ALTER` on anything existing.
+- `20260911215959_add_campaign_documents` - `CampaignDocument` table linking a
+  document asset to a campaign, so a GM can share a rulebook with one table
+  without making it visible to the whole instance. One `CREATE TABLE`, three
+  indexes and three foreign keys. Nothing existing is altered.
+- `20260917003045_add_map_fog_enabled` - `Map.fogEnabled`, a boolean defaulting to `true`.
+  One `ALTER TABLE ... ADD COLUMN` with a default, so every existing map keeps
+  fog of war exactly as it was; only maps created afterwards start with it off.
+- `20260917005458_add_map_global_illumination` - `Map.globalIllumination`, a boolean defaulting
+  to `true`. Same shape: one `ALTER TABLE ... ADD COLUMN` with a default. Every
+  existing lit map keeps showing players everything in line of sight, as it
+  always did; new maps start with it off so lights and darkvision decide.
+- `20260917013238_add_map_exploration` - `Map.explorationEnabled` (boolean, default `true`)
+  and a new `MapExploration` table holding what each player has explored on a
+  map, one row per map and user, cascading on delete of either. One `ALTER
+  TABLE ... ADD COLUMN` with a default, one `CREATE TABLE`, two indexes and two
+  foreign keys. Nothing existing is altered; the table starts empty.
+- `20260928120000_keep_rolls_and_uploads_of_deleted_accounts` - `Asset.uploadedById`
+  and `DiceRoll.userId` become nullable, and their foreign keys change from
+  refusing a user's deletion to setting the column to null, as
+  `Message.userId` already did. Two `DROP NOT NULL` and the two foreign keys
+  dropped and re-added in one transaction. No row is changed or removed; it
+  only lets an account with rolls or uploads be deleted.
+- `20261015032229_add_login_session_table` - The `session` table the sign-in
+  store keeps, with its key and its expiry index, exactly as the store makes
+  it. Every instance whose backend has started already has the table, so
+  there `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` find it
+  and change nothing, and no one is signed out. A new install gets it from
+  the migrations. With the table described in the schema, `prisma db push` and
+  `migrate dev` no longer offer to drop it.
+- `20261015033738_creature_template_author_set_null` - `CreatureTemplate.createdById`
+  gets a foreign key to `User` that sets it to null when the author's account
+  is deleted, and an index. This one changes rows, and like every migration it
+  runs by itself when the backend starts: before adding the key, it clears the
+  author id of every creature whose author's account was already deleted,
+  since the key cannot be added while any row names a missing user. Those ids
+  point at nothing, so nothing that can be looked up is lost, and every
+  creature stays. It is safe to run twice: a second run finds nothing to clear,
+  makes the index only if it is missing, and drops the key and adds the same
+  one again.
+- `20261027065007_add_message_recipient` - `Message.recipientId`, the one
+  member a whisper is for, with a foreign key to `User` that sets it to null
+  when that account is deleted, an index on `campaignId`, `recipientId` and
+  `createdAt`, and `WHISPER` added to `MessageType`. One `ALTER TYPE ... ADD
+  VALUE`, one `ALTER TABLE ... ADD COLUMN` with no default (every existing
+  message gets null, as a message to everyone has), one index and one foreign
+  key. No existing row is changed or removed. Nothing else in it names
+  `WHISPER`: PostgreSQL does not let a new enum value be used in the
+  transaction that adds it. PostgreSQL cannot remove an enum value either, so
+  going back to 1.5.4 means restoring a backup taken before the upgrade:
+  1.5.4's client does not know `WHISPER`, and its chat history route answers
+  500 for any page that holds a whisper.
+- `20261027171654_add_map_drawings` - The `MapDrawing` table, one row per
+  drawing on a map, with its two enums, `DrawingAudience` (`ALL` and the
+  GM's value, which 1.7.0 renamed `GM`) and `DrawingLayer` (`MARKUP`,
+  `GROUND`), and `Campaign.playersMayDraw`. Two
+  `CREATE TYPE ... AS ENUM`, one `ALTER TABLE ... ADD COLUMN` with a
+  constant default, one `CREATE TABLE`, one index on `mapId` and two foreign
+  keys: `mapId` to `Map` with `ON DELETE CASCADE`, so a drawing goes with its
+  map and so with its campaign, and `authorId` to `User` with `ON DELETE SET
+  NULL`, so a drawing stays when its author's account is deleted. No
+  existing row is changed or removed. `playersMayDraw` is `NOT NULL DEFAULT
+  true`: every existing campaign lets its players draw, as a new one does,
+  and on PostgreSQL 11 and later a constant default is written to the
+  catalogue alone, with no rewrite of the table. Nothing here adds a value to
+  an existing enum, so the new types can be used at once. 1.5.4 runs on an
+  upgraded database: it reads neither the table nor the column, and a
+  campaign it makes takes the default.
+- `20261101181352_add_dice_macro_character` - `DiceMacro.characterName` and
+  `DiceMacro.purpose`, the character a saved roll is made as when the dice
+  panel's **Character** box is empty and what it is for. One `ALTER TABLE`
+  adding both, `TEXT` with no default, so every existing saved roll gets null
+  for both and rolls as it did. Their 200-character limit is the
+  validator's (`validators/diceMacros.ts`), as with the other text columns. No
+  existing row is changed or removed. 1.5.4 runs on an upgraded database: it
+  reads neither column, and a saved roll it makes or edits leaves them as they
+  are.
+- `20261102224331_add_document_picture_links` - The `DocumentPicture` table,
+  one row for each asset a plain text or Markdown document names by its
+  address, and `Asset.picturesReadAt`, when a document's text was last read
+  for it. One `ALTER TABLE ... ADD COLUMN` with no default, so every existing
+  asset gets null; one `CREATE TABLE` keyed on `(documentId, pictureId)`, an
+  index on `pictureId`, an index on `Asset (type, picturesReadAt)`, and two
+  foreign keys to `Asset`, both `ON DELETE CASCADE`, so a row goes with its
+  document and with the asset it names. No existing row is changed or
+  removed, and the migration reads no file. The server fills the table as a
+  document is uploaded, written or saved; a document stored before it, with
+  `picturesReadAt` null, is read by the requests that need it, five at a
+  time, until none is left (`services/sharedDocumentPictures.ts`); one whose
+  file cannot be read stays null and is read again ten minutes later. Until a
+  document is read, a map picture it shows is not shown to players through
+  it. 1.5.4 runs on an upgraded database: it reads neither the table nor the
+  column. A document saved by 1.5.4 keeps the rows of its earlier text until
+  it is next saved on this version.
+- `20261108215941_add_map_drawn_background` - `Map.drawnBackground`, the
+  colour a map drawn in CozyVTT is made in, written `#rrggbb`, which
+  Mapmaker's eraser paints. One `ALTER TABLE ... ADD COLUMN` with no default,
+  so every existing map gets null; Mapmaker then reads the colour off the
+  picture's top-left pixel, as before. No existing row is changed or removed.
+  1.5.4 runs on an upgraded database: it reads no such column.
+- `20261112013825_name_systems_and_gm_role` - The game systems and the game
+  master's role get CozyVTT's own names: `GameSystem` holds `FIFTH_EDITION`,
+  `FANTASY_D20` and `HORROR_D100`, and `CampaignRole`, `MessageType` and
+  `DrawingAudience` hold `GM` for the game master. This one changes rows, and
+  like every migration it runs by itself when the backend starts. It is
+  written by hand: `migrate diff` cannot tell a renamed enum value from a new
+  one, and the script it writes casts every stored value to a type that lacks
+  it, which fails on the first row. In order, it:
+  1. renames each value in place with `ALTER TYPE ... RENAME VALUE`, which
+     changes the catalogue and rewrites no row;
+  2. gives no system to each campaign, character, character template and
+     creature whose system is none of the three: the value of an unreleased
+     system that never shipped, which the app already treated as none;
+  3. replaces `GameSystem` with a type holding only the three (`CREATE TYPE`,
+     `ALTER COLUMN ... TYPE` on each of the four columns, which rebuilds their
+     indexes, then `DROP TYPE` of the old one once no column uses it), so that
+     value can never be stored again;
+  4. renames the game system a stat block names inside its JSON, in
+     `CreatureTemplate.statBlock`, `TokenTemplate.statBlock`, each token of
+     `Map.tokens` and each token of `Session.savedState`, keeping every token
+     in its place. Every seeded SRD creature names its system there, and
+     initiative reads its DEX only while that name is the campaign's system.
+
+  No row is deleted. Each step looks before it changes anything, so a second
+  run changes nothing, and the file runs as one transaction, so a failure
+  leaves the data as it was. It does not leave the instance ready to start,
+  though: Prisma records the migration as started and not finished, and every
+  later `migrate deploy`, the one the backend runs as it starts included,
+  stops there (P3009) until
+  `prisma migrate resolve --rolled-back 20261112013825_name_systems_and_gm_role`
+  has been run. The next start then runs the migration from its beginning; see
+  [A migration fails on an instance with real data](#a-migration-fails-on-an-instance-with-real-data).
+  Step 3 rewrites those four tables, `Character`
+  among them, so the first start after the upgrade takes longer on a large
+  instance. A request, an archive, a character file or a script that still
+  sends an old value is read through `src/legacy/gameSystemAliases.ts`. 1.6.0
+  cannot run on an upgraded database, since its client knows none of the new
+  values, so going back means restoring a backup taken before the upgrade.
+  `src/legacy/__tests__/storedNamesMigration.test.ts` builds a 1.6.0 database
+  from the migrations before it and checks every step.
+
+## Data migrations (one-off scripts)
+
+Some changes move data around inside the JSON columns rather than altering the
+schema. Prisma does not run these — they are scripts you run once, by hand, and
+they are safe to run again. Each ends with exit status 0 when it succeeds and 1
+when it fails, so a wrapper can tell the two apart. (A data change that is small
+and safe to repeat is sometimes a SQL migration instead, and then it runs by
+itself like any other: see `20260417000000_migrate_light_bright_dim` above.)
+
+| Script | What it does | In the production image |
+|---|---|---|
+| `npm run migrate:sheet-fields` | Moves character sheets onto the fields the app reads. See below. | `docker compose exec -u appuser backend node dist/scripts/migrate-sheet-fields.js` |
+| `npm run migrate:characters` | Guesses a game system for characters stored before game systems existed. Not for a current instance; see below. | `docker compose exec -u appuser backend node dist/scripts/migrate-characters.js` |
+| `npm run migrate:avatar-scope` | Moves AVATAR assets from GLOBAL to USER scope. | `docker compose exec -u appuser backend node dist/scripts/migrate-avatar-scope.js` |
+| `npm run validate:characters` | Changes nothing. Lists the characters the server would refuse when next saved. See below. | `docker compose exec -u appuser backend node dist/scripts/validate-characters.js` |
+| `npx ts-node src/scripts/backfillCreatureProficiency.ts` | Records which saves and skills each seeded SRD creature is proficient in, worked out from its printed bonuses, and renames Open5e's snake_case skill keys. No bonus changes, and custom creatures are not touched. `--dry-run` reports only; `--verbose` lists each creature. | `docker compose exec -u appuser backend node dist/scripts/backfillCreatureProficiency.js` |
+
+The `npm run` forms run the TypeScript source and need a development checkout.
+In the production image, which has no source and no `ts-node`, run the compiled
+file shown in the last column, with the same options. The image's app folder is
+read-only, so `validate-characters.js --export` writes its report to
+`/tmp/validation-report.json` there and says so; copy it out with
+`docker compose cp backend:/tmp/validation-report.json .`
+
+### `migrate:sheet-fields`
+
+The built-in character templates had been written against an older shape, so
+sheets created from them hold content in fields nothing displays: a 5E
+Fighter's features, its armour and weapon proficiencies, a Fantasy d20
+character's strikes and class features.
+
+Reading is already fixed for 5E: those sheets display correctly with no
+migration at all. **Fantasy d20 sheets need this script** to show their
+strikes and class features, and running it also tidies the 5E duplicates away
+so the same fact is not stored twice.
+
+The same transforms, in `src/utils/sheetFieldMigrations.ts`, run on every
+character and character template the API creates or saves, before the sheet
+is validated. Validation drops a field the schema does not declare, so without
+them the first save of such a sheet would lose the content this script exists
+to move. A sheet that is saved is therefore moved already, and the script
+finds nothing to do for it. The script reads only characters: a template
+published before 1.3.0 is moved when it is next saved, and a character made
+from it is moved when it is created.
+
+```bash
+# Report what would change, without writing anything
+docker compose exec -u appuser backend node dist/scripts/migrate-sheet-fields.js --dry-run
+
+# Apply
+docker compose exec -u appuser backend node dist/scripts/migrate-sheet-fields.js
+```
+
+The production image has no `src/` and no `ts-node`, so `npm run
+migrate:sheet-fields` (which runs the TypeScript source) works only in a
+development checkout. Outside Docker, run the compiled file from `backend/`
+after `npm run build`.
+
+What it does with each older field:
+
+- **5E.** The template's `features` are added to Features & Traits; a
+  feature already there by name is filled in or skipped, and one whose text
+  differs is added beside it. The flat `proficiencies` list and `languages`
+  are added to the proficiency list (and the languages to the Languages box).
+  The loose `personalityTraits`, `ideals`, `bonds` and `flaws` fill empty
+  personality boxes; where a box already holds other text, the older text is
+  added after it as a new paragraph. `allies` fills an empty Allies name, or is
+  added after the description.
+- **Fantasy d20.** `attacks` are added after the character's own strikes,
+  skipping any with the name of one already there. `specialAbilities` are
+  added to the class features. Top-level `senses`, `resistances` and
+  `immunities` are added to the lists inside `perception` and `hp`.
+- **Horror d100.** A sheet in the shape before 1.7.0 is converted to the
+  sheet rebuilt on the open d100 rules, exactly as the backend converts every
+  such sheet before it listens (`src/legacy/storedHorrorD100Sheets.ts`); the
+  report lists it as converted, with each value the conversion kept in the
+  sheet's record because it had nowhere else to go. Otherwise `player`
+  becomes `playerName` when that is empty.
+
+An older field is removed only once everything in it is in the new place,
+whether it was there already or has just been added. A field holding
+something with nowhere to go, such as a second player name when `playerName`
+already holds a different one, or an entry with no name or that is not text,
+is left where it is, and the report lists that character under "keep something in an older
+field". Text a player typed is moved verbatim and never parsed. The report
+gives each changed character's name, game system and id, with a line for each
+change.
+
+It is safe to run while people are playing, and safe to run more than once.
+Each character is written in its own transaction: the row is locked, read
+again and migrated from that fresh copy, so a save or a hit point change made
+since the run started is kept, and an interruption cannot leave a sheet
+half-converted. A character already converted is skipped. The command ends
+with exit status 1 if it fails part-way, or if a character changed while it
+was being written and was left for the next run; run it again. Take a backup
+first anyway, as with any data change.
+
+Saving a character in the app applies the same moves, so a sheet saved before
+the script runs is moved already. The one difference is a field with nowhere
+to go: the script keeps it, but a save cannot, because the server stores only
+the fields the sheet declares.
+
+### `migrate:characters`
+
+Written for characters stored before CozyVTT recorded a game system. On any
+current instance a character with no game system is a **Flexible** character
+on purpose, and giving it one would stop it fitting its Flexible campaign, so
+the script previews by default and is careful when told to apply:
+
+```bash
+npm run migrate:characters               # preview: lists every guess, changes nothing
+npm run migrate:characters -- --execute  # apply the guesses marked as applied
+```
+
+It guesses from the shape of the sheet, with high, medium or low confidence.
+Only a **high-confidence** guess is applied, and only to a character in no
+campaign or in a campaign of that same game system. A character in a Flexible
+campaign, or in a campaign of another system, is listed and left alone, and
+medium and low guesses are only ever listed. Each change is printed with the
+character's id, so it can be undone by hand. A character given Horror d100
+has its sheet converted to the rebuilt one in the same write, as every stored
+Horror d100 sheet is.
+
+### `validate:characters`
+
+Checks every character against its game system's rules the way a save does,
+after moving older fields as a save does, and lists each one the server would
+refuse, with its id and the fields at fault. A Horror d100 sheet still in the
+shape before 1.7.0 is judged converted, as the server answers and saves it.
+Nothing is written.
+
+```bash
+npm run validate:characters                          # every character
+npm run validate:characters -- --system FIFTH_EDITION  # one game system; fifthedition and the name older versions used work too
+npm run validate:characters -- --verbose             # every error for every character
+npm run validate:characters -- --export              # also write validation-report.json
+```
+
+It ends with exit status 0 when every character passes, and 1 when one does
+not, when an option is not understood, or when it cannot run. To fix a listed
+character, open it in the Character Editor and save it: the message names the
+field.
+
+## Troubleshooting
+
+### "Table does not exist" Error
+
+If you see errors like "The table `public.SystemSettings` does not exist", it means migrations haven't been run. This can happen if:
+
+1. You're setting up CozyVTT for the first time
+2. You manually created the database without running migrations
+3. The migration script failed
+
+**Solution:**
+```bash
+# Stop all containers
+docker compose down
+
+# Rebuild and restart (migrations will run automatically)
+docker compose up --build
+
+# Or run migrations manually:
+docker compose exec -u appuser backend ./node_modules/.bin/prisma migrate deploy
+```
+
+### A migration fails on an instance with real data
+
+Do not reset anything. Each migration runs as a single step, so a failed one
+normally leaves your data as it was. It still blocks the next start: Prisma has
+recorded the migration as started and not finished, `migrate deploy` refuses to
+go on while that record stands, and `start.sh` exits, so under Docker the
+backend container restarts over and over, and its log shows `Migration failed`.
+
+The log gives the cause once, at the first failure, as Prisma's P3018 with the
+database's own message; every later start prints only P3009, `migrate found
+failed migrations`. Find the first with
+`docker compose logs backend | grep -B2 -A8 "Database error"` (the same text is
+in the `logs` column of the migration's row in `_prisma_migrations`), and
+remove the cause where there is one, such as a full disk, or the migration
+fails the same way again.
+
+Then mark the migration as rolled back, naming the one the log names, and start
+again. The backend container is not running, so `docker compose exec` cannot
+reach it; `docker compose run` starts one for the command, with Prisma as its
+entry point in place of `start.sh`:
+
+```bash
+docker compose run --rm -u appuser --entrypoint ./node_modules/.bin/prisma backend migrate resolve --rolled-back 20261112013825_name_systems_and_gm_role
+docker compose up -d
+```
+
+Without Docker, from the `backend` folder:
+
+```bash
+npx prisma migrate resolve --rolled-back 20261112013825_name_systems_and_gm_role
+npx prisma migrate deploy
+```
+
+The migration then runs again from its beginning. This is the recovery for
+1.7.0's migration, named above, and for any other that failed with nothing
+changed. If it fails a second time, take the last lines of
+`docker compose logs backend` and the output of `migrate status`, run the same
+way as the `resolve` command above, and open an issue with both. If you have to
+get back to a working instance first, go back to the version you came from with
+the backup taken before the upgrade (see
+[Going back to the version you came from](../docs/DEPLOYMENT.md#going-back-to-the-version-you-came-from)).
+
+### Migration conflicts (development only)
+
+> **Development only. This deletes the database.** `down -v` removes the database
+> volume, and every campaign, character and account with it. Never run it on an
+> instance whose data you want. For that, restore a backup as described above.
+
+If you have migration conflicts on a development database you can throw away, you may need to reset it:
+
+```bash
+docker compose down -v  # Remove volumes
+docker compose up --build  # Fresh start with migrations
+```
+
+### Checking Migration Status
+
+To see which migrations have been applied:
+
+```bash
+docker compose exec -u appuser backend ./node_modules/.bin/prisma migrate status
+```
+
+## Creating New Migrations
+
+When you modify the Prisma schema (`backend/prisma/schema.prisma`), create a new migration:
+
+```bash
+cd backend
+npm run prisma:migrate
+# Follow the prompts to name your migration
+```
+
+This will:
+1. Generate a new migration file
+2. Apply it to your development database
+
+Since Prisma 7 it no longer regenerates the Prisma client; run
+`npx prisma generate` afterwards.
+
+If `prisma migrate dev` reports drift and offers a reset that deletes the
+database, answer no, and generate the migration as `docs/DEVELOPMENT.md`
+(Running Migrations) shows. On a database the backend ran against before
+1.5.3 it does that because of the sign-in `session` table, which no migration
+made until then. `npx prisma migrate deploy` applies the one that does, and
+the backend container runs that command each time it starts.
+
+## Production Deployment
+
+For production deployments, always use `prisma migrate deploy` instead of `prisma migrate dev`:
+
+```bash
+npx prisma migrate deploy
+```
+
+This command:
+- ✅ Applies pending migrations
+- ✅ Does not create new migrations
+- ✅ Does not prompt for input
+- ✅ Safe for production use
+
+The startup script (`scripts/start.sh`) uses `migrate deploy` to ensure safe, automatic migrations in production.

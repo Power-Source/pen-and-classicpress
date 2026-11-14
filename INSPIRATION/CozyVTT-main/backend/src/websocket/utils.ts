@@ -1,0 +1,541 @@
+import { Server } from 'socket.io';
+import { CampaignRole } from '@prisma/client';
+import type { GameSystem, Prisma } from '@prisma/client';
+import { prisma } from '../config/database';
+import logger from '../utils/logger';
+import { jsonOrNull } from '../utils/prisma-json';
+import { canReadMap } from '../services/permissions';
+import { characterForReader } from '../utils/gmNotes';
+import type { AuthenticatedFields } from './auth';
+import { emitNewestState } from './outgoingQueue';
+import { NOT_A_MEMBER_MESSAGE } from '../middleware/rbac';
+
+/** The events that carry a map's whole list of walls, lights or drawings. */
+const WHOLE_LIST_EVENTS: ReadonlySet<string> = new Set(['walls:replaced', 'lights:replaced', 'drawings:state']);
+
+/**
+ * WebSocket Utility Functions
+ * WebSocket Event Specification
+ */
+
+let ioInstance: Server | null = null;
+
+/**
+ * Store the Socket.io instance for use in utility functions
+ */
+export function setSocketInstance(io: Server): void {
+  ioInstance = io;
+}
+
+/**
+ * Get the Socket.io instance
+ */
+export function getSocketInstance(): Server {
+  if (!ioInstance) {
+    throw new Error('Socket.io instance not initialized');
+  }
+  return ioInstance;
+}
+
+/**
+ * Broadcast an event to all members of a campaign
+ * @param campaignId - Campaign ID
+ * @param event - Event name
+ * @param data - Event data
+ */
+export function broadcastToCampaign(campaignId: string, event: string, data: unknown): void {
+  const io = getSocketInstance();
+  io.to(campaignId).emit(event, data);
+}
+
+/**
+ * Tell each campaign's open pages that its roster changed for `userId`: they
+ * left it (removed, of their own accord, or their account deleted) or their
+ * role changed. Every
+ * page keeps the member list and the roster panel it loaded, and refreshes
+ * both on this. Never throws: the change is already saved.
+ */
+export function announceRosterChange(userId: string, campaignIds: string[], action: 'member.left' | 'member.role'): void {
+  for (const campaignId of campaignIds) {
+    try {
+      broadcastToCampaign(campaignId, 'roster.updated', { action, userId, campaignId });
+    } catch (error) {
+      logger.warn('roster.updated not broadcast; the change stands', { err: error, campaignId, userId });
+    }
+  }
+}
+
+/**
+ * `character.updated` to a campaign's room with the sheet in it, as each
+ * member may read it: the GM's Notes go to the campaign's GM alone
+ * (utils/gmNotes.ts). `fields` are the rest of the payload, the same for
+ * everyone.
+ */
+export async function emitCharacterUpdated<C extends { gameSystem: GameSystem | null; data: Prisma.JsonValue }>(
+  campaignId: string,
+  character: C,
+  fields: Record<string, unknown>
+): Promise<void> {
+  const io = getSocketInstance();
+  for (const s of await campaignSockets(io, campaignId)) {
+    const isGm = (s as unknown as AuthenticatedFields).role === 'GM';
+    s.emit('character.updated', { ...fields, character: characterForReader(character, isGm) });
+  }
+}
+
+/**
+ * Broadcast an event to a specific user (all their connected sockets)
+ * @param userId - User ID
+ * @param event - Event name
+ * @param data - Event data
+ */
+export function broadcastToUser(userId: string, event: string, data: unknown): void {
+  const io = getSocketInstance();
+  io.to(userId).emit(event, data);
+}
+
+/** A socket as a room fan-out sees it, with the fields authentication set. */
+export type CampaignSocket = Awaited<ReturnType<Server['fetchSockets']>>[number];
+
+/**
+ * The sockets in a campaign's room that belong to it.
+ *
+ * A socket's own `campaignId` is what every gated handler trusts; the room is
+ * only how a broadcast finds it, and `authenticate` keeps the two in step.
+ * Every fan-out that walks a room and reads each socket's role goes through
+ * here, so a socket that is in a room it no longer belongs to is skipped
+ * instead of being answered with another campaign's view. The default
+ * in-memory adapter hands back the real sockets, so the fields are readable.
+ */
+export async function campaignSockets(io: Server, campaignId: string): Promise<CampaignSocket[]> {
+  const sockets = await io.in(campaignId).fetchSockets();
+  return sockets.filter((s) => (s as unknown as AuthenticatedFields).campaignId === campaignId);
+}
+
+/**
+ * Run the part of a handler that tells the table about a change it has
+ * already saved. A failure there is logged and goes no further: the change
+ * stands, so answering the sender that it failed would be wrong, and what the
+ * handler does next (a chat notice, the order re-sent) still happens.
+ */
+export async function bestEffort(what: string, tell: () => Promise<void>): Promise<void> {
+  try {
+    await tell();
+  } catch (error) {
+    logger.warn(`${what} failed; the change stands`, { err: error });
+  }
+}
+
+/**
+ * Those of `sockets` that still belong to the campaign. campaignSockets
+ * checks when it fetches; a fan-out that awaits anything after that, a
+ * database read say, calls this again right before it reads each socket's
+ * role, with no await between the check and the emits. A socket that
+ * authenticated into another campaign in the meantime carries that
+ * campaign's role, and is skipped instead of being sent this campaign's
+ * data worked out for it.
+ */
+export function stillInCampaign<T>(sockets: readonly T[], campaignId: string): T[] {
+  return sockets.filter((s) => (s as unknown as AuthenticatedFields).campaignId === campaignId);
+}
+
+/**
+ * Send one of a map's live edits (its walls, lights, fog, settings, pings,
+ * the explored-memory reset) to everyone who may read that map
+ * (canReadMap): the whole campaign while it is the map on screen, the GM's
+ * sockets for any other. A prepared map's layout is the GM's until they
+ * switch to it, on the live connection as on its fetch.
+ * `exceptSocketId` leaves out the sender where the event is not echoed.
+ * Best-effort: a failure is logged and goes no further.
+ */
+export async function emitToMapReaders(
+  io: Server,
+  campaignId: string,
+  mapId: string,
+  event: string,
+  data: unknown,
+  exceptSocketId?: string
+): Promise<void> {
+  // Every caller has saved its change by now: failing to tell the table is
+  // logged, never turned into a reply that the change failed.
+  try {
+    const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentMapId: true } });
+    const currentMapId = campaign?.currentMapId ?? null;
+    if (currentMapId === mapId) {
+      const room = io.to(campaignId);
+      (exceptSocketId ? room.except(exceptSocketId) : room).emit(event, data);
+      return;
+    }
+    for (const s of await campaignSockets(io, campaignId)) {
+      if (s.id === exceptSocketId) continue;
+      if (canReadMap((s as unknown as AuthenticatedFields).role, mapId, currentMapId)) s.emit(event, data);
+    }
+  } catch (error) {
+    logger.warn(`${event} not broadcast; the change stands`, { err: error, mapId });
+  }
+}
+
+/**
+ * emitToMapReaders, with the event and its data decided per reader from
+ * their role: what a player may be sent of a map's walls and lights differs
+ * from what the GM is. `sendFor` returns null for a reader who is told
+ * nothing.
+ */
+export async function emitToMapReadersAs(
+  io: Server,
+  campaignId: string,
+  mapId: string,
+  what: string,
+  sendFor: (role: string | undefined) => { event: string; data: unknown } | null
+): Promise<void> {
+  try {
+    const campaign = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentMapId: true } });
+    const currentMapId = campaign?.currentMapId ?? null;
+    for (const s of await campaignSockets(io, campaignId)) {
+      const role = (s as unknown as AuthenticatedFields).role;
+      if (!canReadMap(role, mapId, currentMapId)) continue;
+      const send = sendFor(role);
+      if (!send) continue;
+      // A whole list of the map's walls, lights or drawings: the newest is all a reader needs.
+      if (WHOLE_LIST_EVENTS.has(send.event)) emitNewestState(s, send.event, send.data, mapId);
+      else s.emit(send.event, send.data);
+    }
+  } catch (error) {
+    logger.warn(`${what} not broadcast; the change stands`, { err: error, mapId });
+  }
+}
+
+/**
+ * Which users currently have at least one socket in the campaign.
+ *
+ * Derived from the room membership rather than tracked in a counter, because a
+ * user can hold several sockets at once — two tabs, or an old one that has not
+ * timed out yet. Anything that flipped a user offline on the first disconnect
+ * would show them as gone while they were still sitting there in another tab.
+ *
+ * @param campaignId - Campaign ID
+ * @returns Distinct user IDs, deduplicated across sockets
+ */
+export async function getOnlineUserIds(campaignId: string): Promise<string[]> {
+  const io = getSocketInstance();
+  const sockets = await campaignSockets(io, campaignId);
+  const ids = new Set<string>();
+  for (const socket of sockets) {
+    // The default in-memory adapter hands back the real sockets, so the fields
+    // set during authentication are readable — the same approach the secret
+    // dice-roll fan-out uses.
+    const userId = (socket as unknown as AuthenticatedFields).userId;
+    if (userId) ids.add(userId);
+  }
+  return [...ids];
+}
+
+/**
+ * Tell a campaign who is currently online.
+ *
+ * Sends the whole set rather than a join/leave delta: a table is a handful of
+ * people so the payload is trivial, and a snapshot cannot drift out of step the
+ * way an incrementally-patched list can after a missed event.
+ *
+ * Best-effort — presence is decoration, and a failure here must never break the
+ * connect or disconnect path it is called from.
+ */
+export async function broadcastPresence(campaignId: string): Promise<void> {
+  try {
+    const io = getSocketInstance();
+    const onlineUserIds = await getOnlineUserIds(campaignId);
+    io.to(campaignId).emit('presence.state', { campaignId, onlineUserIds });
+  } catch (error) {
+    logger.error('Failed to broadcast presence', { err: error, campaignId });
+  }
+}
+
+/** Why a connection lost its campaign, as `campaign.access.revoked` says. */
+export type AccessRevokedReason = 'removed' | 'left' | 'campaign-deleted' | 'signed-out' | 'not-member';
+
+/** Why a member's connections lost the campaign while the campaign stays: the GM removed them, or they left. */
+export type MemberLeftReason = Extract<AccessRevokedReason, 'removed' | 'left'>;
+
+/** Why someone is not a member of a campaign that exists: removed, left, or no record of which (memberDepartures.ts). */
+export type NotAMemberReason = Extract<AccessRevokedReason, MemberLeftReason | 'not-member'>;
+
+/** What `campaign.access.revoked` carries. */
+export interface AccessRevoked {
+  /**
+   * The campaign the notice is about: the one the connection was in, or the
+   * one it asked to join; null when it had not joined one.
+   */
+  campaignId: string | null;
+  reason: AccessRevokedReason;
+  /** A sentence for the person, shown as it is. */
+  message: string;
+}
+
+export const REMOVED_MESSAGE = 'You were removed from this campaign.';
+export const LEFT_MESSAGE = 'You left this campaign.';
+export const CAMPAIGN_DELETED_MESSAGE = 'This campaign was deleted.';
+/** A join refused because no campaign has that id: deleted, or never there. */
+export const NO_SUCH_CAMPAIGN_MESSAGE = 'This campaign does not exist. It may have been deleted.';
+export const NOT_MEMBER_MESSAGE = `${NOT_A_MEMBER_MESSAGE}.`;
+
+const NOT_A_MEMBER_MESSAGES: Record<NotAMemberReason, string> = {
+  removed: REMOVED_MESSAGE,
+  left: LEFT_MESSAGE,
+  'not-member': NOT_MEMBER_MESSAGE,
+};
+
+/**
+ * campaign.access.revoked — the connection may no longer use its campaign,
+ * and why: removed from it, left it, the campaign deleted, the sign-in ended,
+ * or a join refused because the campaign is gone or the user is not in it. A
+ * typed event, so the page can tell the person and stop, where a plain
+ * `error` was only logged.
+ */
+function tellAccessRevoked(socket: TellableSocket, revoked: AccessRevoked): void {
+  socket.emit('campaign.access.revoked', revoked);
+}
+
+/**
+ * Tell a socket its join was refused because the campaign is gone
+ * (`campaign-deleted`) or the user is not a member of it (`removed` or
+ * `left` while that is recent, otherwise `not-member`). Says nothing about
+ * the campaign that the person did not send: someone who was never a member
+ * learns no more than that.
+ */
+export function tellJoinRefused(socket: TellableSocket, campaignId: string, reason: 'campaign-deleted' | NotAMemberReason): void {
+  tellAccessRevoked(socket, {
+    campaignId,
+    reason,
+    message: reason === 'campaign-deleted' ? NO_SUCH_CAMPAIGN_MESSAGE : NOT_A_MEMBER_MESSAGES[reason],
+  });
+}
+
+/** A server-side socket, a live one or one `fetchSockets()` handed back. */
+interface TellableSocket {
+  emit(event: 'campaign.access.revoked', revoked: AccessRevoked): unknown;
+  disconnect(close: boolean): unknown;
+}
+
+/**
+ * End one socket whose sign-in has ended, told why and which campaign it was
+ * in. Every helper here that ends a sign-in's sockets, and the sweep
+ * (signInSweep.ts), ends each this way.
+ */
+export function endSignedOutSocket(socket: TellableSocket, message: string): void {
+  const campaignId = (socket as unknown as AuthenticatedFields).campaignId ?? null;
+  tellAccessRevoked(socket, { campaignId, reason: 'signed-out', message });
+  socket.disconnect(true);
+}
+
+/**
+ * End a user's live sockets, each told why, when their sign-in ends.
+ *
+ * A socket takes its user at the handshake and re-reads nothing after that,
+ * so a sign-in the database no longer holds would otherwise keep acting
+ * through it, with the campaign role it cached. `exceptSessionId` keeps the
+ * sockets of the sign-in making the change (a password change keeps the
+ * device it is made on); `onlySessionId` ends one sign-in's sockets alone
+ * (signing out). Best-effort, like the other live-socket helpers: the change
+ * this follows is already written.
+ */
+export async function endLiveSockets(
+  userId: string,
+  reason: string,
+  which: { exceptSessionId?: string; onlySessionId?: string } = {}
+): Promise<number> {
+  try {
+    const io = getSocketInstance();
+    let ended = 0;
+    for (const socket of await io.in(userId).fetchSockets()) {
+      const sid = (socket as unknown as AuthenticatedFields).sessionId;
+      if (which.exceptSessionId !== undefined && sid === which.exceptSessionId) continue;
+      if (which.onlySessionId !== undefined && sid !== which.onlySessionId) continue;
+      endSignedOutSocket(socket, reason);
+      ended += 1;
+    }
+    return ended;
+  } catch (error) {
+    logger.error('Failed to end live sockets', { err: error, userId });
+    return 0;
+  }
+}
+
+/**
+ * End every live socket on the instance, each told why and which campaign it
+ * was in: a restore, after which no sign-in exists. Best-effort, as above.
+ */
+export async function endEveryLiveSocket(reason: string): Promise<number> {
+  try {
+    const io = getSocketInstance();
+    let ended = 0;
+    for (const socket of await io.fetchSockets()) {
+      endSignedOutSocket(socket, reason);
+      ended += 1;
+    }
+    return ended;
+  } catch (error) {
+    logger.error('Failed to end live sockets', { err: error });
+    return 0;
+  }
+}
+
+/**
+ * Send a system message to a campaign
+ * Creates a database record and broadcasts to all campaign members
+ * System Messages
+ *
+ * @param campaignId - Campaign ID
+ * @param content - Message content
+ * @param metadata - Optional metadata (e.g., { userId, action })
+ */
+export async function sendSystemMessage(
+  campaignId: string,
+  content: string,
+  metadata?: Record<string, unknown>
+): Promise<void> {
+  try {
+    // Save to database
+    const message = await prisma.message.create({
+      data: {
+        campaignId,
+        userId: null, // System messages have no user
+        type: 'SYSTEM',
+        content,
+        // `jsonOrNull` rather than a bare `null`: Prisma types a nullable Json
+        // column as needing an explicit null sentinel, and the previous `as any`
+        // was only hiding that. Verified against Postgres that a bare `null`
+        // stores the JSON `null` literal — the same thing `Prisma.JsonNull`
+        // stores, and *not* SQL NULL — so this is the equivalent spelling.
+        metadata: jsonOrNull(metadata),
+      },
+    });
+
+    // Broadcast to campaign
+    const io = getSocketInstance();
+    io.to(campaignId).emit('chat.system', {
+      id: message.id,
+      content,
+      metadata: metadata || null,
+      timestamp: message.createdAt.toISOString(),
+    });
+
+    logger.info(`📢 System message to campaign ${campaignId}: ${content}`);
+  } catch (error) {
+    // Log but never re-throw — a failed system message must not crash the server
+    // (e.g. when the campaign was deleted just before the disconnect fires).
+    logger.error('❌ Error sending system message', { err: error });
+  }
+}
+
+/**
+ * Point a user's live sockets at their new campaign role.
+ *
+ * `socket.role` is read from the session once, when the socket authenticates to
+ * a campaign, and then trusted by every handler that gates on it. That is the
+ * right place to read it from — a handler must never take a role off the wire —
+ * but it means the value is a snapshot. When a role changes underneath a
+ * connected socket the snapshot is simply wrong, and wrong in the dangerous
+ * direction: a demoted GM keeps GM powers over that connection until they
+ * happen to reload.
+ *
+ * REST has no equivalent problem because its middleware reads the membership per
+ * request. This closes the same gap for sockets rather than waiting for a
+ * reconnect, so a handover does not interrupt play.
+ *
+ * Only sockets attached to this campaign are touched: the same person may have
+ * another tab open on a different campaign, where this role means nothing.
+ *
+ * Returns how many sockets were updated, which is 0 when the user is offline —
+ * the ordinary case, and not a failure.
+ */
+export async function applyRoleToLiveSockets(
+  userId: string,
+  campaignId: string,
+  role: CampaignRole
+): Promise<number> {
+  const io = getSocketInstance();
+  // Sockets join a room named for their user (see events.ts), which is how a
+  // specific person's connections are addressed.
+  const sockets = await io.in(userId).fetchSockets();
+
+  let updated = 0;
+  for (const socket of sockets) {
+    // The default in-memory adapter hands back the real sockets, so the fields
+    // set during authentication are both readable and writable — the same
+    // approach getOnlineUserIds and the secret dice-roll fan-out rely on.
+    const authed = socket as unknown as AuthenticatedFields;
+    if (authed.campaignId === campaignId || socket.rooms.has(campaignId)) {
+      authed.role = role;
+      updated += 1;
+    }
+  }
+
+  return updated;
+}
+
+/**
+ * Cut a user's live connections to one campaign.
+ *
+ * Removing someone from a campaign, or their leaving it, like changing their
+ * role, leaves any socket they already have authenticated for it. The handlers read the campaign and
+ * the role from the socket, so without this they keep sending and keep
+ * receiving every broadcast until they close the tab.
+ *
+ * Clearing `campaignId` is what stops them acting: every handler refuses a
+ * socket that is not authenticated to a campaign. Leaving the room is what
+ * stops them listening. A socket authenticates to one campaign, so a person
+ * playing elsewhere in another tab is left alone. A token they are holding
+ * goes back where it stands on everyone else's screen, since their own
+ * put-down would now be refused. `reason` is what each connection is told:
+ * the GM removed them, they left, or (a join that found the membership gone
+ * with no record of why) only that they are not a member.
+ *
+ * @returns number of connections closed off
+ */
+export async function clearCampaignFromLiveSockets(
+  userId: string,
+  campaignId: string,
+  reason: NotAMemberReason = 'removed'
+): Promise<number> {
+  const io = getSocketInstance();
+  const sockets = await io.in(userId).fetchSockets();
+
+  let cleared = 0;
+  for (const socket of sockets) {
+    const authed = socket as unknown as AuthenticatedFields;
+    if (authed.campaignId === campaignId || socket.rooms.has(campaignId)) {
+      socket.leave(campaignId);
+      if (authed.campaignId === campaignId) {
+        authed.releaseHeldTokens?.(campaignId);
+        authed.campaignId = undefined;
+        authed.role = undefined;
+      }
+      tellAccessRevoked(socket, { campaignId, reason, message: NOT_A_MEMBER_MESSAGES[reason] });
+      cleared += 1;
+    }
+  }
+
+  return cleared;
+}
+
+/**
+ * Empty a campaign's room when the campaign itself is gone: every socket in
+ * it leaves, forgets the campaign and its role, and is told why. Deleting a
+ * campaign cascades its memberships in the database; this is the live half
+ * of that, the same as removing one member is for one person.
+ */
+export async function clearDeletedCampaignFromLiveSockets(campaignId: string): Promise<number> {
+  const io = getSocketInstance();
+  let cleared = 0;
+  for (const socket of await io.in(campaignId).fetchSockets()) {
+    const authed = socket as unknown as AuthenticatedFields;
+    socket.leave(campaignId);
+    if (authed.campaignId === campaignId) {
+      authed.campaignId = undefined;
+      authed.role = undefined;
+    }
+    tellAccessRevoked(socket, { campaignId, reason: 'campaign-deleted', message: CAMPAIGN_DELETED_MESSAGE });
+    cleared += 1;
+  }
+  return cleared;
+}

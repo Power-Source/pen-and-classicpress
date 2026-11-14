@@ -1,0 +1,738 @@
+// ============================================
+// Token movement handlers
+// token.move.start / token.move (throttled) / token.move.end
+// ============================================
+
+import { Server } from 'socket.io';
+import { throttle } from '../../utils/throttle';
+import { AuthenticatedSocket } from '../auth';
+import { prisma } from '../../config/database';
+import {
+  canActOnTokenPlane, getSpiritVisibilityBatch, filterTokensByRole, filterTokensByLighting, playerSightOnLitMap,
+  tokenForRecipient, viewerIdFor,
+} from '../../utils/spirit-layer';
+import type { Map as MapRow } from '@prisma/client';
+import type { WallSegment } from '../../types/walls';
+import logger from '../../utils/logger';
+import { Token, tokenMoveLimiter, limiterKey, withinCeiling } from '../shared';
+import { readTokens, toJson } from '../../utils/prisma-json';
+import { withMapsLocked, clampTokenPosition } from '../../utils/mapTokens';
+import { canControlToken, canMoveTokensNow, canReadMap, PAUSED_MOVE_REFUSAL } from '../../services/permissions';
+import { bestEffort, campaignSockets, stillInCampaign } from '../utils';
+import { inBackground } from '../../utils/backgroundWork';
+import { createTurnQueue } from '../../utils/turnQueue';
+
+/** How one member is sent a dragged token. */
+interface FrameRecipient {
+  /** Whether they may see the token where it is put: always, off a lit map. */
+  sees: (token: Token) => boolean;
+  /** The token as they are sent it, with only the fields they may have. */
+  shown: (token: Token) => Token;
+}
+
+/** Who a drag's frames may reach, and which of them have the token now. */
+interface DragAudience {
+  recipients: Map<string, FrameRecipient>;
+  holding: Set<string>;
+}
+
+/** Why a socket may not move a token, in the words the client already shows. */
+const moveRefusal = (role: string | undefined): string =>
+  role === 'SPECTATOR' ? 'Spectators cannot move tokens' : 'You do not have permission to move this token';
+
+/**
+ * How long a drag's decision of who may see the token is reused, at most,
+ * lit map or not. On a lit map the decision includes each player's line of
+ * sight, which on a map of a thousand walls takes tens of milliseconds per
+ * player token and per light, and every frame is tested against it, so it
+ * is worked out again no more often than this.
+ */
+export const DRAG_DECISION_MS = 1000;
+
+export function registerTokenHandlers(io: Server, socket: AuthenticatedSocket): void {
+  /**
+   * Who is sent a token's drag frames: the GM's sockets, and the players the
+   * map fetch would send the token to where each frame puts it. On a lit map
+   * that means their tokens can see that position, so a token carried out of
+   * a player's sight stops reaching them, and they are told it has gone, at
+   * the frame that takes it out; one carried into their sight is sent to
+   * them there. Frames arrive up to sixty times a second, so the expensive
+   * part (who may have the token at all, and each player's line of sight) is
+   * decided once, on the start event or the first frame, and each frame only
+   * tests its position against it. The decision is reused until
+   * token.move.end clears it, or until the token is hidden, shown or moved to
+   * the other plane mid-drag, which changes who may see it and so decides
+   * again. Who may see it also turns on each player's plane, their role, the
+   * map on screen, and on a lit map the walls, lights and their own tokens,
+   * which can change mid-drag without touching the token, so the decision is
+   * made again at least every DRAG_DECISION_MS as well.
+   */
+  const drags = new Map<string, { seenAs: string; at: number; mapId: string; deciding: Promise<DragAudience> }>();
+  const seenAs = (token: Pick<Token, 'visible' | 'layer'>) => `${token.visible !== false}|${token.layer}`;
+  /**
+   * This connection's token.move.start and token.move.end take turns, by
+   * token, in the order they arrive. An arrow key sends the two back to back,
+   * and each awaits its own reads, so a drop handled beside its pick-up would
+   * be judged before the drag is recorded: refused then, it would be put back
+   * only on the mover's screen, and the pick-up would record a drag that
+   * nothing ends. Another token's events do not wait.
+   */
+  const moveTurns = createTurnQueue();
+  function dragAudienceFor(mapId: string, token: Token): Promise<DragAudience> {
+    const cached = drags.get(token.id);
+    const now = Date.now();
+    const sameSight = cached !== undefined && cached.seenAs === seenAs(token);
+    if (sameSight && now - cached.at < DRAG_DECISION_MS) return cached.deciding;
+    // The promise is cached, not its result, so frames that arrive while the
+    // first one is still being decided wait for it instead of deciding again.
+    // Decided again for the same drag, who has the token is what the frames
+    // so far have left them with; a change of visibility or plane has its own
+    // fan-out, so who has it then starts again from where it stands.
+    const previous = sameSight ? cached.deciding : null;
+    const deciding = decideDragAudience(mapId, token.id).then(async (audience) => {
+      const before = previous ? await previous.catch(() => null) : null;
+      if (before) audience.holding = before.holding;
+      return audience;
+    });
+    drags.set(token.id, { seenAs: seenAs(token), at: now, mapId, deciding });
+    return deciding;
+  }
+  async function decideDragAudience(mapId: string, tokenId: string): Promise<DragAudience> {
+    const audience: DragAudience = { recipients: new Map(), holding: new Set() };
+    const campaignId = socket.campaignId;
+    if (!campaignId) return audience;
+    const map = await prisma.map.findUnique({
+      where: { id: mapId },
+      include: { campaign: { select: { currentMapId: true } } },
+    });
+    // The frame's own check of the map was against the campaign the socket
+    // was in then; one that waited while the socket joined another is sent
+    // to nobody there.
+    if (!map || map.campaignId !== campaignId) return audience;
+    const tokens = (Array.isArray(map.tokens) ? map.tokens : []) as unknown as Token[];
+    const token = tokens.find((t) => t.id === tokenId);
+    if (!token) return audience;
+    const members = await campaignSockets(io, campaignId);
+    const playerIds = members
+      .map((s) => s as unknown as AuthenticatedSocket)
+      .filter((a) => a.role !== 'GM' && a.userId)
+      .map((a) => a.userId as string);
+    const spiritVisibility = await getSpiritVisibilityBatch(campaignId, playerIds);
+    for (const s of stillInCampaign(members, campaignId)) {
+      if (s.id === socket.id) continue;
+      const recipient = frameRecipient(s as unknown as AuthenticatedSocket, map, tokens, tokenId, spiritVisibility);
+      if (!recipient) continue;
+      audience.recipients.set(s.id, recipient);
+      if (recipient.sees(token)) audience.holding.add(s.id);
+    }
+    return audience;
+  }
+
+  /**
+   * How one member is sent a token while it is dragged, or null when they
+   * may not have it wherever it goes: every GM, and a player for whom the
+   * role filter keeps it (visible, on their plane), with the line of sight
+   * their tokens have on a lit map. A map the GM is preparing is theirs
+   * until they switch to it.
+   */
+  function frameRecipient(
+    member: AuthenticatedSocket,
+    map: MapRow & { campaign: { currentMapId: string | null } },
+    tokens: Token[],
+    tokenId: string,
+    spiritVisibility: Map<string, boolean>
+  ): FrameRecipient | null {
+    if (!canReadMap(member.role, map.id, map.campaign.currentMapId)) return null;
+    if (member.role === 'GM') return { sees: () => true, shown: (t) => t };
+    if (!member.userId) return null;
+    const forRole = filterTokensByRole(tokens, member.role ?? 'PLAYER', spiritVisibility.get(member.userId) ?? false, member.userId);
+    if (!forRole.some((t) => t.id === tokenId)) return null;
+    const viewer = viewerIdFor(member.role, member.userId);
+    const shown = (t: Token) => tokenForRecipient(t, viewer);
+    if (!map.lightingEnabled) return { sees: () => true, shown };
+    const sight = playerSightOnLitMap(
+      forRole, viewer, map.wallSegments as unknown as WallSegment[],
+      map.width, map.height, map.gridSize, map.lights, map.globalIllumination
+    );
+    return { sees: (t) => sight.seesToken(t), shown };
+  }
+
+  /**
+   * Who a recipient is told moved the token. An obscured token's controller
+   * is part of what obscuring hides (the roster maps the id to a name), so
+   * while a token is obscured only the GM and the mover's own screens learn
+   * who moved it; anyone else is told null.
+   */
+  function moverShownTo(token: Token, recipient: AuthenticatedSocket): string | null {
+    const mover = socket.userId ?? null;
+    if (token.obscured !== true) return mover;
+    return recipient.role === 'GM' || recipient.userId === socket.userId ? mover : null;
+  }
+
+  /**
+   * A move event to everyone the map fetch would send this token to: every
+   * GM, and a player for whom the role filter keeps it (visible, on their
+   * plane). One path for every token, so a hidden token and a spirit-plane
+   * token get the same treatment moving that they get when the map is
+   * opened; the four branches this replaced (spirit, hidden, lit, unlit)
+   * each applied a different subset of those rules. A map the GM is
+   * preparing reaches only GMs, as its fetch does. Each recipient is told
+   * of the mover what they may know.
+   */
+  async function emitMoveToVisibleSockets(
+    event: string,
+    token: Token,
+    mapId: string,
+    currentMapId: string | null,
+    payload: Record<string, unknown>,
+    includeSender: boolean
+  ): Promise<void> {
+    const campaignId = socket.campaignId!;
+    const members = await campaignSockets(io, campaignId);
+    const playerIds = members
+      .map((s) => s as unknown as AuthenticatedSocket)
+      .filter((a) => a.role !== 'GM' && a.userId)
+      .map((a) => a.userId as string);
+    const spiritVisibility = await getSpiritVisibilityBatch(campaignId, playerIds);
+    for (const s of stillInCampaign(members, campaignId)) {
+      if (!includeSender && s.id === socket.id) continue;
+      const recipient = s as unknown as AuthenticatedSocket;
+      if (!canReadMap(recipient.role, mapId, currentMapId)) continue;
+      if (recipient.role !== 'GM') {
+        if (!recipient.userId) continue;
+        const sent = filterTokensByRole([token], recipient.role ?? 'PLAYER', spiritVisibility.get(recipient.userId) ?? false, recipient.userId);
+        if (sent.length === 0) continue;
+      }
+      s.emit(event, { ...payload, movedBy: moverShownTo(token, recipient) });
+    }
+  }
+
+  /**
+   * The start of a drag, to the members decided for it who have the token
+   * where it stands.
+   */
+  async function emitDragStart(token: Token, mapId: string): Promise<void> {
+    const audience = await dragAudienceFor(mapId, token);
+    // Decided once for the whole drag, so each event goes only to those of
+    // them still in this campaign: a socket that authenticated into another
+    // since is not sent its old table's token positions. Reading the room
+    // is in memory, with no database work per frame.
+    for (const s of await campaignSockets(io, socket.campaignId!)) {
+      if (audience.holding.has(s.id)) {
+        s.emit('token.move.start', { tokenId: token.id, mapId, movedBy: moverShownTo(token, s as unknown as AuthenticatedSocket) });
+      }
+    }
+  }
+
+  /**
+   * One drag frame. Each member decided for the drag is tested at the
+   * frame's position: one who sees it there is sent the frame, and first the
+   * token itself if they do not have it; one who had it and no longer sees
+   * it is told it has gone, and sent nothing more until it comes back.
+   * `currentMapId` is the campaign's as this frame read it: the audience is
+   * kept for up to DRAG_DECISION_MS, and a map the table has left since is
+   * the GM's again from the next frame on.
+   */
+  async function emitDragFrame(token: Token, mapId: string, currentMapId: string | null, x: number, y: number): Promise<void> {
+    const audience = await dragAudienceFor(mapId, token);
+    const there: Token = { ...token, position: { x, y } };
+    for (const s of await campaignSockets(io, socket.campaignId!)) {
+      const recipient = audience.recipients.get(s.id);
+      if (!recipient) continue;
+      // Their page is on the new map, and holds nothing of this one to put back.
+      if (!canReadMap((s as unknown as AuthenticatedSocket).role, mapId, currentMapId)) {
+        audience.holding.delete(s.id);
+        continue;
+      }
+      if (recipient.sees(there)) {
+        if (!audience.holding.has(s.id)) {
+          s.emit('token:appeared', { token: recipient.shown(there), mapId });
+          audience.holding.add(s.id);
+        }
+        s.emit('token.moved', { tokenId: token.id, mapId, x, y, dragging: true, movedBy: moverShownTo(token, s as unknown as AuthenticatedSocket) });
+      } else if (audience.holding.delete(s.id)) {
+        s.emit('token:disappeared', { tokenId: token.id, mapId });
+      }
+    }
+  }
+
+  /**
+   * The carrier is gone from `campaignId`: every token it was carrying there
+   * goes back where it stands on the screens its frames reached. Putting it
+   * down or letting it go is the carrier's to send, so a tab that closed, a
+   * connection that dropped mid-hold, a carrier taken out of the campaign
+   * (whose connection stays open, refused everything there) and one whose
+   * connection joined another campaign each left the token drawn at the
+   * last frame on everyone else's screen.
+   *
+   * A drag let go without a drop stays recorded until now, and the GM may
+   * since have hidden the token and moved it somewhere secret, so who is
+   * told is decided again from the map as it is, as for a refused drop: a
+   * screen the map would not give the token to now is told it has gone.
+   */
+  function releaseHeldTokens(campaignId: string): void {
+    const held = [...drags.entries()];
+    drags.clear();
+    for (const [tokenId, drag] of held) {
+      inBackground('a token let go when its carrier left', () => bestEffort('token drag release', async () => {
+        const audience = await drag.deciding;
+        const map = await prisma.map.findUnique({
+          where: { id: drag.mapId },
+          include: { campaign: { select: { currentMapId: true } } },
+        });
+        if (!map || map.campaignId !== campaignId) return;
+        const tokens = readTokens(map.tokens);
+        const token = tokens.find((t) => t.id === tokenId);
+        if (!token) return;
+        // Everyone decided for the drag, not only those still holding it: a
+        // frame may have carried it out of someone's sight, and they are
+        // given it back if it stands in their view.
+        const told = stillInCampaign(await campaignSockets(io, campaignId), campaignId).filter((s) => audience.recipients.has(s.id));
+        const playerIds = told
+          .map((s) => s as unknown as AuthenticatedSocket)
+          .filter((a) => a.role !== 'GM' && a.userId)
+          .map((a) => a.userId as string);
+        const spiritVisibility = await getSpiritVisibilityBatch(campaignId, playerIds);
+        const back = { tokenId, mapId: drag.mapId, x: token.position.x, y: token.position.y, movedBy: null };
+        for (const s of told) {
+          // A map the table has left since is the GM's again: nothing of it,
+          // the token going included, goes to anyone else.
+          if (!canReadMap((s as unknown as AuthenticatedSocket).role, map.id, map.campaign.currentMapId)) continue;
+          const recipient = frameRecipient(s as unknown as AuthenticatedSocket, map, tokens, tokenId, spiritVisibility);
+          const holds = audience.holding.has(s.id);
+          if (recipient?.sees(token)) {
+            if (!holds) s.emit('token:appeared', { token: recipient.shown(token), mapId: drag.mapId });
+            s.emit('token.moved', back);
+          } else if (holds) {
+            s.emit('token:disappeared', { tokenId, mapId: drag.mapId });
+          }
+        }
+      }));
+    }
+  }
+  // For the helpers that take the socket out of its campaign
+  // (clearCampaignFromLiveSockets, and `authenticate` into another one).
+  socket.releaseHeldTokens = releaseHeldTokens;
+
+  socket.on('disconnect', () => {
+    if (socket.campaignId) releaseHeldTokens(socket.campaignId);
+    else drags.clear();
+  });
+
+  /**
+   * TOKEN.MOVE.START - User begins dragging a token
+   * Validates permission and broadcasts to campaign
+   */
+  socket.on('token.move.start', async (data: { tokenId: unknown; mapId: unknown }) => {
+    let done: (() => void) | undefined;
+    try {
+      if (!socket.campaignId) {
+        socket.emit('error', { message: 'Not authenticated to a campaign' });
+        return;
+      }
+
+      // Flood ceiling, before any work: a start reads the whole map before
+      // any of its refusals, and on a lit map decides line of sight for the
+      // drag. A drag sends one, so it has a budget of its own, apart from
+      // the frames.
+      if (!withinCeiling(socket, 'token.move.start')) return;
+
+      const { tokenId, mapId } = data;
+
+      if (typeof tokenId !== 'string' || !tokenId || typeof mapId !== 'string' || !mapId) {
+        socket.emit('error', { message: 'tokenId and mapId required' });
+        return;
+      }
+
+      // After this token's last drop has been judged, which reads the drag.
+      done = await moveTurns.turnFor(tokenId);
+
+      // A new drag: whoever this token's frames went to last time is decided
+      // afresh, in case the last drag never reached token.move.end. Cleared
+      // before the first read, so frames sent right behind this event share
+      // the one decision instead of making one this then throws away.
+      drags.delete(tokenId);
+
+      // Fetch the map, with the campaign's status for the pause rule below
+      // and its current map: a map the GM is preparing is not a player's to
+      // touch until it is shown (canReadMap, the rule its fetch applies)
+      const map = await prisma.map.findUnique({
+        where: { id: mapId },
+        include: { campaign: { select: { status: true, currentMapId: true } } },
+      });
+
+      if (!map || map.campaignId !== socket.campaignId || !canReadMap(socket.role, mapId, map.campaign.currentMapId)) {
+        socket.emit('error', { message: 'Map not found' });
+        return;
+      }
+
+      // Get tokens array
+      const tokensArray = (Array.isArray(map.tokens) ? map.tokens : []) as unknown as Token[];
+      const token = tokensArray.find((t) => t.id === tokenId);
+
+      if (!token) {
+        socket.emit('error', { message: 'Token not found' });
+        return;
+      }
+
+      // The same rule the REST update route applies, so the channels cannot
+      // drift: the GM, or a player (never a spectator) who controls it.
+      if (!canControlToken(socket.role, token.controlledBy, socket.userId)) {
+        socket.emit('error', { message: moveRefusal(socket.role) });
+        return;
+      }
+
+      // The same plane rule the REST update route applies.
+      if (!(await canActOnTokenPlane(socket.role, token, socket.campaignId, socket.userId!))) {
+        socket.emit('error', { message: 'You cannot interact with spirit layer tokens' });
+        return;
+      }
+
+      // And the same session rule: a player's drag waits for the session.
+      if (!canMoveTokensNow(socket.role, map.campaign.status)) {
+        socket.emit('error', { message: PAUSED_MOVE_REFUSAL });
+        return;
+      }
+
+      await emitDragStart(token, mapId);
+
+      logger.debug('token.move.start', { tokenId, userId: socket.userId, mapId });
+    } catch (error) {
+      logger.error('token.move.start failed', { err: error });
+      socket.emit('error', { message: 'Failed to start token movement' });
+    } finally {
+      done?.();
+    }
+  });
+
+  /**
+   * TOKEN.MOVE - Position updates during drag (throttled to 60/s)
+   * Validates coordinates and broadcasts to campaign
+   */
+  const handleTokenMove = throttle(async (socket: AuthenticatedSocket, data: { tokenId: string; mapId: string; x: number; y: number }) => {
+    try {
+      if (!socket.campaignId) {
+        return; // Silently ignore if not authenticated
+      }
+
+      // Flood ceiling: drop excess frames silently — the 16ms throttle
+      // already paces legitimate drags well under this limit. Frames have
+      // this budget to themselves; the start and the drop have their own.
+      if (!tokenMoveLimiter.check(limiterKey(socket), 150, 1000)) {
+        return;
+      }
+
+      const { tokenId, mapId, x, y } = data;
+
+      if (!tokenId || !mapId || typeof x !== 'number' || typeof y !== 'number') {
+        return; // Silently ignore invalid data during rapid updates
+      }
+
+      // Single fetch covers bounds validation AND the spirit-layer check below
+      // (this handler fires up to ~60×/s during a drag, so one query per frame
+      // instead of two is the meaningful per-frame win).
+      const map = await prisma.map.findUnique({
+        where: { id: mapId },
+        select: { width: true, height: true, campaignId: true, tokens: true, campaign: { select: { status: true, currentMapId: true } } },
+      });
+
+      if (!map || map.campaignId !== socket.campaignId || !canReadMap(socket.role, mapId, map.campaign.currentMapId)) {
+        return; // Silently ignore invalid map during rapid updates
+      }
+
+      // Validate coordinates are within map bounds
+      if (x < 0 || x >= map.width || y < 0 || y >= map.height) {
+        socket.emit('error', { message: 'Token position out of bounds' });
+        return;
+      }
+
+      // Get the token to check if it's a spirit layer token
+      const movingTokens = (Array.isArray(map.tokens) ? map.tokens : []) as unknown as Token[];
+      const movingToken = movingTokens.find((t) => t.id === tokenId);
+
+      // Who may move this token, the same checks token.move.start makes.
+      // Nothing server-side ties a start event to the moves that follow it,
+      // so this cannot lean on that one. Refusals are silent because this
+      // fires up to 60 times a second and an error per frame would be its own
+      // problem; token.move.end answers properly.
+      if (!movingToken) {
+        return;
+      }
+
+      if (!canControlToken(socket.role, movingToken.controlledBy, socket.userId)) {
+        return;
+      }
+
+      // The plane rule, as on the start and the drop. It reads the database
+      // only for a spirit-layer token moved by someone other than the GM.
+      if (!(await canActOnTokenPlane(socket.role, movingToken, socket.campaignId, socket.userId!))) {
+        return;
+      }
+
+      // A player's frames are dropped through a pause too, or the token
+      // would still wander on everyone else's screen.
+      if (!canMoveTokensNow(socket.role, map.campaign.status)) {
+        return;
+      }
+
+      // To those decided for the drag who can see this position (on a lit
+      // map; everyone decided for it otherwise). Marked as a frame: a page
+      // draws the token where it is being carried but leaves where it
+      // stands, which decides sight and explored memory, until the drop, so
+      // carrying a player's token about reveals nothing on the way.
+      await emitDragFrame(movingToken, mapId, map.campaign.currentMapId, x, y);
+    } catch (error) {
+      logger.error('token.move failed', { err: error });
+    }
+  }, 16); // 16ms = ~60fps (1000ms / 60fps = 16.67ms)
+
+  socket.on('token.move', (data: { tokenId: string; mapId: string; x: number; y: number }) => {
+    handleTokenMove(socket, data);
+  });
+
+  /**
+   * TOKEN.MOVE.END - User finishes dragging (final position)
+   * Updates database and broadcasts to campaign
+   */
+  socket.on('token.move.end', async (data: { tokenId: unknown; mapId: unknown; x: number; y: number }) => {
+    let done: (() => void) | undefined;
+    try {
+      if (!socket.campaignId) {
+        socket.emit('error', { message: 'Not authenticated to a campaign' });
+        return;
+      }
+
+      // Flood ceiling, before any work: each drop is a write under the
+      // map's lock and, on a lit map, line of sight for every player. A drag
+      // ends with one, so the drops have a budget of their own; the frames
+      // keep theirs.
+      if (!withinCeiling(socket, 'token.move.end')) return;
+
+      const { tokenId, mapId, x: dropX, y: dropY } = data;
+
+      // Whole squares, as the client always sends: other clients draw a
+      // fraction half a square from where sight and stored position count it.
+      if (typeof tokenId !== 'string' || !tokenId || typeof mapId !== 'string' || !mapId || !Number.isInteger(dropX) || !Number.isInteger(dropY)) {
+        socket.emit('error', { message: 'Invalid token move data' });
+        return;
+      }
+
+      // After this token's pick-up, so the drag it began is recorded.
+      done = await moveTurns.turnFor(tokenId);
+
+      // Fetch the map, with the campaign's status for the pause rule below
+      // and its current map, for whether this socket may move tokens on it
+      // and who is told
+      const map = await prisma.map.findUnique({
+        where: { id: mapId },
+        include: { campaign: { select: { status: true, currentMapId: true } } },
+      });
+
+      if (!map || map.campaignId !== socket.campaignId || !canReadMap(socket.role, mapId, map.campaign.currentMapId)) {
+        socket.emit('error', { message: 'Map not found' });
+        return;
+      }
+
+      // Get tokens array
+      const tokensArray = (Array.isArray(map.tokens) ? map.tokens : []) as unknown as Token[];
+      const tokenIndex = tokensArray.findIndex((t) => t.id === tokenId);
+
+      if (tokenIndex === -1) {
+        socket.emit('error', { message: 'Token not found' });
+        return;
+      }
+
+      const token = tokensArray[tokenIndex];
+      // The drag is over; the next one is decided afresh. Who its frames
+      // went to is kept for a refused drop, below.
+      const sawTheDrag = drags.get(tokenId)?.deciding;
+      drags.delete(tokenId);
+      const campaignId = socket.campaignId;
+
+      /**
+       * A refused drop: the mover's screen has already drawn it, and if the
+       * drag began here with frames this socket was allowed to send
+       * (`sawTheDrag`), the frames reached everyone the drag went to. Tell
+       * them where the token is; the correction names no mover, since nobody
+       * moved it. The mover is told even with no drag recorded: its pick-up
+       * was refused too, or never sent, and its screen has the token where
+       * it was dropped. Only a screen that opening the map now would give the
+       * token to: the drag may be long over (a cancelled hold sends no
+       * token.move.end), and the GM may since have hidden the token and moved
+       * it somewhere secret. On a lit map a frame may have taken the token
+       * from a screen, or given it one that cannot see where it stands; each
+       * is put back in step.
+       */
+      const putBack = async () => {
+        const audience = sawTheDrag ? await sawTheDrag : null;
+        const told = stillInCampaign(await campaignSockets(io, campaignId), campaignId)
+          .filter((s) => s.id === socket.id || audience?.recipients.has(s.id));
+        const playerIds = told
+          .map((s) => s as unknown as AuthenticatedSocket)
+          .filter((a) => a.role !== 'GM' && a.userId)
+          .map((a) => a.userId as string);
+        const spiritVisibility = await getSpiritVisibilityBatch(campaignId, playerIds);
+        const back = { tokenId, mapId, x: token.position.x, y: token.position.y, movedBy: null };
+        for (const s of told) {
+          const recipient = frameRecipient(s as unknown as AuthenticatedSocket, map, tokensArray, tokenId, spiritVisibility);
+          const holds = s.id === socket.id || audience === null || audience.holding.has(s.id);
+          if (recipient && recipient.sees(token)) {
+            if (!holds) s.emit('token:appeared', { token: recipient.shown(token), mapId });
+            s.emit('token.moved', back);
+          } else if (holds && s.id !== socket.id && recipient) {
+            s.emit('token:disappeared', { tokenId, mapId });
+          }
+        }
+      };
+
+      // See token.move.start: one rule, shared with the REST update route.
+      // Control can be taken away mid-drag (a demotion, a new controller).
+      if (!canControlToken(socket.role, token.controlledBy, socket.userId)) {
+        socket.emit('error', { message: moveRefusal(socket.role) });
+        await putBack();
+        return;
+      }
+
+      // The same plane rule the REST update route applies.
+      if (!(await canActOnTokenPlane(socket.role, token, socket.campaignId, socket.userId!))) {
+        socket.emit('error', { message: 'You cannot interact with spirit layer tokens' });
+        await putBack();
+        return;
+      }
+
+      // And the same session rule: a player's move waits for the session.
+      // A pause can land after the token was picked up.
+      if (!canMoveTokensNow(socket.role, map.campaign.status)) {
+        socket.emit('error', { message: PAUSED_MOVE_REFUSAL });
+        await putBack();
+        return;
+      }
+
+      // Update token position, in the list as it is under the map's lock: a
+      // GM's add or delete landing during the drag used to be written away.
+      // The drop is checked against the map's size there, and kept whole on
+      // it by the token's size then, the rule the client applies before it
+      // sends a drop; everyone, the mover included, is told where it went.
+      // Judged by the map read before the lock, a token the GM grew or a map
+      // the GM shrank meanwhile was left hanging off the edge. Who is told,
+      // and on a lit map what each player sees, is judged by the token and
+      // the map as they are there too: a token the GM hid, a map the GM lit
+      // or a door the GM closed meanwhile was judged as it had been. The
+      // current map is read there as well, for who may read this one.
+      const dropped = await withMapsLocked([mapId], async (tx) => {
+        const fresh = await tx.map.findUniqueOrThrow({
+          where: { id: mapId },
+          select: {
+            tokens: true, width: true, height: true, gridSize: true,
+            lightingEnabled: true, wallSegments: true, lights: true, globalIllumination: true,
+            campaign: { select: { currentMapId: true } },
+          },
+        });
+        if (dropX < 0 || dropX >= fresh.width || dropY < 0 || dropY >= fresh.height) return { refused: 'Token position out of bounds' };
+        const tokens = readTokens(fresh.tokens);
+        const index = tokens.findIndex((t) => t.id === tokenId);
+        if (index === -1) return { refused: 'Token not found' };
+        const position = clampTokenPosition({ x: dropX, y: dropY }, tokens[index].size ?? { width: 1, height: 1 }, fresh);
+        tokens[index] = { ...tokens[index], position };
+        await tx.map.update({ where: { id: mapId }, data: { tokens: toJson(tokens) } });
+        return { written: tokens[index], stored: { ...fresh, tokens } };
+      });
+      if ('refused' in dropped) {
+        // TODO(play): a drop refused here for its bounds (the GM shrank the map during the drag) is put back
+        // on no screen, so the mover and those the frames reached keep the token where it was carried. Put it
+        // back as the refusals above do, judged from the map as read under the lock.
+        socket.emit('error', { message: dropped.refused });
+        return;
+      }
+      const { written, stored } = dropped;
+      const updatedTokens = stored.tokens;
+      const currentMapId = stored.campaign.currentMapId;
+      const { x, y } = written.position;
+
+      if (stored.lightingEnabled) {
+        // Dynamic lighting: per-player visibility filtering. The plane and
+        // hidden-token rules (filterTokensByRole, the same call the map fetch
+        // makes) come first, then line of sight, so a player is never sent a
+        // token here that opening the map would not have given them, and the
+        // payloads carry no GM notes.
+        const members = await campaignSockets(io, socket.campaignId);
+        const playerIds = members
+          .map((s) => s as unknown as AuthenticatedSocket)
+          .filter((a) => a.role !== 'GM' && a.userId)
+          .map((a) => a.userId as string);
+        const spiritVisibility = await getSpiritVisibilityBatch(socket.campaignId, playerIds);
+        for (const s of stillInCampaign(members, socket.campaignId)) {
+          const authedSocket = s as unknown as AuthenticatedSocket;
+          if (authedSocket.role === 'GM') {
+            s.emit('token.moved', { tokenId, mapId, x, y, movedBy: socket.userId });
+            continue;
+          }
+          if (!authedSocket.userId) continue;
+          if (!canReadMap(authedSocket.role, mapId, currentMapId)) continue;
+
+          const viewer = viewerIdFor(authedSocket.role, authedSocket.userId);
+          const forRole = filterTokensByRole(
+            updatedTokens,
+            authedSocket.role ?? 'PLAYER',
+            spiritVisibility.get(authedSocket.userId) ?? false,
+            authedSocket.userId
+          );
+          const visible = filterTokensByLighting(
+            forRole,
+            viewer,
+            stored.wallSegments as unknown as WallSegment[],
+            stored.width,
+            stored.height,
+            stored.gridSize,
+            true,
+            stored.lights,
+            stored.globalIllumination
+          );
+          const visibleById = new Map(visible.map((t) => [t.id, t]));
+          // Only a token this player may have at all is ever named to them:
+          // hidden and off-plane tokens are not in forRole, so no
+          // token:disappeared carries their ids.
+          const mayHave = new Set(forRole.map((t) => t.id));
+
+          const moved = visibleById.get(tokenId);
+          if (moved) {
+            // Visible: position update AND the full token (frontend deduplicates),
+            // in case this player did not have it yet.
+            s.emit('token.moved', { tokenId, mapId, x, y, movedBy: moverShownTo(written, authedSocket) });
+            s.emit('token:appeared', { token: moved, mapId });
+          } else if (mayHave.has(tokenId)) {
+            s.emit('token:disappeared', { tokenId, mapId });
+          }
+
+          // If a player moved their OWN token, their view changed: re-sync all
+          // OTHER tokens so those that left or entered view go at once.
+          if (viewer && written.controlledBy === viewer) {
+            for (const otherToken of forRole) {
+              if (otherToken.id === tokenId) continue; // already handled above
+              // Skip own tokens — always included by filterTokensByLighting
+              if ((otherToken as Token).controlledBy === viewer) continue;
+              const other = visibleById.get(otherToken.id);
+              if (other) {
+                s.emit('token:appeared', { token: other, mapId });
+              } else {
+                s.emit('token:disappeared', { tokenId: otherToken.id, mapId });
+              }
+            }
+          }
+        }
+      } else {
+        // The sender included, as confirmation that the write went through.
+        await emitMoveToVisibleSockets(
+          'token.moved', written, mapId, currentMapId, { tokenId, mapId, x, y }, true
+        );
+      }
+
+      logger.debug('token.move.end', { tokenId, x, y, userId: socket.userId });
+    } catch (error) {
+      logger.error('token.move.end failed', { err: error });
+      socket.emit('error', { message: 'Failed to finalize token movement' });
+    } finally {
+      done?.();
+    }
+  });
+}

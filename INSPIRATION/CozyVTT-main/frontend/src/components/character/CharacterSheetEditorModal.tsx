@@ -1,0 +1,268 @@
+/**
+ * Character Sheet Editor Modal
+ */
+
+import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useUnsavedWorkGuard } from '@/hooks/useUnsavedWorkGuard';
+import { useToast } from '@/contexts/ToastContext';
+import { api } from '@/services/api';
+import type { Character } from '@/types';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
+import SignedOutNotice from '@/components/common/SignedOutNotice';
+import { CharacterSheetErrorBoundary } from '../character-sheets/ErrorBoundary';
+import { SHEET_SHELL_DIALOG, SHEET_SHELL_OVERLAY } from './sheetShell';
+
+// Import editor components
+import FifthEditionCharacterEditor from '../character-sheets/fifth-edition/FifthEditionCharacterEditor';
+import FantasyD20CharacterEditor from '../character-sheets/fantasy-d20/FantasyD20CharacterEditor';
+import HorrorD100CharacterEditor from '../character-sheets/horror-d100/HorrorD100CharacterEditor';
+import { FlexibleCharacterSheetEdit } from '../character-sheets/flexible/FlexibleCharacterSheetEdit';
+import { UnsupportedSystemSheet } from '../character-sheets/UnsupportedSystemSheet';
+import { isSupportedOrNoSystem } from '@/constants/game-systems';
+import { apiErrorMessage, apiValidationIssues, errorSummary } from '@/utils/errors';
+import { refusedSaveMessage } from '@/utils/sheetSaveRefusal';
+import { isStaleCharacterSave } from '@/utils/staleCharacter';
+import { useStaleSaveReapply } from './StaleSaveDialog';
+import { isSignedOutSave, SIGNED_OUT_NOT_SAVED } from '@/utils/signedOut';
+import { reportSignedIn, reportSignedOut } from '@/services/unsavedWork';
+import type { CharacterData } from '@/types';
+
+interface CharacterSheetEditorModalProps {
+  character: Character;
+  onClose: () => void;
+  onSaved?: () => void; // Optional callback after save
+}
+
+export default function CharacterSheetEditorModal({
+  character,
+  onClose,
+  onSaved,
+}: CharacterSheetEditorModalProps) {
+  const [saving, setSaving] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const signedOut = useUnsavedWorkGuard(hasUnsavedChanges);
+  const { showToast } = useToast();
+  // The version the editor's form was made from: the one it opened, then the
+  // one each save stored while the editor stays open. The character handed in
+  // here can be refreshed meanwhile, since the sheet behind it follows the
+  // table, but the editor's form is not, so its save is made from this one,
+  // and a refused save's changes are measured from its sheet.
+  const [loadedAt, setLoadedAt] = useState(character.updatedAt);
+  const openedSheetRef = useRef(character.data);
+  const staleSave = useStaleSaveReapply();
+
+  // Handle save. The editors pass a freshly-uploaded token image URL as the
+  // third argument — forward it so the character's token actually updates.
+  // (Omit it when undefined so an edit that didn't touch the token keeps the
+  // existing image.)
+  const handleSave = async (data: CharacterData, _showToast?: boolean, tokenImageUrl?: string) => {
+    const picture = tokenImageUrl !== undefined ? { tokenImageUrl } : {};
+    try {
+      setSaving(true);
+      let saved: Character;
+      let carriedOver = false;
+      try {
+        ({ character: saved } = await api.updateCharacter(character.id, { data, updatedAt: loadedAt, ...picture }));
+      } catch (error) {
+        // Saving over a newer version would undo it. The editor stays open,
+        // the player's changes are carried onto the newest version, and that
+        // is saved once they say so.
+        if (!isStaleCharacterSave(error)) throw error;
+        const stored = await staleSave.reapply({
+          opened: openedSheetRef.current,
+          edited: data,
+          withNewPicture: tokenImageUrl !== undefined,
+          fetchLatest: async () => (await api.getCharacter(character.id)).character,
+          // The sheet behind loads it too, and the Characters page with it.
+          onLatest: () => onSaved?.(),
+          save: async (merged, updatedAt) =>
+            (await api.updateCharacter(character.id, { data: merged, updatedAt, ...picture })).character,
+        });
+        if (!stored) throw error;
+        saved = stored;
+        carriedOver = true;
+      }
+      reportSignedIn();
+      // The editor closes through onDone once it holds nothing unsaved. With
+      // something typed while this save was in flight it stays open, and its
+      // next save is made from the version just stored. After changes were
+      // carried over, its form is still the older version's, so it keeps that
+      // one: another save is refused and carried over in turn, and cannot put
+      // the older values back.
+      if (!carriedOver) {
+        setLoadedAt(saved.updatedAt);
+        openedSheetRef.current = saved.data;
+      }
+
+      // Call optional callback
+      if (onSaved) {
+        onSaved();
+      }
+    } catch (error) {
+      console.error('Error saving character:', errorSummary(error));
+
+      // Signed out meanwhile: the editor stays open with the changes, and the
+      // notice says how to save them.
+      if (isSignedOutSave(error)) {
+        reportSignedOut();
+        showToast(SIGNED_OUT_NOT_SAVED, 'error');
+        throw error;
+      }
+
+      // The player chose to keep editing; the dialog has said why.
+      if (isStaleCharacterSave(error)) throw error;
+
+      // Say which boxes the server refused, so the player knows what to fix.
+      const validationErrors = apiValidationIssues(error);
+      if (validationErrors) console.error('Validation errors:', validationErrors);
+      showToast(
+        refusedSaveMessage(
+          validationErrors ?? [],
+          apiErrorMessage(error),
+          'Failed to save character. Please try again.'
+        ),
+        'error'
+      );
+      // Thrown on so the sheet knows nothing was saved: it keeps its unsaved
+      // changes, and leaving still asks before discarding them.
+      throw error;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Ask before leaving only when something would be lost.
+  const handleCancel = () => {
+    if (!hasUnsavedChanges) {
+      onClose();
+      return;
+    }
+    setConfirmClose(true);
+  };
+
+  // Escape does what Cancel does. While a question is up, Escape is its to
+  // answer, so this one stands aside.
+  const modalRef = useFocusTrap(true, confirmClose || staleSave.asking ? undefined : handleCancel);
+
+  // Render appropriate character sheet editor based on game system
+  const renderCharacterEditor = () => {
+    // A system CozyVTT no longer supports has no editor: its data, read-only.
+    if (!isSupportedOrNoSystem(character.gameSystem)) {
+      return <UnsupportedSystemSheet character={character} />;
+    }
+    switch (character.gameSystem) {
+      case 'FIFTH_EDITION':
+        return (
+          <FifthEditionCharacterEditor
+            character={character}
+            onSave={handleSave}
+            onCancel={handleCancel}
+            onDirtyChange={setHasUnsavedChanges}
+            onDone={onClose}
+          />
+        );
+      case 'FANTASY_D20':
+        return (
+          <FantasyD20CharacterEditor
+            character={character}
+            onSave={handleSave}
+            onCancel={handleCancel}
+            onDirtyChange={setHasUnsavedChanges}
+            onDone={onClose}
+          />
+        );
+      case 'HORROR_D100':
+        return (
+          <HorrorD100CharacterEditor
+            character={character}
+            onSave={handleSave}
+            onCancel={handleCancel}
+            onDirtyChange={setHasUnsavedChanges}
+            onDone={onClose}
+          />
+        );
+      default:
+        // Flexible character sheet
+        return (
+          <FlexibleCharacterSheetEdit
+            character={character}
+            onSave={handleSave}
+            onCancel={handleCancel}
+            onDirtyChange={setHasUnsavedChanges}
+            onDone={onClose}
+          />
+        );
+    }
+  };
+
+  // Portaled to the body, as the sheet it is opened over is (sheetShell.ts).
+  return (
+    <>
+    {createPortal(
+    <div className={SHEET_SHELL_OVERLAY}>
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="character-sheet-editor-title"
+        className={SHEET_SHELL_DIALOG}
+      >
+        {/* Close button, in flow rather than absolute. It used to be
+            `absolute top-4 right-4`, but the dialog is not a positioned
+            ancestor — so it resolved against the full-viewport overlay and
+            floated outside the dialog entirely. Making the dialog `relative`
+            would fix that but drop it straight onto the sheet's own palette
+            button, which sits at the same offset inside the sheet header. A
+            flow row keeps it clear of the sheet's controls at every width. */}
+        <div className="flex justify-end px-3 py-2 border-b border-moss-green/20 shrink-0">
+          <button
+            onClick={handleCancel}
+            aria-label="Close dialog"
+            className="touch-target inline-flex items-center justify-center p-2 rounded-lg hover:bg-stone-gray/10 transition-colors"
+            disabled={saving}
+          >
+            <X className="w-5 h-5 text-stone-gray" />
+          </button>
+        </div>
+
+        {signedOut && (
+          <div className="px-4 pt-4 shrink-0">
+            <SignedOutNotice />
+          </div>
+        )}
+
+        {/* Visually hidden title for accessibility */}
+        <h2 id="character-sheet-editor-title" className="sr-only">
+          Edit Character Sheet: {character.name}
+        </h2>
+
+        {/* Editor Content. A sheet the editor cannot draw fails here, inside
+            the dialog, and not across the whole page. Not reset when the
+            character is refreshed: that would throw away the edits. */}
+        <div className="flex-1 overflow-y-auto">
+          <CharacterSheetErrorBoundary>{renderCharacterEditor()}</CharacterSheetErrorBoundary>
+        </div>
+      </div>
+    </div>,
+    document.body
+    )}
+    {/* The question is a Modal on the overlay layer (z-60), portaled to the
+        body after this dialog, so it is drawn over it. */}
+    <ConfirmDialog
+      isOpen={confirmClose}
+      title="Discard Changes?"
+      message="Are you sure you want to cancel? Any unsaved changes will be lost."
+      confirmLabel="Discard"
+      cancelLabel="Keep Editing"
+      variant="warning"
+      onConfirm={onClose}
+      onCancel={() => setConfirmClose(false)}
+    />
+    {staleSave.dialog}
+    </>
+  );
+}

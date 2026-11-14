@@ -1,0 +1,2364 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
+import { AuthenticatedRequest, NOT_A_MEMBER_MESSAGE } from '../middleware/rbac';
+import { authenticated, campaignMember, campaignGM, adminOnly } from '../middleware/compose';
+import { prisma } from '../config/database';
+import { canDeleteCampaign, canTransferGM, canReadMap } from '../services/permissions';
+import { getSpiritVisibility, MAP_SELECT_SENT_TO_EVERYONE } from '../utils/spirit-layer';
+import { captureGameState, getNextSessionNumber, withSessionsHeld, openSession } from '../services/sessionState';
+import { resendInitiative } from '../websocket/handlers/initiative';
+import { sendSystemMessage, broadcastToUser, broadcastToCampaign, applyRoleToLiveSockets, clearDeletedCampaignFromLiveSockets, announceRosterChange, getSocketInstance, LEFT_MESSAGE } from '../websocket/utils';
+import { takeMemberOut, tellTableMemberLeft, type TakeOutRefusal } from '../services/campaignMembers';
+import { broadcastMapData } from '../websocket/shared';
+import { clearState as clearCombatState } from '../websocket/initiativeState';
+import { isSmtpConfigured, sendCampaignInvitationEmail } from '../services/email';
+import { DEFAULT_VIBE_SETTINGS } from '../utils/vibe-presets';
+import { issueMessages } from '../validators/issueMessages';
+import { saveVibeSettings, vibeAudioRefusal } from '../services/vibeSave';
+import { prepareCampaignExport, ExportTooLargeError, type PreparedExport } from '../services/campaignExporter';
+import { CAMPAIGN_ARCHIVE_MAX_BYTES, megabytes } from '../utils/campaignArchiveSize';
+import { previewCampaignImport, importCampaign, importTempDirectory, IMPORT_FAILED_MESSAGE } from '../services/campaignImporter';
+import { ArchiveRefusedError } from '../utils/archive';
+import { CreateCampaignSchema, UpdateCampaignSchema, TransferGMSchema, CampaignInviteSchema, VibeSettingsSchema } from '../validators/campaigns';
+import { CreatePersonalNoteSchema, UpdatePersonalNoteSchema, MAX_NOTES_PER_CAMPAIGN } from '../validators/personalNotes';
+import { UpdateSessionNotesSchema, EndSessionSchema } from '../validators/sessionNotes';
+import { listLeftCampaigns, getLeftCampaign, getLeftCampaignNote, getLeftCampaignNotes } from './leftCampaigns';
+import { leftNotesDownloadLimiter } from '../middleware/leftNotesDownloadLimiter';
+import { CampaignRole, type GameSystem, type Prisma } from '@prisma/client';
+import { normaliseRole } from '../legacy/gameSystemAliases';
+import { sheetAsRead } from '../legacy/sheetConversion';
+import { errorMessage } from '../utils/errors';
+import { inSerializableTransaction } from '../utils/serializable';
+import { toJson, readJsonObject } from '../utils/prisma-json';
+import { extractCharacterHp } from '../utils/characterHp';
+import logger from '../utils/logger';
+import { encodeMessageCursor, decodeMessageCursor } from '../utils/messageCursor';
+import { MULTIPART_FIELD_LIMITS, MULTIPART_NAME_CHARSET } from '../utils/multipartLimits';
+import { invitationEmailLimiter } from '../middleware/invitationEmailLimiter';
+import { MAX_DISPLAY_NAME_LENGTH } from '../validators/users';
+import { INVITE_SEARCH_MIN_LENGTH, INVITE_SEARCH_MAX_RESULTS } from '../validators/inviteSearchLimits';
+import { escapeLikePattern } from '../utils/likePattern';
+import { standingInvitation, isStanding } from '../utils/invitationState';
+import { CAMPAIGN_LIMITS } from '../validators/campaignLimits';
+import { MAX_CHAT_HISTORY_PAGE } from '../validators/chatLimits';
+import { downloadOnly } from '../middleware/downloadOnly';
+import { refuseNulCharacters } from '../middleware/nulCharacter';
+import {
+  campaignPreviewLimiter,
+  campaignImportLimiter,
+  campaignExportLimiter,
+  oneCampaignArchiveAtATime,
+  whileHoldingArchiveSlot,
+} from '../middleware/campaignArchiveLimits';
+import { randomUUID } from 'crypto';
+import path from 'path';
+import fsp from 'fs/promises';
+import { resendDrawings } from '../services/mapDrawings';
+const router = Router();
+
+/**
+ * What a campaign member's account carries wherever a membership is sent:
+ * the roster, the campaign fetch, the members list and a role change. Never
+ * the email address: these go to every member, and a GM must not be able to
+ * collect the addresses of the people at their table.
+ */
+export const MEMBER_USER_SELECT = { id: true, displayName: true, avatarUrl: true } as const satisfies Prisma.UserSelect;
+
+/** The account fields a chat message carries for its author. */
+export const MESSAGE_USER_SELECT = { id: true, displayName: true } as const satisfies Prisma.UserSelect;
+
+// ── Import file upload ──────────────────────────────────────────────────────
+// A campaign archive is written to disk and read from there, never held in
+// memory: the backend shares a few hundred megabytes between every table, and
+// an archive may be 500 MB. The folder sits in the uploads volume, beside the
+// asset uploads' own temp folder, and is made the first time it is needed.
+// The importer stages the files it unpacks in the same folder.
+const IMPORT_TEMP_DIR = importTempDirectory();
+/** An archive or staging folder older than this was left by a backend that stopped mid-import. */
+const STALE_IMPORT_MS = 24 * 60 * 60 * 1000;
+
+/** Remove archives and staging folders a stopped backend left behind. Best effort: a failure here stops no import. */
+async function removeStaleImports(): Promise<void> {
+  try {
+    const now = Date.now();
+    for (const name of await fsp.readdir(IMPORT_TEMP_DIR)) {
+      const file = path.join(IMPORT_TEMP_DIR, name);
+      const stats = await fsp.stat(file).catch(() => null);
+      if (stats && now - stats.mtimeMs > STALE_IMPORT_MS) await fsp.rm(file, { recursive: true, force: true });
+    }
+  } catch (error) {
+    logger.warn('Could not clear old campaign import files', { error: errorMessage(error) });
+  }
+}
+
+const importUpload = multer({
+  ...MULTIPART_NAME_CHARSET,
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      fsp
+        .mkdir(IMPORT_TEMP_DIR, { recursive: true })
+        .then(() => {
+          void removeStaleImports();
+          cb(null, IMPORT_TEMP_DIR);
+        })
+        .catch((err: Error) => cb(err, IMPORT_TEMP_DIR));
+    },
+    filename: (_req, _file, cb) => cb(null, `${randomUUID()}.cozyvtt`),
+  }),
+  limits: { fileSize: CAMPAIGN_ARCHIVE_MAX_BYTES, files: 1, ...MULTIPART_FIELD_LIMITS },
+  fileFilter: (_req, file, cb) => {
+    // Accept .cozyvtt or .zip MIME types
+    const allowed = [
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/octet-stream',
+    ];
+    if (allowed.includes(file.mimetype) || file.originalname.endsWith('.cozyvtt')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only .cozyvtt archives are accepted.'));
+    }
+  },
+});
+
+/** Remove an uploaded archive once its request is done with it. */
+async function removeUploadedArchive(file: Express.Multer.File | undefined): Promise<void> {
+  if (file?.path) await fsp.rm(file.path, { force: true }).catch(() => undefined);
+}
+
+// ── Session steps ───────────────────────────────────────────────────────────
+// A step that cannot go ahead returns one of these from inside
+// `withSessionsHeld`, and the route answers with it once the hold is let go.
+interface SessionRefusal { refused: 400 | 404; message: string }
+
+function sessionRefusal(refused: 400 | 404, message: string): SessionRefusal {
+  return { refused, message };
+}
+
+function sendSessionRefusal(res: Response, { refused, message }: SessionRefusal) {
+  return res.status(refused).json({ error: refused === 404 ? 'Not Found' : 'Bad Request', message });
+}
+
+/**
+ * Campaign Routes
+ * Campaign Endpoints
+ */
+
+/**
+ * GET /api/campaigns/left, /left/:campaignId, /left/:campaignId/notes and
+ * /left/:campaignId/notes/:noteId
+ * The caller's notes and dice macros from campaigns they have left (see
+ * routes/leftCampaigns.ts). Before the /:campaignId routes below, which would
+ * read "left" as a campaign id.
+ */
+router.get('/left', authenticated, listLeftCampaigns);
+router.get('/left/:campaignId', authenticated, getLeftCampaign);
+router.get('/left/:campaignId/notes', authenticated, leftNotesDownloadLimiter, getLeftCampaignNotes);
+router.get('/left/:campaignId/notes/:noteId', authenticated, getLeftCampaignNote);
+
+/**
+ * GET /api/campaigns
+ * Get all campaigns the user is a member of
+ * Requires: Authentication
+ */
+router.get('/', authenticated, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+
+    // Find all campaigns where user is a member.
+    // SECURITY: Do NOT include `email` in any nested user select — these
+    // payloads are returned to non-admin users who can see their fellow
+    // members. Emails are PII and only the owner of an account (via
+    // /auth/me) or platform admins should ever receive them. Same rule
+    // applies to every other endpoint in this file that embeds users.
+    const memberships = await prisma.campaignMembership.findMany({
+      where: { userId },
+      include: {
+        campaign: {
+          include: {
+            owner: {
+              select: {
+                id: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+            memberships: {
+              include: {
+                user: { select: MEMBER_USER_SELECT },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const campaigns = memberships.map((m) => ({
+      ...m.campaign,
+      userRole: m.role,
+      characterIds: m.characterIds,
+    }));
+
+    return res.status(200).json({ campaigns });
+  } catch (error) {
+    logger.error('Error fetching campaigns', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch campaigns',
+    });
+  }
+});
+
+/**
+ * POST /api/campaigns
+ * Create a new campaign
+ * Requires: Authentication
+ * Note: Creator automatically becomes campaign owner and GM
+ */
+router.post('/', authenticated, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+
+    const parsed = CreateCampaignSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: parsed.error.issues[0]?.message ?? 'Invalid campaign data',
+      });
+    }
+    const { name, description, gameSystem } = parsed.data;
+
+    // Create campaign with default vibe settings and optional gameSystem
+    const campaign = await prisma.campaign.create({
+      data: {
+        name,
+        description: description || '',
+        ownerId: userId,
+        vibeSettings: toJson(DEFAULT_VIBE_SETTINGS),
+        gameSystem: gameSystem || null,
+      },
+    });
+
+    // Automatically add creator as GM
+    await prisma.campaignMembership.create({
+      data: {
+        userId,
+        campaignId: campaign.id,
+        role: 'GM',
+        characterIds: [],
+      },
+    });
+
+    // Fetch campaign with memberships to return complete data.
+    // SECURITY: see note in GET /api/campaigns — never embed `email` in
+    // member-facing payloads.
+    const campaignWithMemberships = await prisma.campaign.findUnique({
+      where: { id: campaign.id },
+      include: {
+        memberships: {
+          include: {
+            user: { select: MEMBER_USER_SELECT },
+          },
+        },
+      },
+    });
+
+    return res.status(201).json({
+      message: 'Campaign created successfully',
+      campaign: campaignWithMemberships,
+    });
+  } catch (error) {
+    logger.error('Error creating campaign', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to create campaign',
+    });
+  }
+});
+
+/**
+ * GET /api/campaigns/:campaignId
+ * Get campaign details
+ * Requires: Campaign membership (any role)
+ */
+router.get('/:campaignId', campaignMember, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      include: {
+        // SECURITY: never embed `email` in member-facing payloads —
+        // any campaign member can hit this endpoint.
+        owner: {
+          select: {
+            id: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+        memberships: {
+          include: {
+            user: { select: MEMBER_USER_SELECT },
+          },
+        },
+        // PERFORMANCE: return map/character METADATA only. The full
+        // token/wall/fog/light blobs and full character sheets are unbounded and
+        // were never used from this payload — the active map's full data loads via
+        // GET /api/campaigns/:campaignId/maps/:id (spirit-filtered) and character
+        // sheets via GET /api/characters/:id. Frontend only reads ids + a few
+        // metadata fields from these arrays (map move-to-map, token ownership).
+        // The fields everyone is sent of a map, and the spirit layer address,
+        // blanked below for a member who may not have it.
+        maps: { select: { ...MAP_SELECT_SENT_TO_EVERYONE, spiritLayerUrl: true } },
+        characters: {
+          select: {
+            id: true,
+            userId: true,
+            campaignId: true,
+            gameSystem: true,
+            name: true,
+            tokenImageUrl: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        // Include the most recent open session for session controls UI
+        sessions: {
+          where: { endedAt: null },
+          orderBy: { startedAt: 'desc' },
+          take: 1,
+          select: { id: true, sessionNumber: true, startedAt: true },
+        },
+      },
+    });
+
+    if (!campaign) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Campaign not found',
+      });
+    }
+
+    // Flatten sessions array → activeSession (first open session, or null)
+    const { sessions: _sessions, ...campaignRest } = campaign;
+
+    // A map's spirit layer is for the GM and for a player who has crossed
+    // over. The map fetch hides its address from everyone else, and so must
+    // this list: any member can fetch the image by the address alone.
+    const role = req.campaignMembership!.role;
+    const spiritVisible = role === 'GM' || (await getSpiritVisibility(campaignId, req.session.userId!));
+    // A player is told about the map the campaign is showing and no other;
+    // the rest are the GM's until they switch to them (canReadMap).
+    const shown = campaignRest.maps.filter((m) => canReadMap(role, m.id, campaignRest.currentMapId));
+    const maps = spiritVisible
+      ? shown
+      : shown.map((m) => ({ ...m, spiritLayerUrl: null }));
+    // A character is the campaign's while its owner is a member. One a
+    // removal left naming the campaign (removals now take it out) is not.
+    const memberIds = new Set(campaignRest.memberships.map((m) => m.userId));
+    const characters = campaignRest.characters.filter((c) => memberIds.has(c.userId));
+
+    return res.status(200).json({
+      campaign: {
+        ...campaignRest,
+        maps,
+        characters,
+        activeSession: (_sessions && _sessions.length > 0) ? _sessions[0] : null,
+        userRole: role,
+      },
+    });
+  } catch (error) {
+    logger.error('Error fetching campaign', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch campaign',
+    });
+  }
+});
+
+/**
+ * GET /api/campaigns/:campaignId/characters
+ * Get all characters in campaign grouped by member.
+ * Includes extracted HP info per character (game-system-aware).
+ * Requires: Campaign membership (any role)
+ */
+
+router.get('/:campaignId/characters', campaignMember, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+
+    // Fetch all memberships with their character assignments
+    const memberships = await prisma.campaignMembership.findMany({
+      where: { campaignId },
+      include: {
+        user: { select: MEMBER_USER_SELECT },
+      },
+    });
+
+    // Get all character IDs from all memberships
+    const allCharacterIds = memberships.flatMap((m) => m.characterIds);
+
+    // Fetch character details including data for HP extraction
+    // TODO(play): this loads the whole sheet of every character in the
+    // campaign at once, only to read its hit points. A sheet may be near the
+    // 1 MB body limit and a member may bring many characters, so a campaign
+    // of large sheets costs this request that much memory (suspected, not
+    // measured). Right: read the sheets a few at a time, or select the hit
+    // point fields alone in SQL for each system.
+    const characters = await prisma.character.findMany({
+      where: {
+        id: { in: allCharacterIds },
+      },
+      select: {
+        id: true,
+        name: true,
+        tokenImageUrl: true,
+        gameSystem: true,
+        userId: true,
+        data: true,
+      },
+    });
+
+    // Build response — extract HP from character data, never expose raw data
+    const roster = memberships.map((membership) => {
+      const memberCharacters = characters
+        .filter((c) => membership.characterIds.includes(c.id))
+        .map(({ data, ...char }) => ({
+          ...char,
+          hp: extractCharacterHp(char.gameSystem, readJsonObject(sheetAsRead(char.gameSystem, data))),
+        }));
+
+      return {
+        userId: membership.userId,
+        userName: membership.user.displayName,
+        userAvatar: membership.user.avatarUrl,
+        role: membership.role,
+        joinedAt: membership.joinedAt,
+        characters: memberCharacters,
+      };
+    });
+
+    return res.status(200).json({ roster });
+  } catch (error) {
+    logger.error('Error fetching campaign characters', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch campaign characters',
+    });
+  }
+});
+
+/**
+ * `campaign.settings.updated`: the Campaign Settings every member's page
+ * shows, as stored, sent when the GM saves any of them. The frontend declares
+ * the same fields (keepInStep.test.ts).
+ */
+export interface CampaignSettingsUpdatedBroadcast {
+  campaignId: string;
+  name: string;
+  description: string | null;
+  gameSystem: GameSystem | null;
+  chatCooldownEnabled: boolean;
+  chatCooldownSeconds: number;
+  playersMayDraw: boolean;
+}
+
+/**
+ * PUT /api/campaigns/:campaignId
+ * Update campaign settings
+ * Requires: Campaign GM role
+ */
+router.put('/:campaignId', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const parsed = UpdateCampaignSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: parsed.error.issues[0]?.message ?? 'Invalid campaign data',
+      });
+    }
+    const { name, description, status, vibeSettings, spiritLayerEnabled, spiritLayerStyle, gameSystem, chatCooldownEnabled, chatCooldownSeconds, playersMayDraw } = parsed.data;
+
+    const updateData: Prisma.CampaignUpdateInput = {};
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (status !== undefined) updateData.status = status;
+    // Vibe settings are saved after the rest, as PUT .../vibe saves them;
+    // a track the GM may not play to the table refuses the whole request
+    // before anything is written.
+    if (vibeSettings !== undefined) {
+      const refusal = await vibeAudioRefusal(campaignId, req.session.userId!, vibeSettings);
+      if (refusal) return res.status(400).json({ error: 'Validation Error', message: refusal });
+    }
+    if (spiritLayerEnabled !== undefined) updateData.spiritLayerEnabled = spiritLayerEnabled;
+    if (spiritLayerStyle !== undefined) updateData.spiritLayerStyle = spiritLayerStyle;
+    if (chatCooldownEnabled !== undefined) updateData.chatCooldownEnabled = chatCooldownEnabled;
+    if (chatCooldownSeconds !== undefined) updateData.chatCooldownSeconds = chatCooldownSeconds;
+    if (playersMayDraw !== undefined) updateData.playersMayDraw = playersMayDraw;
+
+    // Handle gameSystem update
+    if (gameSystem !== undefined) {
+      // Changing the system under existing characters is allowed, but logged.
+      const characterCount = await prisma.character.count({
+        where: { campaignId },
+      });
+
+      if (characterCount > 0) {
+        logger.warn('campaign game system changed with existing characters', { campaignId, characterCount });
+      }
+
+      updateData.gameSystem = gameSystem;
+    }
+
+    // A status is set between sessions only, under the same hold as the
+    // session steps, so a Start cannot slip in beside it.
+    const outcome = status === undefined
+      ? { campaign: await prisma.campaign.update({ where: { id: campaignId }, data: updateData }) }
+      : await withSessionsHeld(campaignId, async (tx) => (await openSession(tx, campaignId))
+        ? sessionRefusal(400, 'End the session before changing the campaign status')
+        : { campaign: await tx.campaign.update({ where: { id: campaignId }, data: updateData }) });
+    if ('refused' in outcome) return sendSessionRefusal(res, outcome);
+    const campaign = vibeSettings === undefined
+      ? outcome.campaign
+      : { ...outcome.campaign, ...(await saveVibeSettings(campaignId, req.session.userId!, vibeSettings)) };
+
+    // Every member's page shows these, so a player at the table follows them
+    // without a reload: the chat box's cooldown, the campaign's name, whether
+    // they may draw. The change is saved either way, so a failed broadcast is
+    // only logged.
+    if ([name, description, gameSystem, chatCooldownEnabled, chatCooldownSeconds, playersMayDraw].some((value) => value !== undefined)) {
+      try {
+        const settings: CampaignSettingsUpdatedBroadcast = {
+          campaignId,
+          name: campaign.name,
+          description: campaign.description,
+          gameSystem: campaign.gameSystem,
+          chatCooldownEnabled: campaign.chatCooldownEnabled,
+          chatCooldownSeconds: campaign.chatCooldownSeconds,
+          playersMayDraw: campaign.playersMayDraw,
+        };
+        broadcastToCampaign(campaignId, 'campaign.settings.updated', settings);
+      } catch (error) {
+        logger.error('Campaign settings saved but not sent to the table', { err: error, campaignId });
+      }
+    }
+
+    return res.status(200).json({
+      message: 'Campaign updated successfully',
+      campaign,
+    });
+  } catch (error) {
+    logger.error('Error updating campaign', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to update campaign',
+    });
+  }
+});
+
+/**
+ * PUT /api/campaigns/:campaignId/vibe
+ * Update vibe tracker settings for a campaign
+ * Requires: Campaign GM role
+ * Vibe Tracker Details
+ */
+router.put('/:campaignId/vibe', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    if (!req.body?.vibeSettings) {
+      return res.status(400).json({ error: 'Validation Error', message: 'vibeSettings is required' });
+    }
+    const parsed = VibeSettingsSchema.safeParse(req.body.vibeSettings);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Validation Error', message: issueMessages(parsed.error) });
+    }
+    const refusal = await vibeAudioRefusal(campaignId, req.session.userId!, parsed.data);
+    if (refusal) return res.status(400).json({ error: 'Validation Error', message: refusal });
+
+    const saved = await saveVibeSettings(campaignId, req.session.userId!, parsed.data);
+    return res.status(200).json({ message: 'Vibe settings updated successfully', ...saved });
+  } catch (error) {
+    logger.error('Error updating vibe settings', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to update vibe settings',
+    });
+  }
+});
+
+/**
+ * DELETE /api/campaigns/:campaignId
+ * Delete a campaign
+ * Requires: Campaign owner or Admin
+ */
+router.delete('/:campaignId', authenticated, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const platformRole = req.session.platformRole!;
+    const { campaignId } = req.params;
+
+    // Check permission using helper function
+    const hasPermission = await canDeleteCampaign(userId, campaignId, platformRole);
+
+    if (!hasPermission) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Only the campaign owner or admin can delete this campaign',
+      });
+    }
+
+    // Convert CAMPAIGN-scoped assets to USER scope before deleting.
+    // Each asset is reassigned to its uploader's personal library.
+    //
+    // One transaction, so a delete that fails leaves the library as it was.
+    // The campaign's row is locked first: an asset written into the campaign
+    // holds a share lock on that row until it commits, so none can land
+    // between the two writes and be left a campaign asset with no campaign,
+    // which the permission check lets anyone read. The array form has no
+    // time limit, which a large campaign's cascade may need.
+    await prisma.$transaction([
+      prisma.$queryRaw`SELECT id FROM "Campaign" WHERE id = ${campaignId} FOR UPDATE`,
+      prisma.asset.updateMany({
+        where: { campaignId, scope: 'CAMPAIGN' },
+        data: { scope: 'USER', campaignId: null },
+      }),
+      prisma.campaign.delete({
+        where: { id: campaignId },
+      }),
+    ]);
+
+    // The live half of the cascade: sockets still in the room would keep
+    // relaying to each other and fail every write against the missing row.
+    // Best-effort, like the other membership changes: the row is gone.
+    try {
+      await clearDeletedCampaignFromLiveSockets(campaignId);
+    } catch (err) {
+      logger.warn('Campaign deleted but its live sockets could not be cleared', { campaignId, err });
+    }
+    clearCombatState(campaignId);
+
+    return res.status(200).json({
+      message: 'Campaign deleted successfully',
+    });
+  } catch (error) {
+    logger.error('Error deleting campaign', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to delete campaign',
+    });
+  }
+});
+
+/**
+ * GET /api/campaigns/:campaignId/invitable-users?search=<part of a name>
+ * Search the accounts that can be invited to this campaign by display name.
+ * A search of INVITE_SEARCH_MIN_LENGTH or more characters finds names that
+ * contain it; a shorter one finds only names that are exactly it, so a
+ * one-character name can still be invited without listing everyone. Answers
+ * nobody for an empty search, and at most INVITE_SEARCH_MAX_RESULTS, with
+ * `hasMore` when there were more.
+ * Excludes: existing members, users with a pending invitation, and accounts
+ * still waiting for an administrator's approval.
+ * Requires: Campaign GM role
+ *
+ * Any user can create a campaign and so become a GM, so this must never hand
+ * out the whole user directory: it used to, unpaged.
+ */
+router.get('/:campaignId/invitable-users', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const raw: unknown = req.query.search;
+    if (raw !== undefined && typeof raw !== 'string') {
+      return res.status(400).json({ error: 'Validation Error', message: 'Send the search once, as text.' });
+    }
+    // Display names are stored in NFC, so an accent typed as its own mark
+    // still finds the name.
+    const search = (raw ?? '').normalize('NFC').trim();
+    if (search.length > MAX_DISPLAY_NAME_LENGTH) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: `A display name is at most ${MAX_DISPLAY_NAME_LENGTH} characters, so search for that many or fewer.`,
+      });
+    }
+    if (search.length === 0) {
+      return res.status(200).json({ users: [], hasMore: false });
+    }
+
+    // Find existing member user IDs
+    const memberships = await prisma.campaignMembership.findMany({
+      where: { campaignId },
+      select: { userId: true },
+    });
+
+    // Those already invited, by an invitation that still stands
+    const pendingInvitations = await prisma.campaignInvitation.findMany({
+      where: { campaignId, ...standingInvitation() },
+      select: { userId: true },
+    });
+
+    const excludedIds = [
+      ...memberships.map((m) => m.userId),
+      ...pendingInvitations.map((i) => i.userId),
+    ];
+
+    // SECURITY: narrow select to displayName/avatar only. Any authenticated
+    // GM can call this endpoint, and `sanitizeUser` only strips password/MFA
+    // — it does NOT strip email. Returning emails here would let any GM
+    // harvest every account's email address via the invite picker.
+    const found = await prisma.user.findMany({
+      where: {
+        id: { notIn: excludedIds },
+        isApproved: true,
+        // Escaped both ways, or a search of `%%`, or `%` alone, would match every name.
+        displayName: search.length < INVITE_SEARCH_MIN_LENGTH
+          ? { equals: escapeLikePattern(search), mode: 'insensitive' }
+          : { contains: escapeLikePattern(search), mode: 'insensitive' },
+      },
+      orderBy: [{ displayName: 'asc' }, { id: 'asc' }],
+      take: INVITE_SEARCH_MAX_RESULTS + 1,
+      select: {
+        id: true,
+        displayName: true,
+        avatarUrl: true,
+      },
+    });
+
+    return res.status(200).json({
+      users: found.slice(0, INVITE_SEARCH_MAX_RESULTS),
+      hasMore: found.length > INVITE_SEARCH_MAX_RESULTS,
+    });
+  } catch (error) {
+    logger.error('Error fetching invitable users', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch invitable users',
+    });
+  }
+});
+
+/**
+ * POST /api/campaigns/:campaignId/invite
+ * Invite a user to join the campaign.
+ * Creates a pending invitation that the user must accept.
+ * Requires: Campaign GM role
+ * An invitation that asks for an email counts against the GM's hourly
+ * ceiling on invitation emails (middleware/invitationEmailLimiter).
+ */
+router.post('/:campaignId/invite', campaignGM, invitationEmailLimiter, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const parsed = CampaignInviteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: parsed.error.issues[0]?.message ?? 'Invalid invitation',
+      });
+    }
+    const { userId, expiresInDays } = parsed.data;
+    const { sendEmail } = req.body;
+
+    // Emailing is opt-in per invitation. The invitation itself is created
+    // either way — a player sees it on their dashboard — so an instance with no
+    // mail server, or a GM who would rather tell their player in person, loses
+    // nothing by leaving this off. Anything other than an explicit true means
+    // no email.
+    const wantsEmail = sendEmail === true;
+
+    // Check if user exists. An account still waiting for an administrator's
+    // approval cannot sign in to accept, and is answered as no account, so
+    // the invite route does not tell a GM which accounts are waiting.
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || !user.isApproved) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'User not found',
+      });
+    }
+
+    // Check if user is already a member
+    const existingMembership = await prisma.campaignMembership.findUnique({
+      where: {
+        userId_campaignId: {
+          userId,
+          campaignId,
+        },
+      },
+    });
+
+    if (existingMembership) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'User is already a member of this campaign',
+      });
+    }
+
+    // Check if there's already a pending invitation
+    const existingInvitation = await prisma.campaignInvitation.findUnique({
+      where: {
+        userId_campaignId: {
+          userId,
+          campaignId,
+        },
+      },
+    });
+
+    if (existingInvitation && isStanding(existingInvitation)) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'User already has a pending invitation to this campaign',
+      });
+    }
+
+    // Calculate expiration date if specified
+    let expiresAt = null;
+    if (expiresInDays && expiresInDays > 0) {
+      expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+    }
+
+    // Get campaign info and GM info for notification and email
+    const [campaign, gmUser] = await Promise.all([
+      prisma.campaign.findUnique({
+        where: { id: campaignId },
+        select: { name: true, description: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: req.session.userId! },
+        select: { displayName: true },
+      }),
+    ]);
+
+    // Create or update invitation
+    const invitation = await prisma.campaignInvitation.upsert({
+      where: {
+        userId_campaignId: {
+          userId,
+          campaignId,
+        },
+      },
+      create: {
+        userId,
+        campaignId,
+        status: 'PENDING',
+        expiresAt,
+      },
+      update: {
+        status: 'PENDING',
+        expiresAt,
+        createdAt: new Date(), // Reset creation time
+      },
+      include: {
+        campaign: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Broadcast invitation.received to the invited user (WebSocket, if online)
+    try {
+      broadcastToUser(userId, 'invitation.received', {
+        invitationId: invitation.id,
+        campaignId,
+        campaignName: campaign!.name,
+        invitedBy: req.session.userId,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('Failed to broadcast invitation', { err: error });
+      // Don't fail the request if broadcast fails
+    }
+
+    // Email only when the GM asked for it and the instance can actually send.
+    // Awaited rather than fire-and-forget, because the response reports whether
+    // it went out — the same shape POST /api/admin/users uses. A failure is
+    // logged and swallowed: the invitation is the thing that matters, and it
+    // already exists by this point.
+    let emailSent = false;
+    if (wantsEmail && isSmtpConfigured()) {
+      try {
+        // Bounded, because this is awaited inside the request. Nodemailer's own
+        // connection timeout runs to minutes, and the browser gives up after
+        // 30s — so a configured-but-unreachable mail server would surface a
+        // *successful* invitation as a failure, and the obvious retry would then
+        // be refused as a duplicate. The invitation is what matters; if the mail
+        // is slow it is reported as not sent rather than holding up the reply.
+        let timer: NodeJS.Timeout | undefined;
+        try {
+          await Promise.race([
+            sendCampaignInvitationEmail(
+              user.email,
+              user.displayName,
+              campaign!.name,
+              gmUser?.displayName ?? null,
+              campaign!.description ?? null
+            ),
+            new Promise((_, reject) => {
+              timer = setTimeout(() => reject(new Error('SMTP send timed out')), 10000);
+            }),
+          ]);
+          emailSent = true;
+        } finally {
+          // Always clear it: a pending timer left behind by the winning branch
+          // keeps the event loop alive for its full duration.
+          if (timer) clearTimeout(timer);
+        }
+      } catch (err) {
+        logger.error(`[campaigns] Failed to send invitation email to ${user.email}`, { err: err });
+      }
+    }
+
+    return res.status(201).json({
+      message: emailSent
+        ? `Invitation sent, and emailed to ${user.displayName}.`
+        : 'Invitation sent successfully',
+      invitation,
+      emailSent,
+    });
+  } catch (error) {
+    logger.error('Error inviting user to campaign', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to invite user',
+    });
+  }
+});
+
+/**
+ * GET /api/campaigns/:campaignId/invitations
+ * The campaign's invitations that still stand (pending and in date), newest
+ * first, so the GM can see who has been asked and withdraw one.
+ * Requires: Campaign GM role
+ */
+router.get('/:campaignId/invitations', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const invitations = await prisma.campaignInvitation.findMany({
+      where: { campaignId, ...standingInvitation() },
+      select: { id: true, userId: true, createdAt: true, expiresAt: true, user: { select: { displayName: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json({ invitations });
+  } catch (error) {
+    logger.error('Error listing campaign invitations', { err: error });
+    return res.status(500).json({ error: 'Internal Server Error', message: 'Failed to list invitations' });
+  }
+});
+
+/**
+ * DELETE /api/campaigns/:campaignId/invitations/:invitationId
+ * Withdraw a pending invitation: it is deleted, so the player no longer has
+ * it and can be invited again. One of another campaign, or one already
+ * answered, is answered 404 as an unknown one is.
+ * Requires: Campaign GM role
+ */
+router.delete('/:campaignId/invitations/:invitationId', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId, invitationId } = req.params;
+    const { count } = await prisma.campaignInvitation.deleteMany({
+      where: { id: invitationId, campaignId, status: 'PENDING' },
+    });
+    if (count === 0) {
+      return res.status(404).json({ error: 'Not Found', message: 'Invitation not found' });
+    }
+    return res.json({ message: 'Invitation withdrawn' });
+  } catch (error) {
+    logger.error('Error withdrawing invitation', { err: error });
+    return res.status(500).json({ error: 'Internal Server Error', message: 'Failed to withdraw invitation' });
+  }
+});
+
+/** What the GM is told when a removal is refused (services/campaignMembers.ts). */
+const REMOVAL_REFUSED: Record<TakeOutRefusal, { status: number; error: string; message: string }> = {
+  'not-member': { status: 404, error: 'Not Found', message: 'User is not a member of this campaign' },
+  gm: { status: 400, error: 'Bad Request', message: 'Cannot remove the GM from the campaign' },
+  owner: { status: 400, error: 'Bad Request', message: 'Cannot remove the campaign owner from their own campaign' },
+};
+
+/**
+ * DELETE /api/campaigns/:campaignId/members/:userId
+ * Remove a member from the campaign
+ * Requires: Campaign GM role
+ * Cannot remove the GM or the campaign's owner
+ */
+router.delete('/:campaignId/members/:userId', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId, userId } = req.params;
+
+    const refusal = await takeMemberOut(campaignId, userId, 'removed');
+    if (refusal) {
+      const refused = REMOVAL_REFUSED[refusal];
+      return res.status(refused.status).json({ error: refused.error, message: refused.message });
+    }
+    await tellTableMemberLeft(userId, campaignId, 'removed');
+
+    return res.status(200).json({
+      message: 'Member removed successfully',
+    });
+  } catch (error) {
+    logger.error('Error removing member from campaign', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to remove member',
+    });
+  }
+});
+
+/**
+ * What a member is told when their leave is refused. Not a member any more
+ * (the GM's removal won the race with this request) is answered as the
+ * `campaignMember` guard answers it. The wording of the GM's refusal follows
+ * account deletion's (services/accountDeletion.ts).
+ */
+const LEAVE_REFUSED: Record<TakeOutRefusal, { status: number; error: string; message: string }> = {
+  'not-member': { status: 403, error: 'Forbidden', message: NOT_A_MEMBER_MESSAGE },
+  owner: {
+    status: 409,
+    error: 'Conflict',
+    message: "You own this campaign, so you cannot leave it. If you no longer want it, delete it in the campaign's settings.",
+  },
+  gm: {
+    status: 409,
+    error: 'Conflict',
+    message: "You run this campaign. Hand the GM seat to someone else in the campaign's settings, then leave it.",
+  },
+};
+
+/**
+ * POST /api/campaigns/:campaignId/leave
+ * Leave the campaign, as a player or a spectator: the same as the GM's
+ * Remove, asked by the member. Their characters go back to their own list;
+ * their tokens, combatants, drawings, notes and macros stay with the campaign.
+ * Requires: Campaign membership, any role. The owner (asked first) and the
+ * GM are refused in the transaction, which reads the role as it stands.
+ */
+router.post('/:campaignId/leave', campaignMember, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = req.session.userId!;
+
+    const refusal = await takeMemberOut(campaignId, userId, 'left');
+    if (refusal) {
+      const refused = LEAVE_REFUSED[refusal];
+      return res.status(refused.status).json({ error: refused.error, message: refused.message });
+    }
+    await tellTableMemberLeft(userId, campaignId, 'left');
+
+    return res.status(200).json({ message: LEFT_MESSAGE });
+  } catch (error) {
+    logger.error('Error leaving campaign', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to leave the campaign',
+    });
+  }
+});
+
+/**
+ * What the open pages need after members' roles change, the new roles
+ * already applied to their live connections: the roster panel regroups
+ * (it groups by role from its own list), and each copy of the initiative
+ * order, of the map the table is on and of its drawings is sent again as
+ * the new roles see it. A spectator on a lit map is sent no tokens, a player their own and
+ * what they see, a GM every hidden creature and its notes.
+ */
+async function followNewRoles(campaignId: string, userIds: string[]): Promise<void> {
+  for (const userId of userIds) announceRosterChange(userId, [campaignId], 'member.role');
+  await resendInitiative(campaignId);
+  const shown = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { currentMapId: true } });
+  const map = shown?.currentMapId ? await prisma.map.findUnique({ where: { id: shown.currentMapId } }) : null;
+  if (!map) return;
+  await broadcastMapData(getSocketInstance(), campaignId, map);
+  // A drawing for the GM alone goes with the seat: the new GM's page is sent
+  // it, and the old GM's page is sent the list without it.
+  await resendDrawings(campaignId, map.id);
+}
+
+/**
+ * PUT /api/campaigns/:campaignId/members/:userId/role
+ * Change a member's role in the campaign
+ * Requires: Campaign GM role
+ * Only ONE GM per campaign, cannot change GM's role
+ */
+router.put('/:campaignId/members/:userId/role', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId, userId } = req.params;
+    // The GM's value from an older version is read as GM.
+    const given = normaliseRole(req.body.role);
+    const role = Object.values(CampaignRole).find((option) => option === given);
+
+    // Validate role
+    if (!role) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'Role must be GM, PLAYER, or SPECTATOR',
+      });
+    }
+
+    // The member's role now, and the change, in one serializable transaction
+    // (utils/serializable.ts): a GM hand-over landing in between could
+    // otherwise give this member the seat just before this took it away,
+    // leaving the campaign with no GM, or a second GM could be made.
+    const outcome = await inSerializableTransaction(async (tx) => {
+      const membership = await tx.campaignMembership.findUnique({
+        where: { userId_campaignId: { userId, campaignId } },
+        select: { role: true },
+      });
+      if (!membership) {
+        return { ok: false, refused: { status: 404, error: 'Not Found', message: 'User is not a member of this campaign' } } as const;
+      }
+
+      // CRITICAL: Cannot change the GM's role
+      if (membership.role === 'GM') {
+        return { ok: false, refused: { status: 400, error: 'Bad Request', message: 'Cannot change the GM\'s role' } } as const;
+      }
+
+      // CRITICAL: Cannot promote to GM while the campaign has one (only one GM per campaign)
+      if (role === 'GM' && (await tx.campaignMembership.findFirst({ where: { campaignId, role: 'GM' }, select: { userId: true } }))) {
+        return {
+          ok: false,
+          refused: {
+            status: 400,
+            error: 'Bad Request',
+            message: 'Campaign already has a GM. Only one GM per campaign is allowed.',
+          },
+        } as const;
+      }
+
+      const updated = await tx.campaignMembership.update({
+        where: { userId_campaignId: { userId, campaignId } },
+        data: { role },
+        include: {
+          user: { select: MEMBER_USER_SELECT },
+        },
+      });
+      return { ok: true, updated } as const;
+    });
+    if (!outcome.ok) {
+      return res.status(outcome.refused.status).json({ error: outcome.refused.error, message: outcome.refused.message });
+    }
+    const updatedMembership = outcome.updated;
+
+    // Same reason as the GM transfer below: a socket caches its role from when
+    // it authenticated, so a demotion has to reach any open connection or the
+    // person keeps what they had until they reload.
+    try {
+      await applyRoleToLiveSockets(userId, campaignId, role);
+      // And every open page, the member's own included, so the controls
+      // follow the role without a reload (the client patches its list).
+      broadcastToCampaign(campaignId, 'campaign.role.changed', { campaignId, userId, role });
+      await followNewRoles(campaignId, [userId]);
+    } catch (error) {
+      logger.error('Member role updated but live sockets were not', { err: error, userId, campaignId });
+    }
+
+    return res.status(200).json({
+      message: 'Member role updated successfully',
+      membership: updatedMembership,
+    });
+  } catch (error) {
+    logger.error('Error updating member role', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to update member role',
+    });
+  }
+});
+
+/**
+ * PUT /api/campaigns/:campaignId/gm
+ * Hand the GM seat to another member of the campaign.
+ * Requires: the sitting GM, the campaign owner, or a platform admin
+ *
+ * Also answered at PUT /api/campaigns/:campaignId/dm, the path versions
+ * before 1.7.0 gave it, so a script or a browser tab made for one still
+ * works.
+ *
+ * A dedicated route rather than a loosening of the role endpoint above, which
+ * still refuses to touch a GM. Promoting one member and demoting the other are
+ * one action, not two: done separately the campaign is briefly observable with
+ * two GMs or none, and a failure between them would strand it that way.
+ *
+ * The campaign's `ownerId` is deliberately untouched. Ownership and the GM role
+ * are separate, and keeping them separate is what lets an owner hand the game to
+ * somebody else — a co-host, or an automated GM account — and stay at the table
+ * as a player without giving away the campaign itself.
+ */
+async function transferGMSeat(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { campaignId } = req.params;
+    const callerId = req.session.userId!;
+    const platformRole = req.session.platformRole!;
+
+    const parsed = TransferGMSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: parsed.error.issues[0]?.message ?? 'Invalid transfer request',
+      });
+    }
+    const { userId: incomingId } = parsed.data;
+
+    // A campaign the caller is not in, does not own and cannot run as an
+    // admin answers as one that is not there; a member who may not hand the
+    // seat over is told so below.
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      select: { ownerId: true, memberships: { where: { userId: callerId }, select: { userId: true } } },
+    });
+
+    if (!campaign || (platformRole !== 'ADMIN' && campaign.ownerId !== callerId && campaign.memberships.length === 0)) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Campaign not found',
+      });
+    }
+
+    // Who may hand the seat over, who holds it, and the hand-over itself, in
+    // one serializable transaction (utils/serializable.ts), so the one-GM rule
+    // cannot be caught half-applied. Two hand-overs at once each read the same
+    // sitting GM and each seated their own member, leaving two GMs; now the
+    // second one runs again and sees the first.
+    const transfer = await inSerializableTransaction(async (tx) => {
+      if (!(await canTransferGM(callerId, campaignId, platformRole, tx))) {
+        return {
+          ok: false,
+          refused: { status: 403, error: 'Forbidden', message: 'Only the GM, the campaign owner, or an admin can transfer the GM role' },
+        } as const;
+      }
+
+      const incoming = await tx.campaignMembership.findUnique({
+        where: { userId_campaignId: { userId: incomingId, campaignId } },
+        select: { role: true },
+      });
+      if (!incoming) {
+        return { ok: false, refused: { status: 404, error: 'Not Found', message: 'That user is not a member of this campaign' } } as const;
+      }
+      if (incoming.role === 'GM') {
+        return { ok: false, refused: { status: 400, error: 'Bad Request', message: 'That member is already the GM' } } as const;
+      }
+
+      // Every GM row is stepped down, so a campaign an older version left with
+      // two GMs comes out of this with one. A campaign with no GM row is not
+      // supposed to happen, but it is recoverable and this route is how you
+      // would recover it, so it is seated rather than the transfer refused.
+      const sitting = await tx.campaignMembership.findMany({
+        where: { campaignId, role: 'GM' },
+        select: { userId: true },
+      });
+      if (sitting.length > 0) {
+        await tx.campaignMembership.updateMany({ where: { campaignId, role: 'GM' }, data: { role: 'PLAYER' } });
+      }
+      await tx.campaignMembership.update({
+        where: { userId_campaignId: { userId: incomingId, campaignId } },
+        data: { role: 'GM' },
+      });
+      return { ok: true, steppedDown: sitting.map((m) => m.userId) } as const;
+    });
+    if (!transfer.ok) {
+      return res.status(transfer.refused.status).json({ error: transfer.refused.error, message: transfer.refused.message });
+    }
+    const steppedDown = transfer.steppedDown;
+    const outgoing = steppedDown.length > 0 ? { userId: steppedDown[0] } : null;
+
+    const memberships = await prisma.campaignMembership.findMany({
+      where: { campaignId },
+      include: {
+        user: { select: MEMBER_USER_SELECT },
+      },
+    });
+
+    // Bring any live connections into line before telling anyone the seat has
+    // moved. Sockets cache the role from when they authenticated, so until this
+    // runs the outgoing GM still holds GM powers over an open connection and the
+    // incoming one cannot use theirs. Best-effort: a socket layer that is not up
+    // must not fail a transfer that is already committed.
+    try {
+      for (const previous of steppedDown) {
+        await applyRoleToLiveSockets(previous, campaignId, 'PLAYER');
+      }
+      await applyRoleToLiveSockets(incomingId, campaignId, 'GM');
+
+      // Sent under the name and with the fields versions before 1.7.0 used
+      // as well, for this release, so a tab or script made for one still
+      // hears that the seat moved.
+      const transferred = {
+        campaignId,
+        previousGmId: outgoing?.userId ?? null,
+        newGmId: incomingId,
+        previousDmId: outgoing?.userId ?? null,
+        newDmId: incomingId,
+      };
+      broadcastToCampaign(campaignId, 'campaign.gm.transferred', transferred);
+      broadcastToCampaign(campaignId, 'campaign.dm.transferred', transferred);
+      await followNewRoles(campaignId, [...steppedDown, incomingId]);
+    } catch (error) {
+      logger.error('GM transfer committed but live sockets were not updated', {
+        err: error,
+        campaignId,
+      });
+    }
+
+    logger.info('campaign.gm.transferred', {
+      campaignId,
+      from: outgoing?.userId ?? null,
+      to: incomingId,
+      by: callerId,
+    });
+
+    return res.status(200).json({
+      message: 'GM role transferred successfully',
+      memberships,
+    });
+  } catch (error) {
+    logger.error('Error transferring GM role', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to transfer the GM role',
+    });
+  }
+}
+
+router.put('/:campaignId/gm', authenticated, transferGMSeat);
+router.put('/:campaignId/dm', authenticated, transferGMSeat);
+
+/**
+ * GET /api/campaigns/admin/all
+ * Get all campaigns in the system (Admin only)
+ * Requires: Admin role
+ */
+router.get('/admin/all', adminOnly, async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const campaigns = await prisma.campaign.findMany({
+      include: {
+        owner: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+        _count: {
+          select: {
+            memberships: true,
+            maps: true,
+            characters: true,
+          },
+        },
+      },
+    });
+
+    return res.status(200).json({ campaigns });
+  } catch (error) {
+    logger.error('Error fetching all campaigns', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch campaigns',
+    });
+  }
+});
+
+/**
+ * GET /api/campaigns/:campaignId/messages
+ * Get chat messages for a campaign
+ * Requires: Campaign member
+ * Chat Messages - Load last 50 messages with pagination
+ *
+ * A whisper is sent to the two people it is between, its sender and its
+ * recipient, and to nobody else: the GM reads only their own.
+ */
+router.get('/:campaignId/messages', campaignMember, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = req.session.userId!;
+    // `before` was once sent by the client and never read here. It is still
+    // ignored rather than rejected, so an older client keeps working — it simply
+    // gets the newest page, which is what it got before.
+    const { limit = '50', cursor: rawCursor } = req.query;
+
+    const limitNum = parseInt(limit as string, 10);
+
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > MAX_CHAT_HISTORY_PAGE) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: `Limit must be between 1 and ${MAX_CHAT_HISTORY_PAGE}`,
+      });
+    }
+
+    // A cursor names where the last page stopped. Anything this server did not
+    // mint is refused rather than quietly restarting from the newest message,
+    // which would read as history that loops.
+    let cursor: { createdAt: Date; id: string } | null = null;
+    if (rawCursor !== undefined) {
+      cursor = decodeMessageCursor(rawCursor);
+      if (!cursor) {
+        return res.status(400).json({
+          error: 'Validation Error',
+          message: 'Invalid cursor',
+        });
+      }
+    }
+
+    // One row beyond the page: its presence is what says there is more, exactly,
+    // where a count of all messages cannot — the count would include the dice
+    // rows this endpoint filters out.
+    const rows = await prisma.message.findMany({
+      where: {
+        campaignId,
+        // `not` rather than a list of the types to keep: a MessageType added
+        // later then shows up in chat by default instead of silently vanishing.
+        //
+        // Dice rolls are not chat. They are served from the DiceRoll table,
+        // which has `secret` as a real column and a clear-history watermark;
+        // these rows carry the flag only inside unindexed metadata, so serving
+        // them here would leak hidden rolls.
+        type: { not: 'DICE_ROLL' },
+        // Each condition in its own OR, both under AND: two OR keys side by
+        // side would be one object key, and whichever came last would drop
+        // the other, the cursor or the whisper rule.
+        AND: [
+          // The type marks a whisper private and the recipient says who it is
+          // for. A whisper whose recipient's account was deleted has no
+          // recipient left, and stays its sender's alone.
+          { OR: [{ type: { not: 'WHISPER' } }, { userId }, { recipientId: userId }] },
+          ...(cursor
+            ? [
+                {
+                  // (createdAt, id) < (cursor.createdAt, cursor.id), spelled out
+                  // because Prisma cannot express a row-value comparison.
+                  OR: [
+                    { createdAt: { lt: cursor.createdAt } },
+                    { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+                  ],
+                },
+              ]
+            : []),
+        ],
+      },
+      include: { user: { select: MESSAGE_USER_SELECT }, recipient: { select: MESSAGE_USER_SELECT } },
+      // createdAt alone is not unique — a burst of system messages lands in one
+      // millisecond — and paging needs a total order or rows on the boundary are
+      // skipped or repeated. The existing [campaignId, createdAt] index carries
+      // this; the id tiebreak is resolved without one.
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limitNum + 1,
+    });
+
+    const hasMore = rows.length > limitNum;
+    const page = hasMore ? rows.slice(0, limitNum) : rows;
+    const last = page[page.length - 1];
+
+    const formattedMessages = page.map((msg) => ({
+        id: msg.id,
+        userId: msg.userId,
+        userName: msg.user?.displayName || null,
+        user: msg.user ? {
+          id: msg.user.id,
+          displayName: msg.user.displayName,
+        } : null,
+        recipientId: msg.recipientId,
+        recipientName: msg.recipient?.displayName || null,
+        recipient: msg.recipient ? {
+          id: msg.recipient.id,
+          displayName: msg.recipient.displayName,
+        } : null,
+        content: msg.content,
+        type: msg.type,
+        metadata: msg.metadata || null,
+        createdAt: msg.createdAt.toISOString(),
+      }));
+
+    return res.status(200).json({
+      messages: formattedMessages,
+      pagination: {
+        limit: limitNum,
+        hasMore,
+        nextCursor: hasMore && last ? encodeMessageCursor(last.createdAt, last.id) : null,
+      },
+    });
+  } catch (error) {
+    logger.error('Error fetching messages', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch messages',
+    });
+  }
+});
+
+/**
+ * DELETE /api/campaigns/:campaignId/messages/join-leave
+ * Remove the legacy "X has joined / has left the campaign" system messages.
+ * Requires: Campaign GM role
+ *
+ * Those messages are no longer written — they fired on every refresh and every
+ * brief disconnect, and presence in the roster says the same thing better. Rows
+ * already in the database are left alone on upgrade rather than deleted behind
+ * the GM's back, since a chat log is a record of a session. This is how a GM
+ * clears the backlog when they want to.
+ *
+ * Matched on `metadata.action`, deliberately NOT on the message text: the
+ * wording is display copy and could reasonably change or be translated, while
+ * the action tag is what the writer actually meant.
+ */
+router.delete('/:campaignId/messages/join-leave', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+
+    const result = await prisma.message.deleteMany({
+      where: {
+        campaignId,
+        type: 'SYSTEM',
+        OR: [
+          { metadata: { path: ['action'], equals: 'user.joined' } },
+          { metadata: { path: ['action'], equals: 'user.left' } },
+        ],
+      },
+    });
+
+    logger.info('Cleared join/leave messages', { campaignId, count: result.count });
+
+    return res.status(200).json({
+      message:
+        result.count === 0
+          ? 'No join or leave messages to clear'
+          : `Cleared ${result.count} join and leave ${result.count === 1 ? 'message' : 'messages'}`,
+      deleted: result.count,
+    });
+  } catch (error) {
+    logger.error('Error clearing join/leave messages', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to clear join and leave messages',
+    });
+  }
+});
+
+/**
+ * GET /api/campaigns/:campaignId/dice-rolls
+ * Roll history for a campaign, newest first.
+ * Requires: Campaign member
+ *
+ * Rolls have always been written to the database; nothing read them back, so
+ * the dice panel started empty after every refresh. This is that read side.
+ *
+ * SECURITY: secret rolls are the reason this endpoint cannot be a plain
+ * "last N rolls for this campaign". The live socket path sends a secret roll
+ * only to the person who made it and to GMs; replaying history without the same
+ * restriction would hand every player the GM's hidden rolls the moment they
+ * pressed refresh — a worse bug than the one being fixed. The visibility filter
+ * is applied in the query below, server-side, and must stay there: filtering in
+ * the client would still ship the rolls over the wire.
+ */
+router.get('/:campaignId/dice-rolls', campaignMember, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const { limit = '50', offset = '0' } = req.query;
+
+    const limitNum = parseInt(limit as string, 10);
+    const offsetNum = parseInt(offset as string, 10);
+
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 100) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'Limit must be between 1 and 100',
+      });
+    }
+
+    if (isNaN(offsetNum) || offsetNum < 0) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'Offset must be a non-negative number',
+      });
+    }
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      select: { rollHistoryClearedAt: true },
+    });
+
+    if (!campaign) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Campaign not found',
+      });
+    }
+
+    // Role comes from the membership the campaignMember middleware loaded, not
+    // from campaign.ownerId — a co-GM by membership is a GM here too.
+    const isGM = req.campaignMembership?.role === 'GM';
+    const userId = req.session.userId!;
+
+    const where = {
+      campaignId,
+      // Rolls from before the GM last cleared the history stay in the table for
+      // audit, but are not served.
+      ...(campaign.rollHistoryClearedAt
+        ? { rolledAt: { gt: campaign.rollHistoryClearedAt } }
+        : {}),
+      // A GM sees everything. Everyone else sees public rolls plus their own
+      // secret ones — never someone else's.
+      ...(isGM ? {} : { OR: [{ secret: false }, { secret: true, userId }] }),
+    };
+
+    const [totalCount, rolls] = await Promise.all([
+      prisma.diceRoll.count({ where }),
+      prisma.diceRoll.findMany({
+        where,
+        include: { user: { select: { id: true, displayName: true } } },
+        // rolledAt has millisecond precision, so a table rolling at once can
+        // produce ties; the id keeps their order the same on every request
+        // and across pages.
+        orderBy: [{ rolledAt: 'desc' }, { id: 'desc' }],
+        take: limitNum,
+        skip: offsetNum,
+      }),
+    ]);
+
+    // Shaped to match the `dice.rolled` socket payload so the panel can hold
+    // replayed and live rolls in one list without special-casing either.
+    const formattedRolls = rolls.map((roll) => ({
+      id: roll.id,
+      userId: roll.userId,
+      userName: roll.user?.displayName ?? null,
+      characterName: roll.characterName,
+      expression: roll.expression,
+      result: roll.result,
+      breakdown: roll.breakdown,
+      purpose: roll.purpose,
+      secret: roll.secret,
+      timestamp: roll.rolledAt.toISOString(),
+    }));
+
+    return res.status(200).json({
+      rolls: formattedRolls,
+      pagination: {
+        total: totalCount,
+        limit: limitNum,
+        offset: offsetNum,
+        hasMore: offsetNum + limitNum < totalCount,
+      },
+    });
+  } catch (error) {
+    logger.error('Error fetching dice rolls', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch dice rolls',
+    });
+  }
+});
+
+// ============================================
+// PERSONAL NOTES
+//
+// A player's own notes, in Markdown. Private to whoever wrote them — the GM
+// included. `Session.notes` is the shared recap; this is not that.
+//
+// SECURITY: every query below is scoped by `req.session.userId` as well as the
+// campaign, and never by an id taken from the request. A note that is not the
+// caller's answers **404 rather than 403**, deliberately: 403 would confirm the
+// id exists, which is itself a disclosure to someone with no business knowing.
+// ============================================
+
+/**
+ * GET /api/campaigns/:campaignId/notes
+ * The caller's own notes for this campaign, most recently edited first.
+ * Requires: Campaign membership (any role)
+ *
+ * Titles only. A note runs to tens of thousands of characters, and a list that
+ * shipped every body would move megabytes each time the panel opened; the body
+ * is fetched when a note is actually opened.
+ */
+router.get('/:campaignId/notes', campaignMember, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const notes = await prisma.personalNote.findMany({
+      where: { campaignId: req.params.campaignId, userId: req.session.userId! },
+      orderBy: { updatedAt: 'desc' },
+      select: { id: true, title: true, createdAt: true, updatedAt: true },
+    });
+    return res.status(200).json({ notes });
+  } catch (error) {
+    logger.error('Error fetching personal notes', { err: error });
+    return res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch notes' });
+  }
+});
+
+/**
+ * POST /api/campaigns/:campaignId/notes
+ * Start a new note. Requires: Campaign membership (any role)
+ */
+router.post('/:campaignId/notes', campaignMember, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const parsed = CreatePersonalNoteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: parsed.error.issues[0]?.message ?? 'Invalid note',
+      });
+    }
+
+    const { campaignId } = req.params;
+    const userId = req.session.userId!;
+
+    const existing = await prisma.personalNote.count({ where: { campaignId, userId } });
+    if (existing >= MAX_NOTES_PER_CAMPAIGN) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: `You already have ${MAX_NOTES_PER_CAMPAIGN} notes in this campaign. Delete one to make room.`,
+      });
+    }
+
+    const note = await prisma.personalNote.create({
+      data: {
+        campaignId,
+        userId,
+        title: parsed.data.title,
+        content: parsed.data.content ?? '',
+      },
+    });
+
+    return res.status(201).json({ note });
+  } catch (error) {
+    logger.error('Error creating personal note', { err: error });
+    return res.status(500).json({ error: 'Internal Server Error', message: 'Failed to create note' });
+  }
+});
+
+/**
+ * GET /api/campaigns/:campaignId/notes/:noteId
+ * One note, body included. Requires: Campaign membership, and authorship.
+ */
+router.get('/:campaignId/notes/:noteId', campaignMember, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const note = await prisma.personalNote.findFirst({
+      where: {
+        id: req.params.noteId,
+        campaignId: req.params.campaignId,
+        userId: req.session.userId!,
+      },
+    });
+
+    if (!note) {
+      return res.status(404).json({ error: 'Not Found', message: 'Note not found' });
+    }
+
+    return res.status(200).json({ note });
+  } catch (error) {
+    logger.error('Error fetching personal note', { err: error });
+    return res.status(500).json({ error: 'Internal Server Error', message: 'Failed to fetch note' });
+  }
+});
+
+/**
+ * PUT /api/campaigns/:campaignId/notes/:noteId
+ * Rename a note, replace its body, or both.
+ * Requires: Campaign membership, and authorship.
+ */
+router.put('/:campaignId/notes/:noteId', campaignMember, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const parsed = UpdatePersonalNoteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: parsed.error.issues[0]?.message ?? 'Invalid note',
+      });
+    }
+
+    // Scoped lookup first: the id used in the update below is one this caller
+    // has already been proven to own, rather than one taken from the request.
+    const owned = await prisma.personalNote.findFirst({
+      where: {
+        id: req.params.noteId,
+        campaignId: req.params.campaignId,
+        userId: req.session.userId!,
+      },
+      select: { id: true },
+    });
+
+    if (!owned) {
+      return res.status(404).json({ error: 'Not Found', message: 'Note not found' });
+    }
+
+    const note = await prisma.personalNote.update({
+      where: { id: owned.id },
+      data: {
+        ...(parsed.data.title !== undefined ? { title: parsed.data.title } : {}),
+        ...(parsed.data.content !== undefined ? { content: parsed.data.content } : {}),
+      },
+    });
+
+    return res.status(200).json({ note });
+  } catch (error) {
+    logger.error('Error updating personal note', { err: error });
+    return res.status(500).json({ error: 'Internal Server Error', message: 'Failed to update note' });
+  }
+});
+
+/**
+ * DELETE /api/campaigns/:campaignId/notes/:noteId
+ * Requires: Campaign membership, and authorship.
+ */
+router.delete('/:campaignId/notes/:noteId', campaignMember, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // deleteMany rather than delete: the whole ownership scope goes into the
+    // one statement, so there is no window between checking and deleting.
+    const { count } = await prisma.personalNote.deleteMany({
+      where: {
+        id: req.params.noteId,
+        campaignId: req.params.campaignId,
+        userId: req.session.userId!,
+      },
+    });
+
+    if (count === 0) {
+      return res.status(404).json({ error: 'Not Found', message: 'Note not found' });
+    }
+
+    return res.status(200).json({ message: 'Note deleted' });
+  } catch (error) {
+    logger.error('Error deleting personal note', { err: error });
+    return res.status(500).json({ error: 'Internal Server Error', message: 'Failed to delete note' });
+  }
+});
+
+/**
+ * Saved dice macros — a player's own named rolls for one campaign.
+ *
+ * Scoped and answered exactly the way personal notes are: every query carries
+ * the session's own user id, and a macro belonging to someone else answers 404
+ * rather than 403, so the response cannot confirm that the id exists. A macro is
+ * private to whoever saved it, the GM included.
+ *
+ * The expression is validated on the way in — see `validators/diceMacros.ts` —
+ * so a stored macro is always one that can actually be rolled.
+ */
+
+/**
+ * GET /api/campaigns/:campaignId/sessions
+ * Past sessions and the notes recorded when each one ended.
+ * Requires: Campaign membership (any role)
+ *
+ * The GM has always been able to write notes when ending a session, and the
+ * dialog said they were kept — but nothing read them back, so they were stored
+ * and invisible. They were never private: the field is labelled "Session Notes"
+ * and asks "What happened this session?", so every member can read them, which
+ * is what a player wanting to remember last time needs.
+ *
+ * `savedState` is deliberately not selected. It is a large blob of token
+ * positions kept for resuming, and nothing reading history needs it.
+ */
+router.get('/:campaignId/sessions', campaignMember, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+
+    const sessions = await prisma.session.findMany({
+      where: { campaignId },
+      orderBy: { sessionNumber: 'desc' },
+      // Bounded: a long-running campaign accumulates these indefinitely, and
+      // nobody scrolls back a hundred sessions in a side panel.
+      take: 50,
+      select: {
+        id: true,
+        sessionNumber: true,
+        startedAt: true,
+        endedAt: true,
+        notes: true,
+      },
+    });
+
+    return res.status(200).json({ sessions });
+  } catch (error) {
+    logger.error('Error fetching sessions', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch sessions',
+    });
+  }
+});
+
+/**
+ * PUT /api/campaigns/:campaignId/sessions/:sessionId/notes
+ * Rewrite or clear the recap for a session that has already ended.
+ * Requires: Campaign GM role
+ *
+ * Sessions were being ended with notes long before anything displayed them, so
+ * the history list showed every recap ever written at once. A GM who had treated
+ * that box as private working notes had no way to take them back. Sending an
+ * empty string clears the recap outright.
+ */
+router.put('/:campaignId/sessions/:sessionId/notes', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId, sessionId } = req.params;
+
+    const parsed = UpdateSessionNotesSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: parsed.error.issues[0]?.message ?? 'Invalid session notes',
+      });
+    }
+
+    const trimmed = parsed.data.notes.trim();
+
+    // Scoped by campaign as well as id, in one statement: `campaignGM` proves
+    // the caller runs *this* campaign, and looking the session up separately
+    // would leave a window between the check and the write. A session belonging
+    // to someone else's campaign matches nothing and answers 404 — a 403 would
+    // confirm the id exists.
+    const updated = await prisma.session.updateMany({
+      where: { id: sessionId, campaignId },
+      data: { notes: trimmed.length > 0 ? trimmed : null },
+    });
+
+    if (updated.count === 0) {
+      return res.status(404).json({ error: 'Not Found', message: 'Session not found' });
+    }
+
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      select: { id: true, sessionNumber: true, startedAt: true, endedAt: true, notes: true },
+    });
+
+    return res.status(200).json({ session });
+  } catch (error) {
+    logger.error('Error updating session notes', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to update session notes',
+    });
+  }
+});
+
+/**
+ * POST /api/campaigns/:campaignId/sessions
+ * Start a new session
+ * Requires: Campaign GM role
+ * Starting a Session
+ */
+router.post('/:campaignId/sessions', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+
+    // Refused while a session is open, running or paused: a paused one is
+    // resumed or ended, or it would be left without an end time for good.
+    // The campaign's status is not consulted, so a campaign an older version
+    // left marked ACTIVE or PAUSED with no session open can start again.
+    const outcome = await withSessionsHeld(campaignId, async (tx, campaign) => {
+      if (!campaign) return sessionRefusal(404, 'Campaign not found');
+      if (await openSession(tx, campaignId)) {
+        return sessionRefusal(400, 'A session is already active or paused. Resume or end it first.');
+      }
+      const sessionNumber = await getNextSessionNumber(campaignId, tx);
+      const session = await tx.session.create({ data: { campaignId, sessionNumber } });
+      await tx.campaign.update({
+        where: { id: campaignId },
+        data: { status: 'ACTIVE', lastPlayedAt: new Date() },
+      });
+      return { session };
+    });
+    if ('refused' in outcome) return sendSessionRefusal(res, outcome);
+    const { session } = outcome;
+    const { sessionNumber } = session;
+
+    // Send system message
+    await sendSystemMessage(
+      campaignId,
+      `Session ${sessionNumber} has started!`,
+      { sessionId: session.id, sessionNumber, action: 'session.started' }
+    );
+
+    // Broadcast session.started so all connected clients update campaign status
+    broadcastToCampaign(campaignId, 'session.started', {
+      sessionId: session.id,
+      sessionNumber,
+      startedAt: session.startedAt.toISOString(),
+    });
+
+    return res.status(201).json({
+      message: 'Session started successfully',
+      session: {
+        id: session.id,
+        sessionNumber: session.sessionNumber,
+        startedAt: session.startedAt,
+      },
+    });
+  } catch (error) {
+    logger.error('Error starting session', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to start session',
+    });
+  }
+});
+
+/**
+ * PUT /api/campaigns/:campaignId/sessions/:sessionId/pause
+ * Pause the current session
+ * Requires: Campaign GM role
+ * Pausing a Session
+ */
+router.put('/:campaignId/sessions/:sessionId/pause', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId, sessionId } = req.params;
+
+    // The snapshot is taken under the hold, so an End sent at the same moment
+    // waits, and then ends the session this left paused.
+    const outcome = await withSessionsHeld(campaignId, async (tx, campaign) => {
+      const session = await tx.session.findFirst({ where: { id: sessionId, campaignId } });
+      if (!campaign || !session) return sessionRefusal(404, 'Session not found');
+      if (session.endedAt) return sessionRefusal(400, 'Session has already ended');
+      if (campaign.status === 'PAUSED') return sessionRefusal(400, 'Session is already paused');
+
+      const gameState = await captureGameState(campaignId, sessionId, tx);
+      await tx.session.update({ where: { id: sessionId }, data: { savedState: toJson(gameState) } });
+      await tx.campaign.update({ where: { id: campaignId }, data: { status: 'PAUSED' } });
+      return { session };
+    });
+    if ('refused' in outcome) return sendSessionRefusal(res, outcome);
+    const { session } = outcome;
+
+    // Send system message
+    await sendSystemMessage(
+      campaignId,
+      `Session ${session.sessionNumber} has been paused. See you next time!`,
+      { sessionId: session.id, sessionNumber: session.sessionNumber, action: 'session.paused' }
+    );
+
+    // Broadcast session.paused so all connected clients update campaign status
+    broadcastToCampaign(campaignId, 'session.paused', {
+      sessionId: session.id,
+      sessionNumber: session.sessionNumber,
+    });
+
+    return res.status(200).json({
+      message: 'Session paused successfully',
+      stateSaved: true,
+    });
+  } catch (error) {
+    logger.error('Error pausing session', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to pause session',
+    });
+  }
+});
+
+/**
+ * PUT /api/campaigns/:campaignId/sessions/:sessionId/end
+ * End the current session and save state
+ * Requires: Campaign GM role
+ * Ending a Session
+ */
+router.put('/:campaignId/sessions/:sessionId/end', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId, sessionId } = req.params;
+    const parsed = EndSessionSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: parsed.error.issues[0]?.message ?? 'Invalid request',
+      });
+    }
+    const saveState = parsed.data.saveState ?? true;
+    const notes = parsed.data.notes?.trim();
+
+    const outcome = await withSessionsHeld(campaignId, async (tx, campaign) => {
+      const session = await tx.session.findFirst({ where: { id: sessionId, campaignId } });
+      if (!campaign || !session) return sessionRefusal(404, 'Session not found');
+      if (session.endedAt) return sessionRefusal(400, 'Session has already ended');
+
+      // Unticked, the snapshot taken at pause (if any) is kept as it was.
+      const savedState = saveState ? toJson(await captureGameState(campaignId, sessionId, tx)) : undefined;
+      await tx.session.update({
+        where: { id: sessionId },
+        data: {
+          endedAt: new Date(),
+          ...(savedState !== undefined ? { savedState } : {}),
+          ...(notes ? { notes } : {}),
+        },
+      });
+      // INACTIVE: the session formally ended, not just paused.
+      await tx.campaign.update({ where: { id: campaignId }, data: { status: 'INACTIVE' } });
+      return { session };
+    });
+    if ('refused' in outcome) return sendSessionRefusal(res, outcome);
+    const { session } = outcome;
+
+    // Send system message
+    await sendSystemMessage(
+      campaignId,
+      `Session ${session.sessionNumber} has ended.${saveState ? ' Game state saved!' : ''}`,
+      {
+        sessionId: session.id,
+        sessionNumber: session.sessionNumber,
+        action: 'session.ended',
+        stateSaved: saveState,
+      }
+    );
+
+    // Broadcast session.ended so all connected clients update campaign status to INACTIVE
+    broadcastToCampaign(campaignId, 'session.ended', {
+      sessionId: session.id,
+      sessionNumber: session.sessionNumber,
+    });
+
+    return res.status(200).json({
+      message: 'Session ended successfully',
+      stateSaved: saveState,
+    });
+  } catch (error) {
+    logger.error('Error ending session', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to end session',
+    });
+  }
+});
+
+/**
+ * PUT /api/campaigns/:campaignId/resume
+ * Reopen the paused session. The snapshot taken at pause is not applied.
+ * Requires: Campaign GM role
+ * Resuming a Session
+ */
+router.put('/:campaignId/resume', campaignGM, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+
+    // The live state is the state: everything is stored as it is played, so
+    // the snapshot pause took is a record of where the break began and is
+    // never written back. Restoring it undid whatever the GM did during the
+    // break, silently: a token hidden then was shown to players again, a
+    // moved one jumped back, an added one vanished, a map switch reverted.
+    const outcome = await withSessionsHeld(campaignId, async (tx, campaign) => {
+      const session = await openSession(tx, campaignId);
+      if (!campaign || !session) return sessionRefusal(400, 'There is no paused session to resume');
+      if (campaign.status !== 'PAUSED') return sessionRefusal(400, 'The session is not paused');
+      await tx.campaign.update({
+        where: { id: campaignId },
+        data: { status: 'ACTIVE', lastPlayedAt: new Date() },
+      });
+      return { session };
+    });
+    if ('refused' in outcome) return sendSessionRefusal(res, outcome);
+    const { session: lastSession } = outcome;
+
+    // Send system message
+    await sendSystemMessage(
+      campaignId,
+      `Session ${lastSession.sessionNumber} has been resumed!`,
+      {
+        sessionId: lastSession.id,
+        sessionNumber: lastSession.sessionNumber,
+        action: 'session.resumed',
+      }
+    );
+
+    // Broadcast session.resumed so all connected clients update campaign status
+    broadcastToCampaign(campaignId, 'session.resumed', {
+      sessionId: lastSession.id,
+      sessionNumber: lastSession.sessionNumber,
+      startedAt: lastSession.startedAt.toISOString(),
+    });
+
+    return res.status(200).json({
+      message: 'Session resumed successfully',
+      session: {
+        id: lastSession.id,
+        sessionNumber: lastSession.sessionNumber,
+        startedAt: lastSession.startedAt,
+      },
+    });
+  } catch (error) {
+    logger.error('Error resuming session', { err: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to resume session',
+    });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Campaign Export / Import
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/campaigns/:campaignId/export
+ * Export campaign as a .cozyvtt ZIP archive.
+ * Query params:
+ *   includeAudio (boolean, default false)
+ *   includeTokens (boolean, default true)
+ * Requires: Campaign GM role. Per user: CAMPAIGN_ARCHIVE_RATE_LIMIT an hour
+ * (20 by default), and one archive operation at a time.
+ */
+router.get('/:campaignId/export', campaignGM, downloadOnly, oneCampaignArchiveAtATime, campaignExportLimiter, async (req: AuthenticatedRequest, res: Response) => {
+  await whileHoldingArchiveSlot(res, async () => {
+    const { campaignId } = req.params;
+    const includeAudio = req.query.includeAudio === 'true';
+    const includeTokens = req.query.includeTokens !== 'false'; // default true
+
+    logger.info('Campaign export started', { campaignId, includeAudio, includeTokens, userId: req.session.userId });
+
+    let prepared: PreparedExport;
+    try {
+      prepared = await prepareCampaignExport(
+        campaignId,
+        { userId: req.session.userId!, isAdmin: req.session.platformRole === 'ADMIN' },
+        { includeAudio, includeTokens }
+      );
+    } catch (error: unknown) {
+      if (error instanceof ExportTooLargeError) {
+        return res.status(422).json({ error: 'Export Too Large', message: error.message });
+      }
+      logger.error('Campaign export failed', { campaignId, error: errorMessage(error) });
+      if (errorMessage(error) === 'Campaign not found') {
+        return res.status(404).json({ error: 'Not Found', message: 'Campaign not found' });
+      }
+      return res.status(500).json({
+        error: 'Export Failed',
+        message: 'Failed to export campaign. Please try again.',
+      });
+    }
+
+    // No Content-Length: the archive's size is known only once it is written.
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${prepared.filename}"`);
+    try {
+      await prepared.writeTo(res);
+    } catch (error: unknown) {
+      // Part of the archive may be on its way already, so there is no status
+      // left to send. The response is cut off, which the browser reports as a
+      // failed download, never as a finished but short one.
+      logger.error('Campaign export stopped part-way', { campaignId, error: errorMessage(error) });
+      res.destroy();
+    }
+    return undefined;
+  });
+});
+
+/**
+ * Take the archive upload of an import route, answering a refused one itself.
+ */
+function takeImportUpload(req: Request, res: Response, next: NextFunction): void {
+  importUpload.single('file')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        res.status(413).json({
+          error: 'File Too Large',
+          message: `The archive is larger than ${megabytes(CAMPAIGN_ARCHIVE_MAX_BYTES)}, the most a campaign archive may be.`,
+        });
+        return;
+      }
+      res.status(400).json({ error: 'Upload Error', message: err.message });
+      return;
+    }
+    if (err) {
+      res.status(400).json({ error: 'Upload Error', message: err.message });
+      return;
+    }
+    next();
+  });
+}
+
+interface ImportReply {
+  status: number;
+  body: Record<string, unknown>;
+}
+
+/**
+ * Answer an import route with what `work` decides, once the uploaded archive
+ * has been removed, so nothing of it is left by the time the caller hears back.
+ */
+async function answerAfterRemovingArchive(
+  req: AuthenticatedRequest,
+  res: Response,
+  work: (archivePath: string) => Promise<ImportReply>
+): Promise<void> {
+  let reply: ImportReply | undefined;
+  try {
+    const file = req.file;
+    reply = file
+      ? await whileHoldingArchiveSlot(res, () => work(file.path))
+      : { status: 400, body: { error: 'Validation Error', message: 'No file uploaded.' } };
+  } finally {
+    await removeUploadedArchive(req.file);
+  }
+  // Undefined when the caller hung up before the work could start.
+  if (reply) res.status(reply.status).json(reply.body);
+}
+
+/**
+ * POST /api/campaigns/import/preview
+ * Upload a .cozyvtt archive and return its manifest preview.
+ * Does NOT create anything — just reads manifest.json.
+ * Requires: Authentication. Per user: CAMPAIGN_ARCHIVE_RATE_LIMIT an hour
+ * (20 by default), and one archive operation at a time.
+ */
+router.post('/import/preview', authenticated, oneCampaignArchiveAtATime, campaignPreviewLimiter, takeImportUpload, async (req: AuthenticatedRequest, res: Response) => {
+  await answerAfterRemovingArchive(req, res, async (archivePath) => {
+    try {
+      const preview = await previewCampaignImport(archivePath);
+      return { status: 200, body: { preview } };
+    } catch (error: unknown) {
+      if (error instanceof ArchiveRefusedError) {
+        logger.warn('Campaign import preview refused', { error: error.message });
+        return { status: 400, body: { error: 'Invalid Archive', message: error.message } };
+      }
+      // The server's own failure: its detail is for the log, not the caller.
+      logger.error('Campaign import preview failed', { error: errorMessage(error) });
+      return { status: 500, body: { error: 'Preview Failed', message: 'The archive could not be read. The server log has the details.' } };
+    }
+  });
+});
+
+/**
+ * POST /api/campaigns/import
+ * Upload a .cozyvtt archive and create a new campaign from it.
+ * Body (multipart): file + optional JSON fields:
+ *   campaignName (string) — override campaign name
+ *   importTokens (boolean, default true)
+ * Requires: Authentication. Per user: CAMPAIGN_ARCHIVE_RATE_LIMIT an hour
+ * (20 by default), and one archive operation at a time.
+ */
+router.post('/import', authenticated, oneCampaignArchiveAtATime, campaignImportLimiter, takeImportUpload, refuseNulCharacters, async (req: AuthenticatedRequest, res: Response) => {
+  await answerAfterRemovingArchive(req, res, async (archivePath) => {
+    try {
+      const userId = req.session.userId!;
+      const campaignName = typeof req.body.campaignName === 'string' ? req.body.campaignName.trim() : undefined;
+      const importTokens = req.body.importTokens !== 'false'; // default true
+
+      if (campaignName !== undefined && (campaignName.length === 0 || campaignName.length > CAMPAIGN_LIMITS.maxNameLength)) {
+        return {
+          status: 400,
+          body: { error: 'Validation Error', message: `Campaign name must be between 1 and ${CAMPAIGN_LIMITS.maxNameLength} characters.` },
+        };
+      }
+
+      logger.info('Campaign import started', { userId, importTokens, hasNameOverride: !!campaignName });
+
+      const result = await importCampaign(archivePath, userId, {
+        importTokens,
+        campaignName: campaignName || undefined,
+      });
+
+      return { status: 201, body: { message: 'Campaign imported successfully', ...result } };
+    } catch (error: unknown) {
+      if (error instanceof ArchiveRefusedError) {
+        logger.warn('Campaign import refused', { error: error.message, userId: req.session?.userId });
+        return { status: 400, body: { error: 'Import Failed', message: error.message } };
+      }
+      // Nothing was kept (the importer undoes a failed import), and the
+      // detail of the server's own failure is for the log, not the caller.
+      logger.error('Campaign import failed', { error: errorMessage(error), userId: req.session?.userId });
+      return { status: 500, body: { error: 'Import Failed', message: IMPORT_FAILED_MESSAGE } };
+    }
+  });
+});
+
+export default router;

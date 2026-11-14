@@ -1,0 +1,1501 @@
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { handleUnauthorized } from '@/services/unsavedWork';
+import { loadPage } from '@/services/pageLoad';
+import { rememberSignInNotice } from '@/services/signInNotice';
+import { signInPath } from '@/utils/returnTo';
+import type { WallSegment, WallsAdded } from '@/types/walls';
+import type {
+  User,
+  AdminListedUser,
+  InvitableUserSearch,
+  AuthResponse,
+  MFARequiredResponse,
+  MFASetupResponse,
+  MFAVerifyResponse,
+  MFALoginResponse,
+  LoginRequest,
+  RegisterRequest,
+  MFAVerifyRequest,
+  MFALoginVerifyRequest,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+  ChangePasswordRequest,
+  Campaign,
+  CreateCampaignRequest,
+  UpdateCampaignRequest,
+  Character,
+  CharacterSummary,
+  CreateCharacterRequest,
+  UpdateCharacterRequest,
+  Asset,
+  AssetListResponse,
+  CampaignMap,
+  CreateMapRequest,
+  UpdateMapRequest,
+  CreateTokenRequest,
+  UpdateTokenRequest,
+  Token,
+  CreatureTemplate,
+  CharacterTemplate,
+  CharacterTemplateSummary,
+  TokenTemplate,
+  CampaignImportPreview,
+  CampaignImportResult,
+
+  MessageHistoryPage,
+  DiceRolledEvent,
+  Session,
+  SessionSummary,
+  PersonalNote,
+  PersonalNoteSummary,
+  CampaignInvitation,
+  CampaignInvitationSummary,
+  ApiError,
+  SystemStats,
+  AdminHealth,
+  AdminSystemSettings,
+  AdminActivityData,
+  AdminServerConfig,
+  AdminBackup,
+  CreatedBackup,
+  OrphanedFilesReport,
+  OrphanedFilesDeletion,
+  LeftCampaignSummary,
+  LeftCampaignDetail,
+  AppearanceSettings,
+  UserPreferences,
+  ServerConfig,
+  RosterMember,
+  CampaignMembership,
+  AssignableCampaignRole,
+} from '@/types';
+import { withKnownCreatureChoices, withKnownTemplateChoices } from '@/utils/knownChoices';
+import { saveBlob } from '@/utils/download';
+
+// ============================================
+// API Client Configuration
+// ============================================
+
+// Use relative URL in development to leverage Vite's proxy (Docker support)
+// Use absolute URL in production
+// Empty string = relative URLs (Nginx proxies /api/* to backend in production,
+// Vite dev server proxies in development)
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /**
+     * A 401 to this request is the caller's to show, not a lost sign-in.
+     * Set on the calls that check the current password or a code while
+     * signed in, which the server answers 401 when it is wrong.
+     */
+    skipAuthRedirect?: boolean;
+  }
+}
+
+/** The request option for a call whose 401 means a wrong password or code. */
+const CREDENTIAL_CHECK = { skipAuthRedirect: true } as const;
+
+/** What a finished restore answers: the safety copy is the backup of the database as it was, in the backup list. */
+export interface RestoreReply {
+  message: string;
+  safetyBackup: string;
+}
+
+class ApiClient {
+  private client: AxiosInstance;
+
+  constructor() {
+    this.client = axios.create({
+      baseURL: API_BASE_URL,
+      timeout: 30000,
+      withCredentials: true, // Important: sends cookies with requests
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    this.setupInterceptors();
+  }
+
+  private setupInterceptors() {
+    // Request interceptor
+    this.client.interceptors.request.use(
+      (config: InternalAxiosRequestConfig) => {
+        // Add any request modifications here (e.g., auth tokens if needed)
+        return config;
+      },
+      (error: AxiosError) => {
+        return Promise.reject(error);
+      }
+    );
+
+    // Response interceptor
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error: AxiosError<ApiError>) => {
+        // Handle common errors
+        if (error.response) {
+          const { status, data } = error.response;
+
+          // Unauthorized - redirect to login, but only from protected pages,
+          // and not while an editor holds unsaved changes (see unsavedWork).
+          // On a public page a 401 is expected, because nobody has signed in
+          // yet. The route list lives in utils/publicRoutes so it can be tested
+          // against App.tsx — see the note there on why a missing entry breaks
+          // tokenised links rather than merely redirecting them.
+          //
+          // A call that checks the current password or a code answers 401 for
+          // a wrong one; that request is marked, and its form says so.
+          //
+          // A sign-in that has reached its 30-day limit says so, and the
+          // sign-in page shows that sentence.
+          if (status === 401 && !error.config?.skipAuthRedirect) {
+            handleUnauthorized(window.location.pathname, () => {
+              const reply = data as { code?: unknown; message?: unknown } | undefined;
+              if (reply?.code === 'SIGN_IN_EXPIRED' && typeof reply.message === 'string') {
+                rememberSignInNotice(reply.message);
+              }
+              // Back to this page once signed in again.
+              loadPage(signInPath(`${window.location.pathname}${window.location.search}`));
+            });
+          }
+
+          // Forbidden
+          if (status === 403) {
+            // The account must replace an admin-issued password before it can
+            // do anything else. Covers tabs left open when the flag was set.
+            const code = (data as { code?: string })?.code;
+            if (code === 'PASSWORD_CHANGE_REQUIRED') {
+              if (window.location.pathname !== '/auth/change-password') {
+                loadPage('/auth/change-password');
+              }
+            } else if (code === 'MFA_ENROLMENT_REQUIRED') {
+              // An administrator past the two-factor deadline may do nothing
+              // else until it is set up.
+              if (window.location.pathname !== '/auth/mfa-setup') {
+                loadPage('/auth/mfa-setup');
+              }
+            } else {
+              console.error('Permission denied:', data.message);
+            }
+          }
+
+          // Rate limited
+          if (status === 429) {
+            console.error('Rate limit exceeded:', data.message);
+          }
+        } else if (error.request) {
+          // Network error
+          console.error('Network error:', error.message);
+        }
+
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  // ============================================
+  // Authentication
+  // ============================================
+
+  async register(data: RegisterRequest): Promise<AuthResponse> {
+    const response = await this.client.post<AuthResponse>('/api/auth/register', data);
+    return response.data;
+  }
+
+  async login(data: LoginRequest): Promise<AuthResponse | MFARequiredResponse> {
+    const response = await this.client.post<AuthResponse | MFARequiredResponse>('/api/auth/login', data);
+    return response.data;
+  }
+
+  async logout(): Promise<{ message: string }> {
+    const response = await this.client.post('/api/auth/logout');
+    return response.data;
+  }
+
+  async getCurrentUser(): Promise<{ user: User }> {
+    const response = await this.client.get<{ user: User }>('/api/auth/me');
+    return response.data;
+  }
+
+  async pingSession(): Promise<void> {
+    await this.client.get('/api/auth/ping');
+  }
+
+  async getRegistrationStatus(): Promise<{ allowRegistration: boolean }> {
+    const response = await this.client.get<{ allowRegistration: boolean }>('/api/auth/registration-status');
+    return response.data;
+  }
+
+  async getAppearance(): Promise<AppearanceSettings> {
+    const response = await this.client.get<AppearanceSettings>('/api/auth/appearance');
+    return response.data;
+  }
+
+  /**
+   * Server-enforced upload limits (from the MAX_*_SIZE_MB environment variables).
+   * Fetched at runtime so limit changes don't require rebuilding the SPA.
+   */
+  async getServerConfig(): Promise<ServerConfig> {
+    const response = await this.client.get<ServerConfig>('/api/config');
+    return response.data;
+  }
+
+  async forgotPassword(data: ForgotPasswordRequest): Promise<{ message: string }> {
+    const response = await this.client.post('/api/auth/forgot-password', data);
+    return response.data;
+  }
+
+  async resetPassword(data: ResetPasswordRequest): Promise<{ message: string }> {
+    const response = await this.client.post('/api/auth/reset-password', data);
+    return response.data;
+  }
+
+  async changePassword(data: ChangePasswordRequest): Promise<{ message: string }> {
+    const response = await this.client.post('/api/auth/change-password', data, CREDENTIAL_CHECK);
+    return response.data;
+  }
+
+  async deleteAccount(password: string): Promise<{ message: string }> {
+    const response = await this.client.delete('/api/auth/account', { data: { password }, ...CREDENTIAL_CHECK });
+    return response.data;
+  }
+
+  // ============================================
+  // Setup
+  // ============================================
+
+  async checkSetupStatus(): Promise<{ setupCompleted: boolean; hasUsers: boolean; needsSetup: boolean }> {
+    const response = await this.client.get('/api/setup/status');
+    return response.data;
+  }
+
+  async initializeSetup(data: {
+    setupToken: string;
+    email: string;
+    password: string;
+    displayName: string;
+    instanceName?: string;
+    allowRegistration?: boolean;
+  }): Promise<{ message: string; user: User }> {
+    const response = await this.client.post('/api/setup/init', data);
+    return response.data;
+  }
+
+  // ============================================
+  // MFA
+  // ============================================
+
+  async mfaSetup(password: string): Promise<MFASetupResponse> {
+    const response = await this.client.post<MFASetupResponse>('/api/auth/mfa/setup', { password }, CREDENTIAL_CHECK);
+    return response.data;
+  }
+
+  async mfaVerifySetup(data: MFAVerifyRequest): Promise<MFAVerifyResponse> {
+    const response = await this.client.post<MFAVerifyResponse>('/api/auth/mfa/verify', data, CREDENTIAL_CHECK);
+    return response.data;
+  }
+
+  async mfaVerifyLogin(data: MFALoginVerifyRequest): Promise<MFALoginResponse> {
+    const response = await this.client.post<MFALoginResponse>('/api/auth/mfa/verify-login', data);
+    return response.data;
+  }
+
+  async mfaDisable(password: string, token: string): Promise<{ message: string }> {
+    const response = await this.client.post('/api/auth/mfa/disable', { password, token }, CREDENTIAL_CHECK);
+    return response.data;
+  }
+
+  async mfaRegenerateBackupCodes(password: string): Promise<MFAVerifyResponse> {
+    const response = await this.client.post<MFAVerifyResponse>('/api/auth/mfa/backup-codes', { password }, CREDENTIAL_CHECK);
+    return response.data;
+  }
+
+  // ============================================
+  // Users
+  // ============================================
+
+  async listUsers(): Promise<{ users: AdminListedUser[] }> {
+    const response = await this.client.get<{ users: AdminListedUser[] }>('/api/users');
+    return response.data;
+  }
+
+  async getUser(id: string): Promise<{ user: User }> {
+    const response = await this.client.get<{ user: User }>(`/api/users/${id}`);
+    return response.data;
+  }
+
+  /**
+   * Change an account. A change to your own email address carries
+   * `currentPassword`, and the server answers a wrong one 401, which the
+   * caller shows.
+   */
+  async updateUser(
+    id: string,
+    data: Partial<User> & { currentPassword?: string }
+  ): Promise<{ message: string; user: User }> {
+    const response = await this.client.put(
+      `/api/users/${id}`,
+      data,
+      data.currentPassword !== undefined ? CREDENTIAL_CHECK : undefined
+    );
+    return response.data;
+  }
+
+  async deleteUser(id: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/users/${id}`);
+    return response.data;
+  }
+
+  async adminResetUserPassword(id: string): Promise<{ message: string; temporaryPassword: string }> {
+    const response = await this.client.post(`/api/users/${id}/reset-password`);
+    return response.data;
+  }
+
+  async adminSendPasswordResetLink(id: string): Promise<{ message: string }> {
+    const response = await this.client.post(`/api/users/${id}/send-reset-link`);
+    return response.data;
+  }
+
+  // ============================================
+  // User Preferences (per-user theme/font/dice/etc.)
+  // ============================================
+
+  async getUserPreferences(userId: string): Promise<UserPreferences> {
+    const response = await this.client.get<{ preferences: UserPreferences }>(
+      `/api/users/${userId}/preferences`
+    );
+    return response.data.preferences ?? {};
+  }
+
+  async updateUserPreferences(
+    userId: string,
+    prefs: Partial<UserPreferences>
+  ): Promise<UserPreferences> {
+    const response = await this.client.put<{ preferences: UserPreferences }>(
+      `/api/users/${userId}/preferences`,
+      prefs
+    );
+    return response.data.preferences ?? {};
+  }
+
+  // ============================================
+  // Admin
+  // ============================================
+
+  async getAdminStats(): Promise<SystemStats> {
+    const response = await this.client.get<SystemStats>('/api/admin/stats');
+    return response.data;
+  }
+
+  async getAdminHealth(): Promise<AdminHealth> {
+    const response = await this.client.get<AdminHealth>('/api/admin/health');
+    return response.data;
+  }
+
+  async getAdminSettings(): Promise<AdminSystemSettings> {
+    const response = await this.client.get<{ settings: AdminSystemSettings }>('/api/admin/settings');
+    return response.data.settings;
+  }
+
+  async updateAdminSettings(data: Partial<Omit<AdminSystemSettings, 'id'>>): Promise<AdminSystemSettings> {
+    const response = await this.client.put<{ message: string; settings: AdminSystemSettings }>(
+      '/api/admin/settings',
+      data
+    );
+    return response.data.settings;
+  }
+
+  async getAdminActivity(): Promise<AdminActivityData> {
+    const response = await this.client.get<AdminActivityData>('/api/admin/activity');
+    return response.data;
+  }
+
+  /**
+   * Create a user with a temporary password. `temporaryPassword` is only
+   * returned when the welcome email could not be sent (no SMTP, or delivery
+   * failed) — otherwise the user has it and the admin does not need it.
+   */
+  async createAdminUser(data: {
+    email: string;
+    displayName?: string;
+    platformRole?: string;
+  }): Promise<{ message: string; user: User; emailSent: boolean; temporaryPassword?: string }> {
+    const response = await this.client.post('/api/admin/users', data);
+    return response.data;
+  }
+
+  /** Invite a user by email — no password is created or returned. */
+  async inviteAdminUser(data: {
+    email: string;
+    displayName?: string;
+    platformRole?: string;
+  }): Promise<{ message: string; user: User; expiresInDays: number }> {
+    const response = await this.client.post('/api/admin/users/invite', data);
+    return response.data;
+  }
+
+  /** Issue a fresh invitation link, invalidating any outstanding one. */
+  async resendAdminUserInvite(userId: string): Promise<{ message: string; expiresInDays: number }> {
+    const response = await this.client.post(`/api/admin/users/${userId}/resend-invite`);
+    return response.data;
+  }
+
+  async resetAdminUserMfa(userId: string): Promise<{ message: string }> {
+    const response = await this.client.post(`/api/admin/users/${userId}/reset-mfa`);
+    return response.data;
+  }
+
+  /** Forget an account's wrong passwords and sign-in codes, so it can sign in at once. */
+  async clearAdminUserSignInLock(userId: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/admin/users/${userId}/sign-in-lock`);
+    return response.data;
+  }
+
+  async approveAdminUser(userId: string): Promise<{ message: string }> {
+    const response = await this.client.post(`/api/admin/users/${userId}/approve`);
+    return response.data;
+  }
+
+  async getAdminConfig(): Promise<AdminServerConfig> {
+    const response = await this.client.get<AdminServerConfig>('/api/admin/config');
+    return response.data;
+  }
+
+  async testAdminSmtp(): Promise<{ message: string }> {
+    const response = await this.client.post('/api/admin/smtp/test');
+    return response.data;
+  }
+
+  async createAdminBackup(): Promise<CreatedBackup> {
+    // Dumping and zipping the whole database takes minutes on a large
+    // instance; the bundled nginx allows this route ten minutes.
+    const response = await this.client.post<CreatedBackup>('/api/admin/backups', undefined, { timeout: LONG_ADMIN_REQUEST_MS });
+    return response.data;
+  }
+
+  async listAdminBackups(): Promise<AdminBackup[]> {
+    const response = await this.client.get<{ backups: AdminBackup[] }>('/api/admin/backups');
+    return response.data.backups;
+  }
+
+  getAdminBackupDownloadUrl(filename: string): string {
+    return `${API_BASE_URL}/api/admin/backups/${encodeURIComponent(filename)}/download`;
+  }
+
+  async deleteAdminBackup(filename: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/admin/backups/${encodeURIComponent(filename)}`);
+    return response.data;
+  }
+
+  async listOrphanedFiles(): Promise<OrphanedFilesReport> {
+    const response = await this.client.get<OrphanedFilesReport>('/api/admin/orphaned-files');
+    return response.data;
+  }
+
+  async deleteOrphanedFiles(paths: string[]): Promise<OrphanedFilesDeletion> {
+    const response = await this.client.delete<OrphanedFilesDeletion>('/api/admin/orphaned-files', { data: { paths } });
+    return response.data;
+  }
+
+  async restoreAdminBackup(file: File): Promise<RestoreReply> {
+    const formData = new FormData();
+    formData.append('backup', file);
+    // A restore writes a safety copy of the current database, then loads the
+    // backup and migrates it: minutes on a large instance, and the bundled
+    // nginx allows this route ten minutes. Giving up sooner reported a
+    // restore as failed while the server went on to replace the database.
+    const response = await this.client.post<RestoreReply>('/api/admin/backups/restore', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      // No limit of the page's own: it would count the upload, which nginx's
+      // ten minutes do not, and a slow upload then ran the page out of time
+      // while the server went on restoring. nginx still ends a restore that
+      // goes silent for ten minutes.
+      timeout: 0,
+    });
+    return response.data;
+  }
+
+  // ============================================
+  // Campaigns
+  // ============================================
+
+  async listCampaigns(): Promise<{ campaigns: Campaign[] }> {
+    const response = await this.client.get<{ campaigns: Campaign[] }>('/api/campaigns');
+    return response.data;
+  }
+
+  async adminListAllCampaigns(): Promise<{ campaigns: Campaign[] }> {
+    const response = await this.client.get<{ campaigns: Campaign[] }>('/api/campaigns/admin/all');
+    return response.data;
+  }
+
+  async createCampaign(data: CreateCampaignRequest): Promise<{ message: string; campaign: Campaign }> {
+    const response = await this.client.post('/api/campaigns', data);
+    return response.data;
+  }
+
+  async getCampaign(id: string): Promise<{ campaign: Campaign }> {
+    const response = await this.client.get<{ campaign: Campaign }>(`/api/campaigns/${id}`);
+    return response.data;
+  }
+
+  async updateCampaign(id: string, data: UpdateCampaignRequest): Promise<{ message: string; campaign: Campaign }> {
+    const response = await this.client.put(`/api/campaigns/${id}`, data);
+    return response.data;
+  }
+
+  async deleteCampaign(id: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/campaigns/${id}`);
+    return response.data;
+  }
+
+  /**
+   * Search the people who can be invited to a campaign by display name. A
+   * search of INVITE_SEARCH_MIN_LENGTH (in constants/inviteSearchLimits.ts)
+   * or more characters finds names that contain it, and a shorter one finds
+   * only names that are exactly it. The server answers nobody for an empty
+   * search, and at most INVITE_SEARCH_MAX_RESULTS matches, with `hasMore`
+   * when there were more.
+   */
+  async listInvitableUsers(campaignId: string, search: string): Promise<InvitableUserSearch> {
+    const response = await this.client.get<InvitableUserSearch>(`/api/campaigns/${campaignId}/invitable-users`, {
+      params: { search },
+    });
+    return response.data;
+  }
+
+  /**
+   * Invite a user to a campaign.
+   *
+   * `sendEmail` is opt-in and defaults to false: the invitation always appears
+   * on the invitee's dashboard, and an email only goes out if the GM asked for
+   * one. `emailSent` reports what actually happened, since a server with no
+   * SMTP configured will decline to send even when asked.
+   */
+  async inviteUserToCampaign(
+    campaignId: string,
+    userId: string,
+    sendEmail = false,
+    expiresInDays?: number
+  ): Promise<{ message: string; emailSent: boolean }> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/invite`, { userId, sendEmail, expiresInDays });
+    return response.data;
+  }
+
+  /** The campaign's invitations that still stand (GM only). */
+  async listCampaignInvitations(campaignId: string): Promise<{ invitations: CampaignInvitationSummary[] }> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/invitations`);
+    return response.data;
+  }
+
+  /** Withdraw a pending invitation (GM only); the player no longer has it. */
+  async withdrawCampaignInvitation(campaignId: string, invitationId: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/campaigns/${campaignId}/invitations/${invitationId}`);
+    return response.data;
+  }
+
+  async removeCampaignMember(campaignId: string, userId: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/campaigns/${campaignId}/members/${userId}`);
+    return response.data;
+  }
+
+  /**
+   * Leave a campaign as a player or a spectator. Refused (409) for its owner
+   * and its GM; `message` is the sentence the leaver's socket is told too.
+   */
+  async leaveCampaign(campaignId: string): Promise<{ message: string }> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/leave`);
+    return response.data;
+  }
+
+  /**
+   * Make a member a player or a spectator (GM only). Refused for the GM and
+   * for someone no longer in the campaign, with a message that says which.
+   * Every open page of the campaign hears `campaign.role.changed`.
+   */
+  async changeCampaignMemberRole(
+    campaignId: string,
+    userId: string,
+    role: AssignableCampaignRole,
+  ): Promise<{ message: string; membership: CampaignMembership }> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/members/${userId}/role`, { role });
+    return response.data;
+  }
+
+  /**
+   * Hand the GM role to another member. The outgoing GM becomes a player in the
+   * same action, and campaign ownership does not move.
+   */
+  async transferGM(
+    campaignId: string,
+    userId: string,
+  ): Promise<{ message: string; memberships: import('@/types').CampaignMembership[] }> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/gm`, { userId });
+    return response.data;
+  }
+
+  async updateVibeSettings(
+    campaignId: string,
+    vibeSettings: import('@/types').VibeSettings,
+  ): Promise<{ message: string; vibeSettings: import('@/types').VibeSettings; currentVibe: string | null }> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/vibe`, { vibeSettings });
+    return response.data;
+  }
+
+  async getCampaignCharacters(campaignId: string): Promise<{ roster: RosterMember[] }> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/characters`);
+    return response.data;
+  }
+
+  // ============================================
+  // Campaign Invitations
+  // ============================================
+
+  async getPendingInvitations(): Promise<CampaignInvitation[]> {
+    const response = await this.client.get('/api/invitations');
+    return response.data;
+  }
+
+  async acceptInvitation(invitationId: string, characterIds: string[]): Promise<{ message: string; membership: CampaignMembership }> {
+    const response = await this.client.post(`/api/invitations/${invitationId}/accept`, { characterIds });
+    return response.data;
+  }
+
+  async declineInvitation(invitationId: string): Promise<{ message: string }> {
+    const response = await this.client.post(`/api/invitations/${invitationId}/decline`);
+    return response.data;
+  }
+
+  // ============================================
+  // Sessions
+  // ============================================
+
+  // ============================================
+  // Documents
+  //
+  // Shared, not private: a campaign's members read what its GM shares. The
+  // server decides who may read, edit or share each one; these calls only ask.
+  // ============================================
+
+  /**
+   * The documents a campaign's members may read: shared in by the GM, or
+   * created for the campaign. Any member can list.
+   */
+  async listCampaignDocuments(
+    campaignId: string,
+  ): Promise<{ documents: import('@/types').CampaignDocument[] }> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/documents`);
+    return response.data;
+  }
+
+  /** Share a document with a campaign. GM only; the GM must already be able to read it. */
+  async linkCampaignDocument(campaignId: string, assetId: string): Promise<{ link: { id: string } }> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/documents`, { assetId });
+    return response.data;
+  }
+
+  /** Stop sharing a document with a campaign. The document itself is untouched. */
+  async unlinkCampaignDocument(campaignId: string, assetId: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/campaigns/${campaignId}/documents/${assetId}`);
+    return response.data;
+  }
+
+  /**
+   * Create a text or Markdown document from typed content. The same scope rules
+   * as an upload apply; the content is stored as typed and never interpreted.
+   */
+  async createDocument(body: {
+    name: string;
+    format: 'txt' | 'md';
+    content: string;
+    description?: string;
+    scope?: 'USER' | 'CAMPAIGN' | 'GLOBAL';
+    campaignId?: string;
+  }): Promise<{ asset: import('@/types').Asset }> {
+    const response = await this.client.post('/api/assets/documents', body);
+    return response.data;
+  }
+
+  /** Replace a text or Markdown document's content. Uploader or admin only. */
+  async updateDocumentContent(assetId: string, content: string): Promise<{ asset: import('@/types').Asset }> {
+    const response = await this.client.put(`/api/assets/documents/${assetId}/content`, { content });
+    return response.data;
+  }
+
+  /**
+   * The URL a document is read from. Same-origin, so a browser can show it in
+   * an iframe under the current Content Security Policy.
+   */
+  getDocumentUrl(assetId: string): string {
+    return this.getAssetUrl(assetId, 'documents');
+  }
+
+  // ============================================
+  // Personal notes and dice macros
+  //
+  // Private to the signed-in user; the server scopes every one of these by the
+  // session's own id, so there is no user parameter to pass or to get wrong.
+  // ============================================
+
+  /**
+   * Your own saved dice macros for this campaign, oldest first, the order they
+   * appear as buttons, which stays put when one is edited.
+   */
+  async listDiceMacros(campaignId: string): Promise<{ macros: import('@/types').DiceMacro[] }> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/macros`);
+    return response.data;
+  }
+
+  /** An empty or null character name or purpose is stored as none. */
+  async createDiceMacro(
+    campaignId: string,
+    body: { name: string; expression: string; characterName?: string | null; purpose?: string | null },
+  ): Promise<{ macro: import('@/types').DiceMacro }> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/macros`, body);
+    return response.data;
+  }
+
+  /** A field left out is kept; an empty or null character name or purpose clears it. */
+  async updateDiceMacro(
+    campaignId: string,
+    macroId: string,
+    body: { name?: string; expression?: string; characterName?: string | null; purpose?: string | null },
+  ): Promise<{ macro: import('@/types').DiceMacro }> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/macros/${macroId}`, body);
+    return response.data;
+  }
+
+  async deleteDiceMacro(campaignId: string, macroId: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/campaigns/${campaignId}/macros/${macroId}`);
+    return response.data;
+  }
+
+  /** The caller's notes for a campaign, newest first. Titles only, no bodies. */
+  async listNotes(campaignId: string): Promise<{ notes: PersonalNoteSummary[] }> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/notes`);
+    return response.data;
+  }
+
+  /** One note, with its Markdown source. */
+  async getNote(campaignId: string, noteId: string): Promise<{ note: PersonalNote }> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/notes/${noteId}`);
+    return response.data;
+  }
+
+  async createNote(
+    campaignId: string,
+    title: string,
+    content = ''
+  ): Promise<{ note: PersonalNote }> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/notes`, { title, content });
+    return response.data;
+  }
+
+  async updateNote(
+    campaignId: string,
+    noteId: string,
+    patch: { title?: string; content?: string }
+  ): Promise<{ note: PersonalNote }> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/notes/${noteId}`, patch);
+    return response.data;
+  }
+
+  async deleteNote(campaignId: string, noteId: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/campaigns/${campaignId}/notes/${noteId}`);
+    return response.data;
+  }
+
+  /** Campaigns the caller has left that still hold their notes or dice macros. */
+  async listLeftCampaigns(): Promise<{ campaigns: LeftCampaignSummary[] }> {
+    const response = await this.client.get('/api/campaigns/left');
+    return response.data;
+  }
+
+  /** The caller's note titles and dice macros in one campaign they have left. */
+  async getLeftCampaign(campaignId: string): Promise<LeftCampaignDetail> {
+    const response = await this.client.get(`/api/campaigns/left/${campaignId}`);
+    return response.data;
+  }
+
+  /** One of the caller's notes, with its text, from a campaign they have left. */
+  async getLeftCampaignNote(campaignId: string, noteId: string): Promise<{ note: PersonalNote }> {
+    const response = await this.client.get(`/api/campaigns/left/${campaignId}/notes/${noteId}`);
+    return response.data;
+  }
+
+  /**
+   * Every one of the caller's notes, with its text, from a campaign they have
+   * left, in one request. Up to 200 notes of 100,000 characters, so the
+   * answer can be large; the Download button is the only caller.
+   */
+  async getLeftCampaignNotes(campaignId: string): Promise<{ notes: PersonalNote[] }> {
+    // No limit of the page's own: the shared 30 seconds count the download,
+    // and at the cap the answer is 20 to 40 MB before compression. The server
+    // writes it out as it reads, and the proxy drops a connection that goes
+    // silent for 60 seconds.
+    const response = await this.client.get(`/api/campaigns/left/${campaignId}/notes`, { timeout: 0 });
+    return response.data;
+  }
+
+  /** Past sessions and the notes recorded when each ended. Newest first. */
+  async listSessions(campaignId: string): Promise<{ sessions: SessionSummary[] }> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/sessions`);
+    return response.data;
+  }
+
+  /** Rewrite a past session's recap. An empty string clears it. GM only. */
+  async updateSessionNotes(
+    campaignId: string,
+    sessionId: string,
+    notes: string
+  ): Promise<{ session: SessionSummary }> {
+    const response = await this.client.put(
+      `/api/campaigns/${campaignId}/sessions/${sessionId}/notes`,
+      { notes }
+    );
+    return response.data;
+  }
+
+  async startSession(campaignId: string): Promise<{ message: string; session: Session }> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/sessions`);
+    return response.data;
+  }
+
+  async pauseSession(campaignId: string, sessionId: string): Promise<{ message: string }> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/sessions/${sessionId}/pause`);
+    return response.data;
+  }
+
+  async endSession(
+    campaignId: string,
+    sessionId: string,
+    saveState: boolean = true,
+    notes?: string,
+  ): Promise<{ message: string; stateSaved: boolean }> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/sessions/${sessionId}/end`, {
+      saveState,
+      notes,
+    });
+    return response.data;
+  }
+
+  async resumeSession(campaignId: string): Promise<{ message: string; session: Session }> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/resume`);
+    return response.data;
+  }
+
+  // ============================================
+  // Characters
+  // ============================================
+
+  /** The user's characters without their sheets; getCharacter fetches one with its sheet. */
+  async listCharacters(): Promise<{ characters: CharacterSummary[] }> {
+    const response = await this.client.get<{ characters: CharacterSummary[] }>('/api/characters');
+    return response.data;
+  }
+
+  async createCharacter(data: CreateCharacterRequest): Promise<{ message: string; character: Character }> {
+    const response = await this.client.post('/api/characters', data);
+    return response.data;
+  }
+
+  async getCharacter(id: string): Promise<{ character: Character }> {
+    const response = await this.client.get<{ character: Character }>(`/api/characters/${id}`);
+    return response.data;
+  }
+
+  async updateCharacter(id: string, data: UpdateCharacterRequest): Promise<{ message: string; character: Character }> {
+    const response = await this.client.put(`/api/characters/${id}`, data);
+    return response.data;
+  }
+
+  async deleteCharacter(id: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/characters/${id}`);
+    return response.data;
+  }
+
+  async assignCharacterToCampaign(id: string, campaignId: string | null): Promise<{ message: string; character: Character }> {
+    const response = await this.client.post(`/api/characters/${id}/assign`, { campaignId });
+    return response.data;
+  }
+
+  async copyCharacter(id: string): Promise<{ message: string; character: Character }> {
+    const response = await this.client.post(`/api/characters/${id}/copy`);
+    return response.data;
+  }
+
+  async validateCharacter(id: string): Promise<{ isValid: boolean; errors?: Array<{ path: string; message: string; code: string }> }> {
+    const response = await this.client.get(`/api/characters/${id}/validate`);
+    return response.data;
+  }
+
+  // ============================================
+  // Assets
+  // ============================================
+
+  async listAssets(params?: {
+    type?: string;
+    scope?: string;
+    campaignId?: string;
+    page?: number;
+    limit?: number;
+    search?: string;
+    uploadedBy?: string;
+    /** Only what the caller may put on a map or token; see GET /api/assets. */
+    usable?: boolean;
+    /** Newest first when left out. */
+    sort?: 'name' | 'size';
+  }): Promise<AssetListResponse> {
+    const response = await this.client.get<AssetListResponse>('/api/assets', { params });
+    return response.data;
+  }
+
+  /**
+   * Upload a picture, sound, PDF or other file (up to 50 MB for a map picture
+   * or PDF). Serves map pictures, PDFs, token art, avatars and sheet portraits.
+   */
+  /**
+   * `onProgress` is told the share of the request sent so far, 0 to 100, as
+   * the browser reports it.
+   */
+  async uploadAsset(formData: FormData, onProgress?: (percent: number) => void): Promise<{ message: string; asset: Asset }> {
+    const response = await this.client.post('/api/assets/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: onProgress
+        ? (event) => {
+            if (event.total) onProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        : undefined,
+      // No limit of the page's own: the shared 30 seconds count the upload
+      // itself, so a 50 MB file on a connection slower than about 14 Mbit/s
+      // was cut off with "Failed to upload asset" before it had arrived.
+      // Nothing queues on the server for this route; the proxy drops an upload
+      // that goes silent for 60 seconds, and the backend allows a request an
+      // hour, so those are the limits.
+      timeout: 0,
+    });
+    return response.data;
+  }
+
+  /**
+   * Write a new picture over a picture drawn in CozyVTT, under the same id:
+   * Paint's Save. Answers the asset and `imageUrl`, the picture's address
+   * with a version new on every save, to give the map. No limit of the
+   * page's own, as for an upload.
+   */
+  async replaceDrawnPicture(id: string, formData: FormData): Promise<{ message: string; asset: Asset; imageUrl: string }> {
+    const response = await this.client.put(`/api/assets/${id}/picture`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
+    });
+    return response.data;
+  }
+
+  async getAsset(id: string): Promise<{ asset: Asset }> {
+    const response = await this.client.get<{ asset: Asset }>(`/api/assets/${id}`);
+    return response.data;
+  }
+
+  /**
+   * Delete an asset.
+   *
+   * Answers 409 with `ASSET_IN_USE` and where it is used while something
+   * still names it, having deleted nothing. Pass `force` only after the person
+   * has seen that list and chosen to delete anyway; see useAssetDelete.
+   */
+  async deleteAsset(id: string, options?: { force?: boolean }): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/assets/${id}`, {
+      params: options?.force ? { force: 'true' } : undefined,
+    });
+    return response.data;
+  }
+
+  async patchAssetScope(id: string, scope: string, campaignId?: string): Promise<{ message: string; asset: Asset }> {
+    const response = await this.client.patch(`/api/assets/${id}/scope`, { scope, campaignId });
+    return response.data;
+  }
+
+  getAssetUrl(id: string, type: import('@/utils/assetUrl').AssetDirectory): string {
+    return `${API_BASE_URL}/api/assets/${type}/${id}`;
+  }
+
+  /**
+   * A map or token picture's thumbnail, at most 512 pixels, for cards and
+   * pickers; the full picture for one that has none.
+   */
+  getAssetThumbnailUrl(id: string, type: 'maps' | 'tokens'): string {
+    return `${API_BASE_URL}/api/assets/${type}/${id}/thumbnail`;
+  }
+
+  /** The address that downloads an asset under its original file name. */
+  getAssetDownloadUrl(id: string): string {
+    return `${API_BASE_URL}/api/assets/${encodeURIComponent(id)}/download`;
+  }
+
+  /**
+   * The address to load a stored picture reference from. Token templates keep
+   * the reference as sent, which from their editor's upload is the asset's bare
+   * id, so a bare id is given its serving address and an address is used as it
+   * is.
+   */
+  storedAssetSrc(stored: string, type: import('@/utils/assetUrl').AssetDirectory): string {
+    return stored.startsWith('/') || stored.startsWith('http') ? stored : this.getAssetUrl(stored, type);
+  }
+
+  // ============================================
+  // Maps & Tokens
+  // ============================================
+
+  async listMaps(campaignId: string): Promise<{ maps: CampaignMap[] }> {
+    const response = await this.client.get<{ maps: CampaignMap[] }>(`/api/campaigns/${campaignId}/maps`);
+    return response.data;
+  }
+
+  async createMap(campaignId: string, data: CreateMapRequest): Promise<{ map: CampaignMap }> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/maps`, data);
+    return response.data;
+  }
+
+  async getMap(campaignId: string, mapId: string): Promise<{ map: CampaignMap; spiritVisible?: boolean }> {
+    const response = await this.client.get<{ map: CampaignMap; spiritVisible?: boolean }>(`/api/campaigns/${campaignId}/maps/${mapId}`);
+    return response.data;
+  }
+
+  async updateMap(campaignId: string, mapId: string, data: UpdateMapRequest): Promise<{ map: CampaignMap }> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/maps/${mapId}`, data);
+    return response.data;
+  }
+
+  /**
+   * Add many wall segments to a map in one request (GM only); the server
+   * gives each its id. Those the map refuses are skipped and listed, each
+   * with its place in the list and why.
+   */
+  async addWalls(campaignId: string, mapId: string, segments: Array<Omit<WallSegment, 'id'>>): Promise<WallsAdded> {
+    const response = await this.client.post<WallsAdded>(`/api/campaigns/${campaignId}/maps/${mapId}/walls/batch`, { segments });
+    return response.data;
+  }
+
+  /**
+   * Save a map as a Universal VTT file. It is fetched first and saved once
+   * it has arrived, so a refusal (a map with no picture, or one that is not
+   * a PNG, JPEG, WebP or GIF image) rejects like any other request, with its
+   * message readable by `apiErrorMessage`; a plain download link saved the
+   * server's error as the file. The map's picture is inside the file, so it
+   * is fetched without the shared client's thirty-second limit.
+   */
+  async downloadUVTTExport(campaignId: string, mapId: string, fileName: string): Promise<void> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/campaigns/${encodeURIComponent(campaignId)}/maps/${encodeURIComponent(mapId)}/export-uvtt`,
+      { credentials: 'include' }
+    );
+    if (!response.ok) throw await refusalFrom(response);
+    saveBlob(fileName, await response.blob());
+  }
+
+  /**
+   * Import a Universal VTT file as a new map.
+   *
+   * Answers 409 with `UVTT_IMPORT_NEEDS_CONFIRMATION` when the file needs the
+   * GM's answer first, having created nothing: its walls reach outside its
+   * picture, or it carries walls for its furniture. Send the answer back in
+   * `options`. See MapManager, which is where it is asked.
+   */
+  async importUVTT(
+    campaignId: string,
+    file: File,
+    name?: string,
+    gridSize?: number,
+    options?: { confirm?: boolean; includeObjectWalls?: boolean },
+  ): Promise<{ map: CampaignMap; wallCount: number; portalCount: number; totalSegments: number; lightCount: number }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (name) formData.append('name', name);
+    if (gridSize) formData.append('gridSize', String(gridSize));
+    if (options?.confirm) formData.append('confirm', 'true');
+    if (options?.includeObjectWalls) formData.append('includeObjectWalls', 'true');
+    // Once the upload has arrived, the server answers within 50 seconds: an
+    // import waits up to 20 for its turn behind other GMs' imports and runs
+    // for up to 30, and reaching either limit answers 503 saying which. A
+    // limit of the page's own would count the upload too and give up before
+    // that answer, so there is none; the bundled nginx allows the answer 60
+    // seconds.
+    const response = await this.client.post(
+      `/api/campaigns/${campaignId}/maps/import-uvtt`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 },
+    );
+    return response.data;
+  }
+
+  async deleteMap(campaignId: string, mapId: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/campaigns/${campaignId}/maps/${mapId}`);
+    return response.data;
+  }
+
+  async setCurrentMap(campaignId: string, mapId: string): Promise<{ message: string }> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/maps/${mapId}/set-current`);
+    return response.data;
+  }
+
+  async addToken(campaignId: string, mapId: string, data: CreateTokenRequest): Promise<{ message: string; token: Token }> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/maps/${mapId}/tokens`, data);
+    return response.data;
+  }
+
+  /** `token` is null when the caller is not sent the token, e.g. a player's own token the GM has hidden. */
+  async updateToken(campaignId: string, mapId: string, tokenId: string, data: UpdateTokenRequest): Promise<{ message: string; token: Token | null }> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/maps/${mapId}/tokens/${tokenId}`, data);
+    return response.data;
+  }
+
+  async deleteToken(campaignId: string, mapId: string, tokenId: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/campaigns/${campaignId}/maps/${mapId}/tokens/${tokenId}`);
+    return response.data;
+  }
+
+  /**
+   * Move tokens from one map to another in one step. The server keeps each
+   * token as it is, under its own id, and tells the table itself; a move
+   * used to be a copy and a delete per token, which raced and rebuilt them.
+   */
+  async moveTokens(campaignId: string, mapId: string, tokenIds: string[], targetMapId: string): Promise<{ message: string; moved: Token[] }> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/maps/${mapId}/tokens/move`, { tokenIds, targetMapId });
+    return response.data;
+  }
+
+  // ============================================
+  // Creature Library
+  // ============================================
+
+  // ── Character templates ──────────────────────────────────────────────────
+  // Server-wide starter sheets any user can publish and copy. Distinct from
+  // GET /api/characters/templates/:system/:name, which serves the hardcoded
+  // presets compiled into the backend.
+
+  /**
+   * One of the starter sheets compiled into the backend — the blank for a game
+   * system, or a named preset like the level 1 fighter.
+   *
+   * Here rather than fetched directly so it goes through the same base URL and
+   * credentials as everything else; two dialogs used to call `fetch` and so
+   * ignored `VITE_API_URL` entirely.
+   *
+   * @param gameSystem - A GameSystem value, or 'null' for the flexible sheet.
+   * @param templateName - 'blank', or a preset name such as 'fighter'.
+   */
+  async getStarterSheet(
+    gameSystem: string,
+    templateName: string
+  ): Promise<{ name: string; description: string; gameSystem: string | null; data: Record<string, unknown> }> {
+    const response = await this.client.get(
+      `/api/characters/templates/${gameSystem}/${templateName}`
+    );
+    return response.data;
+  }
+
+  async listCharacterTemplates(params?: {
+    search?: string;
+    /** A GameSystem value, or 'flexible' for the system-agnostic ones. */
+    gameSystem?: string;
+    mine?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ templates: CharacterTemplateSummary[]; total: number; limit: number; offset: number }> {
+    // The list carries no sheets; getCharacterTemplate fetches one with its sheet.
+    const response = await this.client.get('/api/character-templates', { params });
+    return response.data;
+  }
+
+  async getCharacterTemplate(id: string): Promise<CharacterTemplate> {
+    const response = await this.client.get(`/api/character-templates/${id}`);
+    return response.data;
+  }
+
+  async createCharacterTemplate(data: {
+    name: string;
+    description?: string | null;
+    gameSystem?: string | null;
+    tokenImageUrl?: string | null;
+    data?: unknown;
+  }): Promise<CharacterTemplate> {
+    const response = await this.client.post('/api/character-templates', data);
+    return response.data;
+  }
+
+  async updateCharacterTemplate(
+    id: string,
+    data: {
+      name?: string;
+      description?: string | null;
+      tokenImageUrl?: string | null;
+      data?: unknown;
+      /** The version this save was made from; the server answers 409 if the template has changed since. */
+      updatedAt?: string;
+    }
+  ): Promise<CharacterTemplate> {
+    const response = await this.client.put(`/api/character-templates/${id}`, data);
+    return response.data;
+  }
+
+  async deleteCharacterTemplate(id: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/character-templates/${id}`);
+    return response.data;
+  }
+
+  async listCreatures(
+    campaignId: string,
+    params?: { search?: string; source?: string; cr?: string; gameSystem?: string; limit?: number; offset?: number }
+  ): Promise<{ creatures: CreatureTemplate[]; total: number; limit: number; offset: number }> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/creatures`, { params });
+    return { ...response.data, creatures: response.data.creatures.map(withKnownCreatureChoices) };
+  }
+
+  async getCreature(campaignId: string, creatureId: string): Promise<CreatureTemplate> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/creatures/${creatureId}`);
+    return withKnownCreatureChoices(response.data);
+  }
+
+  async createCreature(campaignId: string, data: Partial<CreatureTemplate>): Promise<CreatureTemplate> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/creatures`, data);
+    return withKnownCreatureChoices(response.data);
+  }
+
+  async updateCreature(campaignId: string, creatureId: string, data: Partial<CreatureTemplate>): Promise<CreatureTemplate> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/creatures/${creatureId}`, data);
+    return withKnownCreatureChoices(response.data);
+  }
+
+  async deleteCreature(campaignId: string, creatureId: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/campaigns/${campaignId}/creatures/${creatureId}`);
+    return response.data;
+  }
+
+  /** `canSeed`: whether the caller may run the SRD import, which only an administrator may. */
+  async getSeedStatus(campaignId: string): Promise<{ srdCount: number; customCount: number; seedInProgress: boolean; canSeed: boolean }> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/creatures/seed/status`);
+    return response.data;
+  }
+
+  async seedSrdCreatures(campaignId: string): Promise<{ message: string; fetched: number; created: number; updated: number; skipped: number; alreadyExisted: number; rejected: number }> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/creatures/seed`);
+    return response.data;
+  }
+
+  async duplicateCreature(campaignId: string, creatureId: string): Promise<CreatureTemplate> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/creatures/${creatureId}/duplicate`);
+    return withKnownCreatureChoices(response.data);
+  }
+
+  async listCreatureFavorites(campaignId: string): Promise<{ favoriteIds: string[]; creatures: CreatureTemplate[] }> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/creatures/favorites/list`);
+    return { ...response.data, creatures: response.data.creatures.map(withKnownCreatureChoices) };
+  }
+
+  async toggleCreatureFavorite(campaignId: string, creatureId: string): Promise<{ favorited: boolean }> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/creatures/${creatureId}/favorite`);
+    return response.data;
+  }
+
+  // ============================================
+  // Token Templates
+  // ============================================
+
+  async listTokenTemplates(
+    campaignId: string,
+    params?: { search?: string; type?: string; limit?: number; offset?: number }
+  ): Promise<{ templates: TokenTemplate[]; total: number; limit: number; offset: number }> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/token-templates`, { params });
+    return { ...response.data, templates: response.data.templates.map(withKnownTemplateChoices) };
+  }
+
+  async getTokenTemplate(campaignId: string, id: string): Promise<TokenTemplate> {
+    const response = await this.client.get(`/api/campaigns/${campaignId}/token-templates/${id}`);
+    return withKnownTemplateChoices(response.data);
+  }
+
+  async createTokenTemplate(campaignId: string, data: Partial<TokenTemplate>): Promise<TokenTemplate> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/token-templates`, data);
+    return response.data;
+  }
+
+  async updateTokenTemplate(campaignId: string, id: string, data: Partial<TokenTemplate>): Promise<TokenTemplate> {
+    const response = await this.client.put(`/api/campaigns/${campaignId}/token-templates/${id}`, data);
+    return withKnownTemplateChoices(response.data);
+  }
+
+  async deleteTokenTemplate(campaignId: string, id: string): Promise<{ message: string }> {
+    const response = await this.client.delete(`/api/campaigns/${campaignId}/token-templates/${id}`);
+    return response.data;
+  }
+
+  async saveTokenAsTemplate(campaignId: string, tokenData: Partial<TokenTemplate>): Promise<TokenTemplate> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/token-templates/from-token`, tokenData);
+    return response.data;
+  }
+
+  async copyTokenTemplateToCampaign(campaignId: string, templateId: string, targetCampaignId: string): Promise<TokenTemplate> {
+    const response = await this.client.post(`/api/campaigns/${campaignId}/token-templates/${templateId}/copy-to/${targetCampaignId}`);
+    return withKnownTemplateChoices(response.data);
+  }
+
+  // ============================================
+  // Campaign Export/Import
+  // ============================================
+
+  /**
+   * Download a campaign's export archive to a file.
+   *
+   * An archive can be hundreds of megabytes and takes as long to arrive as
+   * the connection needs, so it is not fetched through the shared client,
+   * whose thirty-second limit covers the whole download and which would hold
+   * all of it in the page. Where the browser lets a page write to a file the
+   * user picks (Chrome and Edge on a computer), the archive streams there as
+   * it arrives. Elsewhere it is handed to the browser's own download once it
+   * has arrived; those browsers keep a large download on disk, not in the
+   * page.
+   *
+   * The save dialog opens only once the server has agreed to the export, so
+   * a refusal never leaves an empty file behind. Rejects like any other
+   * request when the server refuses, with its message readable by
+   * `apiErrorMessage`.
+   */
+  async downloadCampaignExport(
+    campaignId: string,
+    params: { includeAudio: boolean },
+    fileName: string
+  ): Promise<'saved' | 'cancelled'> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/campaigns/${encodeURIComponent(campaignId)}/export?includeAudio=${params.includeAudio}`,
+      { credentials: 'include' }
+    );
+    if (!response.ok) throw await refusalFrom(response);
+
+    const pick = (window as SaveFilePickerWindow).showSaveFilePicker;
+    if (pick && response.body) {
+      let target: FileSystemFileHandle | null = null;
+      try {
+        target = await pick({
+          suggestedName: fileName,
+          types: [{ description: 'CozyVTT campaign archive', accept: { 'application/zip': ['.cozyvtt'] } }],
+        });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          await response.body.cancel();
+          return 'cancelled';
+        }
+        // The browser would not open the dialog here, usually because the
+        // click that asked for it was too long ago. Its download still works.
+      }
+      if (target) {
+        await response.body.pipeTo(await target.createWritable());
+        return 'saved';
+      }
+    }
+
+    saveBlob(fileName, await response.blob());
+    return 'saved';
+  }
+
+  // Both send the whole archive, up to 500 MB, which takes minutes on a slow
+  // connection. A limit of the page's own would count that upload and give up
+  // while the server carried on, so there is none: the bundled nginx still
+  // ends a request whose server goes silent for five minutes.
+  async previewCampaignImport(formData: FormData): Promise<CampaignImportPreview> {
+    const response = await this.client.post('/api/campaigns/import/preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
+    });
+    return response.data.preview;
+  }
+
+  async importCampaign(formData: FormData): Promise<CampaignImportResult> {
+    const response = await this.client.post('/api/campaigns/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
+    });
+    return response.data;
+  }
+
+  // ============================================
+  // Messages
+  // ============================================
+
+  async getMessages(
+    campaignId: string,
+    params?: { limit?: number; cursor?: string }
+  ): Promise<MessageHistoryPage> {
+    const response = await this.client.get<MessageHistoryPage>(
+      `/api/campaigns/${campaignId}/messages`,
+      { params }
+    );
+    return response.data;
+  }
+
+  /**
+   * Remove the legacy "X has joined / has left" system messages from a
+   * campaign's chat. GM only. These are no longer written; this clears what
+   * earlier versions left behind.
+   */
+  async clearJoinLeaveMessages(campaignId: string): Promise<{ message: string; deleted: number }> {
+    const response = await this.client.delete(`/api/campaigns/${campaignId}/messages/join-leave`);
+    return response.data;
+  }
+
+  /**
+   * Roll history for a campaign, newest first. The server decides what the
+   * caller may see — a player never receives someone else's secret rolls — so
+   * the response can be rendered as-is.
+   */
+  async getDiceRolls(
+    campaignId: string,
+    params?: { limit?: number; offset?: number }
+  ): Promise<{ rolls: DiceRolledEvent[] }> {
+    const response = await this.client.get<{ rolls: DiceRolledEvent[] }>(
+      `/api/campaigns/${campaignId}/dice-rolls`,
+      { params }
+    );
+    return response.data;
+  }
+}
+
+/** The File System Access save dialog, where the browser has one. */
+interface SaveFilePickerWindow extends Window {
+  showSaveFilePicker?: (options: {
+    suggestedName: string;
+    types: { description: string; accept: Record<string, string[]> }[];
+  }) => Promise<FileSystemFileHandle>;
+}
+
+/**
+ * A refused fetch, shaped as an axios error is, so `apiErrorMessage` and
+ * `apiErrorStatus` read it the same way. A sign-in that has run out is
+ * handled as the shared client handles it.
+ */
+async function refusalFrom(response: Response): Promise<Error> {
+  let data: unknown = null;
+  try {
+    data = JSON.parse(await response.text());
+  } catch {
+    // Not JSON: a proxy's error page, which says nothing worth showing.
+  }
+  if (response.status === 401) {
+    handleUnauthorized(window.location.pathname, () => {
+      window.location.href = '/auth/login';
+    });
+  }
+  return Object.assign(new Error(`Request failed with status code ${response.status}`), {
+    response: { status: response.status, data },
+  });
+}
+
+// Export singleton instance
+/** The bundled nginx's proxy_read_timeout for the backup routes (nginx/locations.conf). */
+const LONG_ADMIN_REQUEST_MS = 600_000;
+
+export const api = new ApiClient();
+export default api;

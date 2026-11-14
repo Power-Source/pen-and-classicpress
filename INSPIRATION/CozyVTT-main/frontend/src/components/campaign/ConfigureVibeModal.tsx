@@ -1,0 +1,495 @@
+/**
+ * Configure Vibe Modal
+ * Vibe Tracker Details
+ *
+ * GM-only modal for adding, editing, and removing time-of-day periods.
+ * Each period has a name, hue color, CSS filter (built via sliders), and audio track (stub).
+ * Saves to PUT /api/campaigns/:id/vibe — backend validates and persists.
+ */
+
+import { useState, useCallback, useEffect } from 'react';
+import { Plus, Trash2, RotateCcw, Music } from 'lucide-react';
+import { useCampaign } from '@/contexts/CampaignContext';
+import { useAuth } from '@/contexts/AuthContext';
+import Toast, { useToast } from '@/components/Toast';
+import api from '@/services/api';
+import type { Asset, VibePeriod, VibeSettings } from '@/types';
+import { Button, Modal } from '@/components/ui';
+import { apiErrorMessage, errorSummary } from '@/utils/errors';
+import { assetScopeLabel } from '@/utils/assetUrl';
+import { settableAudioAssets } from '@/utils/audioAssets';
+import { listEveryAsset } from '@/services/assetPages';
+import { vibePeriodAudioAssetId } from '@/utils/vibeAudio';
+import { CAMPAIGN_LIMITS } from '@/constants/campaignLimits';
+
+// ============================================
+// Default presets (mirrors backend vibe-presets.ts)
+// ============================================
+
+const DEFAULT_PERIODS: VibePeriod[] = [
+  { name: 'dawn', hue: '#FFB88C', filter: 'brightness(0.9) saturate(1.1)', audio: null },
+  { name: 'day',  hue: '#FFFACD', filter: 'brightness(1.0) saturate(1.0)', audio: null },
+  { name: 'dusk', hue: '#FF9966', filter: 'brightness(0.85) saturate(1.3) hue-rotate(10deg)', audio: null },
+  { name: 'night', hue: '#1A1A2E', filter: 'brightness(0.6) saturate(0.7) contrast(1.1)', audio: null },
+];
+
+// ============================================
+// Filter string helpers
+// ============================================
+
+interface FilterValues {
+  brightness: number;  // 0.3 – 1.5
+  saturate: number;    // 0.0 – 2.0
+  contrast: number;    // 0.5 – 1.5
+  hueRotate: number;   // -90 – 90 (degrees)
+}
+
+function parseFilter(filterStr: string): FilterValues {
+  const get = (name: string, defaultVal: number) => {
+    const m = filterStr.match(new RegExp(`${name}\\(([\\d.-]+)(?:deg)?\\)`));
+    return m ? parseFloat(m[1]) : defaultVal;
+  };
+  return {
+    brightness: get('brightness', 1.0),
+    saturate:   get('saturate',   1.0),
+    contrast:   get('contrast',   1.0),
+    hueRotate:  get('hue-rotate', 0),
+  };
+}
+
+function buildFilter(v: FilterValues): string {
+  const parts: string[] = [];
+  if (Math.abs(v.brightness - 1.0) > 0.001) parts.push(`brightness(${v.brightness.toFixed(2)})`);
+  if (Math.abs(v.saturate - 1.0) > 0.001)   parts.push(`saturate(${v.saturate.toFixed(2)})`);
+  if (Math.abs(v.contrast - 1.0) > 0.001)   parts.push(`contrast(${v.contrast.toFixed(2)})`);
+  if (Math.abs(v.hueRotate) > 0.5)           parts.push(`hue-rotate(${Math.round(v.hueRotate)}deg)`);
+  return parts.length ? parts.join(' ') : 'brightness(1.0) saturate(1.0)';
+}
+
+// ============================================
+// Period editor sub-component
+// ============================================
+
+interface PeriodEditorProps {
+  period: VibePeriod;
+  index: number;
+  canDelete: boolean;
+  /** The tracks this GM may open to the table; the picker offers nothing else. */
+  audioAssets: Asset[];
+  audioLoading: boolean;
+  onChange: (index: number, updated: VibePeriod) => void;
+  onDelete: (index: number) => void;
+}
+
+function PeriodEditor({ period, index, canDelete, audioAssets, audioLoading, onChange, onDelete }: PeriodEditorProps) {
+  const filterVals = parseFilter(period.filter ?? '');
+
+  const updateFilterVal = (key: keyof FilterValues, val: number) => {
+    const updated = { ...filterVals, [key]: val };
+    onChange(index, { ...period, filter: buildFilter(updated) });
+  };
+
+  return (
+    <div className="p-4 rounded-lg bg-parchment border border-moss-green/20 space-y-4">
+      {/* Period name + delete */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-stone-gray mb-1">Period Name</label>
+          <input
+            type="text"
+            value={period.name}
+            maxLength={CAMPAIGN_LIMITS.maxVibePeriodNameLength}
+            onChange={(e) => onChange(index, { ...period, name: e.target.value })}
+            className="input-cozy w-full"
+            placeholder="e.g. dawn, midday, twilight..."
+          />
+        </div>
+        <button
+          onClick={() => onDelete(index)}
+          disabled={!canDelete}
+          title={canDelete ? 'Remove this period' : 'Cannot remove the only period'}
+          className="touch-target mt-5 inline-flex items-center justify-center p-2 rounded-lg text-danger-ink hover:bg-danger/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Hue color + preview */}
+      <div>
+        <label className="block text-xs font-medium text-stone-gray mb-2">Hue Color</label>
+        <div className="flex items-center gap-3">
+          <input
+            type="color"
+            value={period.hue}
+            onChange={(e) => onChange(index, { ...period, hue: e.target.value })}
+            className="w-10 h-10 rounded-lg border border-moss-green/20 cursor-pointer bg-transparent"
+          />
+          <input
+            type="text"
+            value={period.hue}
+            maxLength={7}
+            pattern="^#[0-9A-Fa-f]{6}$"
+            onChange={(e) => {
+              const v = e.target.value;
+              if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) {
+                onChange(index, { ...period, hue: v });
+              }
+            }}
+            className="input-cozy w-32 font-mono text-sm"
+            placeholder="#FF9966"
+          />
+          {/* Preview swatch */}
+          <div className="flex-1 h-8 rounded-lg ring-1 ring-black/10" style={{ backgroundColor: period.hue }} />
+        </div>
+      </div>
+
+      {/* Filter sliders */}
+      <div className="space-y-3">
+        <p className="text-xs font-medium text-stone-gray">Visual Filter</p>
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          {/* Brightness */}
+          <div>
+            <div className="flex justify-between text-xs text-warm-gray mb-1">
+              <span>Brightness</span>
+              <span>{filterVals.brightness.toFixed(2)}</span>
+            </div>
+            <input
+              type="range"
+              min={0.3} max={1.5} step={0.05}
+              value={filterVals.brightness}
+              onChange={(e) => updateFilterVal('brightness', parseFloat(e.target.value))}
+              className="w-full accent-moss-green"
+            />
+          </div>
+
+          {/* Saturation */}
+          <div>
+            <div className="flex justify-between text-xs text-warm-gray mb-1">
+              <span>Saturation</span>
+              <span>{filterVals.saturate.toFixed(2)}</span>
+            </div>
+            <input
+              type="range"
+              min={0} max={2} step={0.05}
+              value={filterVals.saturate}
+              onChange={(e) => updateFilterVal('saturate', parseFloat(e.target.value))}
+              className="w-full accent-moss-green"
+            />
+          </div>
+
+          {/* Contrast */}
+          <div>
+            <div className="flex justify-between text-xs text-warm-gray mb-1">
+              <span>Contrast</span>
+              <span>{filterVals.contrast.toFixed(2)}</span>
+            </div>
+            <input
+              type="range"
+              min={0.5} max={1.5} step={0.05}
+              value={filterVals.contrast}
+              onChange={(e) => updateFilterVal('contrast', parseFloat(e.target.value))}
+              className="w-full accent-moss-green"
+            />
+          </div>
+
+          {/* Hue rotate */}
+          <div>
+            <div className="flex justify-between text-xs text-warm-gray mb-1">
+              <span>Hue Shift</span>
+              <span>{Math.round(filterVals.hueRotate)}°</span>
+            </div>
+            <input
+              type="range"
+              min={-90} max={90} step={5}
+              value={filterVals.hueRotate}
+              onChange={(e) => updateFilterVal('hueRotate', parseFloat(e.target.value))}
+              className="w-full accent-moss-green"
+            />
+          </div>
+        </div>
+
+        {/* Computed filter string */}
+        <p className="text-xs font-mono text-stone-gray bg-parchment px-2 py-1 rounded-sm border border-moss-green/20 truncate">
+          {period.filter || 'brightness(1.0) saturate(1.0)'}
+        </p>
+      </div>
+
+      {/* Filter preview */}
+      <div>
+        <p className="text-xs font-medium text-stone-gray mb-2">Preview</p>
+        <div className="relative h-16 rounded-lg overflow-hidden ring-1 ring-moss-green/20">
+          {/* Simulated map background */}
+          <div
+            className="absolute inset-0 bg-linear-to-br/srgb from-success via-success to-warning"
+            style={{ filter: period.filter || undefined }}
+          />
+          {/* Hue overlay */}
+          <div
+            className="absolute inset-0"
+            style={{ backgroundColor: period.hue, opacity: 0.15, mixBlendMode: 'multiply' }}
+          />
+          <span className="absolute bottom-1 right-2 text-xs text-white/80 drop-shadow-sm capitalize">
+            {period.name}
+          </span>
+        </div>
+      </div>
+
+      {/* Audio track */}
+      <div>
+        <label className="block text-xs font-medium text-stone-gray mb-1">
+          <Music className="w-3 h-3 inline mr-1" />
+          Audio Track (optional)
+        </label>
+        <select
+          value={(() => {
+            const id = vibePeriodAudioAssetId(period.audio);
+            return id && audioAssets.some((a) => a.id === id) ? id : '';
+          })()}
+          onChange={(e) => onChange(index, { ...period, audio: e.target.value || null })}
+          className="input-cozy w-full"
+          disabled={audioLoading}
+          aria-label={`Audio track for ${period.name}`}
+        >
+          <option value="">{audioLoading ? 'Loading audio library…' : 'No audio'}</option>
+          {audioAssets.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name} ({assetScopeLabel(a.scope)})
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-warm-gray mt-1">
+          Loops for everyone while this period is the vibe. A period with no
+          audio silences the table when chosen. Upload tracks in the Asset
+          Library (type: Audio).
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Main Modal
+// ============================================
+
+interface ConfigureVibeModalProps {
+  onClose: () => void;
+}
+
+export default function ConfigureVibeModal({ onClose }: ConfigureVibeModalProps) {
+  const { campaign, updateVibeSettings } = useCampaign();
+  const { user } = useAuth();
+  const { toast, showToast, hideToast } = useToast();
+
+  // Initialize local state from campaign's current vibeSettings
+  const [periods, setPeriods] = useState<VibePeriod[]>(
+    () => (campaign?.vibeSettings?.periods ?? DEFAULT_PERIODS).map((p) => ({ ...p }))
+  );
+  const [isSaving, setIsSaving] = useState(false);
+
+  // The tracks the picker may offer, the same set the Atmosphere panel plays from
+  const [audioAssets, setAudioAssets] = useState<Asset[]>([]);
+  const [audioLoading, setAudioLoading] = useState(true);
+  const [audioListFailed, setAudioListFailed] = useState(false);
+  useEffect(() => {
+    if (!campaign) return;
+    let cancelled = false;
+    listEveryAsset({ type: 'AUDIO' })
+      .then((assets) => {
+        if (!cancelled) setAudioAssets(settableAudioAssets(assets, user?.id, campaign.id));
+      })
+      .catch(() => {
+        if (!cancelled) setAudioListFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setAudioLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [campaign, user?.id]);
+
+  const handleClose = useCallback(() => onClose(), [onClose]);
+
+  // ============================================
+  // Period CRUD
+  // ============================================
+
+  const handlePeriodChange = useCallback((index: number, updated: VibePeriod) => {
+    setPeriods((prev) => prev.map((p, i) => (i === index ? updated : p)));
+  }, []);
+
+  const handleAddPeriod = () => {
+    setPeriods((prev) => [
+      ...prev,
+      { name: `Period ${prev.length + 1}`, hue: '#AABBCC', filter: 'brightness(1.0) saturate(1.0)', audio: null },
+    ]);
+  };
+
+  const handleDeletePeriod = (index: number) => {
+    setPeriods((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleRestoreDefaults = () => {
+    setPeriods(DEFAULT_PERIODS.map((p) => ({ ...p })));
+  };
+
+  // ============================================
+  // Validation
+  // ============================================
+
+  const validate = (): string | null => {
+    if (periods.length === 0) return 'At least one period is required.';
+    if (periods.length > CAMPAIGN_LIMITS.maxVibePeriods) return `Maximum ${CAMPAIGN_LIMITS.maxVibePeriods} periods allowed.`;
+    const names = periods.map((p) => p.name.trim().toLowerCase());
+    for (const name of names) {
+      if (!name) return 'All period names must be non-empty.';
+      if (name.length > CAMPAIGN_LIMITS.maxVibePeriodNameLength) return `Period names must be ${CAMPAIGN_LIMITS.maxVibePeriodNameLength} characters or fewer.`;
+    }
+    const unique = new Set(names);
+    if (unique.size !== names.length) return 'Period names must be unique.';
+    for (const p of periods) {
+      if (!/^#[0-9A-Fa-f]{6}$/.test(p.hue)) {
+        return `"${p.name}" has an invalid hue color. Use format #RRGGBB.`;
+      }
+    }
+    return null;
+  };
+
+  // ============================================
+  // Save
+  // ============================================
+
+  const handleSave = async () => {
+    const error = validate();
+    if (error) {
+      showToast(error, 'error');
+      return;
+    }
+
+    if (!campaign) return;
+
+    // The server refuses a save whose audio is not a track this GM may set,
+    // so a free-text note from the old field, or a track that has since gone,
+    // saves as no audio. When the library failed to load the values pass
+    // through untouched, so a blip cannot silently strip every period.
+    const knownTrack = (audio: VibePeriod['audio']): string | null => {
+      const id = vibePeriodAudioAssetId(audio);
+      if (!id) return null;
+      if (audioListFailed || audioLoading) return id;
+      return audioAssets.some((a) => a.id === id) ? id : null;
+    };
+
+    const newSettings: VibeSettings = {
+      ...(campaign.vibeSettings ?? {}),
+      enabled: true, // always keep enabled when GM is actively managing it
+      periods: periods.map((p) => ({
+        ...p,
+        name: p.name.trim(),
+        filter: p.filter || 'brightness(1.0) saturate(1.0)',
+        audio: knownTrack(p.audio),
+      })),
+    };
+
+    setIsSaving(true);
+    try {
+      const result = await api.updateVibeSettings(campaign.id, newSettings);
+      // Patch local context so VibeTracker reflects new periods immediately
+      updateVibeSettings(result.vibeSettings, result.currentVibe);
+      showToast('Vibe periods saved!', 'success');
+      setTimeout(onClose, 900);
+    } catch (err) {
+      console.error('Failed to save vibe settings:', errorSummary(err));
+      showToast(apiErrorMessage(err) || 'Failed to save vibe settings', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // ============================================
+  // Render
+  // ============================================
+
+  return (
+    <>
+      {/* fitViewport with the buttons in the Modal's own footer: the period
+          list is taller than most windows, and with the buttons at its end
+          inside one scrolling body nothing said the dialog scrolled, so the
+          editor looked like it had no save button. */}
+      <Modal
+        open
+        onClose={handleClose}
+        title="Configure Vibe Periods"
+        icon={Music}
+        size="lg"
+        closeDisabled={isSaving}
+        fitViewport
+        footer={
+          // Below sm the row may not fit (a phone has about 310 px for it),
+          // so Cancel and Save Periods wrap onto a line of their own, held at
+          // the right. From sm up it stays on one line.
+          <div className="flex flex-wrap sm:flex-nowrap w-full items-center justify-between gap-3 border-t border-moss-green/20 pt-4">
+            <button
+              onClick={handleRestoreDefaults}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-stone-gray hover:bg-parchment transition-colors"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Restore Defaults
+            </button>
+
+            <div className="flex items-center gap-3 ml-auto">
+              <Button
+                onClick={onClose}
+                disabled={isSaving}
+                variant="secondary"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={isSaving || periods.length === 0}
+              >
+                {isSaving ? 'Saving...' : 'Save Periods'}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+          <p className="text-sm text-ink-muted -mt-4 mb-6">
+            Define the time-of-day periods and their visual effects.
+          </p>
+
+          {/* Period Editors */}
+          <div className="space-y-4 mb-6">
+            {periods.map((period, index) => (
+              <PeriodEditor
+                key={index}
+                period={period}
+                index={index}
+                canDelete={periods.length > 1}
+                audioAssets={audioAssets}
+                audioLoading={audioLoading}
+                onChange={handlePeriodChange}
+                onDelete={handleDeletePeriod}
+              />
+            ))}
+          </div>
+
+          {/* Add Period */}
+          {periods.length < 20 && (
+            <button
+              onClick={handleAddPeriod}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed border-moss-green/30 text-brand-ink hover:border-moss-green/60 hover:bg-moss-green/5 transition-colors mb-6"
+            >
+              <Plus className="w-4 h-4" />
+              Add Period
+            </button>
+          )}
+        </div>
+      </Modal>
+
+      <Toast message={toast.message} type={toast.type} show={toast.show} onClose={hideToast} />
+    </>
+  );
+}

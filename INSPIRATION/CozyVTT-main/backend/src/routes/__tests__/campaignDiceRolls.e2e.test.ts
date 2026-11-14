@@ -1,0 +1,226 @@
+/**
+ * Campaign roll history — End-to-End Tests
+ *
+ * Covers `GET /api/campaigns/:campaignId/dice-rolls`, added so the dice panel
+ * survives a page refresh. Rolls were always written to the database; nothing
+ * read them back.
+ *
+ * The case that matters most here is **secret rolls**. The live socket path
+ * sends a secret roll only to the person who made it and to GMs. Replaying
+ * history without the same restriction would hand every player the GM's hidden
+ * rolls the moment they pressed refresh — a worse bug than the one being fixed —
+ * so the visibility rule is pinned from every angle below rather than only on
+ * the happy path.
+ *
+ * Also covers the clear watermark: clearing has to survive a reload, which it
+ * did not when `dice.clearHistory` merely broadcast to connected clients.
+ *
+ * Requires PostgreSQL at DATABASE_URL.
+ */
+
+import request from 'supertest';
+import { createTestApp } from '../../__tests__/helpers/test-app';
+import {
+  prisma,
+  createTestUser,
+  createTestCampaign,
+  cleanupUsers,
+  cleanupCampaigns,
+  TEST_PASSWORD,
+} from '../../__tests__/helpers/db';
+
+const app = createTestApp();
+
+describe('GET /api/campaigns/:campaignId/dice-rolls', () => {
+  let gmId: string;
+  let playerId: string;
+  let outsiderId: string;
+  let campaignId: string;
+
+  let gmAgent: ReturnType<typeof request.agent>;
+  let playerAgent: ReturnType<typeof request.agent>;
+  let outsiderAgent: ReturnType<typeof request.agent>;
+
+  async function login(email: string) {
+    const agent = request.agent(app);
+    const res = await agent.post('/api/auth/login').send({ email, password: TEST_PASSWORD });
+    expect(res.status).toBe(200);
+    return agent;
+  }
+
+  /** Insert a roll directly — the socket handler is not under test here. */
+  async function addRoll(
+    userId: string,
+    expression: string,
+    secret: boolean,
+    extra: { id?: string; rolledAt?: Date } = {}
+  ) {
+    return prisma.diceRoll.create({
+      data: { campaignId, userId, expression, result: 10, breakdown: {}, secret, ...extra },
+    });
+  }
+
+  const expressionsIn = (body: { rolls: Array<{ expression: string }> }) =>
+    body.rolls.map((r) => r.expression).sort();
+
+  beforeAll(async () => {
+    const stamp = Date.now();
+    const gm = await createTestUser({ email: `roll_dm_${stamp}@test.invalid`, isApproved: true });
+    const player = await createTestUser({ email: `roll_pl_${stamp}@test.invalid`, isApproved: true });
+    const outsider = await createTestUser({ email: `roll_out_${stamp}@test.invalid`, isApproved: true });
+
+    gmId = gm.id;
+    playerId = player.id;
+    outsiderId = outsider.id;
+
+    const campaign = await createTestCampaign(gmId, { name: `Roll History ${stamp}` });
+    campaignId = campaign.id;
+
+    await prisma.campaignMembership.createMany({
+      data: [
+        { campaignId, userId: gmId, role: 'GM', characterIds: [] },
+        { campaignId, userId: playerId, role: 'PLAYER', characterIds: [] },
+      ],
+    });
+
+    gmAgent = await login(`roll_dm_${stamp}@test.invalid`);
+    playerAgent = await login(`roll_pl_${stamp}@test.invalid`);
+    outsiderAgent = await login(`roll_out_${stamp}@test.invalid`);
+  });
+
+  afterEach(async () => {
+    await prisma.diceRoll.deleteMany({ where: { campaignId } });
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { rollHistoryClearedAt: null },
+    });
+  });
+
+  afterAll(async () => {
+    await cleanupCampaigns([campaignId]);
+    await cleanupUsers([gmId, playerId, outsiderId]);
+    await prisma.$disconnect();
+  });
+
+  it('returns rolls newest first', async () => {
+    // Seeded a second apart: three rolls made back to back can share a
+    // millisecond, and then "newest" is not defined by the timestamp.
+    const base = Date.now() - 10_000;
+    await addRoll(gmId, '1d4', false, { rolledAt: new Date(base) });
+    await addRoll(playerId, '1d6', false, { rolledAt: new Date(base + 1000) });
+    await addRoll(playerId, '1d8', false, { rolledAt: new Date(base + 2000) });
+
+    const res = await gmAgent.get(`/api/campaigns/${campaignId}/dice-rolls`);
+    expect(res.status).toBe(200);
+    expect(res.body.rolls.map((r: { expression: string }) => r.expression)).toEqual([
+      '1d8',
+      '1d6',
+      '1d4',
+    ]);
+    expect(res.body.pagination.total).toBe(3);
+  });
+
+  it('orders rolls made in the same millisecond by id, the same on every request and page', async () => {
+    // Three rolls with one timestamp, inserted in ascending id order so that a
+    // route returning them in insertion order gives the opposite of id order.
+    const at = new Date(Date.now() - 10_000);
+    const ids = ['00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-00000000000b', '00000000-0000-4000-8000-00000000000c'];
+    for (const id of ids) await addRoll(playerId, `tie-${id.slice(-1)}`, false, { id, rolledAt: at });
+
+    const whole = await gmAgent.get(`/api/campaigns/${campaignId}/dice-rolls`);
+    expect(whole.body.rolls.map((r: { id: string }) => r.id)).toEqual([...ids].reverse());
+
+    const paged: string[] = [];
+    for (const offset of [0, 1, 2]) {
+      const page = await gmAgent.get(`/api/campaigns/${campaignId}/dice-rolls?limit=1&offset=${offset}`);
+      paged.push(page.body.rolls[0].id);
+    }
+    expect(paged).toEqual([...ids].reverse());
+  });
+
+  describe('secret roll visibility', () => {
+    it('gives the GM every roll, including secret ones', async () => {
+      await addRoll(gmId, 'dm-secret', true);
+      await addRoll(playerId, 'player-secret', true);
+      await addRoll(playerId, 'public', false);
+
+      const res = await gmAgent.get(`/api/campaigns/${campaignId}/dice-rolls`);
+      expect(res.status).toBe(200);
+      expect(expressionsIn(res.body)).toEqual(['dm-secret', 'player-secret', 'public']);
+    });
+
+    // The regression this endpoint could most easily introduce.
+    it("never leaks another user's secret roll to a player", async () => {
+      await addRoll(gmId, 'dm-secret', true);
+      await addRoll(playerId, 'public', false);
+
+      const res = await playerAgent.get(`/api/campaigns/${campaignId}/dice-rolls`);
+      expect(res.status).toBe(200);
+      expect(expressionsIn(res.body)).toEqual(['public']);
+      expect(JSON.stringify(res.body)).not.toContain('dm-secret');
+      expect(res.body.pagination.total).toBe(1);
+    });
+
+    it('gives a player their own secret rolls back', async () => {
+      await addRoll(playerId, 'mine-secret', true);
+      await addRoll(gmId, 'theirs-secret', true);
+      await addRoll(gmId, 'public', false);
+
+      const res = await playerAgent.get(`/api/campaigns/${campaignId}/dice-rolls`);
+      expect(expressionsIn(res.body)).toEqual(['mine-secret', 'public']);
+    });
+  });
+
+  describe('clearing', () => {
+    it('hides rolls older than the clear, and keeps newer ones', async () => {
+      const before = await addRoll(playerId, 'before-clear', false);
+      // Derived from the row rather than `new Date()`. `rolledAt` is stamped by
+      // Postgres and the watermark by Node, and under load those two clocks are
+      // far enough apart to put the roll *after* its own clear — which is what
+      // made this test fail once in a full run and pass on its own.
+      await prisma.campaign.update({
+        where: { id: campaignId },
+        data: { rollHistoryClearedAt: new Date(before.rolledAt.getTime() + 1) },
+      });
+      // Ensure the next roll is strictly after the watermark.
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      await addRoll(playerId, 'after-clear', false);
+
+      const res = await gmAgent.get(`/api/campaigns/${campaignId}/dice-rolls`);
+      expect(expressionsIn(res.body)).toEqual(['after-clear']);
+    });
+
+    it('keeps the cleared rows in the table for audit', async () => {
+      const cleared = await addRoll(gmId, 'secret-before-clear', true);
+      await prisma.campaign.update({
+        where: { id: campaignId },
+        data: { rollHistoryClearedAt: new Date(cleared.rolledAt.getTime() + 1) },
+      });
+
+      const res = await gmAgent.get(`/api/campaigns/${campaignId}/dice-rolls`);
+      expect(res.body.rolls).toHaveLength(0);
+
+      // Hidden from the endpoint, still on disk — the point of a watermark.
+      const stored = await prisma.diceRoll.count({ where: { campaignId } });
+      expect(stored).toBe(1);
+    });
+  });
+
+  describe('access', () => {
+    it('refuses a user who is not a member of the campaign', async () => {
+      await addRoll(gmId, 'public', false);
+      const res = await outsiderAgent.get(`/api/campaigns/${campaignId}/dice-rolls`);
+      expect([403, 404]).toContain(res.status);
+    });
+
+    it('refuses an unauthenticated request', async () => {
+      const res = await request(app).get(`/api/campaigns/${campaignId}/dice-rolls`);
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects an out-of-range limit', async () => {
+      const res = await gmAgent.get(`/api/campaigns/${campaignId}/dice-rolls?limit=500`);
+      expect(res.status).toBe(400);
+    });
+  });
+});

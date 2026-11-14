@@ -1,0 +1,198 @@
+// ============================================
+// Campaign Info Component
+// Displays campaign name, description, status
+// ============================================
+
+import { useState } from 'react';
+import { CAMPAIGN_ROLE_LABEL, campaignGmName, campaignOwnerName, ownerDiffersFromGm } from '@/utils/campaignRoles';
+import { useCampaign } from '@/contexts/CampaignContext';
+import { Info, Users, Crown, Calendar, UserPlus, KeyRound} from 'lucide-react';
+import { CampaignRole } from '@/types';
+import type { AccessRevoked, CampaignStatus } from '@/types';
+import GameSystemBadge from '../common/GameSystemBadge';
+import InvitePlayerModal from './InvitePlayerModal';
+import LeaveCampaign from './LeaveCampaign';
+import { AboutButton } from '../common/AboutDialog';
+
+interface CampaignInfoProps {
+  /** Told when the member has left the campaign from here (useAccessRevoked). */
+  onLeft: (revoked: AccessRevoked) => void;
+}
+
+export default function CampaignInfo({ onLeft }: CampaignInfoProps) {
+  const { campaign, userRole } = useCampaign();
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteKey, setInviteKey] = useState(0);
+
+  if (!campaign) {
+    return (
+      <div className="glass-panel p-4">
+        <div className="animate-pulse space-y-3">
+          <div className="h-6 bg-warm-gray/20 rounded-sm w-3/4" />
+          <div className="h-4 bg-warm-gray/20 rounded-sm w-full" />
+          <div className="h-4 bg-warm-gray/20 rounded-sm w-5/6" />
+        </div>
+      </div>
+    );
+  }
+
+  // Get status badge styling
+  const getStatusBadge = (status: CampaignStatus) => {
+    const badges = {
+      PREPARATION: {
+        label: 'Preparation',
+        class: 'bg-warm-amber/15 text-accent-ink border-warm-amber/30',
+      },
+      ACTIVE: {
+        label: 'Active',
+        class: 'bg-moss-green/15 text-brand-ink border-moss-green/30',
+      },
+      PAUSED: {
+        label: 'Paused',
+        class: 'bg-stone-gray/20 text-stone-gray border-stone-gray/30',
+      },
+      COMPLETED: {
+        label: 'Completed',
+        class: 'bg-spirit-purple/15 text-spirit-ink border-spirit-purple/30',
+      },
+      ARCHIVED: {
+        label: 'Archived',
+        class: 'bg-warm-gray/20 text-warm-gray border-warm-gray/30',
+      },
+      INACTIVE: {
+        label: 'Inactive',
+        class: 'bg-warm-gray/20 text-warm-gray border-warm-gray/30',
+      },
+    };
+
+    return badges[status] || badges.PREPARATION;
+  };
+
+  const statusBadge = getStatusBadge(campaign.status);
+  const memberCount = campaign.memberships?.length || 0;
+  // The person running the game, which is not necessarily the person who
+  // created it.
+  const gmName = campaignGmName(campaign);
+  const showOwner = ownerDiffersFromGm(campaign);
+  const ownerName = campaignOwnerName(campaign);
+
+  return (
+    <div className="glass-panel p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-2 pb-2 border-b border-moss-green/20">
+        <Info className="w-5 h-5 text-brand-ink" />
+        <h3 className="text-lg font-semibold text-brand-ink">
+          Campaign Info
+        </h3>
+      </div>
+
+      {/* Campaign Name */}
+      <div>
+        <h2 className="text-xl font-bold text-brand-ink mb-1">
+          {campaign.name}
+        </h2>
+        {campaign.description && (
+          <p className="text-sm text-warm-gray line-clamp-3">
+            {campaign.description}
+          </p>
+        )}
+      </div>
+
+      {/* Status and Game System Badges */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span
+          className={`inline-block px-2.5 py-1 rounded-full border text-xs font-medium ${statusBadge.class}`}
+        >
+          {statusBadge.label}
+        </span>
+        <GameSystemBadge gameSystem={campaign.gameSystem} size="md" />
+      </div>
+
+      {/* Details */}
+      <div className="space-y-2 text-sm">
+        <div className="flex items-center gap-2 text-stone-gray">
+          <Crown className="w-4 h-4 text-brand-ink" />
+          <span className="text-warm-gray">{CAMPAIGN_ROLE_LABEL[CampaignRole.GM]}:</span>
+          <span className="text-stone-gray font-medium">{gmName}</span>
+        </div>
+
+        {/* Only worth saying once the two have come apart — while the creator
+            still runs the game, naming them twice is noise. */}
+        {showOwner && (
+          <div className="flex items-center gap-2 text-stone-gray">
+            <KeyRound className="w-4 h-4 text-accent-ink" />
+            <span className="text-warm-gray">Owner:</span>
+            <span className="text-stone-gray font-medium">{ownerName}</span>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 text-stone-gray">
+          <Users className="w-4 h-4 text-spirit-ink" />
+          <span className="text-warm-gray">Members:</span>
+          <span className="text-stone-gray font-medium">{memberCount}</span>
+        </div>
+
+        {campaign.lastPlayedAt && (
+          <div className="flex items-center gap-2 text-stone-gray">
+            <Calendar className="w-4 h-4 text-accent-ink" />
+            <span className="text-warm-gray">Last played:</span>
+            <span className="text-stone-gray font-medium">
+              {new Date(campaign.lastPlayedAt).toLocaleDateString()}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* GM Actions - Invite Player Button */}
+      {userRole === 'GM' && (
+        <div className="pt-2 border-t border-moss-green/20">
+          <button
+            onClick={() => { setInviteKey((k) => k + 1); setShowInviteModal(true); }}
+            className="flex items-center gap-2 px-3 py-2 w-full rounded-lg bg-moss-green/10 text-brand-ink hover:bg-moss-green/15 transition-colors text-sm font-medium"
+          >
+            <UserPlus className="w-4 h-4" />
+            Invite Player
+          </button>
+        </div>
+      )}
+
+      {/* User Role Badge, and the way out of the campaign */}
+      {userRole && (
+        <div className="pt-2 border-t border-moss-green/20 space-y-3">
+          <div>
+            <span className="text-xs text-warm-gray">Your role:</span>
+            <div
+              className={`inline-block ml-2 px-2.5 py-1 rounded-full border text-xs font-medium ${
+                userRole === 'GM'
+                  ? 'bg-moss-green/15 text-brand-ink border-moss-green/40'
+                  : 'bg-spirit-purple/15 text-spirit-ink border-spirit-purple/40'
+              }`}
+            >
+              {CAMPAIGN_ROLE_LABEL[userRole]}
+            </div>
+          </div>
+          <LeaveCampaign campaign={campaign} userRole={userRole} onLeft={onLeft} />
+        </div>
+      )}
+
+      {/* The credits for the game rules the sheets and creatures here use. */}
+      <div className="pt-2 border-t border-moss-green/20 flex justify-center">
+        <AboutButton />
+      </div>
+
+      {/* Invite Player Modal */}
+      {/* Mounted from its first opening on, so it fades out on close. */}
+      {campaign && inviteKey > 0 && (
+        <InvitePlayerModal
+          key={inviteKey}
+          open={showInviteModal}
+          campaignId={campaign.id}
+          onClose={() => setShowInviteModal(false)}
+          // The invite dialog says it was sent. Nothing on the campaign
+          // changes until it is accepted, which the roster hears about.
+          onSuccess={() => setShowInviteModal(false)}
+        />
+      )}
+    </div>
+  );
+}

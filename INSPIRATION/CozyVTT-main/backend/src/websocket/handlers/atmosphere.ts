@@ -1,0 +1,79 @@
+// ============================================
+// Atmosphere handlers: atmosphere.effect.set / atmosphere.audio.set
+// ============================================
+
+import { Server } from 'socket.io';
+import { AuthenticatedSocket } from '../auth';
+import logger from '../../utils/logger';
+import { setCampaignAmbientAudio, setCampaignAtmosphereEffect } from '../../services/atmosphereAudio';
+import { withinCeiling } from '../shared';
+
+export function registerAtmosphereHandlers(io: Server, socket: AuthenticatedSocket): void {
+  /**
+   * ATMOSPHERE.EFFECT.SET — GM sets a visual particle overlay on the map canvas.
+   * Valid: 'rain' | 'mist' | 'leaves' | 'sparkles' | 'snow' | 'wind' | null (clear)
+   */
+  socket.on('atmosphere.effect.set', async (data: { effect: string | null }) => {
+    try {
+      if (!socket.campaignId) return;
+      if (!withinCeiling(socket, 'atmosphere.effect.set')) return;
+
+      if (socket.role !== 'GM') {
+        socket.emit('error', { message: 'Only the GM can set atmosphere effects' });
+        return;
+      }
+
+      const VALID_EFFECTS = ['rain', 'mist', 'leaves', 'sparkles', 'snow', 'wind'];
+      const effect = data.effect === null || VALID_EFFECTS.includes(data.effect)
+        ? data.effect
+        : null;
+
+      await setCampaignAtmosphereEffect(socket.campaignId, effect);
+
+      io.to(socket.campaignId).emit('atmosphere.effect.updated', {
+        effect,
+        setBy: socket.userId,
+        timestamp: new Date().toISOString(),
+      });
+
+      logger.info('atmosphere.effect.set', { effect: effect ?? 'none', userId: socket.userId, campaignId: socket.campaignId });
+    } catch (error) {
+      logger.error('atmosphere.effect.set failed', { err: error });
+      socket.emit('error', { message: 'Failed to set atmosphere effect' });
+    }
+  });
+
+  /**
+   * ATMOSPHERE.AUDIO.SET — GM queues or stops ambient audio for all players.
+   * assetId: UUID of an AUDIO asset, or null to stop.
+   *
+   * Setting a track is what opens it to the campaign: the read rule lets a
+   * member fetch whatever their campaign is playing, because the sound is not
+   * relayed through here, each player's browser fetches the file itself. So
+   * this handler asks the same question the serving route asks, of the GM. A
+   * track the GM cannot read answers the same as one that does not exist, so
+   * the reply cannot be used to discover which ids are real.
+   */
+  socket.on('atmosphere.audio.set', async (data: { assetId: string | null; volume?: number; loop?: boolean }) => {
+    try {
+      if (!socket.campaignId || !socket.userId) return;
+      if (!withinCeiling(socket, 'atmosphere.audio.set')) return;
+
+      if (socket.role !== 'GM') {
+        socket.emit('error', { message: 'Only the GM can control ambient audio' });
+        return;
+      }
+
+      const result = await setCampaignAmbientAudio(io, socket.campaignId, socket.userId, data.assetId ?? null, {
+        volume: data.volume,
+        loop: data.loop,
+      });
+      if (!result.ok) {
+        socket.emit('error', { message: result.message ?? 'Failed to set atmosphere audio' });
+      }
+    } catch (error) {
+      logger.error('atmosphere.audio.set failed', { err: error });
+      socket.emit('error', { message: 'Failed to set atmosphere audio' });
+    }
+  });
+}

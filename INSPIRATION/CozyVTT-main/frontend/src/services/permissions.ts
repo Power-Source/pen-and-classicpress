@@ -1,0 +1,136 @@
+/**
+ * Permission Utilities
+ */
+
+import type { User, Character, CampaignMembership, Campaign } from '../types';
+
+/**
+ * Check if a user can edit a character
+ * @param user - Current user
+ * @param character - Character to edit
+ * @param membership - User's campaign membership (if viewing in campaign context)
+ * @returns true if user can edit the character
+ */
+export function canEditCharacter(
+  user: User,
+  character: Pick<Character, 'userId'>,
+  membership?: Pick<CampaignMembership, 'role'>
+): boolean {
+  // A spectator may read the characters they own but not edit them while
+  // they are a spectator in the character's campaign: a bound token follows
+  // the sheet on every screen, and the server refuses the save.
+  if (membership?.role === 'SPECTATOR') {
+    return false;
+  }
+
+  // User owns the character
+  if (character.userId === user.id) {
+    return true;
+  }
+
+  // User is GM of the campaign
+  if (membership && membership.role === 'GM') {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * canEditCharacter for a page outside the campaign, which holds the
+ * character's campaign as the user's campaign list gives it (with their role
+ * in it) and no membership: the Characters page and the full editor. An
+ * owner who is a spectator in that campaign may not edit, as the server
+ * refuses the save.
+ */
+export function canEditCharacterIn(
+  user: User,
+  character: Pick<Character, 'userId'>,
+  campaign: Pick<Campaign, 'userRole' | 'memberships'> | null | undefined
+): boolean {
+  const role = campaign ? (campaign.userRole ?? campaign.memberships?.find((m) => m.userId === user.id)?.role) : undefined;
+  return canEditCharacter(user, character, role ? { role } : undefined);
+}
+
+/**
+ * Why `user` may not edit `character`, once canEditCharacterIn has said no.
+ * An owner is refused only for being a spectator in its campaign, so they are
+ * told that, not that only the owner may edit it.
+ */
+export function characterEditRefusal(user: Pick<User, 'id'>, character: Pick<Character, 'userId'>): string {
+  return character.userId === user.id
+    ? "You watch this character's campaign as a spectator, so you cannot edit the character there. Ask its GM to make you a player."
+    : 'You do not have permission to edit this character. Only its owner or the GM of its campaign can edit it.';
+}
+
+/**
+ * Check if a user can roll a character's dice
+ *
+ * Rolling uses the sheet's own modifiers, so it is an action taken *as* that
+ * character rather than a way of reading one. The owner may, and the GM may so
+ * they can cover for an absent player. Everyone else in the campaign — other
+ * players and spectators alike — may still open and read the sheet, which the
+ * server deliberately allows, but not roll from it.
+ *
+ * This is deliberately its own rule rather than a call to canEditCharacter.
+ * The two happen to agree today, but "may change this sheet" and "may act as
+ * this character" are different questions, and folding them together would
+ * mean any future change to editing silently changed who can roll.
+ *
+ * @param user - Current user
+ * @param character - Character whose rolls are being offered
+ * @param membership - User's campaign membership (if in campaign context)
+ * @returns true if user can roll as the character
+ */
+export function canRollAsCharacter(
+  user: User,
+  // Only ownership is read, and the roster's context menu holds the owner id
+  // without the character object — so this takes the narrowest thing that
+  // answers the question rather than making callers fetch a whole Character.
+  character: Pick<Character, 'userId'>,
+  membership?: CampaignMembership
+): boolean {
+  // A spectator is watching, not playing, even with a character of their own
+  // in the roster; the server refuses the roll.
+  if (membership?.role === 'SPECTATOR') {
+    return false;
+  }
+
+  // User owns the character
+  if (character.userId === user.id) {
+    return true;
+  }
+
+  // User is GM of the campaign
+  if (membership && membership.role === 'GM') {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check if a user can remove a character from a campaign
+ * Character owners and GMs can remove characters
+ * @param user - Current user
+ * @param character - Character to remove
+ * @param membership - User's campaign membership
+ * @returns true if user can remove the character
+ */
+export function canRemoveCharacterFromCampaign(
+  user: User,
+  character: Pick<Character, 'userId'>,
+  membership?: CampaignMembership
+): boolean {
+  // User owns the character
+  if (character.userId === user.id) {
+    return true;
+  }
+
+  // User is GM
+  if (membership?.role === 'GM') {
+    return true;
+  }
+
+  return false;
+}

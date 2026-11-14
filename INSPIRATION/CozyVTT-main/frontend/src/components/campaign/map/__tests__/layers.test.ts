@@ -1,0 +1,1629 @@
+/**
+ * Pure draw-layer tests.
+ *
+ * The layers are `(ctx, state, viewport) => void` with no React — so
+ * they can be exercised with a recording mock context. These tests
+ * assert call shape (what got drawn), not pixels: enough to catch a
+ * broken guard (players seeing hidden tokens, fog filling revealed
+ * cells) without being brittle about styling.
+ */
+
+import { TOKEN_HUES, hueColour } from '@/utils/tokenColours';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { drawGrid } from '../layers/drawGrid';
+import { drawFog } from '../layers/drawFog';
+import { drawTokens, placeholderColor, type TokenDrawState } from '../layers/drawTokens';
+import { drawWalls } from '../layers/drawWalls';
+import { drawFogSelection, type FogSelectionState } from '../layers/drawOverlays';
+import { drawPings, PING_DURATION_MS, type ActivePing, type PingDrawState } from '../layers/drawPings';
+import { drawSpiritLayer } from '../layers/drawBackground';
+import { drawDynamicLighting, drawLightIcons } from '../layers/drawLights';
+import { computeVisionState } from '../vision';
+import { MAX_BACKING_PIXELS } from '../layerCanvas';
+import type { Viewport } from '../layers/types';
+import type { Token } from '@/types';
+import { TokenDisposition, TokenLayer, TokenType } from '@/types';
+import type { FogState, LightSource, WallSegment } from '@/types/walls';
+
+// ── Recording mock 2D context ────────────────────────────────────────────────
+
+interface RecordedCall {
+  method: string;
+  args: unknown[];
+  /** The fillStyle in force when a fillRect or fill was recorded. */
+  fillStyle?: string;
+}
+
+type MockCtx = CanvasRenderingContext2D & { calls: RecordedCall[] };
+
+function makeMockCtx(): MockCtx {
+  const calls: RecordedCall[] = [];
+  const record = (method: string) => (...args: unknown[]) => {
+    calls.push({ method, args });
+  };
+  const gradient = { addColorStop: () => {} };
+  return {
+    calls,
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 0,
+    font: '',
+    textAlign: 'start',
+    textBaseline: 'alphabetic',
+    globalAlpha: 1,
+    globalCompositeOperation: 'source-over',
+    lineCap: 'butt',
+    lineJoin: 'miter',
+    filter: 'none',
+    save: record('save'),
+    restore: record('restore'),
+    beginPath: record('beginPath'),
+    closePath: record('closePath'),
+    moveTo: record('moveTo'),
+    lineTo: record('lineTo'),
+    arc: record('arc'),
+    rect: record('rect'),
+    roundRect: record('roundRect'),
+    stroke: record('stroke'),
+    fill(this: { fillStyle: unknown }, ...args: unknown[]) { calls.push({ method: 'fill', args, fillStyle: String(this.fillStyle) }); },
+    clip: record('clip'),
+    fillRect(this: { fillStyle: unknown }, ...args: unknown[]) { calls.push({ method: 'fillRect', args, fillStyle: String(this.fillStyle) }); },
+    strokeRect: record('strokeRect'),
+    clearRect: record('clearRect'),
+    drawImage: record('drawImage'),
+    fillText: record('fillText'),
+    setLineDash: record('setLineDash'),
+    setTransform: record('setTransform'),
+    translate: record('translate'),
+    scale: record('scale'),
+    measureText: (text: string) => ({ width: text.length * 6 }),
+    createRadialGradient: () => gradient,
+  } as unknown as MockCtx;
+}
+
+function count(ctx: MockCtx, method: string): number {
+  return ctx.calls.filter((c) => c.method === method).length;
+}
+
+function methods(ctx: MockCtx): string[] {
+  return ctx.calls.map((c) => c.method);
+}
+
+// ── Fixtures ─────────────────────────────────────────────────────────────────
+
+const viewport3x3: Viewport = {
+  zoom: 1,
+  panOffset: { x: 0, y: 0 },
+  gridSize: 50,
+  mapWidth: 3,
+  mapHeight: 3,
+};
+
+function makeToken(id: string, overrides: Partial<Token> = {}): Token {
+  return {
+    id,
+    characterId: null,
+    name: `Token ${id}`,
+    // A cached image always has an address in real use; the address decides
+    // whether cached art is drawn (an obscured token arrives without one).
+    imageUrl: `/api/assets/tokens/${id}`,
+    position: { x: 0, y: 0 },
+    size: { width: 1, height: 1 },
+    layer: TokenLayer.TOKEN,
+    visible: true,
+    controlledBy: null,
+    rotation: 0,
+    conditions: [],
+    metadata: {},
+    type: TokenType.NPC,
+    disposition: null,
+    hp: null,
+    showHpBar: false,
+    ...overrides,
+  } as Token;
+}
+
+function baseTokenState(overrides: Partial<TokenDrawState> = {}): TokenDrawState {
+  return {
+    tokens: [],
+    tokenImages: new Map(),
+    animatingTokens: new Map(),
+    heldAt: {},
+    now: Date.now(),
+    draggedToken: null,
+    heldDrawnAt: null,
+    hoverTokenId: null,
+    revealedCells: null,
+    isGM: false,
+    gmShowSpiritTokens: true,
+    gmViewBothPlanes: true,
+    spiritAccentColor: '#9370DB',
+    characterHpCache: {},
+    isOwnToken: () => false,
+    currentTurnTokenId: null,
+    pulsePhase: 0.5,
+    peekTokenId: null,
+    selectedTokenId: null,
+    ...overrides,
+  };
+}
+
+const fakeImage = {} as HTMLImageElement;
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+describe('drawGrid', () => {
+  it('draws one line per grid boundary (N+1 vertical + N+1 horizontal)', () => {
+    const ctx = makeMockCtx();
+    drawGrid(ctx, { gridColor: 'black' }, viewport3x3);
+    // 3×3 map → 4 vertical + 4 horizontal lines
+    expect(count(ctx, 'moveTo')).toBe(8);
+    expect(count(ctx, 'lineTo')).toBe(8);
+    expect(count(ctx, 'stroke')).toBe(8);
+  });
+});
+
+describe('drawFog', () => {
+  // The cells covered by fog: those in the one shape filled for the hidden
+  // cells, and those filled one by one as they fade.
+  const fogged = (ctx: MockCtx) => count(ctx, 'rect') + count(ctx, 'fillRect');
+
+  // Squares filled one by one each leave their edge part-painted where it
+  // falls between screen pixels, and two part-painted edges side by side let
+  // the picture under the fog through: a player saw the walls and the grid,
+  // which lie on those edges, as faint lines. The hidden cells are now one
+  // shape, filled once.
+  it('fills every hidden cell as one shape, so no seam between two cells shows what is under them', () => {
+    const ctx = makeMockCtx();
+    drawFog(ctx, { isGM: false, fogState: null, revealedCells: new Set([4]), revealOpacity: new Map() }, viewport3x3);
+    expect(count(ctx, 'fillRect')).toBe(0);
+    expect(count(ctx, 'rect')).toBe(8);
+    const fills = ctx.calls.filter((c) => c.method === 'fill');
+    expect(fills).toHaveLength(1);
+    expect(fills[0].fillStyle).toBe('rgba(15, 12, 25, 1)');
+  });
+
+  it('fills the GM\'s hidden cells as one shape too, so its fog has no lighter lines', () => {
+    const ctx = makeMockCtx();
+    drawFog(ctx, {
+      isGM: true,
+      fogState: { fogCols: 3, fogRows: 3, cellPx: 50, revealed: [true, false, false, false, false, false, false, false, true] },
+      revealedCells: null,
+      revealOpacity: new Map(),
+    }, viewport3x3);
+    expect(count(ctx, 'fillRect')).toBe(0);
+    expect(ctx.calls.filter((c) => c.method === 'fill').map((c) => c.fillStyle)).toEqual(['rgba(15, 12, 25, 0.55)']);
+  });
+
+  it('player fog fills only unrevealed cells', () => {
+    const ctx = makeMockCtx();
+    drawFog(ctx, {
+      isGM: false,
+      fogState: null,
+      revealedCells: new Set([0, 4]), // 2 of 9 cells revealed
+      revealOpacity: new Map(),
+    }, viewport3x3);
+    expect(fogged(ctx)).toBe(7);
+  });
+
+  it('skips player fog entirely until fog data arrives (revealedCells null)', () => {
+    const ctx = makeMockCtx();
+    drawFog(ctx, { isGM: false, fogState: null, revealedCells: null, revealOpacity: new Map() }, viewport3x3);
+    expect(ctx.calls).toHaveLength(0);
+  });
+
+  it('paints a player\'s unrevealed cells fully opaque, so nothing under them shows through', () => {
+    const ctx = makeMockCtx();
+    drawFog(ctx, { isGM: false, fogState: null, revealedCells: new Set([4]), revealOpacity: new Map() }, viewport3x3);
+    expect(fogged(ctx)).toBe(8);
+    for (const f of ctx.calls.filter((c) => c.method === 'fill')) expect(f.fillStyle).toBe('rgba(15, 12, 25, 1)');
+  });
+
+  it('keeps the GM\'s fog translucent, so the GM can still work under it', () => {
+    const ctx = makeMockCtx();
+    drawFog(ctx, {
+      isGM: true,
+      fogState: { fogCols: 3, fogRows: 3, cellPx: 50, revealed: [true, false, false, false, false, false, false, false, true] },
+      revealedCells: null,
+      revealOpacity: new Map(),
+    }, viewport3x3);
+    const fills = ctx.calls.filter((c) => c.method === 'fill' || c.method === 'fillRect');
+    expect(fills.length).toBeGreaterThan(0);
+    for (const f of fills) expect(f.fillStyle).toBe('rgba(15, 12, 25, 0.55)');
+  });
+
+  it('leaves the cells a player\'s own tokens stand on clear, even when unrevealed', () => {
+    const ctx = makeMockCtx();
+    drawFog(ctx, {
+      isGM: false,
+      fogState: null,
+      revealedCells: new Set([0]),
+      exemptCells: new Set([4, 8]),
+      revealOpacity: new Map(),
+    }, viewport3x3);
+    expect(fogged(ctx)).toBe(6);
+  });
+
+  it('player fog never reads the full fog grid, only the revealed set', () => {
+    const ctx = makeMockCtx();
+    drawFog(ctx, {
+      isGM: false,
+      fogState: { fogCols: 3, fogRows: 3, cellPx: 50, revealed: [true, false, false, false, false, false, false, false, true] },
+      revealedCells: null,
+      revealOpacity: new Map(),
+    }, viewport3x3);
+    expect(ctx.calls).toHaveLength(0);
+  });
+
+  // The fade was read only for cells still hidden, while the cells it was
+  // started for were the ones just revealed, so nothing ever faded.
+  it('fades the fog out over a cell a player has just had revealed', () => {
+    const ctx = makeMockCtx();
+    drawFog(ctx, { isGM: false, fogState: null, revealedCells: new Set([4]), revealOpacity: new Map([[4, 0.5]]) }, viewport3x3);
+    expect(fogged(ctx)).toBe(9);
+    expect(ctx.calls.filter((f) => f.method === 'fillRect' && f.fillStyle === 'rgba(15, 12, 25, 0.5)')).toHaveLength(1);
+  });
+
+  it('fades the GM\'s fog out the same way, from its own strength', () => {
+    const ctx = makeMockCtx();
+    drawFog(ctx, {
+      isGM: true,
+      fogState: { fogCols: 3, fogRows: 3, cellPx: 50, revealed: [true, false, false, false, false, false, false, false, true] },
+      revealedCells: null,
+      revealOpacity: new Map([[0, 0.5]]),
+    }, viewport3x3);
+    expect(fogged(ctx)).toBe(8);
+    expect(ctx.calls.filter((f) => f.method === 'fillRect' && f.fillStyle === 'rgba(15, 12, 25, 0.275)')).toHaveLength(1);
+  });
+
+  it('draws a hidden cell at full strength whatever the fade holds', () => {
+    const ctx = makeMockCtx();
+    drawFog(ctx, { isGM: false, fogState: null, revealedCells: new Set([4]), revealOpacity: new Map([[0, 0.5]]) }, viewport3x3);
+    expect(count(ctx, 'fillRect')).toBe(0);
+    expect(ctx.calls.filter((c) => c.method === 'fill').map((c) => c.fillStyle)).toEqual(['rgba(15, 12, 25, 1)']);
+  });
+
+  it('GM fog uses the full fog grid, not revealedCells', () => {
+    const ctx = makeMockCtx();
+    drawFog(ctx, {
+      isGM: true,
+      fogState: { fogCols: 3, fogRows: 3, cellPx: 50, revealed: [true, false, false, false, false, false, false, false, true] },
+      revealedCells: null,
+      revealOpacity: new Map(),
+    }, viewport3x3);
+    expect(fogged(ctx)).toBe(7);
+  });
+});
+
+describe('drawTokens', () => {
+  it('pog tokens clip to a circle before drawing the image', () => {
+    const ctx = makeMockCtx();
+    drawTokens(ctx, baseTokenState({
+      tokens: [makeToken('a')],
+      tokenImages: new Map([['a', fakeImage]]),
+    }), viewport3x3);
+
+    const seq = methods(ctx);
+    const arcIdx = seq.indexOf('arc');
+    const clipIdx = seq.indexOf('clip');
+    const drawIdx = seq.indexOf('drawImage');
+    expect(arcIdx).toBeGreaterThanOrEqual(0);
+    expect(clipIdx).toBeGreaterThan(arcIdx);
+    expect(drawIdx).toBeGreaterThan(clipIdx);
+  });
+
+  // Someone else is carrying it: drawn where the frames put it, while the
+  // position that sight and explored memory read stays where it was.
+  it('draws a token someone is carrying where it is held', () => {
+    const firstArcX = (heldAt: Record<string, { x: number; y: number }>) => {
+      const ctx = makeMockCtx();
+      drawTokens(ctx, baseTokenState({ tokens: [makeToken('a')], tokenImages: new Map([['a', fakeImage]]), heldAt }), viewport3x3);
+      return ctx.calls.find((c) => c.method === 'arc')?.args[0];
+    };
+    expect(firstArcX({})).toBe(25);
+    expect(firstArcX({ a: { x: 2, y: 0 } })).toBe(125);
+  });
+
+  it('full-art tokens clip to a rounded rect, not a circle', () => {
+    const ctx = makeMockCtx();
+    drawTokens(ctx, baseTokenState({
+      tokens: [makeToken('a', { displayMode: 'full-art' } as Partial<Token>)],
+      tokenImages: new Map([['a', fakeImage]]),
+    }), viewport3x3);
+
+    const seq = methods(ctx);
+    expect(seq.indexOf('roundRect')).toBeGreaterThanOrEqual(0);
+    expect(seq.indexOf('clip')).toBeGreaterThan(seq.indexOf('roundRect'));
+    expect(count(ctx, 'drawImage')).toBe(1);
+  });
+
+  it('an obscured token is a plain shape with a question mark, even when its art is cached', () => {
+    // A player receives it with no image address, as a plain creature with no
+    // disposition. The GM's preview holds the real art under the same id, so
+    // the address decides, not the cache.
+    const veiled = makeToken('v', { obscured: true, name: '', imageUrl: '', type: TokenType.NPC, disposition: null });
+    const ctx = makeMockCtx();
+    drawTokens(ctx, baseTokenState({ tokens: [veiled], tokenImages: new Map([['v', fakeImage]]), isGM: false }), viewport3x3);
+    expect(count(ctx, 'drawImage')).toBe(0);
+    expect(ctx.calls.filter((c) => c.method === 'fillText' && c.args[0] === '?')).toHaveLength(1);
+    expect(placeholderColor(veiled)).toBe(hueColour(TOKEN_HUES.object));
+  });
+
+  it('keeps an obscured token\'s own colour for the GM, who sees it as it is', () => {
+    // The grey the table sees comes from the mask (no kind, no disposition),
+    // not from the flag, so the GM's lettered circle stays blue for a
+    // character and red for a hostile.
+    expect(placeholderColor(makeToken('v', { obscured: true, type: TokenType.PLAYER }))).toBe(hueColour(TOKEN_HUES.player));
+    expect(placeholderColor(makeToken('v', { obscured: true, type: TokenType.NPC, disposition: TokenDisposition.HOSTILE }))).toBe(hueColour(TOKEN_HUES.hostile));
+  });
+
+  it('draws the drag ghost from cached art only when the token has an address', () => {
+    // In Player Preview the dragged token is the masked one, whose id the
+    // GM's image cache still holds under the real art.
+    const veiled = makeToken('v', { obscured: true, name: '', imageUrl: '' });
+    const ctx = makeMockCtx();
+    drawTokens(ctx, baseTokenState({
+      tokens: [veiled], tokenImages: new Map([['v', fakeImage]]), isGM: false,
+      draggedToken: veiled, heldDrawnAt: { x: 1, y: 1 },
+    }), viewport3x3);
+    expect(count(ctx, 'drawImage')).toBe(0);
+    expect(ctx.calls.filter((c) => c.method === 'fillText' && c.args[0] === '?').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('marks an obscured token for the GM, who still sees its art', () => {
+    const veiled = makeToken('v', { obscured: true, imageUrl: '/api/assets/tokens/v' });
+    const ctx = makeMockCtx();
+    drawTokens(ctx, baseTokenState({ tokens: [veiled], tokenImages: new Map([['v', fakeImage]]), isGM: true }), viewport3x3);
+    expect(count(ctx, 'drawImage')).toBe(1);
+    expect(ctx.calls.filter((c) => c.method === 'fillText' && c.args[0] === '?')).toHaveLength(1);
+
+    const plain = makeMockCtx();
+    drawTokens(plain, baseTokenState({ tokens: [makeToken('p', { imageUrl: '/api/assets/tokens/p' })], tokenImages: new Map([['p', fakeImage]]), isGM: true }), viewport3x3);
+    expect(plain.calls.filter((c) => c.method === 'fillText' && c.args[0] === '?')).toHaveLength(0);
+  });
+
+  it('players never see hidden tokens; the GM sees them', () => {
+    const hidden = makeToken('h', { visible: false });
+    const images = new Map([['h', fakeImage]]);
+
+    const playerCtx = makeMockCtx();
+    drawTokens(playerCtx, baseTokenState({ tokens: [hidden], tokenImages: images, isGM: false }), viewport3x3);
+    expect(count(playerCtx, 'drawImage')).toBe(0);
+
+    const gmCtx = makeMockCtx();
+    drawTokens(gmCtx, baseTokenState({ tokens: [hidden], tokenImages: images, isGM: true }), viewport3x3);
+    expect(count(gmCtx, 'drawImage')).toBe(1);
+  });
+
+  it('fog hides other tokens from players but never their own', () => {
+    // Token at (0,0) on a 3×3 map → fog row 2, col 0 → index 6. Not revealed.
+    const token = makeToken('a');
+    const images = new Map([['a', fakeImage]]);
+    const revealedCells = new Set<number>(); // nothing revealed
+
+    const strangerCtx = makeMockCtx();
+    drawTokens(strangerCtx, baseTokenState({
+      tokens: [token], tokenImages: images, revealedCells, isOwnToken: () => false,
+    }), viewport3x3);
+    expect(count(strangerCtx, 'drawImage')).toBe(0);
+
+    const ownerCtx = makeMockCtx();
+    drawTokens(ownerCtx, baseTokenState({
+      tokens: [token], tokenImages: images, revealedCells, isOwnToken: () => true,
+    }), viewport3x3);
+    expect(count(ownerCtx, 'drawImage')).toBe(1);
+  });
+
+  it('tokens without images get a lettered placeholder circle', () => {
+    const ctx = makeMockCtx();
+    drawTokens(ctx, baseTokenState({ tokens: [makeToken('a', { name: 'Goblin' })] }), viewport3x3);
+    expect(count(ctx, 'fillText')).toBe(1);
+    expect(ctx.calls.find((c) => c.method === 'fillText')?.args[0]).toBe('G');
+  });
+
+  it('badges a condition named like a property every object has by its first two letters', () => {
+    // The badge table was read as a plain object, so these found Object and
+    // its prototype, neither of them text.
+    const ctx = makeMockCtx();
+    drawTokens(ctx, baseTokenState({
+      tokens: [makeToken('a', { name: 'Goblin', conditions: ['constructor', '__proto__', 'Prone'] })],
+    }), viewport3x3);
+    const texts = ctx.calls.filter((c) => c.method === 'fillText').map((c) => c.args[0]);
+    expect(texts).toEqual(['G', 'CO', '__', 'PR']);
+  });
+
+  // ── Turn highlight ───────────────────────────────────────────────────────
+  // A plain NPC token with no disposition, HP, conditions or hover draws no
+  // strokes at all, so stroke count isolates the turn ring: 2 (casing + core).
+
+  describe('turn highlight', () => {
+    /** Radii of every arc drawn, in call order. */
+    function arcRadii(ctx: MockCtx): number[] {
+      return ctx.calls.filter((c) => c.method === 'arc').map((c) => c.args[2] as number);
+    }
+
+    it('rings only the token whose turn it is', () => {
+      const ctx = makeMockCtx();
+      drawTokens(ctx, baseTokenState({
+        tokens: [makeToken('a'), makeToken('b'), makeToken('c')],
+        currentTurnTokenId: 'b',
+      }), viewport3x3);
+
+      expect(count(ctx, 'stroke')).toBe(2);
+    });
+
+    it('draws no ring when combat is inactive', () => {
+      const ctx = makeMockCtx();
+      drawTokens(ctx, baseTokenState({
+        tokens: [makeToken('a'), makeToken('b')],
+        currentTurnTokenId: null,
+      }), viewport3x3);
+
+      expect(count(ctx, 'stroke')).toBe(0);
+    });
+
+    it('draws no ring when the acting token is not on this map', () => {
+      // Combat is keyed by campaign, not map — after a map switch the id can
+      // reference a token that is no longer drawn.
+      const ctx = makeMockCtx();
+      drawTokens(ctx, baseTokenState({
+        tokens: [makeToken('a')],
+        currentTurnTokenId: 'gone',
+      }), viewport3x3);
+
+      expect(count(ctx, 'stroke')).toBe(0);
+    });
+
+    it('never reveals an acting token the player cannot see', () => {
+      // The leak case: a GM-hidden ambusher takes its turn. The ring must be
+      // skipped by the same guard that skips the token, or it betrays them.
+      const hidden = makeToken('h', { visible: false });
+
+      const playerCtx = makeMockCtx();
+      drawTokens(playerCtx, baseTokenState({
+        tokens: [hidden], currentTurnTokenId: 'h', isGM: false,
+      }), viewport3x3);
+      expect(count(playerCtx, 'stroke')).toBe(0);
+
+      const gmCtx = makeMockCtx();
+      drawTokens(gmCtx, baseTokenState({
+        tokens: [hidden], currentTurnTokenId: 'h', isGM: true,
+      }), viewport3x3);
+      expect(count(gmCtx, 'stroke')).toBe(2);
+    });
+
+    it('never reveals an acting token hidden by fog', () => {
+      // Token at (0,0) on a 3×3 map → fog index 6, unrevealed.
+      const ctx = makeMockCtx();
+      drawTokens(ctx, baseTokenState({
+        tokens: [makeToken('a')],
+        currentTurnTokenId: 'a',
+        revealedCells: new Set<number>(),
+        isOwnToken: () => false,
+      }), viewport3x3);
+
+      expect(count(ctx, 'stroke')).toBe(0);
+    });
+
+    it('sits outside the token edge, clear of the disposition ring', () => {
+      const ctx = makeMockCtx();
+      drawTokens(ctx, baseTokenState({
+        tokens: [makeToken('a')],
+        currentTurnTokenId: 'a',
+        pulsePhase: 0,
+      }), viewport3x3);
+
+      // 1×1 token on a 50px grid → radius 25. The disposition ring reaches
+      // radius + 4.5; the turn ring starts 8px out at the tightest breath.
+      const ringRadii = arcRadii(ctx).filter((r) => r > 25);
+      expect(ringRadii).toEqual([33, 33]);
+    });
+
+    it('breathes outward as the pulse advances', () => {
+      const tight = makeMockCtx();
+      drawTokens(tight, baseTokenState({
+        tokens: [makeToken('a')], currentTurnTokenId: 'a', pulsePhase: 0,
+      }), viewport3x3);
+
+      const wide = makeMockCtx();
+      drawTokens(wide, baseTokenState({
+        tokens: [makeToken('a')], currentTurnTokenId: 'a', pulsePhase: 1,
+      }), viewport3x3);
+
+      expect(Math.max(...arcRadii(wide))).toBeGreaterThan(Math.max(...arcRadii(tight)));
+    });
+
+    it('follows the token shape — rounded rect for full-art', () => {
+      const ctx = makeMockCtx();
+      drawTokens(ctx, baseTokenState({
+        tokens: [makeToken('a', { displayMode: 'full-art' } as Partial<Token>)],
+        currentTurnTokenId: 'a',
+      }), viewport3x3);
+
+      // No image, so the placeholder still draws its circle; the ring itself
+      // must be the two rounded rects, not arcs.
+      expect(count(ctx, 'roundRect')).toBe(2);
+      expect(count(ctx, 'stroke')).toBe(2);
+    });
+  });
+
+  // ── Tracker-hover highlight ──────────────────────────────────────────────
+
+  describe('tracker-hover highlight', () => {
+    function arcRadii(ctx: MockCtx): number[] {
+      return ctx.calls.filter((c) => c.method === 'arc').map((c) => c.args[2] as number);
+    }
+
+    it('rings and washes only the pointed-at token', () => {
+      const peeked = makeMockCtx();
+      drawTokens(peeked, baseTokenState({
+        tokens: [makeToken('a'), makeToken('b')],
+        peekTokenId: 'b',
+      }), viewport3x3);
+
+      const plain = makeMockCtx();
+      drawTokens(plain, baseTokenState({
+        tokens: [makeToken('a'), makeToken('b')],
+      }), viewport3x3);
+
+      expect(count(peeked, 'stroke')).toBe(2); // casing + core
+      // Exactly one extra fill: the wash over the pointed-at token
+      expect(count(peeked, 'fill')).toBe(count(plain, 'fill') + 1);
+    });
+
+    it('draws nothing when no row is hovered', () => {
+      const ctx = makeMockCtx();
+      drawTokens(ctx, baseTokenState({
+        tokens: [makeToken('a')], peekTokenId: null,
+      }), viewport3x3);
+
+      expect(count(ctx, 'stroke')).toBe(0);
+    });
+
+    it('never reveals a token the player cannot see', () => {
+      // Hovering a hidden ambusher's row must not give its position away.
+      const hidden = makeToken('h', { visible: false });
+
+      const playerCtx = makeMockCtx();
+      drawTokens(playerCtx, baseTokenState({
+        tokens: [hidden], peekTokenId: 'h', isGM: false,
+      }), viewport3x3);
+      expect(count(playerCtx, 'stroke')).toBe(0);
+
+      const gmCtx = makeMockCtx();
+      drawTokens(gmCtx, baseTokenState({
+        tokens: [hidden], peekTokenId: 'h', isGM: true,
+      }), viewport3x3);
+      expect(count(gmCtx, 'stroke')).toBe(2);
+    });
+
+    it('sits outside the turn ring so both can show at once', () => {
+      const ctx = makeMockCtx();
+      drawTokens(ctx, baseTokenState({
+        tokens: [makeToken('a')],
+        currentTurnTokenId: 'a',
+        peekTokenId: 'a',
+        pulsePhase: 1, // turn ring at its widest — the tightest case
+      }), viewport3x3);
+
+      // Four strokes: turn casing + core, then peek casing + core
+      expect(count(ctx, 'stroke')).toBe(4);
+
+      // radius 25. Turn ring at its widest reaches 25+11+3 = 39 outer edge;
+      // the peek ring's casing starts at 25+17-2 = 40. No overlap.
+      const rings = arcRadii(ctx).filter((r) => r > 25);
+      expect(rings).toEqual([36, 36, 42, 42]);
+    });
+  });
+});
+
+describe('the selection ring', () => {
+  function arcRadii(ctx: MockCtx): number[] {
+    return ctx.calls.filter((c) => c.method === 'arc').map((c) => c.args[2] as number);
+  }
+
+  it('rings only the selected token, dashed so it reads apart from the other rings', () => {
+    const ctx = makeMockCtx();
+    drawTokens(ctx, baseTokenState({
+      tokens: [makeToken('a'), makeToken('b', { position: { x: 2, y: 0 } })],
+      selectedTokenId: 'b',
+    }), viewport3x3);
+
+    expect(count(ctx, 'stroke')).toBe(2); // casing + core
+    expect(ctx.calls.some((c) => c.method === 'setLineDash' && (c.args[0] as number[]).length > 0)).toBe(true);
+    // Around b, whose centre is (125, 125) on a 3-square map.
+    const ring = ctx.calls.filter((c) => c.method === 'arc' && (c.args[2] as number) > 25);
+    expect(ring.map((c) => [c.args[0], c.args[1]])).toEqual([[125, 125], [125, 125]]);
+  });
+
+  it('draws nothing with no token selected', () => {
+    const ctx = makeMockCtx();
+    drawTokens(ctx, baseTokenState({ tokens: [makeToken('a')] }), viewport3x3);
+
+    expect(count(ctx, 'stroke')).toBe(0);
+  });
+
+  it('sits outside the turn ring and the tracker ring, so all three show at once', () => {
+    const ctx = makeMockCtx();
+    drawTokens(ctx, baseTokenState({
+      tokens: [makeToken('a')],
+      currentTurnTokenId: 'a',
+      peekTokenId: 'a',
+      selectedTokenId: 'a',
+      pulsePhase: 1,
+    }), viewport3x3);
+
+    expect(count(ctx, 'stroke')).toBe(6);
+    // The tracker ring's casing reaches 25+17+2 = 44; the selection's starts at 25+23-2 = 46.
+    expect(arcRadii(ctx).filter((r) => r > 25)).toEqual([36, 36, 42, 42, 48, 48]);
+  });
+
+  it('never shows where a token the player cannot see stands', () => {
+    const hidden = makeToken('h', { visible: false });
+    const fogged = makeToken('f', { position: { x: 2, y: 2 } });
+
+    const ctx = makeMockCtx();
+    drawTokens(ctx, baseTokenState({ tokens: [hidden], selectedTokenId: 'h' }), viewport3x3);
+    expect(count(ctx, 'stroke')).toBe(0);
+
+    // Fogged: only the middle cell (4) is revealed, and f stands in the top-right corner.
+    const inFog = makeMockCtx();
+    drawTokens(inFog, baseTokenState({ tokens: [fogged], selectedTokenId: 'f', revealedCells: new Set([4]) }), viewport3x3);
+    expect(count(inFog, 'stroke')).toBe(0);
+  });
+
+  it('follows a held token on its ghost, which faces the way the token now faces', () => {
+    const held = makeToken('a', { rotation: 0 });
+    const ctx = makeMockCtx() as MockCtx & { rotate: (r: number) => void };
+    ctx.rotate = (r: number) => { ctx.calls.push({ method: 'rotate', args: [r] }); };
+    drawTokens(ctx, baseTokenState({
+      // The store has turned it since it was picked up.
+      tokens: [{ ...held, rotation: 90 }],
+      draggedToken: held,
+      heldDrawnAt: { x: 1, y: 1 },
+      selectedTokenId: 'a',
+    }), viewport3x3);
+
+    const rotations = ctx.calls.filter((c) => c.method === 'rotate').map((c) => c.args[0] as number);
+    expect(rotations).toHaveLength(1);
+    expect(rotations[0]).toBeCloseTo(Math.PI / 2);
+    // The ghost stands on the middle square, centre (75, 75), and carries the ring.
+    const ring = ctx.calls.filter((c) => c.method === 'arc' && (c.args[2] as number) > 25);
+    expect(ring.map((c) => [c.args[0], c.args[1], c.args[2]])).toEqual([[75, 75, 48], [75, 75, 48]]);
+  });
+});
+
+describe('a held token', () => {
+  /** Each arc drawn, with the opacity it was drawn at. */
+  function recordArcs(ctx: MockCtx): Array<{ x: number; y: number; r: number; alpha: number }> {
+    const arcs: Array<{ x: number; y: number; r: number; alpha: number }> = [];
+    const record = ctx.arc.bind(ctx);
+    ctx.arc = (x: number, y: number, r: number, start: number, end: number, ccw?: boolean) => {
+      arcs.push({ x, y, r, alpha: ctx.globalAlpha });
+      record(x, y, r, start, end, ccw);
+    };
+    return arcs;
+  }
+
+  // A finger has lifted, or a pen has gone out of range: no pointer is over
+  // the map, and the held token was not drawn at all.
+  it('is drawn faded on its own square while no pointer carries it', () => {
+    const held = makeToken('a', { position: { x: 2, y: 0 } });
+    const ctx = makeMockCtx();
+    const arcs = recordArcs(ctx);
+    drawTokens(ctx, baseTokenState({ tokens: [held], draggedToken: held, heldDrawnAt: { x: 2, y: 0 } }), viewport3x3);
+
+    // Square (2, 0) is the bottom-right corner, centre (125, 125).
+    expect(arcs).toEqual([{ x: 125, y: 125, r: 25, alpha: 0.6 }]);
+    expect(count(ctx, 'stroke')).toBe(0);
+  });
+
+  it('carries the selection ring there when it is selected', () => {
+    const held = makeToken('a', { position: { x: 2, y: 0 } });
+    const ctx = makeMockCtx();
+    const arcs = recordArcs(ctx);
+    drawTokens(ctx, baseTokenState({ tokens: [held], draggedToken: held, heldDrawnAt: { x: 2, y: 0 }, selectedTokenId: 'a' }), viewport3x3);
+
+    expect(arcs.map(({ x, y, r }) => [x, y, r])).toEqual([[125, 125, 25], [125, 125, 48], [125, 125, 48]]);
+    expect(count(ctx, 'stroke')).toBe(2);
+  });
+
+  it('is drawn once, as the faded copy, and nowhere else', () => {
+    const held = makeToken('a', { position: { x: 2, y: 0 } });
+    const ctx = makeMockCtx();
+    const arcs = recordArcs(ctx);
+    drawTokens(ctx, baseTokenState({ tokens: [held], draggedToken: held, heldDrawnAt: { x: 0, y: 2 } }), viewport3x3);
+
+    expect(arcs).toEqual([{ x: 25, y: 25, r: 25, alpha: 0.6 }]);
+  });
+});
+
+describe('drawWalls', () => {
+  const wall: WallSegment = { id: 'w1', x1: 0, y1: 0, x2: 100, y2: 0, type: 'wall' };
+  const door: WallSegment = { id: 'd1', x1: 100, y1: 0, x2: 150, y2: 0, type: 'door-closed' };
+
+  function wallsState(overrides: Record<string, unknown> = {}) {
+    return {
+      wallSegments: [wall, door],
+      isGM: false,
+      wallColor: '#ff6600',
+      hoveredWallId: null,
+      selectedWallIds: new Set<string>(),
+      hoveredDoorId: null,
+      showEndpoints: false,
+      dragEndpoint: null,
+      selectedEndpoint: null,
+      lightingEnabled: false,
+      canSee: () => true,
+      ...overrides,
+    };
+  }
+
+  it('players with lighting OFF see doors AND wall outlines', () => {
+    const ctx = makeMockCtx();
+    drawWalls(ctx, wallsState(), viewport3x3);
+    // Two segments drawn: one moveTo/lineTo pair each, plus the door indicator arc
+    expect(count(ctx, 'moveTo')).toBe(2);
+    expect(count(ctx, 'arc')).toBe(1); // closed-door center dot
+  });
+
+  it('players with lighting ON see no doors they cannot see (the rule says so)', () => {
+    const ctx = makeMockCtx();
+    drawWalls(ctx, wallsState({ lightingEnabled: true, canSee: () => false }), viewport3x3);
+    // Door filtered by the rule; walls not drawn under lighting
+    expect(count(ctx, 'moveTo')).toBe(0);
+  });
+
+  it('players with lighting ON see a door the rule says they can see', () => {
+    const ctx = makeMockCtx();
+    drawWalls(ctx, wallsState({ lightingEnabled: true, canSee: () => true }), viewport3x3);
+    expect(count(ctx, 'arc')).toBe(1); // the closed-door dot
+  });
+
+  it('GM sees all segments and endpoint nodes while a wall tool is active', () => {
+    const ctx = makeMockCtx();
+    drawWalls(ctx, wallsState({ isGM: true, showEndpoints: true }), viewport3x3);
+    // 2 segments + 3 unique endpoints (100,0 shared junction)
+    expect(count(ctx, 'moveTo')).toBeGreaterThanOrEqual(2);
+    expect(count(ctx, 'arc')).toBe(1 + 3); // door dot + 3 endpoint nodes
+  });
+});
+
+describe('drawSpiritLayer', () => {
+  const base = {
+    spiritLayerImage: fakeImage,
+    spiritLayerOpacity: 1,
+    spiritActive: true,
+    isInSpiritRealm: true,
+    isGM: false,
+    gmViewBothPlanes: true,
+  };
+
+  it('draws for a player in the spirit realm', () => {
+    const ctx = makeMockCtx();
+    drawSpiritLayer(ctx, base, viewport3x3);
+    expect(count(ctx, 'drawImage')).toBe(1);
+  });
+
+  it('does not draw for a player outside the spirit realm', () => {
+    const ctx = makeMockCtx();
+    drawSpiritLayer(ctx, { ...base, spiritActive: false, isInSpiritRealm: false }, viewport3x3);
+    expect(count(ctx, 'drawImage')).toBe(0);
+  });
+
+  it('GM in dual-plane mode sees a ghost hint even when spirit is inactive', () => {
+    const ctx = makeMockCtx();
+    drawSpiritLayer(ctx, { ...base, isGM: true, spiritActive: false, isInSpiritRealm: false }, viewport3x3);
+    expect(count(ctx, 'drawImage')).toBe(1);
+  });
+});
+
+describe('computeVisionState', () => {
+  it('computes token centers in canvas coordinates (grid-Y flipped)', () => {
+    const token = makeToken('a', { position: { x: 0, y: 0 }, sightRadius: 2 } as Partial<Token>);
+    const vision = computeVisionState([token], [], [], viewport3x3);
+    expect(vision.tokenVision).toHaveLength(1);
+    // Token at bottom-left cell → center (25, (3 - 0 - 0.5) * 50 = 125)
+    expect(vision.tokenVision[0].cx).toBe(25);
+    expect(vision.tokenVision[0].cy).toBe(125);
+    expect(vision.tokenVision[0].poly.points.length).toBeGreaterThan(2);
+  });
+
+  it('keeps every per-token list index-aligned with the tokens it was given', () => {
+    // The canvas pairs tokens with their sight and vision entries by index to
+    // build the viewers the visibility rule reads.
+    const a = makeToken('a', { position: { x: 0, y: 0 }, sightRadius: 2 } as Partial<Token>);
+    const b = makeToken('b', { position: { x: 2, y: 2 }, sightRadius: 0 } as Partial<Token>);
+    const vision = computeVisionState([a, b], [], [], viewport3x3);
+    expect(vision.tokenSight).toHaveLength(2);
+    expect(vision.tokenVision).toHaveLength(2);
+    expect(vision.tokenSight[0].cx).toBe(vision.tokenVision[0].cx);
+    expect(vision.tokenSight[1].cx).toBe(vision.tokenVision[1].cx);
+    expect(vision.tokenVision[0].poly.points.length).toBeGreaterThan(2); // has darkvision
+    expect(vision.tokenVision[1].poly.points).toHaveLength(0);           // has none
+  });
+});
+
+/**
+ * Dynamic lighting: what a light is allowed to reveal.
+ *
+ * Each light is clipped to its own visibility polygon, which gives it wall
+ * shadows — but that only says where the light falls, not who can see where it
+ * falls. Adding it straight to the coverage mask meant every lit patch anywhere
+ * was subtracted from the fog, so a lamp inside a sealed room lit that room for
+ * a player standing outside it, and the server sent them the creatures in it.
+ *
+ * The light layer is therefore intersected with the viewer's line of sight
+ * before it joins the mask. These pin that the intersection happens at all,
+ * which a refactor could otherwise drop in silence.
+ */
+describe('drawDynamicLighting', () => {
+  interface OpCall { method: string; op: string; fillStyle: string; filter: string; src?: unknown; args: unknown[] }
+
+  /**
+   * A context that records the composite operation and fill style in force at
+   * each call, what each drawImage draws from, and every radial gradient made.
+   */
+  function makeOpRecorder(): { ctx: CanvasRenderingContext2D; ops: OpCall[]; gradients: number[][] } {
+    const ops: OpCall[] = [];
+    const gradients: number[][] = [];
+    const gradient = { addColorStop: () => {} };
+    const ctx = {
+      globalCompositeOperation: 'source-over',
+      fillStyle: '', filter: 'none', globalAlpha: 1, imageSmoothingEnabled: true,
+      createRadialGradient: (...args: number[]) => { gradients.push(args); return gradient; },
+    } as unknown as CanvasRenderingContext2D & { globalCompositeOperation: string; fillStyle: string; filter: string };
+    for (const m of ['save', 'restore', 'beginPath', 'closePath', 'moveTo', 'lineTo', 'rect',
+      'arc', 'fill', 'clip', 'fillRect', 'clearRect', 'drawImage', 'setTransform', 'translate', 'scale']) {
+      (ctx as unknown as Record<string, unknown>)[m] = (...args: unknown[]) =>
+        ops.push({ method: m, op: ctx.globalCompositeOperation, fillStyle: String(ctx.fillStyle), filter: String(ctx.filter), src: args[0], args });
+    }
+    return { ctx, ops, gradients };
+  }
+
+  /** A holder whose canvas is already the right size, so ensureCanvas reuses it. */
+  const holderFor = (ctx: CanvasRenderingContext2D, w: number, h: number) => ({
+    current: { width: w, height: h, getContext: () => ctx } as unknown as HTMLCanvasElement,
+  });
+
+  const viewport: Viewport = { zoom: 1, panOffset: { x: 0, y: 0 }, gridSize: 50, mapWidth: 3, mapHeight: 3 };
+  const W = 150, H = 150;
+  const light = { id: 'l1', x: 75, y: 75, brightRadius: 1, dimRadius: 2, color: '#ffaa00', enabled: true };
+
+  function run(opts: {
+    withLight: boolean; globalIllumination?: boolean; sightRadius?: number; noTokens?: boolean; withMemory?: boolean;
+    /** The screen's pixel ratio, and the view; 1 and the plain view by default. */
+    dpr?: number; view?: Pick<Viewport, 'zoom' | 'panOffset'>;
+  }) {
+    const at: Viewport = { ...viewport, ...opts.view };
+    const main = makeOpRecorder();
+    const lighting = makeOpRecorder();
+    const coverage = makeOpRecorder();
+    const lightOnly = makeOpRecorder();
+    const memoryMask = makeOpRecorder();
+    const memory = makeOpRecorder();
+    const explored = opts.withMemory ? ({ width: 3, height: 3 } as unknown as HTMLCanvasElement) : null;
+    const terrainCanvas = { width: W, height: H } as unknown as HTMLCanvasElement;
+
+    const token = makeToken('a', { sightRadius: opts.sightRadius ?? 0 } as Partial<Token>);
+    const myTokens = opts.noTokens ? [] : [token];
+    const gi = opts.globalIllumination ?? false;
+    const vision = computeVisionState(myTokens, opts.withLight ? [light] : [], [], at, { globalIllumination: gi });
+
+    const lightHolder = holderFor(lightOnly.ctx, W, H);
+    const coverageHolder = holderFor(coverage.ctx, W, H);
+    drawDynamicLighting(main.ctx, {
+      myTokens,
+      enabledLights: opts.withLight ? [light] : [],
+      tokenVision: vision.tokenVision,
+      tokenSight: vision.tokenSight,
+      lightVision: vision.lightVision,
+      globalIllumination: gi,
+      lightingCanvas: holderFor(lighting.ctx, W, H),
+      coverageCanvas: coverageHolder,
+      lightCanvas: lightHolder,
+      explored,
+      terrainCanvas,
+      memoryMaskCanvas: holderFor(memoryMask.ctx, W, H),
+      memoryCanvas: holderFor(memory.ctx, W, H),
+      dpr: opts.dpr ?? 1,
+      compositeCache: { current: null },
+    }, at);
+
+    return { main, lighting, lightOnly, coverage, memoryMask, memory, explored, lightCanvas: lightHolder.current, coverageCanvas: coverageHolder.current };
+  }
+
+  // Remembered ground out of sight is dimmed by the memory pass, so it comes
+  // out of the darkness. Ground in sight is remembered too, though, and taking
+  // all of it out left dim light as clear as bright on any map that remembers:
+  // the darkness is cut by the explored raster less what is in sight now.
+  it('takes only remembered ground out of sight out of the darkness, so dim light in sight stays dim', () => {
+    const { lighting, lightOnly, explored, lightCanvas, coverageCanvas } = run({ withLight: false, withMemory: true });
+    const cuts = lighting.ops.filter((c) => c.method === 'drawImage' && c.op === 'destination-out');
+    expect(cuts.map((c) => c.src)).toEqual([coverageCanvas, lightCanvas]);
+    expect(lighting.ops.some((c) => c.method === 'drawImage' && c.src === explored)).toBe(false);
+    // The spent light canvas holds the explored raster, less what is in sight.
+    const scratch = lightOnly.ops.filter((c) => c.method === 'drawImage');
+    expect(scratch.filter((c) => c.src === explored && c.op === 'source-over')).toHaveLength(1);
+    expect(scratch.filter((c) => c.src === coverageCanvas && c.op === 'destination-out')).toHaveLength(3);
+  });
+
+  // Hard circles read as stickers on the map; each zone's edge now fades over
+  // a band centred on its radius, so bright blends into dim and dim into dark.
+  it('feathers each light zone into the next with a radial gradient across its edge', () => {
+    const { lightOnly } = run({ withLight: true });
+    // light: bright 1 square (50 px), dim 2 squares (100 px), at (75, 75)
+    const bands = lightOnly.gradients.map(([, , r0, , , r1]) => [r0, r1]);
+    expect(bands).toHaveLength(2);
+    for (const [[r0, r1], radius] of [[bands[0], 100], [bands[1], 50]] as const) {
+      expect(r0).toBeLessThan(radius);
+      expect(r1).toBeGreaterThan(radius);
+      expect((r0 + r1) / 2).toBeCloseTo(radius);
+    }
+  });
+
+  it('draws remembered ground as a grey, darker copy of the terrain, masked to what is out of sight', () => {
+    const { memoryMask, memory, main } = run({ withLight: false, withMemory: true });
+    // explored raster in, current coverage subtracted three times
+    expect(memoryMask.ops.filter((c) => c.method === 'drawImage' && c.op === 'source-over')).toHaveLength(1);
+    expect(memoryMask.ops.filter((c) => c.method === 'drawImage' && c.op === 'destination-out')).toHaveLength(3);
+    // terrain copy, desaturated, darkened, then kept only where the mask is
+    expect(memory.ops.some((c) => c.method === 'drawImage' && c.op === 'source-over')).toBe(true);
+    expect(memory.ops.some((c) => c.method === 'fillRect' && c.op === 'saturation')).toBe(true);
+    expect(memory.ops.some((c) => c.method === 'fillRect' && c.op === 'source-over' && c.fillStyle === 'rgba(15, 12, 25, 0.65)')).toBe(true);
+    expect(memory.ops.some((c) => c.method === 'drawImage' && c.op === 'destination-in')).toBe(true);
+    expect(main.ops.filter((c) => c.method === 'drawImage')).toHaveLength(3); // memory, the darkness, its edges
+  });
+
+  // The memory pass works on screen-sized canvases, whose pixels are the
+  // screen's: its mask is drawn through the same transform as the layers.
+  it('builds the memory mask through the world transform at the screen ratio', () => {
+    const view = { zoom: 1.5, panOffset: { x: 10, y: -4 } };
+    const { memoryMask } = run({ withLight: false, withMemory: true, dpr: 2, view });
+    const transforms = memoryMask.ops.filter((c) => c.method === 'setTransform').map((c) => c.args);
+    expect(transforms).toContainEqual([3, 0, 0, 3, 20, -8]);
+    expect(memoryMask.ops.some((c) => c.method === 'translate' || c.method === 'scale')).toBe(false);
+    // The explored raster and the three subtractions all go through it.
+    const set = memoryMask.ops.findIndex((c) => c.method === 'setTransform' && c.args[0] === 3);
+    const draws = memoryMask.ops.filter((c, i) => c.method === 'drawImage' && i > set);
+    expect(draws).toHaveLength(4);
+  });
+
+  it('builds the memory mask at ratio 1 as translate(pan) then scale(zoom) did', () => {
+    const view = { zoom: 1.5, panOffset: { x: 10, y: -4 } };
+    const { memoryMask } = run({ withLight: false, withMemory: true, dpr: 1, view });
+    const transforms = memoryMask.ops.filter((c) => c.method === 'setTransform').map((c) => c.args);
+    expect(transforms).toContainEqual([1.5, 0, 0, 1.5, 10, -4]);
+  });
+
+  // A canvas filter's length is in the canvas's own pixels.
+  it('softens the darkness edge over 4 CSS pixels at any ratio', () => {
+    const blurAt = (dpr: number) => {
+      const draws = run({ withLight: true, dpr }).main.ops.filter((c) => c.method === 'drawImage' && c.filter.startsWith('blur'));
+      return draws[draws.length - 1]?.filter;
+    };
+    expect([blurAt(1), blurAt(2), blurAt(3)]).toEqual(['blur(4px)', 'blur(8px)', 'blur(12px)']);
+  });
+
+  // The blur faded the darkness into the clear space past the map, so a
+  // player saw a strip of the map's edge on a lit map without fog of war.
+  // A band along the edges, as wide as the blur reaches, is drawn again
+  // unblurred.
+  it('keeps the darkness whole along the map\'s edges, at any zoom', () => {
+    for (const zoom of [1, 0.25]) {
+      const { main, lighting } = run({ withLight: true, view: { zoom, panOffset: { x: 0, y: 0 } } });
+      const ops = main.ops;
+      const blurred = ops.findIndex((c) => c.method === 'drawImage' && c.filter.startsWith('blur'));
+      const sharp = ops.findIndex((c, i) => i > blurred && c.method === 'drawImage' && c.filter === 'none');
+      expect(blurred).toBeGreaterThan(-1);
+      expect(sharp).toBeGreaterThan(blurred);
+      expect((ops[sharp].src as { getContext: () => unknown }).getContext()).toBe(lighting.ctx);
+      // The band: the map's rectangle less one inset by three blur lengths, in map pixels.
+      const band = 12 / zoom;
+      const rects = ops.slice(blurred, sharp).filter((c) => c.method === 'rect').map((c) => c.args);
+      expect(rects).toEqual([[0, 0, W, H], [band, band, Math.max(0, W - 2 * band), Math.max(0, H - 2 * band)]]);
+      expect(ops.slice(blurred, sharp).find((c) => c.method === 'clip')?.args).toEqual(['evenodd']);
+    }
+  });
+
+  // Drawn blurred and then sharp over it, half-dark ground (darkvision, dim
+  // light) was darker in the band than just inside it.
+  it('draws the blurred darkness only inside the band, so each point of it is drawn once', () => {
+    for (const zoom of [1, 0.25]) {
+      const ops = run({ withLight: true, view: { zoom, panOffset: { x: 0, y: 0 } } }).main.ops;
+      const blurred = ops.findIndex((c) => c.method === 'drawImage' && c.filter.startsWith('blur'));
+      const path = ops.slice(0, blurred).map((c) => c.method).lastIndexOf('beginPath');
+      expect(path).toBeGreaterThan(-1);
+      const band = 12 / zoom;
+      const before = ops.slice(path, blurred);
+      expect(before.filter((c) => c.method === 'rect').map((c) => c.args)).toEqual([[band, band, Math.max(0, W - 2 * band), Math.max(0, H - 2 * band)]]);
+      expect(before.some((c) => c.method === 'clip')).toBe(true);
+      expect(before.some((c) => c.method === 'restore')).toBe(false);
+    }
+  });
+
+  it('runs no memory pass when nothing is remembered', () => {
+    const { memoryMask, memory, lighting } = run({ withLight: false });
+    expect(memoryMask.ops).toHaveLength(0);
+    expect(memory.ops).toHaveLength(0);
+    expect(lighting.ops.filter((c) => c.method === 'drawImage' && c.op === 'destination-out')).toHaveLength(1);
+  });
+
+  const fillsAt = (r: { ops: OpCall[] }, alpha: string) =>
+    r.ops.filter((c) => c.method === 'fill' && c.op === 'lighter' && c.fillStyle === `rgba(255, 255, 255, ${alpha})`);
+
+  it('under global illumination, fills the whole line of sight as bright', () => {
+    const { coverage } = run({ withLight: false, globalIllumination: true });
+    expect(fillsAt(coverage, '1').length).toBeGreaterThan(0);
+    expect(fillsAt(coverage, '0.5')).toHaveLength(0);
+  });
+
+  it('with no darkvision, fills only the viewer\'s own square, and as dim', () => {
+    const { coverage } = run({ withLight: false });
+    expect(fillsAt(coverage, '1')).toHaveLength(0);
+    const dim = fillsAt(coverage, '0.5');
+    expect(dim).toHaveLength(1); // the own-square disc
+    expect(coverage.ops.some((c) => c.method === 'arc' && c.op === 'lighter')).toBe(true);
+  });
+
+  it('darkvision fills its reach as dim', () => {
+    const { coverage } = run({ withLight: false, sightRadius: 2 });
+    expect(fillsAt(coverage, '0.5').length).toBeGreaterThanOrEqual(2); // reach polygon + own square
+    expect(fillsAt(coverage, '1')).toHaveLength(0);
+  });
+
+  it('paints the darkness fully opaque', () => {
+    const { lighting } = run({ withLight: true });
+    expect(lighting.ops.some((c) => c.method === 'fillRect' && c.fillStyle === 'rgba(15, 12, 25, 1)')).toBe(true);
+    expect(lighting.ops.some((c) => c.fillStyle === 'rgba(15, 12, 25, 0.95)')).toBe(false);
+  });
+
+  it('with no viewer token, paints everything dark even when lights are on', () => {
+    const { main, coverage } = run({ withLight: true, noTokens: true });
+    expect(main.ops.filter((c) => c.method === 'fillRect' && c.fillStyle === 'rgba(15, 12, 25, 1)')).toHaveLength(1);
+    expect(main.ops.some((c) => c.method === 'drawImage')).toBe(false);
+    expect(coverage.ops).toHaveLength(0);
+  });
+
+  it('intersects the light layer with the viewer line of sight', () => {
+    const { lightOnly } = run({ withLight: true });
+    // The sight-mask union is composited in with the intersection operator.
+    expect(lightOnly.ops.some((c) => c.method === 'drawImage' && c.op === 'destination-in')).toBe(true);
+  });
+
+  it('composites the clipped light layer into the coverage mask', () => {
+    const { coverage } = run({ withLight: true });
+    expect(coverage.ops.some((c) => c.method === 'drawImage')).toBe(true);
+  });
+
+  it('leaves the light layer alone when there are no lights', () => {
+    const { lightOnly } = run({ withLight: false });
+    expect(lightOnly.ops.some((c) => c.method === 'arc')).toBe(false);
+  });
+
+  /**
+   * The three lighting canvases are the size of the map. Safari on an iPhone
+   * or iPad draws no canvas over MAX_BACKING_PIXELS, so on a bigger map they
+   * are made smaller, evenly, and everything drawn from them is drawn at the
+   * map's size.
+   */
+  describe('on a map over the canvas limit', () => {
+    /** Where a drawImage puts its picture: its own size, unless it was given one. */
+    const destination = (c: OpCall) => {
+      const src = c.src as { width: number; height: number };
+      return c.args.length >= 5 ? [c.args[3], c.args[4]] : [src.width, src.height];
+    };
+
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    /** Draws a map of cols by rows squares into holders that start empty. */
+    function drawLarge(cols: number, rows: number, withMemory = true) {
+      const view: Viewport = { zoom: 0.2, panOffset: { x: 0, y: 0 }, gridSize: 50, mapWidth: cols, mapHeight: rows };
+      const made = new Map<HTMLCanvasElement, ReturnType<typeof makeOpRecorder>>();
+      const create = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
+        if (tag !== 'canvas') return create(tag);
+        const rec = makeOpRecorder();
+        const canvas = Object.assign(new EventTarget(), { width: 300, height: 150, getContext: () => rec.ctx }) as unknown as HTMLCanvasElement;
+        made.set(canvas, rec);
+        return canvas;
+      }) as unknown as typeof document.createElement);
+
+      const lamp = { id: 'l1', x: 2500, y: 1700, brightRadius: 4, dimRadius: 8, color: '#ffaa00', enabled: true };
+      const viewer = makeToken('a', { position: { x: 50, y: 34 }, sightRadius: 6 } as Partial<Token>);
+      const vision = computeVisionState([viewer], [lamp], [], view, { globalIllumination: false });
+      const main = makeOpRecorder();
+      const holders = {
+        lightingCanvas: { current: null as HTMLCanvasElement | null },
+        coverageCanvas: { current: null as HTMLCanvasElement | null },
+        lightCanvas: { current: null as HTMLCanvasElement | null },
+      };
+      drawDynamicLighting(main.ctx, {
+        myTokens: [viewer],
+        enabledLights: [lamp],
+        tokenVision: vision.tokenVision,
+        tokenSight: vision.tokenSight,
+        lightVision: vision.lightVision,
+        globalIllumination: false,
+        ...holders,
+        explored: withMemory ? ({ width: cols, height: rows } as unknown as HTMLCanvasElement) : null,
+        terrainCanvas: { width: 1200, height: 800 } as unknown as HTMLCanvasElement,
+        memoryMaskCanvas: { current: null },
+        memoryCanvas: { current: null },
+        dpr: 1,
+        compositeCache: { current: null },
+      }, view);
+
+      const canvases = [holders.lightingCanvas.current!, holders.coverageCanvas.current!, holders.lightCanvas.current!];
+      return { main, canvases, recorders: canvases.map((c) => made.get(c)!), made };
+    }
+
+    it('makes each lighting canvas smaller, evenly, to fit within the limit', () => {
+      // 100 by 68 squares of 50 pixels: 5,000 by 3,400, 17,000,000 pixels.
+      const { canvases } = drawLarge(100, 68);
+      const scale = Math.sqrt(MAX_BACKING_PIXELS / (5000 * 3400));
+      for (const canvas of canvases) {
+        expect([canvas.width, canvas.height]).toEqual([Math.floor(5000 * scale), Math.floor(3400 * scale)]);
+        expect(canvas.width * canvas.height).toBeLessThanOrEqual(MAX_BACKING_PIXELS);
+      }
+    });
+
+    it('draws into each lighting canvas in map pixels, through its scale', () => {
+      const { canvases, recorders } = drawLarge(100, 68);
+      canvases.forEach((canvas, i) => {
+        const transforms = recorders[i].ops.filter((c) => c.method === 'setTransform').map((c) => c.args);
+        expect(transforms).toContainEqual([canvas.width / 5000, 0, 0, canvas.height / 3400, 0, 0]);
+      });
+    });
+
+    it('draws every composite of the lighting canvases at the map size', () => {
+      const { main, canvases, made } = drawLarge(100, 68);
+      const lighting = new Set<unknown>(canvases);
+      const composites = [main, ...made.values()]
+        .flatMap((r) => r.ops)
+        .filter((c) => c.method === 'drawImage' && lighting.has(c.src));
+      // light into coverage, coverage into light, three into the memory mask,
+      // coverage into the darkness, three into the explored cut, the cut into
+      // the darkness, the darkness onto the map, and again along its edges
+      expect(composites).toHaveLength(12);
+      for (const c of composites) expect(destination(c)).toEqual([5000, 3400]);
+    });
+
+    it('leaves the canvases of a map within the limit at the map size', () => {
+      // 80 by 60 squares of 50 pixels: 4,000 by 3,000.
+      const { main, canvases, made } = drawLarge(80, 60);
+      for (const canvas of canvases) expect([canvas.width, canvas.height]).toEqual([4000, 3000]);
+      const lighting = new Set<unknown>(canvases);
+      const composites = [main, ...made.values()]
+        .flatMap((r) => r.ops)
+        .filter((c) => c.method === 'drawImage' && lighting.has(c.src));
+      for (const c of composites) expect(destination(c)).toEqual([4000, 3000]);
+    });
+  });
+
+  /**
+   * The lighting canvases hold the map-space composite: the light, the line
+   * of sight, the coverage and the darkness cut from it. None of it moves
+   * with the view, and the overlay repaints on every pan frame, ping and
+   * ruler step, so it is drawn again only when something it is made from
+   * changes. The memory pass and the darkness on the map follow the view and
+   * are drawn every frame.
+   */
+  describe('the composite cache', () => {
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    const lamp = (over: Partial<LightSource> = {}): LightSource =>
+      ({ id: 'l1', x: 75, y: 75, brightRadius: 1, dimRadius: 2, color: '#ffaa00', enabled: true, ...over }) as LightSource;
+
+    /** A lit scene drawn frame after frame into the same canvases and cache. */
+    function scene() {
+      const main = makeOpRecorder();
+      const lighting = makeOpRecorder();
+      const coverage = makeOpRecorder();
+      const lightOnly = makeOpRecorder();
+      const memoryMask = makeOpRecorder();
+      const memory = makeOpRecorder();
+      const viewer = makeToken('a', { sightRadius: 2 } as Partial<Token>);
+      const light = lamp();
+      const vision = computeVisionState([viewer], [light], [], viewport, { globalIllumination: false });
+      const explored = { width: 3, height: 3 } as unknown as HTMLCanvasElement;
+      const base: Parameters<typeof drawDynamicLighting>[1] = {
+        myTokens: [viewer],
+        enabledLights: [light],
+        tokenVision: vision.tokenVision,
+        tokenSight: vision.tokenSight,
+        lightVision: vision.lightVision,
+        globalIllumination: false,
+        lightingCanvas: holderFor(lighting.ctx, W, H),
+        coverageCanvas: holderFor(coverage.ctx, W, H),
+        lightCanvas: holderFor(lightOnly.ctx, W, H),
+        explored,
+        terrainCanvas: { width: W, height: H } as unknown as HTMLCanvasElement,
+        memoryMaskCanvas: holderFor(memoryMask.ctx, W, H),
+        memoryCanvas: holderFor(memory.ctx, W, H),
+        dpr: 1,
+        compositeCache: { current: null },
+      };
+      const composite = [lighting, coverage, lightOnly];
+      /** The fills made on the lighting canvases so far. */
+      const fills = () => composite.flatMap((r) => r.ops).filter((c) => c.method === 'fill' || c.method === 'fillRect').length;
+      const draw = (patch: Partial<typeof base> = {}, view: Partial<Viewport> = {}) =>
+        drawDynamicLighting(main.ctx, { ...base, ...patch }, { ...viewport, ...view });
+      return { base, draw, fills, main, memoryMask, viewer, light, vision };
+    }
+
+    it('draws the composite once while nothing it is made from changes', () => {
+      const s = scene();
+      s.draw();
+      const first = s.fills();
+      expect(first).toBeGreaterThan(0);
+
+      s.draw({}, { panOffset: { x: 40, y: -10 } });
+      s.draw({}, { zoom: 2 });
+
+      expect(s.fills()).toBe(first);
+    });
+
+    it('still lays the darkness and the remembered ground over the map on every frame', () => {
+      const s = scene();
+      s.draw();
+      s.draw({}, { panOffset: { x: 40, y: -10 } });
+
+      const offscreen = s.base.lightingCanvas.current;
+      // Each frame: the blurred darkness, and its edges again unblurred.
+      expect(s.main.ops.filter((c) => c.method === 'drawImage' && c.src === offscreen)).toHaveLength(4);
+      expect(s.memoryMask.ops.filter((c) => c.method === 'setTransform' && c.args[4] === 40)).toHaveLength(1);
+    });
+
+    // The canvas builds its light list afresh on every frame.
+    it('keeps the composite for a new list of lights with the same values', () => {
+      const s = scene();
+      s.draw();
+      const first = s.fills();
+
+      s.draw({ enabledLights: [lamp()] });
+
+      expect(s.fills()).toBe(first);
+    });
+
+    it.each([
+      ['x', { x: 80 }],
+      ['y', { y: 70 }],
+      ['bright radius', { brightRadius: 1.5 }],
+      ['dim radius', { dimRadius: 3 }],
+    ] as const)('draws the composite again when a light\'s %s changes', (_field, change) => {
+      const s = scene();
+      s.draw();
+      const first = s.fills();
+
+      s.draw({ enabledLights: [lamp(change)] });
+
+      expect(s.fills()).toBeGreaterThan(first);
+    });
+
+    it.each([
+      ['position', { position: { x: 1, y: 0 } }],
+      ['row', { position: { x: 0, y: 1 } }],
+      ['width', { size: { width: 2, height: 1 } }],
+      ['height', { size: { width: 1, height: 2 } }],
+    ] as const)('draws the composite again when a viewer token\'s %s changes', (_field, change) => {
+      const s = scene();
+      s.draw();
+      const first = s.fills();
+
+      s.draw({ myTokens: [{ ...s.viewer, ...change }] });
+
+      expect(s.fills()).toBeGreaterThan(first);
+    });
+
+    it('draws the composite again for a new line of sight, darkvision reach or light reach', () => {
+      const s = scene();
+      s.draw();
+      for (const field of ['tokenSight', 'tokenVision', 'lightVision'] as const) {
+        const before = s.fills();
+        const again = computeVisionState([s.viewer], [s.light], [], viewport, { globalIllumination: false });
+        s.draw({ [field]: again[field] });
+        expect(s.fills()).toBeGreaterThan(before);
+      }
+    });
+
+    it('draws the composite again when Global Illumination or the explored ground changes', () => {
+      const s = scene();
+      s.draw();
+      let before = s.fills();
+      s.draw({ globalIllumination: true });
+      expect(s.fills()).toBeGreaterThan(before);
+
+      before = s.fills();
+      s.draw({ globalIllumination: true, explored: { width: 3, height: 3 } as unknown as HTMLCanvasElement });
+      expect(s.fills()).toBeGreaterThan(before);
+    });
+
+    // 3 by 3 squares of 50, 5 by 5 of 30 and 6 by 6 of 25 are all 150 by 150
+    // pixels: the same canvases and polygons, and only the map is different.
+    // Its height and grid size place the square a viewer always sees.
+    it('draws the composite again for another map or grid size of the same pixel size', () => {
+      const s = scene();
+      s.draw();
+      let before = s.fills();
+      s.draw({}, { mapWidth: 5, mapHeight: 5, gridSize: 30 });
+      expect(s.fills()).toBeGreaterThan(before);
+
+      before = s.fills();
+      s.draw({}, { mapWidth: 6, mapHeight: 6, gridSize: 25 });
+      expect(s.fills()).toBeGreaterThan(before);
+
+      before = s.fills();
+      s.draw({}, { mapWidth: 6, mapHeight: 6, gridSize: 25 });
+      expect(s.fills()).toBe(before);
+    });
+
+    it('draws the composite again into a new set of canvases', () => {
+      const made: Array<ReturnType<typeof makeOpRecorder>> = [];
+      const create = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
+        if (tag !== 'canvas') return create(tag);
+        const rec = makeOpRecorder();
+        made.push(rec);
+        return Object.assign(new EventTarget(), { width: 300, height: 150, getContext: () => rec.ctx });
+      }) as unknown as typeof document.createElement);
+      const s = scene();
+      const builds = () => made.flatMap((r) => r.ops).filter((c) => c.method === 'fill' || c.method === 'fillRect').length + s.fills();
+
+      s.draw();
+      // A map switch drops the canvases.
+      const before = builds();
+      s.base.lightingCanvas.current = null;
+      s.base.coverageCanvas.current = null;
+      s.base.lightCanvas.current = null;
+      s.draw();
+      expect(builds()).toBeGreaterThan(before);
+    });
+
+    // A lost GPU context leaves a canvas blank, and a blank darkness would
+    // show a player the whole map.
+    it('draws the composite again once the browser restores a lost canvas', () => {
+      const create = document.createElement.bind(document);
+      const made: Array<ReturnType<typeof makeOpRecorder>> = [];
+      vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
+        if (tag !== 'canvas') return create(tag);
+        const rec = makeOpRecorder();
+        made.push(rec);
+        return Object.assign(new EventTarget(), { width: 300, height: 150, getContext: () => rec.ctx });
+      }) as unknown as typeof document.createElement);
+      const s = scene();
+      s.base.lightingCanvas.current = null;
+      s.base.coverageCanvas.current = null;
+      s.base.lightCanvas.current = null;
+      const builds = () => made.flatMap((r) => r.ops).filter((c) => c.method === 'fillRect').length;
+
+      s.draw();
+      s.draw();
+      const before = builds();
+      (s.base.coverageCanvas.current as unknown as EventTarget).dispatchEvent(new Event('contextrestored'));
+      s.draw();
+
+      expect(builds()).toBeGreaterThan(before);
+      const after = builds();
+      s.draw();
+      expect(builds()).toBe(after);
+    });
+  });
+});
+
+describe('drawPings', () => {
+  const NOW = 1_000_000;
+
+  function makePing(overrides: Partial<ActivePing> = {}): ActivePing {
+    return {
+      id: 'p1',
+      x: 100,
+      y: 100,
+      name: 'Sarah',
+      color: '#45a8e0',
+      startedAt: NOW,
+      ...overrides,
+    };
+  }
+
+  function pingState(overrides: Partial<PingDrawState> = {}): PingDrawState {
+    return { pings: [], now: NOW, reducedMotion: false, ...overrides };
+  }
+
+  /** Radii of every arc drawn, in call order. */
+  function arcRadii(ctx: MockCtx): number[] {
+    return ctx.calls.filter((c) => c.method === 'arc').map((c) => c.args[2] as number);
+  }
+
+  it('draws nothing when there are no pings', () => {
+    const ctx = makeMockCtx();
+    drawPings(ctx, pingState(), viewport3x3);
+    expect(ctx.calls).toHaveLength(0);
+  });
+
+  it('draws nothing for a ping that has already expired', () => {
+    const ctx = makeMockCtx();
+    drawPings(ctx, pingState({
+      pings: [makePing()],
+      now: NOW + PING_DURATION_MS + 1,
+    }), viewport3x3);
+    expect(ctx.calls).toHaveLength(0);
+  });
+
+  it('draws nothing for a ping timestamped in the future', () => {
+    const ctx = makeMockCtx();
+    drawPings(ctx, pingState({
+      pings: [makePing({ startedAt: NOW + 500 })],
+    }), viewport3x3);
+    expect(ctx.calls).toHaveLength(0);
+  });
+
+  it('strokes each ring twice — dark casing then coloured core', () => {
+    const ctx = makeMockCtx();
+    // Mid-life, so all three rings are in flight
+    drawPings(ctx, pingState({
+      pings: [makePing()],
+      now: NOW + PING_DURATION_MS * 0.5,
+    }), viewport3x3);
+
+    // Rings come in casing/core pairs, plus one stroke outlining the centre dot
+    const strokes = count(ctx, 'stroke');
+    expect(strokes % 2).toBe(1);
+    expect(strokes).toBeGreaterThanOrEqual(3);
+  });
+
+  it('expands the rings outward over the ping lifetime', () => {
+    const early = makeMockCtx();
+    drawPings(early, pingState({ pings: [makePing()], now: NOW + 100 }), viewport3x3);
+
+    const late = makeMockCtx();
+    drawPings(late, pingState({ pings: [makePing()], now: NOW + 900 }), viewport3x3);
+
+    expect(Math.max(...arcRadii(late))).toBeGreaterThan(Math.max(...arcRadii(early)));
+  });
+
+  it('holds the rings still under reduced motion', () => {
+    const early = makeMockCtx();
+    drawPings(early, pingState({
+      pings: [makePing()], now: NOW + 100, reducedMotion: true,
+    }), viewport3x3);
+
+    const late = makeMockCtx();
+    drawPings(late, pingState({
+      pings: [makePing()], now: NOW + 900, reducedMotion: true,
+    }), viewport3x3);
+
+    // Same radius at both times — only the alpha changes
+    expect(Math.max(...arcRadii(late))).toBe(Math.max(...arcRadii(early)));
+    // Still drawn, not skipped
+    expect(count(late, 'stroke')).toBeGreaterThan(0);
+  });
+
+  it('puts the name on a filled pill before writing the text', () => {
+    const ctx = makeMockCtx();
+    drawPings(ctx, pingState({ pings: [makePing({ name: 'Sarah' })] }), viewport3x3);
+
+    const seq = methods(ctx);
+    const pillIdx = seq.lastIndexOf('fill');
+    const textIdx = seq.indexOf('fillText');
+    expect(textIdx).toBeGreaterThan(pillIdx);
+    expect(ctx.calls.find((c) => c.method === 'fillText')?.args[0]).toBe('Sarah');
+  });
+
+  it('omits the label when the sender could not be named', () => {
+    const ctx = makeMockCtx();
+    drawPings(ctx, pingState({ pings: [makePing({ name: '' })] }), viewport3x3);
+    expect(count(ctx, 'fillText')).toBe(0);
+    // The ping itself still draws
+    expect(count(ctx, 'stroke')).toBeGreaterThan(0);
+  });
+
+  it('draws every live ping in the list', () => {
+    const one = makeMockCtx();
+    drawPings(one, pingState({ pings: [makePing({ id: 'a' })] }), viewport3x3);
+
+    const three = makeMockCtx();
+    drawPings(three, pingState({
+      pings: [makePing({ id: 'a' }), makePing({ id: 'b', x: 200 }), makePing({ id: 'c', x: 300 })],
+    }), viewport3x3);
+
+    expect(count(three, 'stroke')).toBe(count(one, 'stroke') * 3);
+  });
+});
+
+describe('drawFogSelection', () => {
+  const fog: FogState = {
+    fogCols: 20, fogRows: 15, cellPx: 50, revealed: new Array(300).fill(false),
+  };
+
+  function fogState(overrides: Partial<FogSelectionState> = {}): FogSelectionState {
+    return { mode: 'fog-reveal', fog, anchor: null, cursor: null, ...overrides };
+  }
+
+  /** Args of every strokeRect / fillRect call. */
+  function rects(ctx: MockCtx, method: 'strokeRect' | 'fillRect'): unknown[][] {
+    return ctx.calls.filter((c) => c.method === method).map((c) => c.args);
+  }
+
+  it('draws nothing before the cursor is over the map', () => {
+    const ctx = makeMockCtx();
+    drawFogSelection(ctx, fogState(), viewport3x3);
+    expect(ctx.calls).toHaveLength(0);
+  });
+
+  it('outlines just the hovered cell when no drag is in progress', () => {
+    const ctx = makeMockCtx();
+    drawFogSelection(ctx, fogState({ cursor: { x: 137, y: 88 } }), viewport3x3);
+
+    // Snapped to the containing cell (col 2, row 1), not the raw cursor
+    expect(rects(ctx, 'strokeRect')).toEqual([[100, 50, 50, 50]]);
+    // No fill and no size readout until a drag starts
+    expect(count(ctx, 'fillRect')).toBe(0);
+    expect(count(ctx, 'fillText')).toBe(0);
+  });
+
+  it('draws nothing when the cursor is off the map', () => {
+    const ctx = makeMockCtx();
+    drawFogSelection(ctx, fogState({ cursor: { x: -10, y: -10 } }), viewport3x3);
+    expect(ctx.calls).toHaveLength(0);
+  });
+
+  it('snaps the dragged box to cell boundaries, not the raw cursor', () => {
+    const ctx = makeMockCtx();
+    drawFogSelection(ctx, fogState({
+      anchor: { x: 137, y: 88 },   // inside col 2, row 1
+      cursor: { x: 233, y: 191 },  // inside col 4, row 3
+    }), viewport3x3);
+
+    expect(rects(ctx, 'fillRect')).toEqual([[100, 50, 150, 150]]);
+    expect(rects(ctx, 'strokeRect')).toEqual([[100, 50, 150, 150]]);
+  });
+
+  it('reports the size in whole squares', () => {
+    const ctx = makeMockCtx();
+    drawFogSelection(ctx, fogState({
+      anchor: { x: 125, y: 175 },  // col 2, row 3
+      cursor: { x: 275, y: 475 },  // col 5, row 9  -> 4 x 7
+    }), viewport3x3);
+
+    expect(ctx.calls.find((c) => c.method === 'fillText')?.args[0]).toBe('4 × 7');
+  });
+
+  it('puts the readout on a filled pill before writing the text', () => {
+    const ctx = makeMockCtx();
+    drawFogSelection(ctx, fogState({
+      anchor: { x: 125, y: 175 }, cursor: { x: 275, y: 475 },
+    }), viewport3x3);
+
+    const seq = methods(ctx);
+    expect(seq.indexOf('fill')).toBeGreaterThan(-1);
+    expect(seq.indexOf('fillText')).toBeGreaterThan(seq.indexOf('fill'));
+  });
+
+  it('draws nothing for a drag entirely off the map', () => {
+    const ctx = makeMockCtx();
+    drawFogSelection(ctx, fogState({
+      anchor: { x: -400, y: -400 }, cursor: { x: -200, y: -200 },
+    }), viewport3x3);
+    expect(count(ctx, 'fillRect')).toBe(0);
+    expect(count(ctx, 'strokeRect')).toBe(0);
+  });
+});
+
+describe('drawLightIcons', () => {
+  const torch: LightSource = { id: 'l1', x: 100, y: 100, brightRadius: 4, dimRadius: 8, color: '#ffcc66', enabled: true };
+  const viewport: Viewport = { zoom: 1, panOffset: { x: 0, y: 0 }, gridSize: 50, mapWidth: 10, mapHeight: 10 };
+
+  it('draws a marker for each light in the GM view', () => {
+    const ctx = makeMockCtx();
+    drawLightIcons(ctx as unknown as CanvasRenderingContext2D, { lights: [torch], selectedLightId: null, lightMode: null, isGM: true }, viewport);
+    expect(ctx.calls.filter((c) => c.method === 'arc')).toHaveLength(1);
+  });
+
+  it('draws nothing in a player view, where a marker would give away every light on the map', () => {
+    // A GM previewing as a token at a projected table is showing the room a player's view.
+    const ctx = makeMockCtx();
+    drawLightIcons(ctx as unknown as CanvasRenderingContext2D, { lights: [torch], selectedLightId: 'l1', lightMode: 'light-select', isGM: false }, viewport);
+    expect(ctx.calls.filter((c) => ['arc', 'fill', 'stroke'].includes(c.method))).toHaveLength(0);
+  });
+});

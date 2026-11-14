@@ -1,0 +1,3131 @@
+// ============================================
+// AdminPage
+//
+// Platform administration — Admin role only.
+// Protected by ProtectedRoute requireRole={PlatformRole.ADMIN} in App.tsx.
+//
+// Tabs: Dashboard | Users | Settings | Activity
+// ============================================
+
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useAssetDelete } from '@/hooks/useAssetDelete';
+import { useLiveConnectionCheck } from '@/hooks/useLiveConnectionCheck';
+import { useNavigate } from 'react-router';
+import {
+  Users,
+  Settings,
+  Activity,
+  BarChart3,
+  ChevronLeft,
+  Copy,
+  Check,
+  Loader2,
+  Trash2,
+  RefreshCw,
+  Search,
+  Shield,
+  Database,
+  FolderOpen,
+  CalendarDays,
+  UserPlus,
+  Wifi,
+  Clock,
+  X,
+  BookUser,
+  Download,
+  HardDrive,
+  Mail,
+  AlertCircle,
+  Layers,
+  Globe,
+  FileText,
+  User as UserIcon,
+  MapPin,
+  FileAudio,
+  Image as ImageIcon,
+  ArrowRightLeft,
+  ChevronRight,
+  Upload,
+  RotateCcw,
+  Palette,
+  LockOpen,
+} from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
+import { copyText } from '@/utils/clipboard';
+import { adminService } from '@/services/admin.service';
+import type {
+  User,
+  AdminListedUser,
+  SystemStats,
+  AdminHealth,
+  AdminSystemSettings,
+  AdminActivityData,
+  AdminOnlineUser,
+  AdminSystemLog,
+  AdminServerConfig,
+  ServerUploadLimits,
+  AdminBackup,
+  Asset,
+  Campaign,
+  DeletionBlocker,
+} from '@/types';
+import { PlatformRole, AssetType, AssetScope } from '@/types';
+import { api, type RestoreReply } from '@/services/api';
+import { useTheme } from '@/contexts/ThemeContext';
+import {
+  PRESET_THEMES,
+  FONT_OPTIONS,
+  applyThemeColors,
+  applyFont,
+} from '@/themes';
+import ThemePicker from '@/components/appearance/ThemePicker';
+import TableSkeleton from '@/components/skeletons/TableSkeleton';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
+import Button from '@/components/ui/Button';
+import { apiErrorMessage, apiErrorStatus, apiDeletionBlockers } from '@/utils/errors';
+import Modal from '@/components/ui/Modal';
+import { ScrollChevrons, scrollFade, useScrollMore } from '@/components/ui/ScrollCue';
+import { cn } from '@/utils/cn';
+import { assetScopeLabel } from '@/utils/assetUrl';
+import DeletionBlockers from '@/components/admin/DeletionBlockers';
+import OrphanedFilesPanel from '@/components/admin/OrphanedFilesPanel';
+import { LogActor, LogChanges } from '@/components/admin/AdminLogDetails';
+import { formatDuration, formatFileSize, formatRelativeTime, type FileSizeOptions } from '@/utils/format';
+import { tabKeyTarget } from '@/utils/tabKeys';
+
+/** The four colours the appearance form edits. */
+interface AppearanceColors {
+  primary: string;
+  accent: string;
+  background: string;
+  text: string;
+}
+
+// ============================================
+// Helpers
+// ============================================
+
+/** How long a new backup's warning that the restore would refuse it stays up: long enough to read. */
+const BACKUP_WARNING_MS = 20_000;
+
+/** How the Admin Panel writes a size: "512.0 B", "1.5 KB", up to TB. */
+const ADMIN_SIZES: FileSizeOptions = { byteDecimals: 1, largest: 'TB' };
+
+/**
+ * Body size a reverse proxy must accept: the largest upload limit plus a few MB
+ * of multipart overhead (mirrors UPLOAD_OVERHEAD_BYTES in the backend).
+ */
+function requiredProxyBodyMB(uploadLimits: ServerUploadLimits): number {
+  const largest = Math.max(...Object.values(uploadLimits));
+  return Math.ceil((largest + 5 * 1024 * 1024) / (1024 * 1024));
+}
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return '\u2014';
+  return new Date(dateStr).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+/**
+ * Scroll a strip that scrolls sideways, as the row of tabs does on a narrow
+ * screen, just far enough to show `item` inside its padding. Only the strip
+ * moves: scrollIntoView would scroll the page too.
+ */
+function keepInStrip(strip: HTMLElement, item: HTMLElement) {
+  const style = getComputedStyle(strip);
+  const box = strip.getBoundingClientRect();
+  const left = box.left + (parseFloat(style.paddingLeft) || 0);
+  const right = box.right - (parseFloat(style.paddingRight) || 0);
+  const shown = item.getBoundingClientRect();
+  if (shown.left < left) strip.scrollLeft -= left - shown.left;
+  else if (shown.right > right) strip.scrollLeft += shown.right - right;
+}
+
+/** The time of day a sign-in lock ends, as the user list shows it. */
+function formatLockTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatExpiry(dateStr: string | null): string {
+  if (!dateStr) return '\u2014';
+  const diff = new Date(dateStr).getTime() - Date.now();
+  if (diff <= 0) return 'expired';
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `in ${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `in ${hours}h ${minutes % 60}m`;
+  return new Date(dateStr).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+const LOG_LEVEL_COLORS: Record<string, string> = {
+  INFO: 'bg-info/10 text-info-ink',
+  WARNING: 'bg-warning/10 text-warning-ink',
+  ERROR: 'bg-danger/10 text-danger-ink',
+  CRITICAL: 'bg-danger/15 text-danger-ink font-bold',
+};
+
+type Tab = 'dashboard' | 'users' | 'settings' | 'appearance' | 'activity' | 'backups' | 'assets';
+
+// ============================================
+// AdminPage
+// ============================================
+
+export default function AdminPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+
+  // The open tab stays in view in a row of tabs scrolled sideways, however
+  // it was opened (Assets also opens from a link in Delete User).
+  const tabStripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = tabStripRef.current;
+    const tab = strip?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+    if (strip && tab) keepInStrip(strip, tab);
+  }, [activeTab]);
+
+  // Which ends of the row have tabs past them, as it scrolls or resizes.
+  const { ref: tabStripCue, more: tabStripMore } = useScrollMore(tabStripRef);
+
+  // ---- Dashboard ----
+  const [stats, setStats] = useState<SystemStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState('');
+  // What the server says about itself, for the status card; when it could
+  // not be asked, whether the request reached the server at all.
+  const [health, setHealth] = useState<AdminHealth | null>(null);
+  const [healthFailed, setHealthFailed] = useState<{ reachedServer: boolean } | null>(null);
+  // Counts the answers, so the card checks live connections after each one:
+  // a check open while the server counts them would be counted.
+  const [healthAnswers, setHealthAnswers] = useState(0);
+
+  // ---- Users ----
+  const [users, setUsers] = useState<AdminListedUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState('');
+  const [userSearch, setUserSearch] = useState('');
+  const debouncedUserSearch = useDebounce(userSearch, 250);
+
+  // Delete flow
+  const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [deleteEmail, setDeleteEmail] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  // Campaigns the user runs, which the server says must be handed over or deleted first.
+  const [deleteBlockers, setDeleteBlockers] = useState<DeletionBlocker[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Reset password flow
+  const [resetTarget, setResetTarget] = useState<User | null>(null);
+  const [tempPassword, setTempPassword] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [isSendingResetLink, setIsSendingResetLink] = useState(false);
+  const [resetLinkSent, setResetLinkSent] = useState(false);
+  const [resetLinkError, setResetLinkError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  // Role change
+  const [roleChangingId, setRoleChangingId] = useState<string | null>(null);
+  // The user whose role chip was clicked, until the change is confirmed or cancelled.
+  const [roleChangeTarget, setRoleChangeTarget] = useState<User | null>(null);
+
+  // Create user modal
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({ email: '', displayName: '', platformRole: 'USER' });
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [createUserError, setCreateUserError] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserPasswordCopied, setNewUserPasswordCopied] = useState(false);
+  // 'create' generates a temporary password; 'invite' emails a set-password link
+  const [createUserMode, setCreateUserMode] = useState<'create' | 'invite'>('create');
+  // Success message shown after an invite or an emailed create
+  const [createUserSuccess, setCreateUserSuccess] = useState('');
+  const [resendingInviteId, setResendingInviteId] = useState<string | null>(null);
+  const [resendInviteResult, setResendInviteResult] = useState<{ id: string; message: string } | null>(null);
+
+  // MFA reset per-row (inline confirm)
+  const [resetMfaConfirmId, setResetMfaConfirmId] = useState<string | null>(null);
+  const [isResettingMfa, setIsResettingMfa] = useState(false);
+  const [resetMfaError, setResetMfaError] = useState('');
+
+  // User approval
+  const [approvingUserId, setApprovingUserId] = useState<string | null>(null);
+
+  // Clearing a sign-in lock, after the confirmation
+  const [lockToClear, setLockToClear] = useState<AdminListedUser | null>(null);
+  const [clearingLock, setClearingLock] = useState(false);
+
+  // ---- Settings ----
+  const [settings, setSettings] = useState<AdminSystemSettings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({
+    instanceName: '',
+    allowRegistration: false,
+    requireAdminApproval: true,
+  });
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
+  // Why the settings could not be loaded. Until they are, the Settings and
+  // Appearance tabs show this and Retry, never a form: one filled with
+  // placeholders would save them over the real settings.
+  const [settingsLoadError, setSettingsLoadError] = useState('');
+
+  // ---- Appearance ----
+  const { refreshAppearance } = useTheme();
+  const [appearanceForm, setAppearanceForm] = useState<{
+    themeId: string;
+    fontId: string;
+    customColors: AppearanceColors;
+  }>({
+    themeId: 'cozy-default',
+    fontId: 'default',
+    customColors: {
+      primary: '#4A5D4E',
+      accent: '#D4A574',
+      background: '#FFF9E6',
+      text: '#1F2937',
+    },
+  });
+  const [appearanceSaving, setAppearanceSaving] = useState(false);
+  const [appearanceError, setAppearanceError] = useState('');
+
+  // ---- Server Config (read-only) ----
+  const [serverConfig, setServerConfig] = useState<AdminServerConfig | null>(null);
+  const [configLoading, setConfigLoading] = useState(false);
+  const [smtpTesting, setSmtpTesting] = useState(false);
+  const [smtpTestResult, setSmtpTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  // ---- Backups ----
+  const [backups, setBackups] = useState<AdminBackup[]>([]);
+  const [backupsLoading, setBackupsLoading] = useState(false);
+  const [backupsError, setBackupsError] = useState('');
+  const [creatingBackup, setCreatingBackup] = useState(false);
+  const [backupCreateError, setBackupCreateError] = useState('');
+  const [deletingBackupFile, setDeletingBackupFile] = useState<string | null>(null);
+  // The backup whose bin was clicked, until the delete is confirmed or cancelled.
+  const [backupToDelete, setBackupToDelete] = useState<string | null>(null);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [restoreError, setRestoreError] = useState('');
+  const [restoreResult, setRestoreResult] = useState<RestoreReply | null>(null);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+
+  // ---- Activity ----
+  const [activity, setActivity] = useState<AdminActivityData | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState('');
+
+  // ---- Admin Assets ----
+  const [adminAssets, setAdminAssets] = useState<Asset[]>([]);
+  const [adminAssetsLoading, setAdminAssetsLoading] = useState(false);
+  const [adminAssetsError, setAdminAssetsError] = useState('');
+  const [adminAssetsTotal, setAdminAssetsTotal] = useState(0);
+  const [adminAssetsTotalPages, setAdminAssetsTotalPages] = useState(0);
+  const [adminAssetsPage, setAdminAssetsPage] = useState(1);
+  const [adminAssetsScope, setAdminAssetsScope] = useState('');
+  const [adminAssetsType, setAdminAssetsType] = useState('');
+  // 'none': only assets whose uploader's account was deleted.
+  const [adminAssetsOwner, setAdminAssetsOwner] = useState('');
+  const [adminAssetsSearch, setAdminAssetsSearch] = useState('');
+  const debouncedAdminAssetsSearch = useDebounce(adminAssetsSearch, 300);
+  const [adminCampaigns, setAdminCampaigns] = useState<Campaign[]>([]);
+  // Which asset list request is the newest: an older answer is ignored.
+  const adminAssetsRequestRef = useRef(0);
+  // Per-row scope change: if set, this asset's row shows the campaign picker
+  const [assetScopePicker, setAssetScopePicker] = useState<{ assetId: string; campaignId: string } | null>(null);
+  const [assetScopeChanging, setAssetScopeChanging] = useState<string | null>(null);
+  const [assetDeleting, setAssetDeleting] = useState<string | null>(null);
+  // The asset whose bin was clicked, until the delete is confirmed or cancelled.
+  const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
+
+  // ---- Global Asset Manager toggle ----
+  const [togglingGlobalAssets, setTogglingGlobalAssets] = useState<string | null>(null);
+  const [togglingTemplateEditor, setTogglingTemplateEditor] = useState<string | null>(null);
+
+  // ---- Delete user — asset warning ----
+  const [deletingUserAssetCount, setDeletingUserAssetCount] = useState<number>(0);
+  const [loadingDeleteWarning, setLoadingDeleteWarning] = useState<string | null>(null);
+
+  // ============================================
+  // Data loaders
+  // ============================================
+
+  const loadHealth = useCallback(async () => {
+    try {
+      setHealth(await adminService.getHealth());
+      setHealthFailed(null);
+    } catch (err: unknown) {
+      setHealth(null);
+      setHealthFailed({ reachedServer: apiErrorStatus(err) !== undefined });
+    } finally {
+      setHealthAnswers((answers) => answers + 1);
+    }
+  }, []);
+
+  const loadStats = useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError('');
+    void loadHealth();
+    try {
+      setStats(await adminService.getStats());
+    } catch (err: unknown) {
+      setStatsError(apiErrorMessage(err) ?? (err instanceof Error ? err.message : 'Failed to load stats'));
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [loadHealth]);
+
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true);
+    setUsersError('');
+    try {
+      setUsers(await adminService.getUsers());
+    } catch (err: unknown) {
+      setUsersError(err instanceof Error ? err.message : 'Failed to load users');
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
+  const loadSettings = useCallback(async () => {
+    setSettingsLoading(true);
+    setSettingsLoadError('');
+    try {
+      setSettings(await adminService.getSettings());
+    } catch (err: unknown) {
+      setSettingsLoadError(apiErrorMessage(err) ?? 'The settings could not be loaded.');
+    } finally {
+      setSettingsLoading(false);
+    }
+  }, []);
+
+  const loadServerConfig = useCallback(async () => {
+    setConfigLoading(true);
+    try {
+      setServerConfig(await adminService.getConfig());
+    } catch {
+      // non-fatal — config panel just won't show
+    } finally {
+      setConfigLoading(false);
+    }
+  }, []);
+
+  const loadBackups = useCallback(async () => {
+    setBackupsLoading(true);
+    setBackupsError('');
+    try {
+      setBackups(await adminService.listBackups());
+    } catch (err: unknown) {
+      setBackupsError(apiErrorMessage(err) ?? 'Failed to load backups');
+    } finally {
+      setBackupsLoading(false);
+    }
+  }, []);
+
+  const loadActivity = useCallback(async () => {
+    setActivityLoading(true);
+    setActivityError('');
+    try {
+      setActivity(await adminService.getActivity());
+    } catch (err: unknown) {
+      setActivityError(err instanceof Error ? err.message : 'Failed to load activity');
+    } finally {
+      setActivityLoading(false);
+    }
+  }, []);
+
+  const loadAdminAssets = useCallback(async (
+    page: number,
+    scope: string,
+    type: string,
+    search: string,
+    owner: string,
+  ) => {
+    const request = ++adminAssetsRequestRef.current;
+    setAdminAssetsLoading(true);
+    setAdminAssetsError('');
+    try {
+      const resp = await api.listAssets({
+        page,
+        limit: 25,
+        scope: scope || undefined,
+        type: type || undefined,
+        search: search || undefined,
+        uploadedBy: owner || undefined,
+      });
+      if (request !== adminAssetsRequestRef.current) return;
+      setAdminAssets(resp.assets);
+      setAdminAssetsTotal(resp.pagination.total);
+      setAdminAssetsTotalPages(resp.pagination.totalPages);
+    } catch (err: unknown) {
+      if (request !== adminAssetsRequestRef.current) return;
+      setAdminAssetsError(apiErrorMessage(err) ?? (err instanceof Error ? err.message : 'Failed to load assets'));
+    } finally {
+      if (request === adminAssetsRequestRef.current) setAdminAssetsLoading(false);
+    }
+  }, []);
+
+  const loadAdminCampaigns = useCallback(async () => {
+    try {
+      const { campaigns } = await api.adminListAllCampaigns();
+      setAdminCampaigns(campaigns);
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
+  // Populate forms when settings load
+  useEffect(() => {
+    if (settings) {
+      setSettingsForm({
+        instanceName: settings.instanceName,
+        allowRegistration: settings.allowRegistration,
+        requireAdminApproval: settings.requireAdminApproval,
+      });
+      setAppearanceForm({
+        themeId: settings.themeId || 'cozy-default',
+        fontId: settings.fontId || 'default',
+        customColors: (settings.customThemeColors as AppearanceColors | null) || {
+          primary: '#4A5D4E',
+          accent: '#D4A574',
+          background: '#FFF9E6',
+          text: '#1F2937',
+        },
+      });
+    }
+  }, [settings]);
+
+  // Lazy-load per tab
+  useEffect(() => {
+    if (activeTab === 'dashboard' && !stats && !statsLoading) loadStats();
+    if (activeTab === 'users' && users.length === 0 && !usersLoading) loadUsers();
+    // The Users tab needs smtp.configured to decide whether inviting is possible
+    if (activeTab === 'users' && !serverConfig && !configLoading) loadServerConfig();
+    if (activeTab === 'settings' || activeTab === 'appearance') {
+      if (!settings && !settingsLoading) loadSettings();
+      if (activeTab === 'settings' && !serverConfig && !configLoading) loadServerConfig();
+    }
+    if (activeTab === 'activity' && !activity && !activityLoading) loadActivity();
+    if (activeTab === 'backups' && backups.length === 0 && !backupsLoading) loadBackups();
+    if (activeTab === 'assets') {
+      // With the filters the tab still shows, kept from the last visit.
+      loadAdminAssets(adminAssetsPage, adminAssetsScope, adminAssetsType, debouncedAdminAssetsSearch, adminAssetsOwner);
+      if (adminCampaigns.length === 0) loadAdminCampaigns();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loads what a tab needs as it is opened, not as its data arrives
+  }, [activeTab]);
+
+  // Reload assets when filters/page change
+  useEffect(() => {
+    if (activeTab !== 'assets') return;
+    loadAdminAssets(adminAssetsPage, adminAssetsScope, adminAssetsType, debouncedAdminAssetsSearch, adminAssetsOwner);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reloads the assets when a filter or the page changes; opening the tab loads them above
+  }, [adminAssetsPage, adminAssetsScope, adminAssetsType, debouncedAdminAssetsSearch, adminAssetsOwner]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setAdminAssetsPage(1);
+  }, [adminAssetsScope, adminAssetsType, debouncedAdminAssetsSearch, adminAssetsOwner]);
+
+  // ============================================
+  // User management actions
+  // ============================================
+
+  const handleToggleTemplateEditor = async (u: User) => {
+    setTogglingTemplateEditor(u.id);
+    const next = !u.templateEditor;
+    // Optimistic update
+    setUsers(prev => prev.map(x => x.id === u.id ? { ...x, templateEditor: next } : x));
+    try {
+      const updated = await adminService.updateUser(u.id, { templateEditor: next });
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, ...updated } : x));
+      showToast(`Template editing ${next ? 'enabled' : 'disabled'} for ${u.displayName}`, 'success');
+    } catch (err: unknown) {
+      // Revert on error
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, templateEditor: !next } : x));
+      const e = err as { response?: { data?: { message?: string } } };
+      showToast(apiErrorMessage(e) ?? 'Failed to update permission', 'error');
+    } finally {
+      setTogglingTemplateEditor(null);
+    }
+  };
+
+  const handleToggleGlobalAssets = async (u: User) => {
+    setTogglingGlobalAssets(u.id);
+    const next = !u.globalAssetManager;
+    // Optimistic update
+    setUsers(prev => prev.map(x => x.id === u.id ? { ...x, globalAssetManager: next } : x));
+    try {
+      const updated = await adminService.updateUser(u.id, { globalAssetManager: next });
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, ...updated } : x));
+      showToast(`Global Assets ${next ? 'enabled' : 'disabled'} for ${u.displayName}`, 'success');
+    } catch (err: unknown) {
+      // Revert on error
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, globalAssetManager: !next } : x));
+      const e = err as { response?: { data?: { message?: string } } };
+      showToast(apiErrorMessage(e) ?? 'Failed to update permission', 'error');
+    } finally {
+      setTogglingGlobalAssets(null);
+    }
+  };
+
+  const handleRoleChange = async (u: User) => {
+    setRoleChangeTarget(null);
+    setRoleChangingId(u.id);
+    try {
+      const newRole = u.platformRole === PlatformRole.ADMIN
+        ? PlatformRole.USER
+        : PlatformRole.ADMIN;
+      const updated = await adminService.updateUser(u.id, { platformRole: newRole });
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, ...updated } : x));
+      showToast(`Role updated to ${newRole}`, 'success');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      showToast(apiErrorMessage(e) ?? 'Failed to change role', 'error');
+    } finally {
+      setRoleChangingId(null);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetTarget) return;
+    setIsResetting(true);
+    setResetError('');
+    try {
+      const pwd = await adminService.resetUserPassword(resetTarget.id);
+      setTempPassword(pwd);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setResetError(apiErrorMessage(e) ?? 'Failed to reset password');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleSendPasswordResetLink = async () => {
+    if (!resetTarget) return;
+    setIsSendingResetLink(true);
+    setResetLinkError('');
+    try {
+      await adminService.sendPasswordResetLink(resetTarget.id);
+      setResetLinkSent(true);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setResetLinkError(apiErrorMessage(e) ?? 'Failed to send reset link');
+    } finally {
+      setIsSendingResetLink(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deletingUser) return;
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      const deletedName = deletingUser.displayName;
+      await adminService.deleteUser(deletingUser.id);
+      setUsers(prev => prev.filter(u => u.id !== deletingUser.id));
+      setDeletingUser(null);
+      setDeleteEmail('');
+      showToast(`User "${deletedName}" deleted`, 'success');
+    } catch (err: unknown) {
+      setDeleteError(apiErrorMessage(err) ?? 'Failed to delete user');
+      setDeleteBlockers(apiDeletionBlockers(err) ?? []);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const clearDeleteBlocker = (campaignId: string) => {
+    const left = deleteBlockers.filter((c) => c.id !== campaignId);
+    setDeleteBlockers(left);
+    if (left.length === 0) setDeleteError('');
+  };
+
+  // copyText also works over plain HTTP, where navigator.clipboard is missing.
+  const handleCopyToClipboard = async (text: string, setCopiedFn: (v: boolean) => void) => {
+    if (await copyText(text)) {
+      setCopiedFn(true);
+      setTimeout(() => setCopiedFn(false), 2000);
+    } else {
+      showToast('Could not copy the password. Select it and copy it yourself.', 'warning');
+    }
+  };
+
+  const closeResetModal = () => {
+    setResetTarget(null);
+    setTempPassword('');
+    setResetError('');
+    setCopied(false);
+    setResetLinkSent(false);
+    setResetLinkError('');
+  };
+
+  const closeDeleteModal = () => {
+    setDeletingUser(null);
+    setDeleteEmail('');
+    setDeleteError('');
+    setDeleteBlockers([]);
+    setDeletingUserAssetCount(0);
+  };
+
+  const openDeleteModal = async (u: User) => {
+    closeResetModal();
+    setResetMfaConfirmId(null);
+    setDeleteEmail('');
+    setDeleteError('');
+    setDeletingUserAssetCount(0);
+    setLoadingDeleteWarning(u.id);
+    try {
+      // A list with no type leaves documents out, so they are counted apart.
+      const [files, documents] = await Promise.all([
+        api.listAssets({ uploadedBy: u.id, scope: 'USER', limit: 1 }),
+        api.listAssets({ uploadedBy: u.id, scope: 'USER', type: 'DOCUMENT', limit: 1 }),
+      ]);
+      setDeletingUserAssetCount(files.pagination.total + documents.pagination.total);
+    } catch {
+      // non-fatal — just proceed without warning
+    } finally {
+      setLoadingDeleteWarning(null);
+    }
+    setDeletingUser(u);
+  };
+
+  const handleCreateUser = async () => {
+    setCreatingUser(true);
+    setCreateUserError('');
+    try {
+      const payload = {
+        email: createUserForm.email.trim(),
+        displayName: createUserForm.displayName.trim() || undefined,
+        platformRole: createUserForm.platformRole,
+      };
+
+      if (createUserMode === 'invite') {
+        const { user: newUser, expiresInDays } = await adminService.inviteUser(payload);
+        setCreateUserSuccess(
+          `Invitation sent to ${newUser.email}. The link expires in ${expiresInDays} days.`
+        );
+        setUsers(prev => [newUser, ...prev]);
+      } else {
+        const { user: newUser, emailSent, temporaryPassword } = await adminService.createUser(payload);
+        if (emailSent) {
+          // The user has their password by email; the admin doesn't need it
+          setCreateUserSuccess(`User created. Sign-in details were emailed to ${newUser.email}.`);
+        } else {
+          setNewUserPassword(temporaryPassword ?? '');
+        }
+        setUsers(prev => [newUser, ...prev]);
+      }
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setCreateUserError(
+        apiErrorMessage(e) ??
+          (createUserMode === 'invite' ? 'Failed to send invitation' : 'Failed to create user')
+      );
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const handleResendInvite = async (userId: string) => {
+    setResendingInviteId(userId);
+    setResendInviteResult(null);
+    try {
+      const { message } = await adminService.resendInvite(userId);
+      setResendInviteResult({ id: userId, message });
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setResendInviteResult({
+        id: userId,
+        message: apiErrorMessage(e) ?? 'Failed to resend invitation',
+      });
+    } finally {
+      setResendingInviteId(null);
+    }
+  };
+
+  const closeCreateUserModal = () => {
+    setCreateUserOpen(false);
+    setCreateUserForm({ email: '', displayName: '', platformRole: 'USER' });
+    setCreateUserError('');
+    setNewUserPassword('');
+    setNewUserPasswordCopied(false);
+    setCreateUserSuccess('');
+  };
+
+  const handleResetMfa = async (userId: string) => {
+    setIsResettingMfa(true);
+    setResetMfaError('');
+    try {
+      await adminService.resetMfa(userId);
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, mfaEnabled: false } : u));
+      setResetMfaConfirmId(null);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setResetMfaError(apiErrorMessage(e) ?? 'Failed to reset MFA');
+    } finally {
+      setIsResettingMfa(false);
+    }
+  };
+
+  const handleClearSignInLock = async (target: AdminListedUser) => {
+    setClearingLock(true);
+    try {
+      await adminService.clearSignInLock(target.id);
+      setUsers(prev => prev.map(u => u.id === target.id ? { ...u, signInLockedUntil: null } : u));
+      showToast(`Sign-in lock cleared for ${target.displayName}`, 'success');
+    } catch (err: unknown) {
+      showToast(apiErrorMessage(err) ?? 'Failed to clear the sign-in lock', 'error');
+    } finally {
+      setClearingLock(false);
+      setLockToClear(null);
+    }
+  };
+
+  const handleApproveUser = async (userId: string) => {
+    setApprovingUserId(userId);
+    try {
+      await adminService.approveUser(userId);
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, isApproved: true } : u));
+      showToast('User approved!', 'success');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      showToast(apiErrorMessage(e) ?? 'Failed to approve user', 'error');
+    } finally {
+      setApprovingUserId(null);
+    }
+  };
+
+  // ============================================
+  // Admin asset management
+  // ============================================
+
+  const handleAdminAssetScopeChange = async (asset: Asset, newScope: string, campaignId?: string) => {
+    if (newScope === AssetScope.CAMPAIGN && !campaignId) return;
+    setAssetScopeChanging(asset.id);
+    try {
+      const result = await api.patchAssetScope(asset.id, newScope, campaignId);
+      setAdminAssets(prev => prev.map(a => a.id === asset.id ? result.asset : a));
+      setAssetScopePicker(null);
+      showToast('Asset scope updated', 'success');
+    } catch (err: unknown) {
+      showToast(apiErrorMessage(err) ?? 'Failed to update scope', 'error');
+    } finally {
+      setAssetScopeChanging(null);
+    }
+  };
+
+  // Deleting an asset takes two questions: this tab asks "delete this?", and if
+  // the server says something still uses it, the hook's dialog shows where and
+  // asks again before forcing it.
+  const assetDelete = useAssetDelete({
+    onDeleted: ({ id: assetId }) => {
+      setAdminAssets(prev => prev.filter(a => a.id !== assetId));
+      setAdminAssetsTotal(prev => prev - 1);
+    },
+    onError: (message) => showToast(message, 'error'),
+  });
+
+  const handleAdminDeleteAsset = async () => {
+    const asset = assetToDelete;
+    if (!asset) return;
+    setAssetToDelete(null);
+    setAssetDeleting(asset.id);
+    try {
+      await assetDelete.deleteAsset(asset);
+    } finally {
+      setAssetDeleting(null);
+    }
+  };
+
+  // ============================================
+  // SMTP test
+  // ============================================
+
+  const handleSmtpTest = async () => {
+    setSmtpTesting(true);
+    setSmtpTestResult(null);
+    try {
+      const message = await adminService.testSmtp();
+      setSmtpTestResult({ ok: true, message });
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setSmtpTestResult({ ok: false, message: apiErrorMessage(e) ?? 'Test failed' });
+    } finally {
+      setSmtpTesting(false);
+    }
+  };
+
+  // ============================================
+  // Backup actions
+  // ============================================
+
+  const handleCreateBackup = async () => {
+    setCreatingBackup(true);
+    setBackupCreateError('');
+    try {
+      const { warning, ...backup } = await adminService.createBackup();
+      setBackups(prev => [backup, ...prev]);
+      // Made and kept, but past what the restore takes: said now, not on the
+      // day it is needed.
+      if (warning) showToast(warning, 'warning', BACKUP_WARNING_MS);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setBackupCreateError(apiErrorMessage(e) ?? 'Failed to create backup');
+    } finally {
+      setCreatingBackup(false);
+    }
+  };
+
+  const handleDeleteBackup = async (filename: string) => {
+    setBackupToDelete(null);
+    setDeletingBackupFile(filename);
+    try {
+      await adminService.deleteBackup(filename);
+      setBackups(prev => prev.filter(b => b.filename !== filename));
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      showToast(apiErrorMessage(e) ?? 'Failed to delete backup', 'error');
+    } finally {
+      setDeletingBackupFile(null);
+    }
+  };
+
+  const handleRestoreBackup = () => {
+    if (!restoreFile) return;
+    setShowRestoreConfirm(true);
+  };
+
+  const handleRestoreBackupConfirmed = async () => {
+    setShowRestoreConfirm(false);
+    if (!restoreFile) return;
+    setRestoring(true);
+    setRestoreError('');
+    try {
+      setRestoreResult(await adminService.restoreBackup(restoreFile));
+      setRestoreFile(null);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setRestoreError(apiErrorMessage(e) ?? 'Restore failed. Check server logs for details.');
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  // ============================================
+  // Settings actions
+  // ============================================
+
+  const handleSaveSettings = async () => {
+    setSettingsSaving(true);
+    setSettingsError('');
+    try {
+      const updated = await adminService.updateSettings(settingsForm);
+      setSettings(updated);
+      showToast('Settings saved!', 'success');
+      // The instance name is the browser tab's title.
+      void refreshAppearance();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setSettingsError(apiErrorMessage(e) ?? 'Failed to save settings');
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  // ============================================
+  // Filtered users (client-side search)
+  // ============================================
+
+  const filteredUsers = useMemo(() => {
+    const q = debouncedUserSearch.toLowerCase();
+    if (!q) return users;
+    return users.filter(u =>
+      u.email.toLowerCase().includes(q) ||
+      u.displayName.toLowerCase().includes(q)
+    );
+  }, [users, debouncedUserSearch]);
+
+  // ============================================
+  // Tab bar config
+  // ============================================
+
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> },
+    { id: 'users',     label: 'Users',     icon: <Users className="w-4 h-4" /> },
+    { id: 'assets',    label: 'Assets',    icon: <Layers className="w-4 h-4" /> },
+    { id: 'settings',  label: 'Settings',  icon: <Settings className="w-4 h-4" /> },
+    { id: 'appearance', label: 'Appearance', icon: <Palette className="w-4 h-4" /> },
+    { id: 'backups',   label: 'Backups',   icon: <HardDrive className="w-4 h-4" /> },
+    { id: 'activity',  label: 'Activity',  icon: <Activity className="w-4 h-4" /> },
+  ];
+
+  // The open tab is the one stop for Tab; the arrows, Home and End open
+  // another and move the focus to it (tabKeyTarget).
+  const onTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const target = tabKeyTarget(event.key, index, tabs.length);
+    if (target === null) return;
+    event.preventDefault();
+    setActiveTab(tabs[target].id);
+    document.getElementById(`tab-${tabs[target].id}`)?.focus();
+  };
+
+  // ============================================
+  // Render
+  // ============================================
+
+  return (
+    <div className="min-h-page bg-linear-to-br/srgb from-soft-cream via-parchment to-warm-amber/20">
+
+      {/* ---- Header ---- */}
+      <header className="bg-moss-green/10 border-b border-moss-green/20">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/dashboard')}
+                aria-label="Back to Dashboard"
+                className="flex items-center gap-1 text-sm text-warm-gray hover:text-brand-ink transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+                Dashboard
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-brand-ink font-heading flex items-center gap-2">
+                  <Shield className="w-6 h-6" aria-hidden="true" />
+                  Admin Panel
+                </h1>
+                <p className="text-xs text-warm-gray mt-0.5">Platform administration</p>
+              </div>
+            </div>
+            {/* A name of one long word breaks where it must, so on a phone
+                it never pushes the header past the screen's edge. */}
+            <span className="min-w-0 wrap-anywhere text-sm text-warm-gray">
+              Signed in as{' '}
+              <span className="font-medium text-brand-ink">{user?.displayName}</span>
+            </span>
+          </div>
+
+          {/* Tab Navigation */}
+          <nav aria-label="Admin panel sections" className={tabStripMore === 'none' ? undefined : 'relative'}>
+            {/* The seven tabs need about 820 px. Below 1024 px they scroll
+                sideways in their own strip, which runs to the screen's
+                edges, so the page never does; its padding keeps a focus
+                ring and the open tab's lower edge inside it, and an end
+                with more tabs past it fades under a chevron that is only
+                for the eye (ScrollCue.tsx). */}
+            <div
+              ref={tabStripCue}
+              role="tablist"
+              aria-label="Admin tabs"
+              className={cn(
+                'flex gap-1 mt-4 max-lg:-mx-4 max-lg:px-4 max-lg:py-1 max-lg:overflow-x-auto max-lg:overscroll-x-contain',
+                scrollFade(tabStripMore, { belowLg: true })
+              )}
+            >
+              {tabs.map((tab, index) => (
+                <button
+                  key={tab.id}
+                  role="tab"
+                  id={`tab-${tab.id}`}
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`tabpanel-${tab.id}`}
+                  tabIndex={activeTab === tab.id ? 0 : -1}
+                  onClick={() => setActiveTab(tab.id)}
+                  onKeyDown={(event) => onTabKeyDown(event, index)}
+                  // A tab reached with the keyboard comes wholly into view;
+                  // the browser stops at one partly shown.
+                  onFocus={(e) => { if (tabStripRef.current) keepInStrip(tabStripRef.current, e.currentTarget); }}
+                  className={`flex items-center gap-2 shrink-0 px-4 py-2 pointer-coarse:min-h-11 rounded-t-lg text-sm font-medium transition-colors ${
+                    activeTab === tab.id
+                      ? 'bg-paper text-brand-ink border border-b-paper border-moss-green/20 -mb-px'
+                      : 'text-warm-gray hover:text-brand-ink hover:bg-paper/50'
+                  }`}
+                >
+                  <span aria-hidden="true">{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <ScrollChevrons more={tabStripMore} start="-left-3" end="-right-3" className="text-warm-gray lg:hidden" />
+          </nav>
+        </div>
+      </header>
+
+      {/* ---- Main ---- */}
+      <main id="main-content" className="max-w-7xl mx-auto px-4 py-8">
+
+        {/* ===== DASHBOARD TAB ===== */}
+        {activeTab === 'dashboard' && (
+          <div role="tabpanel" id="tabpanel-dashboard" aria-labelledby="tab-dashboard">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-brand-ink">System Overview</h2>
+              <Button
+                onClick={loadStats}
+                disabled={statsLoading}
+                variant="secondary" className="flex items-center gap-2 text-sm py-1.5 px-3"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${statsLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+
+            {statsError && (
+              <div className="bg-danger/10 border border-danger/30 text-danger-ink rounded-lg p-4 mb-6 text-sm">
+                {statsError}
+              </div>
+            )}
+
+            {statsLoading && !stats ? (
+              <div className="glass-panel overflow-hidden">
+                {/* Stat card skeletons */}
+                <div className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 animate-pulse">
+                  {[...Array(7)].map((_, i) => (
+                    <div key={i} className="flex flex-col items-center p-4 space-y-2">
+                      <div className="w-7 h-7 bg-moss-green/10 rounded-full" />
+                      <div className="h-8 w-10 bg-moss-green/15 rounded-sm" />
+                      <div className="h-3 w-14 bg-stone-gray/10 rounded-sm" />
+                    </div>
+                  ))}
+                </div>
+                <TableSkeleton rows={6} columns={3} />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* No per-user storage quota is enforced: this warning is the
+                    check, before uploads, backups or the database fail. */}
+                {stats?.uploadsDisk?.warning && (
+                  <div
+                    role="alert"
+                    aria-label="Disk nearly full"
+                    className="bg-danger/10 border border-danger/30 text-danger-ink rounded-lg p-4 text-sm flex items-start gap-3"
+                  >
+                    <HardDrive className="w-5 h-5 shrink-0 mt-0.5" aria-hidden="true" />
+                    <div>
+                      <p className="font-semibold">
+                        The disk that holds your uploads is {stats.uploadsDisk.usedPercent}% full ({formatFileSize(stats.uploadsDisk.freeBytes, ADMIN_SIZES)} free).
+                      </p>
+                      <p className="mt-1">
+                        When it fills, uploads fail, and backups and the database stop working too if they are on the same disk.
+                        Delete files nobody needs from the Assets tab, delete old backups, or move the uploads folder to a larger disk.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Stat Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                  <div className="glass-panel p-5 flex flex-col items-center text-center">
+                    <Users className="w-7 h-7 text-brand-ink mb-2" />
+                    <p className="text-3xl font-bold text-brand-ink">{stats?.userCount ?? '\u2014'}</p>
+                    <p className="text-xs text-warm-gray mt-1">Users</p>
+                  </div>
+
+                  <div className="glass-panel p-5 flex flex-col items-center text-center">
+                    <FolderOpen className="w-7 h-7 text-accent-ink mb-2" />
+                    <p className="text-3xl font-bold text-brand-ink">{stats?.campaignCount ?? '\u2014'}</p>
+                    <p className="text-xs text-warm-gray mt-1">Campaigns</p>
+                    {stats && (
+                      <p className="text-xs text-success-ink mt-0.5">{stats.activeCampaignCount} active</p>
+                    )}
+                  </div>
+
+                  <div className="glass-panel p-5 flex flex-col items-center text-center">
+                    <CalendarDays className="w-7 h-7 text-info-ink mb-2" />
+                    <p className="text-3xl font-bold text-brand-ink">{stats?.sessionCount ?? '\u2014'}</p>
+                    <p className="text-xs text-warm-gray mt-1">Sessions</p>
+                    {stats && (
+                      <p className="text-xs text-success-ink mt-0.5">{stats.activeSessionCount} live</p>
+                    )}
+                  </div>
+
+                  <div className="glass-panel p-5 flex flex-col items-center text-center">
+                    <BookUser className="w-7 h-7 text-info-ink mb-2" />
+                    <p className="text-3xl font-bold text-brand-ink">{stats?.characterCount ?? '\u2014'}</p>
+                    <p className="text-xs text-warm-gray mt-1">Characters</p>
+                  </div>
+
+                  <div className="glass-panel p-5 flex flex-col items-center text-center">
+                    <Database className="w-7 h-7 text-token-friendly-ink mb-2" />
+                    <p className="text-3xl font-bold text-brand-ink">{stats?.mapCount ?? '\u2014'}</p>
+                    <p className="text-xs text-warm-gray mt-1">Maps</p>
+                  </div>
+
+                  <div className="glass-panel p-5 flex flex-col items-center text-center">
+                    <Database className="w-7 h-7 text-spirit-ink mb-2" />
+                    <p className="text-2xl font-bold text-brand-ink break-all">
+                      {stats ? formatFileSize(stats.totalStorageBytes, ADMIN_SIZES) : '\u2014'}
+                    </p>
+                    <p className="text-xs text-warm-gray mt-1">Storage</p>
+                    {stats?.uploadsDisk && (
+                      <p className={`text-xs mt-0.5 ${stats.uploadsDisk.warning ? 'text-danger-ink' : 'text-success-ink'}`}>
+                        {formatFileSize(stats.uploadsDisk.freeBytes, ADMIN_SIZES)} free on disk
+                      </p>
+                    )}
+                  </div>
+
+                  <HealthCard health={health} failed={healthFailed} answers={healthAnswers} />
+                </div>
+
+                {/* Asset Breakdown Table */}
+                {stats && stats.assetBreakdown.length > 0 && (
+                  <section className="glass-panel overflow-hidden">
+                    <div className="px-4 py-3 border-b border-warm-gray/20 flex items-center gap-2">
+                      <FolderOpen className="w-4 h-4 text-accent-ink" />
+                      <h3 className="font-semibold text-brand-ink text-sm">Asset Breakdown</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-warm-gray/10 bg-moss-green/5">
+                            <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Type</th>
+                            <th className="text-right px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Count</th>
+                            <th className="text-right px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Storage</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stats.assetBreakdown.map(row => (
+                            <tr key={row.type} className="border-b border-warm-gray/10 hover:bg-moss-green/5">
+                              <td className="px-4 py-2 font-medium text-stone-gray">{row.type}</td>
+                              <td className="px-4 py-2 text-right text-warm-gray">{row.count}</td>
+                              <td className="px-4 py-2 text-right text-warm-gray">{formatFileSize(row.sizeBytes, ADMIN_SIZES)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-moss-green/5 font-medium">
+                            <td className="px-4 py-2 text-stone-gray">Total</td>
+                            <td className="px-4 py-2 text-right text-stone-gray">
+                              {stats.assetBreakdown.reduce((s, r) => s + r.count, 0)}
+                            </td>
+                            <td className="px-4 py-2 text-right text-stone-gray">
+                              {formatFileSize(stats.totalStorageBytes, ADMIN_SIZES)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== USERS TAB ===== */}
+        {activeTab === 'users' && (
+          <div role="tabpanel" id="tabpanel-users" aria-labelledby="tab-users">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-brand-ink">User Management</h2>
+              <div className="flex items-center gap-2">
+                {/* Only offered when email can actually be delivered — the
+                    invitation link is the sole way into an invited account */}
+                {serverConfig?.smtp.configured && (
+                  <Button
+                    onClick={() => { setCreateUserMode('invite'); setCreateUserOpen(true); }}
+                    className="flex items-center gap-2 text-sm py-1.5 px-3"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    Invite User
+                  </Button>
+                )}
+                <Button
+                  onClick={() => { setCreateUserMode('create'); setCreateUserOpen(true); }}
+                  variant={serverConfig?.smtp.configured ? 'secondary' : 'primary'}
+                  className="flex items-center gap-2 text-sm py-1.5 px-3"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Create User
+                </Button>
+                <Button
+                  onClick={loadUsers}
+                  disabled={usersLoading}
+                  variant="secondary" className="flex items-center gap-2 text-sm py-1.5 px-3"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${usersLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+            </div>
+
+            {usersError && (
+              <div className="bg-danger/10 border border-danger/30 text-danger-ink rounded-lg p-4 mb-4 text-sm">
+                {usersError}
+              </div>
+            )}
+
+            {/* Search */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-gray" />
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                className="input-cozy pl-9 w-full max-w-sm"
+              />
+            </div>
+
+            {usersLoading && users.length === 0 ? (
+              <div className="glass-panel overflow-hidden">
+                <TableSkeleton rows={8} columns={6} />
+              </div>
+            ) : (
+              <div className="glass-panel overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-warm-gray/20 bg-moss-green/5">
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">User</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">Email</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">Role</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">MFA</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">Joined</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">Last Login</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="text-center py-10 text-warm-gray">
+                            {userSearch ? 'No users match your search.' : 'No users found.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredUsers.map(u => {
+                          const isSelf = u.id === user?.id;
+                          const isRoleChanging = roleChangingId === u.id;
+                          const isDeleteExpanded = deletingUser?.id === u.id;
+                          const isResetExpanded = resetTarget?.id === u.id;
+                          const isMfaConfirm = resetMfaConfirmId === u.id;
+                          const isPending = u.isApproved === false;
+                          const isApproving = approvingUserId === u.id;
+
+                          return (
+                            <React.Fragment key={u.id}>
+                              <tr className="border-b border-warm-gray/10 hover:bg-moss-green/5 transition-colors">
+                                {/* User */}
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-moss-green/15 flex items-center justify-center text-brand-ink font-medium text-xs shrink-0">
+                                      {u.displayName.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="font-medium text-stone-gray">{u.displayName}</span>
+                                    {isSelf && (
+                                      <span className="text-xs text-warm-gray">(you)</span>
+                                    )}
+                                    {isPending && (
+                                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-warning/10 text-warning-ink font-medium">Pending</span>
+                                    )}
+                                    {u.signInLockedUntil && (
+                                      <span
+                                        className="text-xs px-1.5 py-0.5 rounded-full bg-danger/10 text-danger-ink font-medium whitespace-nowrap"
+                                        title="Too many wrong passwords or sign-in codes. The account cannot sign in until then, or until the lock is cleared."
+                                      >
+                                        Locked until {formatLockTime(u.signInLockedUntil)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                {/* Email */}
+                                <td className="px-4 py-3 text-warm-gray">{u.email}</td>
+                                {/* Role */}
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                      onClick={() => !isSelf && !isRoleChanging && setRoleChangeTarget(u)}
+                                      disabled={isSelf || isRoleChanging}
+                                      aria-label={`Change role of ${u.displayName} (currently ${u.platformRole})`}
+                                      title={isSelf ? 'Cannot change your own role' : 'Change role (asks to confirm)'}
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                                        u.platformRole === PlatformRole.ADMIN
+                                          ? 'bg-moss-green/15 text-brand-ink hover:bg-moss-green/30'
+                                          : 'bg-warm-gray/20 text-warm-gray hover:bg-warm-gray/30'
+                                      } ${isSelf ? 'opacity-60 cursor-default' : 'cursor-pointer'}`}
+                                    >
+                                      {isRoleChanging && <Loader2 className="w-3 h-3 animate-spin" />}
+                                      {u.platformRole}
+                                    </button>
+                                    {/* Global Assets toggle — only for non-admin users */}
+                                    {u.platformRole !== PlatformRole.ADMIN && (
+                                      <button
+                                        onClick={() => !isSelf && togglingGlobalAssets !== u.id && handleToggleGlobalAssets(u)}
+                                        disabled={isSelf || togglingGlobalAssets === u.id}
+                                        title="Can upload and delete global assets"
+                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                                          u.globalAssetManager
+                                            ? 'bg-warm-amber/15 text-accent-ink hover:bg-warm-amber/30'
+                                            : 'bg-warm-gray/10 text-warm-gray/60 hover:bg-warm-gray/20'
+                                        } ${isSelf ? 'opacity-60 cursor-default' : 'cursor-pointer'}`}
+                                      >
+                                        {togglingGlobalAssets === u.id
+                                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                                          : <Globe className="w-3 h-3" />
+                                        }
+                                        Global Assets
+                                      </button>
+                                    )}
+                                    {/* Template editor toggle — only for non-admin users */}
+                                    {u.platformRole !== PlatformRole.ADMIN && (
+                                      <button
+                                        onClick={() => !isSelf && togglingTemplateEditor !== u.id && handleToggleTemplateEditor(u)}
+                                        disabled={isSelf || togglingTemplateEditor === u.id}
+                                        title="Can edit and delete anyone's character template"
+                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                                          u.templateEditor
+                                            ? 'bg-spirit-purple/15 text-spirit-ink hover:bg-spirit-purple/30'
+                                            : 'bg-warm-gray/10 text-warm-gray/60 hover:bg-warm-gray/20'
+                                        } ${isSelf ? 'opacity-60 cursor-default' : 'cursor-pointer'}`}
+                                      >
+                                        {togglingTemplateEditor === u.id
+                                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                                          : <FileText className="w-3 h-3" />
+                                        }
+                                        Templates
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                                {/* MFA */}
+                                <td className="px-4 py-3">
+                                  <span className={`text-xs font-medium ${u.mfaEnabled ? 'text-success-ink' : 'text-warm-gray'}`}>
+                                    {u.mfaEnabled ? 'Enabled' : 'Off'}
+                                  </span>
+                                </td>
+                                {/* Joined */}
+                                <td className="px-4 py-3 text-warm-gray text-xs">{formatDate(u.createdAt)}</td>
+                                {/* Last Login */}
+                                <td className="px-4 py-3 text-warm-gray text-xs">
+                                  {u.lastLoginAt ? (
+                                    formatDate(u.lastLoginAt)
+                                  ) : (
+                                    <span className="inline-flex items-center rounded-full bg-warm-amber/15 text-accent-ink px-2 py-0.5 text-[10px] font-medium">
+                                      Never signed in
+                                    </span>
+                                  )}
+                                </td>
+                                {/* Actions */}
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {/* Resend invite — only useful before a first sign-in */}
+                                    {!u.lastLoginAt && serverConfig?.smtp.configured && (
+                                      <button
+                                        onClick={() => handleResendInvite(u.id)}
+                                        disabled={resendingInviteId === u.id}
+                                        title="Email a fresh invitation link (invalidates any previous one)"
+                                        className="text-xs py-1 px-2 flex items-center gap-1 rounded-sm border border-moss-green/30 text-brand-ink hover:bg-moss-green/5 transition-colors disabled:opacity-50"
+                                      >
+                                        {resendingInviteId === u.id
+                                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                                          : <Mail className="w-3 h-3" />}
+                                        Invite
+                                      </button>
+                                    )}
+                                    {/* Clear lock: only while the account's sign-in is locked */}
+                                    {u.signInLockedUntil && (
+                                      <button
+                                        onClick={() => setLockToClear(u)}
+                                        title="Let this account sign in again at once (asks to confirm)"
+                                        className="text-xs py-1 px-2 flex items-center gap-1 rounded-sm border border-danger/30 text-danger-ink hover:bg-danger/10 transition-colors whitespace-nowrap"
+                                      >
+                                        <LockOpen className="w-3 h-3" />
+                                        Clear lock
+                                      </button>
+                                    )}
+                                    {/* Approve — only when pending */}
+                                    {isPending && (
+                                      <button
+                                        onClick={() => handleApproveUser(u.id)}
+                                        disabled={isApproving}
+                                        title="Approve this account"
+                                        className="text-xs py-1 px-2 flex items-center gap-1 rounded-sm border border-success/30 text-success-ink hover:bg-success/10 transition-colors disabled:opacity-50"
+                                      >
+                                        {isApproving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                        Approve
+                                      </button>
+                                    )}
+                                    {/* Reset MFA — only when MFA enabled */}
+                                    {u.mfaEnabled && (
+                                      <button
+                                        onClick={() => {
+                                          if (isMfaConfirm) {
+                                            setResetMfaConfirmId(null);
+                                            setResetMfaError('');
+                                          } else {
+                                            closeResetModal();
+                                            closeDeleteModal();
+                                            setResetMfaConfirmId(u.id);
+                                            setResetMfaError('');
+                                          }
+                                        }}
+                                        disabled={isSelf}
+                                        title={isSelf ? 'Cannot reset your own MFA here' : 'Reset MFA'}
+                                        className={`text-xs py-1 px-2 flex items-center gap-1 rounded border transition-colors ${
+                                          isSelf
+                                            ? 'opacity-40 cursor-not-allowed border-warm-gray/20 text-warm-gray'
+                                            : 'border-warning/30 text-warning-ink hover:bg-warning/10'
+                                        }`}
+                                      >
+                                        <Shield className="w-3 h-3" />
+                                        MFA
+                                      </button>
+                                    )}
+                                    {/* Reset Password */}
+                                    <Button
+                                      onClick={() => {
+                                      if (isResetExpanded) {
+                                      closeResetModal();
+                                      } else {
+                                      closeDeleteModal();
+                                      setResetMfaConfirmId(null);
+                                      setResetTarget(u);
+                                      setTempPassword('');
+                                      setResetError('');
+                                      }
+                                      }}
+                                      disabled={isSelf}
+                                      title={isSelf ? 'Cannot reset your own password here' : 'Reset password'}
+                                      variant="secondary" className={`text-xs py-1 px-2 flex items-center gap-1 ${isSelf ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                    >
+                                      <RefreshCw className="w-3 h-3" />
+                                      Pwd
+                                    </Button>
+                                    {/* Delete */}
+                                    <button
+                                      onClick={() => {
+                                        if (isDeleteExpanded) {
+                                          closeDeleteModal();
+                                        } else {
+                                          openDeleteModal(u);
+                                        }
+                                      }}
+                                      disabled={isSelf || loadingDeleteWarning === u.id}
+                                      title={isSelf ? 'Cannot delete your own account' : 'Delete user'}
+                                      className={`text-xs py-1 px-2 flex items-center gap-1 rounded border transition-colors ${
+                                        isSelf
+                                          ? 'opacity-40 cursor-not-allowed border-warm-gray/20 text-warm-gray'
+                                          : 'border-danger/30 text-danger-ink hover:bg-danger/10'
+                                      }`}
+                                    >
+                                      {loadingDeleteWarning === u.id
+                                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                                        : <Trash2 className="w-3 h-3" />
+                                      }
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+
+                              {/* MFA Reset Inline Confirm */}
+                              {isMfaConfirm && (
+                                <tr className="bg-warning/10 border-b border-warm-gray/10">
+                                  <td colSpan={7} className="px-6 py-4">
+                                    <div className="max-w-md">
+                                      <p className="text-sm font-medium text-warning-ink mb-1">
+                                        Reset MFA for <strong>{u.displayName}</strong>?
+                                      </p>
+                                      <p className="text-xs text-warning-ink mb-3">
+                                        This clears their authenticator app enrollment. They sign in with their password alone until they set it up again; an administrator is asked to set it up within 7 days.
+                                      </p>
+                                      {resetMfaError && (
+                                        <p className="text-xs text-danger-ink mb-2">{resetMfaError}</p>
+                                      )}
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => handleResetMfa(u.id)}
+                                          disabled={isResettingMfa}
+                                          className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium bg-warning/15 border border-warning/30 text-warning-ink hover:bg-warning/25 disabled:opacity-50 transition-colors"
+                                        >
+                                          {isResettingMfa && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                          Confirm Reset
+                                        </button>
+                                        <Button
+                                          onClick={() => { setResetMfaConfirmId(null); setResetMfaError(''); }}
+                                          variant="secondary" className="text-sm py-1.5 px-4"
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+
+                              {/* Resend invite result */}
+                              {resendInviteResult?.id === u.id && (
+                                <tr className="bg-moss-green/5 border-b border-warm-gray/10">
+                                  <td colSpan={7} className="px-6 py-2">
+                                    <p className="text-xs text-stone-gray">{resendInviteResult.message}</p>
+                                  </td>
+                                </tr>
+                              )}
+                              {/* Reset Password Inline Panel */}
+                              {isResetExpanded && (
+                                <tr className="bg-info/10 border-b border-warm-gray/10">
+                                  <td colSpan={7} className="px-6 py-4">
+                                    <div className="max-w-md">
+                                      <p className="text-sm font-medium text-stone-gray mb-3">
+                                        Reset password for <strong>{u.displayName}</strong>
+                                      </p>
+                                      {tempPassword ? (
+                                        <div>
+                                          <p className="text-xs text-warm-gray mb-2">
+                                            Temporary password generated. Share it securely — the user must change it on next login.
+                                          </p>
+                                          <div className="flex items-center gap-2">
+                                            <code className="flex-1 bg-paper border border-warm-gray/30 rounded-sm px-3 py-2 text-sm font-mono text-ink-secondary select-all">
+                                              {tempPassword}
+                                            </code>
+                                            <Button
+                                              onClick={() => handleCopyToClipboard(tempPassword, setCopied)}
+                                              variant="secondary" className="flex items-center gap-1 text-xs py-2 px-3"
+                                            >
+                                              {copied ? <Check className="w-3.5 h-3.5 text-success-ink" /> : <Copy className="w-3.5 h-3.5" />}
+                                              {copied ? 'Copied' : 'Copy'}
+                                            </Button>
+                                          </div>
+                                          <button
+                                            onClick={closeResetModal}
+                                            className="mt-3 text-xs text-warm-gray hover:text-stone-gray"
+                                          >
+                                            Close
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-3">
+                                          {/* Option 1: Generate temporary password */}
+                                          <div>
+                                            <p className="text-xs text-warm-gray mb-1.5">Generate a temporary password to share with the user directly:</p>
+                                            {resetError && (
+                                              <p className="text-xs text-danger-ink mb-1.5">{resetError}</p>
+                                            )}
+                                            <Button
+                                              onClick={handleResetPassword}
+                                              disabled={isResetting || isSendingResetLink}
+                                              className="flex items-center gap-2 text-sm py-1.5 px-4"
+                                            >
+                                              {isResetting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                              Generate Temporary Password
+                                            </Button>
+                                          </div>
+
+                                          {/* Option 2: Send reset link via email */}
+                                          <div>
+                                            <p className="text-xs text-warm-gray mb-1.5">Or send a password reset link to their email address:</p>
+                                            {resetLinkSent ? (
+                                              <p className="text-xs text-success-ink flex items-center gap-1">
+                                                <Check className="w-3.5 h-3.5" /> Reset link sent to {resetTarget?.email}
+                                              </p>
+                                            ) : (
+                                              <>
+                                                {resetLinkError && (
+                                                  <p className="text-xs text-danger-ink mb-1.5">{resetLinkError}</p>
+                                                )}
+                                                <Button
+                                                  onClick={handleSendPasswordResetLink}
+                                                  disabled={isSendingResetLink || isResetting}
+                                                  variant="secondary" className="flex items-center gap-2 text-sm py-1.5 px-4"
+                                                >
+                                                  {isSendingResetLink ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                                                  Send Reset Link
+                                                </Button>
+                                              </>
+                                            )}
+                                          </div>
+
+                                          <button
+                                            onClick={closeResetModal}
+                                            className="text-xs text-warm-gray hover:text-stone-gray"
+                                          >
+                                            Cancel
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+
+                              {/* Delete Inline Panel */}
+                              {isDeleteExpanded && (
+                                <tr className="bg-danger/10 border-b border-warm-gray/10">
+                                  <td colSpan={7} className="px-6 py-4">
+                                    <div className="max-w-md">
+                                      <p className="text-sm font-medium text-danger-ink mb-1">
+                                        Delete <strong>{u.displayName}</strong>?
+                                      </p>
+                                      <p className="text-xs text-warm-gray mb-3">
+                                        This action is permanent. Type their email address to confirm.
+                                      </p>
+                                      {deletingUserAssetCount > 0 && (
+                                        <div className="flex items-start gap-2 mb-3 p-2.5 bg-warning/10 border border-warning/30 rounded-lg text-xs text-warning-ink">
+                                          <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-warning-ink" />
+                                          <span>
+                                            This user has <strong>{deletingUserAssetCount}</strong> personal file{deletingUserAssetCount !== 1 ? 's' : ''}. Their avatar, and any of them nothing uses and no campaign shares, are deleted with the account.
+                                            The rest stay, owned by no one, and a file a campaign uses can then be seen by admins alone.
+                                            To keep one usable, move it to Global or into the campaign from the <button onClick={() => { closeDeleteModal(); setActiveTab('assets'); }} className="underline hover:no-underline">Assets tab</button> first.
+                                          </span>
+                                        </div>
+                                      )}
+                                      {deleteError && (
+                                        <p className="text-xs text-danger-ink mb-2">{deleteError}</p>
+                                      )}
+                                      {deleteBlockers.length > 0 && (
+                                        <DeletionBlockers campaigns={deleteBlockers} onCleared={clearDeleteBlocker} onError={setDeleteError} />
+                                      )}
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="email"
+                                          placeholder={u.email}
+                                          value={deleteEmail}
+                                          onChange={e => setDeleteEmail(e.target.value)}
+                                          className="input-cozy text-sm flex-1"
+                                        />
+                                        <button
+                                          onClick={handleDeleteUser}
+                                          disabled={deleteEmail !== u.email || isDeleting}
+                                          className="flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium bg-danger-fill text-white hover:bg-danger-fill disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                          {isDeleting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                          Delete
+                                        </button>
+                                        <Button
+                                          onClick={closeDeleteModal}
+                                          variant="secondary" className="text-sm py-2 px-4"
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {users.length > 0 && (
+                  <div className="px-4 py-2 border-t border-warm-gray/10 text-xs text-warm-gray">
+                    {filteredUsers.length} of {users.length} users
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== ASSETS TAB ===== */}
+        {activeTab === 'assets' && (
+          <div role="tabpanel" id="tabpanel-assets" aria-labelledby="tab-assets">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-brand-ink">Asset Management</h2>
+              <Button
+                onClick={() => loadAdminAssets(adminAssetsPage, adminAssetsScope, adminAssetsType, debouncedAdminAssetsSearch, adminAssetsOwner)}
+                disabled={adminAssetsLoading}
+                variant="secondary" className="flex items-center gap-2 text-sm py-1.5 px-3"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${adminAssetsLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              {/* Search */}
+              <div className="relative flex-1 min-w-48">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-gray" />
+                <input
+                  type="text"
+                  placeholder="Search by name…"
+                  value={adminAssetsSearch}
+                  onChange={e => setAdminAssetsSearch(e.target.value)}
+                  className="input-cozy pl-9 w-full"
+                />
+                {adminAssetsSearch && (
+                  <button
+                    onClick={() => setAdminAssetsSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-warm-gray hover:text-stone-gray"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Scope filter */}
+              <select
+                value={adminAssetsScope}
+                onChange={e => setAdminAssetsScope(e.target.value)}
+                className="input-cozy text-sm"
+              >
+                <option value="">All Scopes</option>
+                <option value="GLOBAL">Global</option>
+                <option value="USER">Personal</option>
+                <option value="CAMPAIGN">Campaign</option>
+              </select>
+
+              {/* Type filter */}
+              <select
+                value={adminAssetsType}
+                onChange={e => setAdminAssetsType(e.target.value)}
+                className="input-cozy text-sm"
+                aria-label="Type"
+              >
+                <option value="">All Types</option>
+                <option value="MAP">Map</option>
+                <option value="TOKEN">Token</option>
+                <option value="AUDIO">Audio</option>
+                <option value="AVATAR">Avatar</option>
+                <option value="DOCUMENT">Document</option>
+              </select>
+
+              {/* Uploader filter: an asset whose uploader was deleted, in no
+                  campaign, is readable by admins alone */}
+              <select
+                value={adminAssetsOwner}
+                onChange={e => setAdminAssetsOwner(e.target.value)}
+                className="input-cozy text-sm"
+                aria-label="Uploader"
+              >
+                <option value="">Any Uploader</option>
+                <option value="none">No Uploader (account deleted)</option>
+              </select>
+            </div>
+
+            {adminAssetsError && (
+              <div className="bg-danger/10 border border-danger/30 text-danger-ink rounded-lg p-4 mb-4 text-sm">
+                {adminAssetsError}
+              </div>
+            )}
+
+            <div className="glass-panel overflow-hidden">
+              {adminAssetsLoading && adminAssets.length === 0 ? (
+                <TableSkeleton rows={8} columns={7} />
+              ) : adminAssets.length === 0 ? (
+                <div className="text-center py-12 text-warm-gray">
+                  <Layers className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">No assets found.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-warm-gray/20 bg-moss-green/5">
+                        <th className="text-left px-3 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide w-14">Preview</th>
+                        <th className="text-left px-3 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">Name</th>
+                        <th className="text-left px-3 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">Type</th>
+                        <th className="text-left px-3 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">Scope</th>
+                        <th className="text-left px-3 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">Uploader</th>
+                        <th className="text-left px-3 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">Campaign</th>
+                        <th className="text-left px-3 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">Size</th>
+                        <th className="text-right px-3 py-3 text-xs font-semibold text-warm-gray uppercase tracking-wide">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminAssets.map(asset => {
+                        const isScopePickerOpen = assetScopePicker?.assetId === asset.id;
+                        const isChangingScope = assetScopeChanging === asset.id;
+                        const isDeleting = assetDeleting === asset.id;
+
+                        // Thumb URL
+                        const thumbUrl = asset.type === AssetType.AVATAR
+                          ? (asset.uploadedById ? api.getAssetUrl(asset.uploadedById, 'avatars') : '')
+                          : asset.type === AssetType.MAP
+                            ? api.getAssetUrl(asset.id, 'maps')
+                            : asset.type === AssetType.TOKEN
+                              ? api.getAssetUrl(asset.id, 'tokens')
+                              : null;
+
+                        return (
+                          <React.Fragment key={asset.id}>
+                            <tr className={`border-b border-warm-gray/10 hover:bg-moss-green/5 transition-colors ${isDeleting ? 'opacity-50' : ''}`}>
+                              {/* Thumb */}
+                              <td className="px-3 py-2">
+                                <div className="w-10 h-10 rounded-sm bg-moss-green/10 overflow-hidden flex items-center justify-center shrink-0">
+                                  {thumbUrl ? (
+                                    <img src={thumbUrl} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                  ) : asset.type === AssetType.AUDIO ? (
+                                    <FileAudio className="w-5 h-5 text-spirit-ink" />
+                                  ) : asset.type === AssetType.DOCUMENT ? (
+                                    <FileText className="w-5 h-5 text-stone-gray/60" />
+                                  ) : (
+                                    <ImageIcon className="w-5 h-5 text-stone-gray/40" />
+                                  )}
+                                </div>
+                              </td>
+                              {/* Name */}
+                              <td className="px-3 py-2 max-w-[180px]">
+                                <p className="font-medium text-stone-gray truncate" title={asset.description ?? asset.name}>
+                                  {asset.name}
+                                </p>
+                                {asset.description && (
+                                  <p className="text-xs text-warm-gray truncate">{asset.description}</p>
+                                )}
+                              </td>
+                              {/* Type */}
+                              <td className="px-3 py-2">
+                                <span className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full bg-parchment border border-moss-green/20 text-stone-gray">
+                                  {asset.type === AssetType.MAP && <MapPin className="w-3 h-3 text-accent-ink" />}
+                                  {asset.type === AssetType.TOKEN && <UserIcon className="w-3 h-3 text-brand-ink" />}
+                                  {asset.type === AssetType.AUDIO && <FileAudio className="w-3 h-3 text-spirit-ink" />}
+                                  {asset.type === AssetType.AVATAR && <UserIcon className="w-3 h-3 text-accent-ink" />}
+                                  {asset.type === AssetType.DOCUMENT && <FileText className="w-3 h-3 text-stone-gray" />}
+                                  {asset.type}
+                                </span>
+                              </td>
+                              {/* Scope */}
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                                  asset.scope === AssetScope.GLOBAL
+                                    ? 'bg-spirit/10 text-spirit-ink'
+                                    : asset.scope === AssetScope.USER
+                                      ? 'bg-moss-green/15 text-brand-ink'
+                                      : 'bg-warm-amber/15 text-accent-ink'
+                                }`}>
+                                  {asset.scope === AssetScope.GLOBAL && <Globe className="w-3 h-3" />}
+                                  {asset.scope === AssetScope.USER && <UserIcon className="w-3 h-3" />}
+                                  {asset.scope === AssetScope.CAMPAIGN && <Users className="w-3 h-3" />}
+                                  {assetScopeLabel(asset.scope)}
+                                </span>
+                              </td>
+                              {/* Uploader */}
+                              <td className="px-3 py-2 text-warm-gray text-xs">
+                                {asset.uploadedBy?.displayName ?? 'No one'}
+                              </td>
+                              {/* Campaign */}
+                              <td className="px-3 py-2 text-warm-gray text-xs">
+                                {asset.campaign?.name ?? '—'}
+                              </td>
+                              {/* Size */}
+                              <td className="px-3 py-2 text-warm-gray text-xs whitespace-nowrap">
+                                {formatFileSize(asset.fileSize, ADMIN_SIZES)}
+                              </td>
+                              {/* Actions */}
+                              <td className="px-3 py-2">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* Scope change dropdown */}
+                                  <div className="relative">
+                                    <select
+                                      value={asset.scope}
+                                      disabled={isChangingScope || isDeleting}
+                                      onChange={e => {
+                                        const newScope = e.target.value;
+                                        if (newScope === AssetScope.CAMPAIGN) {
+                                          setAssetScopePicker({ assetId: asset.id, campaignId: '' });
+                                        } else if (newScope !== asset.scope) {
+                                          handleAdminAssetScopeChange(asset, newScope);
+                                        }
+                                      }}
+                                      className="text-xs py-1 px-2 pr-6 rounded-sm border border-moss-green/30 text-stone-gray bg-paper-white hover:border-moss-green/60 cursor-pointer disabled:opacity-50 appearance-none"
+                                      title="Change scope"
+                                    >
+                                      <option value={AssetScope.GLOBAL}>Global</option>
+                                      <option value={AssetScope.USER}>Personal</option>
+                                      <option value={AssetScope.CAMPAIGN}>Campaign…</option>
+                                    </select>
+                                    {isChangingScope && (
+                                      <Loader2 className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 animate-spin text-brand-ink pointer-events-none" />
+                                    )}
+                                    {!isChangingScope && (
+                                      <ArrowRightLeft className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-warm-gray/60 pointer-events-none" />
+                                    )}
+                                  </div>
+                                  {/* Delete */}
+                                  <button
+                                    onClick={() => setAssetToDelete(asset)}
+                                    disabled={isDeleting || isChangingScope}
+                                    className="text-xs py-1 px-2 flex items-center gap-1 rounded-sm border border-danger/30 text-danger-ink hover:bg-danger/10 transition-colors disabled:opacity-50"
+                                    title="Delete asset"
+                                    aria-label={`Delete asset ${asset.name}`}
+                                  >
+                                    {isDeleting
+                                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                                      : <Trash2 className="w-3 h-3" />
+                                    }
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* Campaign picker row */}
+                            {isScopePickerOpen && (
+                              <tr className="bg-warm-amber/5 border-b border-warm-gray/10">
+                                <td colSpan={8} className="px-6 py-3">
+                                  <div className="flex items-center gap-3 max-w-lg">
+                                    <Users className="w-4 h-4 text-accent-ink shrink-0" />
+                                    <p className="text-xs text-stone-gray font-medium whitespace-nowrap">Move to campaign:</p>
+                                    <select
+                                      value={assetScopePicker?.campaignId ?? ''}
+                                      onChange={e => setAssetScopePicker(p => p ? { ...p, campaignId: e.target.value } : null)}
+                                      className="input-cozy text-xs flex-1"
+                                      autoFocus
+                                    >
+                                      <option value="">— select campaign —</option>
+                                      {adminCampaigns.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                      ))}
+                                    </select>
+                                    <Button
+                                      onClick={() => {
+                                      if (assetScopePicker?.campaignId) {
+                                      handleAdminAssetScopeChange(asset, AssetScope.CAMPAIGN, assetScopePicker.campaignId);
+                                      }
+                                      }}
+                                      disabled={!assetScopePicker?.campaignId || isChangingScope}
+                                      className="text-xs py-1 px-3 flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      {isChangingScope && <Loader2 className="w-3 h-3 animate-spin" />}
+                                      Move
+                                    </Button>
+                                    <Button
+                                      onClick={() => setAssetScopePicker(null)}
+                                      variant="secondary" className="text-xs py-1 px-3"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Footer: count + pagination */}
+              {adminAssetsTotal > 0 && (
+                <div className="px-4 py-3 border-t border-warm-gray/10 flex items-center justify-between text-xs text-warm-gray">
+                  <span>
+                    {adminAssetsTotal} asset{adminAssetsTotal !== 1 ? 's' : ''} total
+                    {(adminAssetsScope || adminAssetsType || adminAssetsSearch || adminAssetsOwner) ? ' (filtered)' : ''}
+                  </span>
+                  {adminAssetsTotalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setAdminAssetsPage(p => Math.max(1, p - 1))}
+                        disabled={adminAssetsPage <= 1 || adminAssetsLoading}
+                        className="p-1 rounded-sm hover:bg-moss-green/10 disabled:opacity-40"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <span>Page {adminAssetsPage} of {adminAssetsTotalPages}</span>
+                      <button
+                        onClick={() => setAdminAssetsPage(p => Math.min(adminAssetsTotalPages, p + 1))}
+                        disabled={adminAssetsPage >= adminAssetsTotalPages || adminAssetsLoading}
+                        className="p-1 rounded-sm hover:bg-moss-green/10 disabled:opacity-40"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <OrphanedFilesPanel />
+          </div>
+        )}
+
+        {/* ===== SETTINGS TAB ===== */}
+        {activeTab === 'settings' && (
+          <div role="tabpanel" id="tabpanel-settings" aria-labelledby="tab-settings" className="max-w-2xl space-y-6">
+            <h2 className="text-xl font-semibold text-brand-ink">System Settings</h2>
+
+            {settingsLoading && !settings ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 text-brand-ink animate-spin" />
+              </div>
+            ) : !settings ? (
+              <SettingsLoadFailed message={settingsLoadError} onRetry={loadSettings} />
+            ) : (
+              <section className="glass-panel p-6 space-y-6">
+                {/* Instance Name */}
+                <div>
+                  <label htmlFor="admin-instance-name" className="block text-sm font-medium text-stone-gray mb-1">
+                    Instance Name
+                  </label>
+                  <input
+                    id="admin-instance-name"
+                    type="text"
+                    value={settingsForm.instanceName}
+                    maxLength={100}
+                    onChange={e => setSettingsForm(f => ({ ...f, instanceName: e.target.value }))}
+                    className="input-cozy w-full"
+                    placeholder="CozyVTT"
+                  />
+                  <p className="text-xs text-warm-gray mt-1">
+                    Shown in the browser tab and in the emails the instance sends.
+                  </p>
+                </div>
+
+                {/* Allow Registration */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-stone-gray">Allow Public Registration</p>
+                    <p className="text-xs text-warm-gray mt-0.5">
+                      When enabled, anyone can create an account via the registration page.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSettingsForm(f => ({ ...f, allowRegistration: !f.allowRegistration }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      settingsForm.allowRegistration ? 'bg-moss-green' : 'bg-warm-gray/40'
+                    }`}
+                    role="switch"
+                    aria-checked={settingsForm.allowRegistration}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        settingsForm.allowRegistration ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Require Admin Approval */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-stone-gray">Require Admin Approval</p>
+                    <p className="text-xs text-warm-gray mt-0.5">
+                      New accounts must be approved by an admin before they can log in.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSettingsForm(f => ({ ...f, requireAdminApproval: !f.requireAdminApproval }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      settingsForm.requireAdminApproval ? 'bg-moss-green' : 'bg-warm-gray/40'
+                    }`}
+                    role="switch"
+                    aria-checked={settingsForm.requireAdminApproval}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        settingsForm.requireAdminApproval ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="pt-2 border-t border-warm-gray/20 flex items-center gap-3">
+                  {settingsError && (
+                    <p className="text-sm text-danger-ink flex-1">{settingsError}</p>
+                  )}
+                  <Button
+                    onClick={handleSaveSettings}
+                    disabled={settingsSaving}
+                    className="flex items-center gap-2 ml-auto"
+                  >
+                    {settingsSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Save Settings
+                  </Button>
+                </div>
+
+              </section>
+            )}
+
+            {/* ---- SMTP Configuration (read-only) ---- */}
+            <section className="glass-panel p-6 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-warm-gray/20">
+                <Mail className="w-4 h-4 text-accent-ink" />
+                <h3 className="font-semibold text-brand-ink text-sm">SMTP Configuration</h3>
+                <span className="ml-auto text-xs text-warm-gray">Read-only — set via environment variables</span>
+              </div>
+
+              {configLoading ? (
+                <div className="flex items-center gap-2 text-sm text-warm-gray">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading...
+                </div>
+              ) : serverConfig ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                      serverConfig.smtp.configured
+                        ? 'bg-success/10 text-success-ink'
+                        : 'bg-warning/10 text-warning-ink'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${serverConfig.smtp.configured ? 'bg-success' : 'bg-warning'}`} />
+                      {serverConfig.smtp.configured ? 'Configured' : 'Not configured'}
+                    </span>
+                    {serverConfig.smtp.configured && (
+                      <span className="text-xs text-warm-gray">
+                        {serverConfig.smtp.host}:{serverConfig.smtp.port}
+                        {serverConfig.smtp.secure ? ' (TLS)' : ' (STARTTLS)'}
+                        {serverConfig.smtp.user ? ` · ${serverConfig.smtp.user}` : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  {serverConfig.smtp.configured && (
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleSmtpTest}
+                        disabled={smtpTesting}
+                        className="flex items-center gap-2 text-sm py-1.5 px-3 rounded-lg border border-moss-green/30 text-brand-ink hover:bg-moss-green/10 transition-colors disabled:opacity-50"
+                      >
+                        {smtpTesting
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Mail className="w-3.5 h-3.5" />
+                        }
+                        Send Test Email
+                      </button>
+                      {smtpTestResult && (
+                        <span className={`text-xs ${smtpTestResult.ok ? 'text-success-ink' : 'text-danger-ink'}`}>
+                          {smtpTestResult.ok ? '✓' : '✗'} {smtpTestResult.message}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {!serverConfig.smtp.configured && (
+                    <p className="text-xs text-warm-gray">
+                      Set <code className="font-mono bg-warm-gray/10 px-1 rounded-sm">SMTP_HOST</code>,{' '}
+                      <code className="font-mono bg-warm-gray/10 px-1 rounded-sm">SMTP_USER</code>, and{' '}
+                      <code className="font-mono bg-warm-gray/10 px-1 rounded-sm">SMTP_PASS</code>{' '}
+                      in your <code className="font-mono bg-warm-gray/10 px-1 rounded-sm">.env</code> to enable email delivery.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-warm-gray">Could not load SMTP configuration.</p>
+              )}
+            </section>
+
+            {/* ---- Upload Size Limits (read-only) ---- */}
+            <section className="glass-panel p-6 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-warm-gray/20">
+                <FolderOpen className="w-4 h-4 text-accent-ink" />
+                <h3 className="font-semibold text-brand-ink text-sm">Upload Size Limits</h3>
+                <span className="ml-auto text-xs text-warm-gray">Read-only — set via environment variables</span>
+              </div>
+
+              {configLoading ? (
+                <div className="flex items-center gap-2 text-sm text-warm-gray">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading...
+                </div>
+              ) : serverConfig ? (
+                <div>
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {(Object.entries(serverConfig.uploadLimits) as [string, number][]).map(([type, bytes]) => (
+                        <tr key={type} className="border-b border-warm-gray/10 last:border-0">
+                          <td className="py-1.5 text-stone-gray font-medium w-24">{type}</td>
+                          <td className="py-1.5 text-warm-gray">{formatFileSize(bytes, ADMIN_SIZES)}</td>
+                          <td className="py-1.5 text-right text-xs text-warm-gray/60">
+                            <code className="font-mono">MAX_{type}_SIZE_MB</code>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="text-xs text-warm-gray/70 mt-3">
+                    Your reverse proxy must allow request bodies of at least{' '}
+                    <strong>{requiredProxyBodyMB(serverConfig.uploadLimits)} MB</strong>, or larger
+                    uploads fail with HTTP 413 before reaching the API. For the bundled Nginx, set{' '}
+                    <code className="font-mono bg-warm-gray/10 px-1 rounded-sm">
+                      NGINX_MAX_BODY_SIZE={requiredProxyBodyMB(serverConfig.uploadLimits)}M
+                    </code>{' '}
+                    in your <code className="font-mono bg-warm-gray/10 px-1 rounded-sm">.env</code> and
+                    apply it with{' '}
+                    <code className="font-mono bg-warm-gray/10 px-1 rounded-sm">docker compose up -d</code>
+                    ; <code className="font-mono bg-warm-gray/10 px-1 rounded-sm">docker compose restart</code>{' '}
+                    keeps the old value. Cloudflare-proxied setups (including Tunnels) also cap request
+                    bodies at 100 MB on Free/Pro plans.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-warm-gray">Could not load upload limits.</p>
+              )}
+            </section>
+
+            {/* ---- Session Timeouts (read-only) ---- */}
+            <section className="glass-panel p-6 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-warm-gray/20">
+                <Clock className="w-4 h-4 text-accent-ink" />
+                <h3 className="font-semibold text-brand-ink text-sm">Session Timeouts</h3>
+                <span className="ml-auto text-xs text-warm-gray">Read-only — set via environment variables</span>
+              </div>
+
+              {configLoading ? (
+                <div className="flex items-center gap-2 text-sm text-warm-gray">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading...
+                </div>
+              ) : serverConfig ? (
+                <table className="w-full text-sm">
+                  <tbody>
+                    <tr className="border-b border-warm-gray/10">
+                      <td className="py-1.5 text-stone-gray font-medium">Session timeout</td>
+                      <td className="py-1.5 text-warm-gray">
+                        {formatDuration(serverConfig.sessionTimeoutMs, 'largest')}
+                      </td>
+                      <td className="py-1.5 text-right text-xs text-warm-gray/60">
+                        <code className="font-mono">SESSION_MAX_AGE</code>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 text-stone-gray font-medium">Remember me</td>
+                      <td className="py-1.5 text-warm-gray">
+                        {formatDuration(serverConfig.rememberMeTimeoutMs, 'largest')}
+                      </td>
+                      <td className="py-1.5 text-right text-xs text-warm-gray/60">
+                        <code className="font-mono">REMEMBER_ME_MAX_AGE</code>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-xs text-warm-gray">Could not load session configuration.</p>
+              )}
+            </section>
+          </div>
+        )}
+
+        {/* ===== APPEARANCE TAB ===== */}
+        {activeTab === 'appearance' && (
+          <div role="tabpanel" id="tabpanel-appearance" aria-labelledby="tab-appearance" className="max-w-3xl space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold text-brand-ink">Default Theme &amp; Branding</h2>
+              <p className="text-sm text-warm-gray mt-1">
+                The default theme is shown on the login page and applied to brand-new users.
+                Each user can pick their own theme from their <span className="font-medium">Profile</span>.
+                Logo, favicon, and mascot remain instance-wide.
+              </p>
+            </div>
+
+            {settingsLoading && !settings ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 text-brand-ink animate-spin" />
+              </div>
+            ) : !settings ? (
+              <SettingsLoadFailed message={settingsLoadError} onRetry={loadSettings} />
+            ) : (
+              <>
+                <ThemePicker
+                  themeId={appearanceForm.themeId}
+                  fontId={appearanceForm.fontId}
+                  customColors={appearanceForm.customColors}
+                  onChange={(next) => {
+                    setAppearanceForm(f => ({
+                      ...f,
+                      themeId: next.themeId,
+                      fontId: next.fontId,
+                      customColors: next.customColors,
+                    }));
+                  }}
+                />
+                {/* Save Appearance */}
+                <div className="flex items-center gap-3">
+                  {appearanceError && (
+                    <p className="text-sm text-danger-ink flex-1">{appearanceError}</p>
+                  )}
+                  <Button
+                    onClick={async () => {
+                    setAppearanceSaving(true);
+                    setAppearanceError('');
+                    try {
+                    const updateData: Record<string, unknown> = {
+                    themeId: appearanceForm.themeId,
+                    fontId: appearanceForm.fontId,
+                    };
+                    if (appearanceForm.themeId === 'custom') {
+                    updateData.customThemeColors = appearanceForm.customColors;
+                    }
+                    await adminService.updateSettings(updateData);
+                    await refreshAppearance();
+                    showToast('Appearance saved!', 'success');
+                    } catch (err: unknown) {
+                    setAppearanceError(apiErrorMessage(err) || 'Failed to save appearance');
+                    } finally {
+                    setAppearanceSaving(false);
+                    }
+                    }}
+                    disabled={appearanceSaving}
+                    className="flex items-center gap-2 ml-auto"
+                  >
+                    {appearanceSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Save Default Theme
+                  </Button>
+                  <Button
+                    onClick={() => {
+                    const defaultTheme = PRESET_THEMES[0];
+                    setAppearanceForm(f => ({ ...f, themeId: 'cozy-default', fontId: 'default' }));
+                    applyThemeColors(defaultTheme.colors);
+                    applyFont(FONT_OPTIONS[0]);
+                    }}
+                    variant="secondary" className="text-sm"
+                  >
+                    Reset to Default
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ===== BACKUPS TAB ===== */}
+        {activeTab === 'backups' && (
+          <div role="tabpanel" id="tabpanel-backups" aria-labelledby="tab-backups" className="max-w-3xl space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-brand-ink">Instance Backups</h2>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleCreateBackup}
+                  disabled={creatingBackup}
+                  className="flex items-center gap-2 text-sm py-1.5 px-3"
+                >
+                  {creatingBackup
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <HardDrive className="w-3.5 h-3.5" />
+                  }
+                  Create Backup
+                </Button>
+                <Button
+                  onClick={loadBackups}
+                  disabled={backupsLoading}
+                  variant="secondary" className="flex items-center gap-2 text-sm py-1.5 px-3"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${backupsLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+            </div>
+
+            {backupCreateError && (
+              <div className="bg-danger/10 border border-danger/30 text-danger-ink rounded-lg p-4 text-sm flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{backupCreateError}</span>
+              </div>
+            )}
+
+            {backupsError && (
+              <div className="bg-danger/10 border border-danger/30 text-danger-ink rounded-lg p-4 text-sm">
+                {backupsError}
+              </div>
+            )}
+
+            <section className="glass-panel overflow-hidden">
+              <div className="px-4 py-3 border-b border-warm-gray/20 flex items-center gap-2">
+                <Database className="w-4 h-4 text-brand-ink" />
+                <h3 className="font-semibold text-brand-ink text-sm">Available Backups</h3>
+                {backups.length > 0 && (
+                  <span className="ml-auto text-xs text-warm-gray">{backups.length} backup{backups.length !== 1 ? 's' : ''}</span>
+                )}
+              </div>
+
+              {backupsLoading && backups.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 text-brand-ink animate-spin" />
+                </div>
+              ) : backups.length === 0 ? (
+                <div className="text-center py-10 text-warm-gray">
+                  <HardDrive className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No backups yet.</p>
+                  <p className="text-xs mt-1">Click <strong>Create Backup</strong> to generate your first backup.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-warm-gray/10 bg-moss-green/5">
+                        <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Filename</th>
+                        <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Size</th>
+                        <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Created</th>
+                        <th className="text-right px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {backups.map(b => (
+                        <tr key={b.filename} className="border-b border-warm-gray/10 hover:bg-moss-green/5">
+                          <td className="px-4 py-2.5 font-mono text-xs text-stone-gray">{b.filename}</td>
+                          <td className="px-4 py-2.5 text-warm-gray text-xs">{formatFileSize(b.sizeBytes, ADMIN_SIZES)}</td>
+                          <td className="px-4 py-2.5 text-warm-gray text-xs">{formatRelativeTime(b.createdAt)}</td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <a
+                                href={adminService.getBackupDownloadUrl(b.filename)}
+                                download={b.filename}
+                                className="text-xs py-1 px-2 flex items-center gap-1 rounded-sm border border-moss-green/30 text-brand-ink hover:bg-moss-green/10 transition-colors"
+                              >
+                                <Download className="w-3 h-3" />
+                                Download
+                              </a>
+                              <button
+                                onClick={() => setBackupToDelete(b.filename)}
+                                disabled={deletingBackupFile === b.filename}
+                                className="text-xs py-1 px-2 flex items-center gap-1 rounded-sm border border-danger/30 text-danger-ink hover:bg-danger/10 transition-colors disabled:opacity-50"
+                                title="Delete backup"
+                                aria-label={`Delete backup ${b.filename}`}
+                              >
+                                {deletingBackupFile === b.filename
+                                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                                  : <Trash2 className="w-3 h-3" />
+                                }
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section className="glass-panel overflow-hidden border border-danger/40">
+              <div className="px-4 py-3 border-b border-danger/30 flex items-center gap-2 bg-danger/10">
+                <RotateCcw className="w-4 h-4 text-danger-ink" />
+                <h3 className="font-semibold text-danger-ink text-sm">Restore from Backup</h3>
+              </div>
+              <div className="p-5 space-y-4">
+                {restoreResult ? (
+                  <div className="bg-moss-green/10 border border-moss-green/30 rounded-lg p-4 text-center space-y-2">
+                    <p className="text-sm font-semibold text-brand-ink">Restore complete!</p>
+                    <p className="text-xs text-warm-gray">
+                      The database and files have been restored. The database as it was before is saved as{' '}
+                      <span className="font-mono">{restoreResult.safetyBackup}</span> in the backup list, in case this was
+                      the wrong file. Your current session is no longer valid.
+                    </p>
+                    {/* A full page load: this session went with the old database. */}
+                    <a
+                      href="/auth/login"
+                      className="inline-block text-xs py-1.5 px-4 rounded-lg bg-moss-green text-brand-text hover:bg-brand-hover transition-colors font-medium"
+                    >
+                      Go to Login
+                    </a>
+                  </div>
+                ) : (
+                  <>
+                    <div className="bg-danger/10 border border-danger/60 rounded-lg p-3 flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-danger-ink mt-0.5 shrink-0" />
+                      <p className="text-xs text-danger-ink">
+                        Restoring <strong>replaces the current database</strong> with the backup's and copies the backup's
+                        uploaded files over yours. A backup of the database as it is now is saved to the backup list first,
+                        so the database can be put back if this turns out to be the wrong file.{' '}
+                        <strong>Restore only backups made by this dashboard or the backup script, on an instance you trust:</strong>{' '}
+                        the database carries out the file's instructions with full rights.
+                      </p>
+                    </div>
+
+                    <div>
+                      <input
+                        ref={restoreInputRef}
+                        type="file"
+                        accept=".zip"
+                        className="hidden"
+                        onChange={(e) => {
+                          setRestoreFile(e.target.files?.[0] ?? null);
+                          setRestoreError('');
+                        }}
+                      />
+                      <Button
+                        onClick={() => restoreInputRef.current?.click()}
+                        variant="secondary" className="flex items-center gap-2 text-sm py-1.5 px-3"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        {restoreFile ? 'Change file' : 'Select backup file (.zip)'}
+                      </Button>
+                      {restoreFile && (
+                        <p className="text-xs text-warm-gray mt-1.5 font-mono">
+                          {restoreFile.name} ({formatFileSize(restoreFile.size, ADMIN_SIZES)})
+                        </p>
+                      )}
+                    </div>
+
+                    {restoreError && (
+                      <div className="bg-danger/10 border border-danger/30 text-danger-ink rounded-lg p-3 text-xs flex items-start gap-2">
+                        <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        {restoreError}
+                      </div>
+                    )}
+
+                    {restoreFile && (
+                      <button
+                        onClick={handleRestoreBackup}
+                        disabled={restoring}
+                        className="flex items-center gap-2 text-sm py-1.5 px-4 rounded-lg bg-danger-fill text-white hover:bg-danger-fill disabled:opacity-50 transition-colors font-medium"
+                      >
+                        {restoring
+                          ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Restoring…</>
+                          : <><RotateCcw className="w-3.5 h-3.5" /> Restore Instance</>
+                        }
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* ===== ACTIVITY TAB ===== */}
+        {activeTab === 'activity' && (
+          <div role="tabpanel" id="tabpanel-activity" aria-labelledby="tab-activity">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-brand-ink">Platform Activity</h2>
+              <Button
+                onClick={loadActivity}
+                disabled={activityLoading}
+                variant="secondary" className="flex items-center gap-2 text-sm py-1.5 px-3"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${activityLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+
+            {activityError && (
+              <div className="bg-danger/10 border border-danger/30 text-danger-ink rounded-lg p-4 mb-6 text-sm">
+                {activityError}
+              </div>
+            )}
+
+            {activityLoading && !activity ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="glass-panel overflow-hidden">
+                    <TableSkeleton rows={4} columns={4} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-8">
+
+                {/* Currently Online */}
+                <section className="glass-panel overflow-hidden">
+                  <div className="px-4 py-3 border-b border-warm-gray/20 flex items-center gap-2">
+                    <Wifi className="w-4 h-4 text-success-ink" />
+                    <h3 className="font-semibold text-brand-ink text-sm">Currently Online</h3>
+                    {activity?.onlineUsers && (
+                      <span className="ml-auto text-xs font-medium text-success-ink">
+                        {activity.onlineUsers.length} active {activity.onlineUsers.length === 1 ? 'session' : 'sessions'}
+                      </span>
+                    )}
+                  </div>
+                  {!activity?.onlineUsers?.length ? (
+                    <p className="text-sm text-warm-gray text-center py-6">No active sessions right now.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-warm-gray/10 bg-moss-green/5">
+                            <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">User</th>
+                            <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Email</th>
+                            <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Role</th>
+                            <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Last Login</th>
+                            <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Session Expires</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activity.onlineUsers.map((u: AdminOnlineUser) => (
+                            <tr key={u.id} className="border-b border-warm-gray/10 hover:bg-moss-green/5">
+                              <td className="px-4 py-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="inline-block w-2 h-2 rounded-full bg-success shrink-0" />
+                                  <span className="font-medium text-stone-gray">{u.displayName}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 text-warm-gray">{u.email}</td>
+                              <td className="px-4 py-2">
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                                  u.platformRole === PlatformRole.ADMIN
+                                    ? 'bg-moss-green/15 text-brand-ink'
+                                    : 'bg-warm-gray/20 text-warm-gray'
+                                }`}>
+                                  {u.platformRole}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 text-warm-gray text-xs">{u.lastLoginAt ? formatRelativeTime(u.lastLoginAt) : '\u2014'}</td>
+                              <td className="px-4 py-2 text-xs text-warm-gray">{formatExpiry(u.sessionExpiry)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+
+                {/* Recent Admin Actions */}
+                <section className="glass-panel overflow-hidden">
+                  <div className="px-4 py-3 border-b border-warm-gray/20 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-accent-ink" />
+                    <h3 className="font-semibold text-brand-ink text-sm">Recent Admin Actions</h3>
+                    <span className="text-xs text-warm-gray ml-auto">last 100</span>
+                  </div>
+                  {!activity?.recentLogs?.length ? (
+                    <p className="text-sm text-warm-gray text-center py-6">No admin actions logged yet.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-warm-gray/10 bg-moss-green/5">
+                            <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Time</th>
+                            <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Level</th>
+                            <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">By</th>
+                            <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activity.recentLogs.map((log: AdminSystemLog) => (
+                            <tr key={log.id} className="border-b border-warm-gray/10 hover:bg-moss-green/5">
+                              <td className="px-4 py-2 text-warm-gray text-xs whitespace-nowrap">{formatRelativeTime(log.createdAt)}</td>
+                              <td className="px-4 py-2">
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${LOG_LEVEL_COLORS[log.level] ?? 'bg-warm-gray/20 text-warm-gray'}`}>
+                                  {log.level}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 text-sm"><LogActor log={log} /></td>
+                              <td className="px-4 py-2 text-stone-gray">
+                                {log.message}
+                                <LogChanges context={log.context} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+
+                {/* Recent Registrations */}
+                <section className="glass-panel overflow-hidden">
+                  <div className="px-4 py-3 border-b border-warm-gray/20 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-brand-ink" />
+                    <h3 className="font-semibold text-brand-ink text-sm">Recent Registrations</h3>
+                    <span className="text-xs text-warm-gray ml-auto">50 most recent</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-warm-gray/10 bg-moss-green/5">
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">User</th>
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Email</th>
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Role</th>
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">MFA</th>
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Joined</th>
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Last Login</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {!activity?.recentUsers.length ? (
+                          <tr>
+                            <td colSpan={6} className="text-center py-8 text-warm-gray">No users yet.</td>
+                          </tr>
+                        ) : (
+                          activity.recentUsers.map(u => (
+                            <tr key={u.id} className="border-b border-warm-gray/10 hover:bg-moss-green/5">
+                              <td className="px-4 py-2 font-medium text-stone-gray">{u.displayName}</td>
+                              <td className="px-4 py-2 text-warm-gray">{u.email}</td>
+                              <td className="px-4 py-2">
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                                  u.platformRole === PlatformRole.ADMIN
+                                    ? 'bg-moss-green/15 text-brand-ink'
+                                    : 'bg-warm-gray/20 text-warm-gray'
+                                }`}>
+                                  {u.platformRole}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2">
+                                <span className={`text-xs ${u.mfaEnabled ? 'text-success-ink' : 'text-warm-gray'}`}>
+                                  {u.mfaEnabled ? 'On' : 'Off'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 text-warm-gray text-xs">{formatDate(u.createdAt)}</td>
+                              <td className="px-4 py-2 text-warm-gray text-xs">{formatDate(u.lastLoginAt)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                {/* Recent Game Sessions */}
+                <section className="glass-panel overflow-hidden">
+                  <div className="px-4 py-3 border-b border-warm-gray/20 flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-info-ink" />
+                    <h3 className="font-semibold text-brand-ink text-sm">Recent Game Sessions</h3>
+                    <span className="text-xs text-warm-gray ml-auto">20 most recent</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-warm-gray/10 bg-moss-green/5">
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Campaign</th>
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide"># Session</th>
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Started</th>
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-warm-gray uppercase tracking-wide">Ended</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {!activity?.recentSessions.length ? (
+                          <tr>
+                            <td colSpan={4} className="text-center py-8 text-warm-gray">No sessions played yet.</td>
+                          </tr>
+                        ) : (
+                          activity.recentSessions.map(s => (
+                            <tr key={s.id} className="border-b border-warm-gray/10 hover:bg-moss-green/5">
+                              <td className="px-4 py-2 font-medium text-stone-gray">{s.campaign.name}</td>
+                              <td className="px-4 py-2 text-warm-gray">#{s.sessionNumber}</td>
+                              <td className="px-4 py-2 text-warm-gray text-xs">{formatDate(s.startedAt)}</td>
+                              <td className="px-4 py-2 text-xs">
+                                {s.endedAt
+                                  ? <span className="text-warm-gray">{formatDate(s.endedAt)}</span>
+                                  : <span className="text-success-ink font-medium">In progress</span>
+                                }
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+              </div>
+            )}
+          </div>
+        )}
+
+      </main>
+
+      {/* ===== CREATE USER MODAL ===== */}
+      {/* While the temporary password is on screen it closes only with Done,
+          so nobody loses the one look they get at it. */}
+      <Modal
+        open={createUserOpen}
+        onClose={closeCreateUserModal}
+        title={createUserMode === 'invite' ? 'Invite User' : 'Create User'}
+        icon={createUserMode === 'invite' ? Mail : UserPlus}
+        closeDisabled={!!newUserPassword || creatingUser}
+      >
+        {createUserSuccess ? (
+          /* Invited, or created with the details emailed — no password to show */
+          <div className="space-y-4">
+            <div className="flex items-start gap-2">
+              <Check className="w-4 h-4 text-success-ink mt-0.5 shrink-0" />
+              <p className="text-sm text-success-ink font-medium">{createUserSuccess}</p>
+            </div>
+            <p className="text-xs text-warm-gray">
+              They choose their own password, so no one else ever sees it.
+            </p>
+            <Button onClick={closeCreateUserModal} className="w-full">
+              Done
+            </Button>
+          </div>
+        ) : newUserPassword ? (
+          /* Success — show temp password */
+          <div>
+            <p className="text-sm text-success-ink font-medium mb-1">User created successfully!</p>
+            <p className="text-xs text-warm-gray mb-4">
+              Share this temporary password securely — it is shown only once, and they will be
+              required to replace it before they can use their account.
+            </p>
+            <div className="flex items-center gap-2 mb-4">
+              <code className="flex-1 bg-warm-amber/10 border border-warm-amber/30 rounded-sm px-3 py-2 text-sm font-mono text-stone-gray select-all">
+                {newUserPassword}
+              </code>
+              <Button
+                onClick={() => handleCopyToClipboard(newUserPassword, setNewUserPasswordCopied)}
+                variant="secondary" className="flex items-center gap-1 text-xs py-2 px-3"
+              >
+                {newUserPasswordCopied ? <Check className="w-3.5 h-3.5 text-success-ink" /> : <Copy className="w-3.5 h-3.5" />}
+                {newUserPasswordCopied ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
+            <Button onClick={closeCreateUserModal} className="w-full">
+              Done
+            </Button>
+          </div>
+        ) : (
+          /* Form */
+          <div className="space-y-4">
+            <p className="text-xs text-warm-gray">
+              {createUserMode === 'invite'
+                ? 'They receive an email with a link to choose their own password. No password is created, so nobody else ever sees one.'
+                : serverConfig?.smtp.configured
+                  ? 'A temporary password is generated and emailed to them. They must replace it before they can use the account.'
+                  : 'A temporary password is generated for you to pass on. They must replace it before they can use the account.'}
+            </p>
+
+            {createUserError && (
+              <div className="bg-danger/10 border border-danger/30 text-danger-ink rounded-lg p-3 text-sm">
+                {createUserError}
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="create-user-email" className="block text-sm font-medium text-stone-gray mb-1">
+                Email <span className="text-danger-ink">*</span>
+              </label>
+              <input
+                id="create-user-email"
+                type="email"
+                value={createUserForm.email}
+                onChange={e => setCreateUserForm(f => ({ ...f, email: e.target.value }))}
+                className="input-cozy w-full"
+                placeholder="user@example.com"
+                data-autofocus
+              />
+            </div>
+
+            <div>
+              <label htmlFor="create-user-name" className="block text-sm font-medium text-stone-gray mb-1">
+                Display Name <span className="text-warm-gray text-xs">(optional)</span>
+              </label>
+              <input
+                id="create-user-name"
+                type="text"
+                value={createUserForm.displayName}
+                onChange={e => setCreateUserForm(f => ({ ...f, displayName: e.target.value }))}
+                className="input-cozy w-full"
+                placeholder="Defaults to email username"
+                maxLength={50}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-stone-gray mb-2">Platform Role</label>
+              <div className="flex gap-2">
+                {(['USER', 'ADMIN'] as const).map(role => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => setCreateUserForm(f => ({ ...f, platformRole: role }))}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                      createUserForm.platformRole === role
+                        ? role === 'ADMIN'
+                          ? 'bg-moss-green text-brand-text border-moss-green'
+                          : 'bg-stone-gray/20 text-stone-gray border-stone-gray/40'
+                        : 'border-warm-gray/30 text-warm-gray hover:border-warm-gray/60'
+                    }`}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 flex gap-2">
+              <Button
+                onClick={handleCreateUser}
+                disabled={creatingUser || !createUserForm.email.trim()}
+                className="flex-1 flex items-center justify-center gap-2"
+              >
+                {creatingUser && <Loader2 className="w-4 h-4 animate-spin" />}
+                {createUserMode === 'invite' ? 'Send Invitation' : 'Create User'}
+              </Button>
+              <Button
+                onClick={closeCreateUserModal}
+                disabled={creatingUser}
+                variant="secondary" className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete asset confirmation; the in-use question follows if the server asks it */}
+      <ConfirmDialog
+        isOpen={assetToDelete !== null}
+        title="Delete Asset"
+        message={
+          assetToDelete
+            ? `Delete "${assetToDelete.name}" (${assetScopeLabel(assetToDelete.scope)} ${assetToDelete.type.toLowerCase()}), uploaded by ${assetToDelete.uploadedBy?.displayName ?? 'a deleted account'}${assetToDelete.campaign ? ` in the campaign "${assetToDelete.campaign.name}"` : ''}? The file is removed from the server and cannot be brought back. If a map, token or anything else still uses it, you will be shown where before it is deleted.`
+            : ''
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleAdminDeleteAsset}
+        onCancel={() => setAssetToDelete(null)}
+      />
+      {assetDelete.inUseDialog}
+
+      {/* Delete backup confirmation */}
+      <ConfirmDialog
+        isOpen={backupToDelete !== null}
+        title="Delete Backup"
+        message={`Delete the backup "${backupToDelete ?? ''}"? The file is removed from the server and cannot be brought back.`}
+        confirmLabel="Delete Backup"
+        variant="danger"
+        onConfirm={() => backupToDelete && handleDeleteBackup(backupToDelete)}
+        onCancel={() => setBackupToDelete(null)}
+      />
+
+      {/* Role change confirmation */}
+      <ConfirmDialog
+        isOpen={roleChangeTarget !== null}
+        title={roleChangeTarget?.platformRole === PlatformRole.ADMIN ? 'Remove Admin Rights' : 'Make Administrator'}
+        message={
+          roleChangeTarget?.platformRole === PlatformRole.ADMIN
+            ? `Remove ${roleChangeTarget.displayName}'s administrator rights? They become a regular user and can no longer open the Admin Panel.`
+            : `Make ${roleChangeTarget?.displayName ?? ''} an administrator? Administrators can manage every user, campaign, asset and setting on this instance, including deleting other people's work and restoring backups. They will have 7 days to set up two-factor authentication.`
+        }
+        confirmLabel={roleChangeTarget?.platformRole === PlatformRole.ADMIN ? 'Remove admin rights' : 'Make administrator'}
+        variant="warning"
+        onConfirm={() => roleChangeTarget && handleRoleChange(roleChangeTarget)}
+        onCancel={() => setRoleChangeTarget(null)}
+      />
+
+      {/* Clear sign-in lock confirmation */}
+      <ConfirmDialog
+        isOpen={lockToClear !== null}
+        title="Clear Sign-in Lock"
+        message={
+          lockToClear?.signInLockedUntil
+            ? `Clear the sign-in lock on ${lockToClear.displayName} (${lockToClear.email})? Too many wrong passwords or sign-in codes locked it until ${formatLockTime(lockToClear.signInLockedUntil)}. Clearing it lets the next correct password sign in at once. If they did not make those attempts, someone may be guessing the password: consider resetting it as well.`
+            : ''
+        }
+        confirmLabel="Clear lock"
+        variant="warning"
+        isLoading={clearingLock}
+        onConfirm={() => lockToClear && handleClearSignInLock(lockToClear)}
+        onCancel={() => setLockToClear(null)}
+      />
+
+      {/* Restore backup confirmation */}
+      <ConfirmDialog
+        isOpen={showRestoreConfirm}
+        title="Restore Backup"
+        message="This replaces the whole database with the backup's and copies the backup's uploaded files over yours, and it signs everyone out, you included. A backup of the database as it is now is saved to the backup list first, so it can be put back. Continue?"
+        confirmLabel="Restore Backup"
+        variant="danger"
+        isLoading={restoring}
+        onConfirm={handleRestoreBackupConfirmed}
+        onCancel={() => setShowRestoreConfirm(false)}
+      />
+    </div>
+  );
+}
+
+// ============================================
+// Status card
+// ============================================
+
+type PartState = 'working' | 'polling only' | 'down' | 'not known' | 'checking';
+
+const PART_TEXT: Record<PartState, string> = {
+  working: 'Working',
+  'polling only': 'Polling only',
+  down: 'Down',
+  'not known': 'Not known',
+  checking: 'Checking…',
+};
+
+const PART_COLOUR: Record<PartState, string> = {
+  working: 'text-success-ink',
+  'polling only': 'text-warning-ink',
+  down: 'text-danger-ink',
+  'not known': 'text-warm-gray',
+  checking: 'text-warm-gray',
+};
+
+/** The deployment guide, where the card's hints send a self-hoster. */
+const DEPLOYMENT_GUIDE = 'https://github.com/CheekyChinchilla/CozyVTT/blob/main/docs/DEPLOYMENT.md';
+
+/**
+ * The dashboard's status card. API and DB are as GET /api/admin/health says;
+ * when that could not be asked, the API is down if the request never reached
+ * the server, and the database is not known. WS is this browser's own check
+ * of live connections, made after each of those answers: the server can only
+ * say that its live-connection service runs, which stays true behind a proxy
+ * that refuses WebSocket connections.
+ */
+function HealthCard({ health, failed, answers }: { health: AdminHealth | null; failed: { reachedServer: boolean } | null; answers: number }) {
+  const live = useLiveConnectionCheck(answers);
+  const api: PartState = health || failed?.reachedServer ? 'working' : failed ? 'down' : 'not known';
+  const database = health?.services.database;
+  const parts: [string, PartState][] = [
+    ['API', api],
+    ['DB', database === 'ok' ? 'working' : database === 'error' ? 'down' : 'not known'],
+    ['WS', live],
+  ];
+  const status = !health
+    ? failed ? 'Unknown' : 'Checking…'
+    : health.status === 'degraded' || live === 'down' || live === 'polling only'
+      ? 'Degraded'
+      : live === 'checking' ? 'Checking…' : 'Healthy';
+  const tone = status === 'Healthy' ? 'text-success-ink' : status === 'Degraded' ? 'text-danger-ink' : 'text-warm-gray';
+  // The last answer of the WS check, kept while the next one runs, so a
+  // screen reader hears it once and not again when a check ends the same.
+  const [heard, setHeard] = useState<PartState | null>(null);
+  if (live !== 'checking' && live !== heard) setHeard(live);
+
+  return (
+    <div className="glass-panel p-5 flex flex-col items-center text-center">
+      <p role="status" className="sr-only">{heard ? `WS: ${PART_TEXT[heard]}` : ''}</p>
+      <Shield className={`w-7 h-7 mb-2 ${tone}`} aria-hidden="true" />
+      <p className={`text-sm font-bold ${tone}`}>{status}</p>
+      <p className="text-xs text-warm-gray mt-1">Status</p>
+      <dl className="mt-2 space-y-1 text-left w-full">
+        {parts.map(([label, state]) => (
+          <div key={label} className="flex items-center justify-between gap-2 text-xs">
+            <dt className="text-stone-gray">{label}</dt>
+            <dd className={`font-medium text-right ${PART_COLOUR[state]}`}>{PART_TEXT[state]}</dd>
+          </div>
+        ))}
+      </dl>
+      {health && (
+        <p className="text-[10px] text-warm-gray mt-1">
+          {health.connections} live {health.connections === 1 ? 'connection' : 'connections'}
+        </p>
+      )}
+      {live === 'polling only' && (
+        <p className="text-[11px] text-warm-gray mt-2 text-left w-full">
+          Tables work, but slower.{' '}
+          <GuideLink section="minimum-proxy-requirements">Check your proxy&apos;s WebSocket settings</GuideLink>
+        </p>
+      )}
+      {live === 'down' && (
+        <p className="text-[11px] text-warm-gray mt-2 text-left w-full">
+          Tables cannot connect.{' '}
+          <GuideLink section="live-features-dont-work-dice-token-movement-chat">Troubleshoot live connections</GuideLink>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** A link to a section of the deployment guide, opened in a new tab. */
+function GuideLink({ section, children }: { section: string; children: React.ReactNode }) {
+  return (
+    <a href={`${DEPLOYMENT_GUIDE}#${section}`} target="_blank" rel="noopener noreferrer" className="underline hover:text-brand-ink">
+      {children}
+      <span className="sr-only"> (opens in a new tab)</span>
+    </a>
+  );
+}
+
+/** What the Settings and Appearance tabs show when the settings could not be loaded. */
+function SettingsLoadFailed({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <section className="glass-panel p-6 space-y-3">
+      <div className="bg-danger/10 border border-danger/30 text-danger-ink rounded-lg p-4 text-sm flex items-start gap-2">
+        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+        <span>{message || 'The settings could not be loaded.'}</span>
+      </div>
+      <p className="text-xs text-warm-gray">Nothing can be changed here until they load, so nothing is saved over them.</p>
+      <Button onClick={onRetry} variant="secondary" className="flex items-center gap-2 text-sm">
+        <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+        Retry
+      </Button>
+    </section>
+  );
+}

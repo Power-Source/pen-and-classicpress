@@ -1,0 +1,415 @@
+// This file holds material under the ORC License, beside CozyVTT's own code under the AGPL-3.0.
+// See GAME_CONTENT_NOTICES.md for the notice and credits.
+
+/**
+ * StatBlockEditor
+ * GM inline editor for NPC stat blocks. Provides a compact form to edit
+ * all stat block fields. Used inside the NpcQuickEditor panel.
+ */
+
+import { useState, useCallback } from 'react';
+import { Plus, X, ChevronDown, ChevronRight } from 'lucide-react';
+import type { NpcStatBlock } from '@/types';
+import { ABILITY_KEYS, CHALLENGE_RATINGS } from '@/utils/rules/fifthEdition';
+import ProficiencyEditor from './ProficiencyEditor';
+import FantasyD20ProficiencyEditor from './FantasyD20ProficiencyEditor';
+import PrintedSkillsEditor from './PrintedSkillsEditor';
+import { creatureModel, scoreLabel, withGameSystem } from './creatureModel';
+import NumberField from '@/components/ui/NumberField';
+import { SCORE_BOX_CLASS } from './scoreBox';
+import { changeAbilitiesOrRating } from './statBlockProficiency';
+import { readAttributeModifiers, setAttributeModifier } from './fantasyD20StatBlock';
+import { STAT_BLOCK_LIMITS, statBlockNumberBounds } from '@/constants/statBlockLimits';
+
+interface StatBlockEditorProps {
+  statBlock: NpcStatBlock;
+  onChange: (updated: NpcStatBlock) => void;
+  /**
+   * The campaign's game system. Decides how this stat block is interpreted:
+   * 5E derives saves and skills from ability scores and Challenge Rating,
+   * Fantasy d20 stores printed modifiers against a creature Level, and Horror
+   * d100 stores its scores and skills as typed (creatureModel). Defaults to
+   * 5E, which is the shape the stat block was designed around. Every change
+   * names the stat block for it, which sets the bounds the server keeps on its
+   * scores and skills.
+   */
+  gameSystem?: string | null;
+}
+
+type ActionEntry = { name: string; description: string };
+
+export default function StatBlockEditor({
+  statBlock,
+  onChange: onChangeProp,
+  gameSystem = 'FIFTH_EDITION',
+}: StatBlockEditorProps) {
+  const onChange = useCallback(
+    (updated: NpcStatBlock) => onChangeProp(withGameSystem(updated, gameSystem)),
+    [onChangeProp, gameSystem]
+  );
+  const model = creatureModel(gameSystem);
+  const { minScore, maxScore } = statBlockNumberBounds(gameSystem);
+  const isFantasyD20 = model === 'fantasyD20';
+  const fantasyD20Modifiers = readAttributeModifiers(statBlock);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['core', 'abilities']));
+
+  const toggleSection = (section: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  };
+
+  const update = useCallback(
+    (changes: Partial<NpcStatBlock>) => {
+      onChange({ ...statBlock, ...changes });
+    },
+    [statBlock, onChange]
+  );
+
+  // Ability scores and CR both feed every derived save and skill, so changing
+  // one has to move the others — raising Wisdom must raise Perception.
+  // Bonuses marked as overrides keep their value.
+  const updateAbility = useCallback(
+    (ab: keyof NpcStatBlock['abilities'], value: number) => {
+      onChange(changeAbilitiesOrRating(statBlock, { abilities: { ...statBlock.abilities, [ab]: value } }));
+    },
+    [statBlock, onChange]
+  );
+
+  const updateChallengeRating = useCallback(
+    (cr: string) => {
+      onChange(changeAbilitiesOrRating(statBlock, { challengeRating: cr || undefined }));
+    },
+    [statBlock, onChange]
+  );
+
+  const updateActionList = useCallback(
+    (field: 'traits' | 'actions' | 'bonusActions' | 'reactions' | 'legendaryActions', items: ActionEntry[]) => {
+      update({ [field]: items });
+    },
+    [update]
+  );
+
+  const isExpanded = (s: string) => expandedSections.has(s);
+
+  return (
+    <div className="space-y-1 text-xs">
+      {/* ── Core Stats ── */}
+      <SectionHeader title="Core Stats" section="core" expanded={isExpanded('core')} toggle={toggleSection} />
+      {isExpanded('core') && (
+        <div className="space-y-2 pl-1">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-ink-muted block mb-0.5">Creature Type</label>
+              <input
+                type="text"
+                value={statBlock.creatureType || ''}
+                onChange={(e) => update({ creatureType: e.target.value })}
+                placeholder="Medium humanoid"
+                maxLength={STAT_BLOCK_LIMITS.maxCreatureTypeLength}
+                className="input-cozy w-full text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-ink-muted block mb-0.5">Alignment</label>
+              <input
+                type="text"
+                value={statBlock.alignment || ''}
+                onChange={(e) => update({ alignment: e.target.value })}
+                placeholder="neutral evil"
+                maxLength={STAT_BLOCK_LIMITS.maxAlignmentLength}
+                className="input-cozy w-full text-xs"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-[10px] text-ink-muted block mb-0.5">AC</label>
+              <input
+                type="number"
+                value={statBlock.ac}
+                onChange={(e) => update({ ac: parseInt(e.target.value, 10) || 0 })}
+                className="input-cozy input-cozy-number w-full text-xs text-center"
+              />
+            </div>
+            {isFantasyD20 ? (
+              <div>
+                {/* Fantasy d20 rates creatures by Level, not Challenge Rating. */}
+                <label className="text-[10px] text-ink-muted block mb-0.5" htmlFor="statblock-level">Level</label>
+                <input
+                  id="statblock-level"
+                  type="number"
+                  min={-1}
+                  max={30}
+                  value={statBlock.level ?? ''}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10);
+                    update({ level: Number.isFinite(parsed) ? parsed : undefined });
+                  }}
+                  placeholder="5"
+                  className="input-cozy input-cozy-number w-full text-xs text-center"
+                />
+              </div>
+            ) : model === 'derived' ? (
+              <div>
+                <label className="text-[10px] text-ink-muted block mb-0.5" htmlFor="statblock-cr">CR</label>
+                {/* A select, not free text: CR drives the proficiency bonus, so a
+                    typo would silently change every derived save and skill. */}
+                <select
+                  id="statblock-cr"
+                  value={statBlock.challengeRating || ''}
+                  onChange={(e) => updateChallengeRating(e.target.value)}
+                  className="input-cozy w-full text-xs"
+                >
+                  <option value="">—</option>
+                  {CHALLENGE_RATINGS.map((cr) => (
+                    <option key={cr} value={cr}>{cr}</option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            <div>
+              <label className="text-[10px] text-ink-muted block mb-0.5">XP</label>
+              <input
+                type="number"
+                value={statBlock.xp ?? ''}
+                onChange={(e) => update({ xp: e.target.value ? parseInt(e.target.value, 10) : undefined })}
+                className="input-cozy input-cozy-number w-full text-xs text-center"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-ink-muted block mb-0.5">Speed</label>
+            <input
+              type="text"
+              value={statBlock.speed}
+              onChange={(e) => update({ speed: e.target.value })}
+              placeholder="30 ft., fly 60 ft."
+              maxLength={STAT_BLOCK_LIMITS.maxSpeedLength}
+              className="input-cozy w-full text-xs"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Ability Scores ── */}
+      <SectionHeader
+        title={isFantasyD20 ? 'Attribute Modifiers' : 'Ability Scores'}
+        section="abilities"
+        expanded={isExpanded('abilities')}
+        toggle={toggleSection}
+      />
+      {isExpanded('abilities') && isFantasyD20 && (
+        // Fantasy d20 stat blocks print modifiers ("Str +4") with no score behind
+        // them, so these are entered directly rather than derived from a score.
+        <div className="grid grid-cols-6 gap-1.5 pl-1">
+          {ABILITY_KEYS.map((ab) => (
+            <div key={ab} className="text-center">
+              <label className="text-[9px] font-bold text-brand-ink uppercase block mb-0.5">{ab}</label>
+              <input
+                type="number"
+                aria-label={`${ab} modifier`}
+                min={-10}
+                max={20}
+                value={fantasyD20Modifiers[ab]}
+                onChange={(e) => {
+                  const parsed = parseInt(e.target.value, 10);
+                  onChange(setAttributeModifier(statBlock, ab, Number.isFinite(parsed) ? parsed : 0));
+                }}
+                className={SCORE_BOX_CLASS}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      {isExpanded('abilities') && !isFantasyD20 && (
+        <div className="grid grid-cols-6 gap-1.5 pl-1">
+          {ABILITY_KEYS.map((ab) => (
+            <div key={ab} className="text-center">
+              <label className="text-[9px] font-bold text-brand-ink uppercase block mb-0.5">{scoreLabel(gameSystem, ab)}</label>
+              <NumberField
+                aria-label={scoreLabel(gameSystem, ab)}
+                min={minScore}
+                max={maxScore}
+                fallback={null}
+                value={statBlock.abilities[ab]}
+                onChange={(value) => {
+                  // Only 5E works anything out from a score.
+                  if (model === 'derived') updateAbility(ab, value);
+                  else update({ abilities: { ...statBlock.abilities, [ab]: value } });
+                }}
+                className={SCORE_BOX_CLASS}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Saves & Skills ── */}
+      <SectionHeader title={model === 'printed' ? 'Skills' : 'Saves & Skills'} section="saves" expanded={isExpanded('saves')} toggle={toggleSection} />
+      {isExpanded('saves') &&
+        (model === 'fantasyD20' ? (
+          <FantasyD20ProficiencyEditor statBlock={statBlock} onChange={onChange} />
+        ) : model === 'printed' ? (
+          <PrintedSkillsEditor statBlock={statBlock} onChange={onChange} gameSystem={gameSystem} />
+        ) : (
+          <ProficiencyEditor statBlock={statBlock} onChange={onChange} />
+        ))}
+
+      {/* ── Defenses ── */}
+      <SectionHeader title="Defenses & Senses" section="defenses" expanded={isExpanded('defenses')} toggle={toggleSection} />
+      {isExpanded('defenses') && (
+        <div className="pl-1 space-y-1.5">
+          {([
+            ['damageVulnerabilities', 'Damage Vulnerabilities'],
+            ['damageResistances', 'Damage Resistances'],
+            ['damageImmunities', 'Damage Immunities'],
+            ['conditionImmunities', 'Condition Immunities'],
+            ['senses', 'Senses'],
+            ['languages', 'Languages'],
+          ] as const).map(([field, label]) => (
+            <div key={field}>
+              <label className="text-[10px] text-ink-muted block mb-0.5">{label}</label>
+              <input
+                type="text"
+                value={(statBlock[field] as string) || ''}
+                onChange={(e) => update({ [field]: e.target.value || undefined })}
+                maxLength={STAT_BLOCK_LIMITS.maxDetailLength}
+                className="input-cozy w-full text-xs"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Action Sections ── */}
+      {(['traits', 'actions', 'bonusActions', 'reactions', 'legendaryActions'] as const).map((field) => {
+        const titles: Record<string, string> = {
+          traits: 'Traits',
+          actions: 'Actions',
+          bonusActions: 'Bonus Actions',
+          reactions: 'Reactions',
+          legendaryActions: 'Legendary Actions',
+        };
+        const items = statBlock[field] || [];
+        return (
+          <div key={field}>
+            <SectionHeader title={titles[field]} section={field} expanded={isExpanded(field)} toggle={toggleSection} />
+            {isExpanded(field) && (
+              <ActionListEditor
+                items={items}
+                onChange={(updated) => updateActionList(field, updated)}
+              />
+            )}
+          </div>
+        );
+      })}
+
+      {/* ── Notes ── */}
+      <SectionHeader title="Notes" section="notes" expanded={isExpanded('notes')} toggle={toggleSection} />
+      {isExpanded('notes') && (
+        <div className="pl-1">
+          <textarea
+            value={statBlock.notes || ''}
+            onChange={(e) => update({ notes: e.target.value || undefined })}
+            placeholder="Additional notes..."
+            maxLength={STAT_BLOCK_LIMITS.maxNotesLength}
+            rows={2}
+            className="input-cozy w-full text-xs resize-none"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sub-components ──────────────────────────────────────────────
+
+function SectionHeader({
+  title,
+  section,
+  expanded,
+  toggle,
+}: {
+  title: string;
+  section: string;
+  expanded: boolean;
+  toggle: (s: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => toggle(section)}
+      className="flex items-center gap-1 w-full text-left py-1 text-[10px] font-semibold text-brand-ink uppercase tracking-wide hover:text-brand-ink/80 transition-colors"
+    >
+      {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+      {title}
+    </button>
+  );
+}
+
+
+function ActionListEditor({
+  items,
+  onChange,
+}: {
+  items: ActionEntry[];
+  onChange: (updated: ActionEntry[]) => void;
+}) {
+  const addItem = () => onChange([...items, { name: '', description: '' }]);
+
+  const updateItem = (idx: number, changes: Partial<ActionEntry>) => {
+    const updated = items.map((item, i) => (i === idx ? { ...item, ...changes } : item));
+    onChange(updated);
+  };
+
+  const removeItem = (idx: number) => {
+    onChange(items.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="pl-1 space-y-1.5">
+      {items.map((item, i) => (
+        <div key={i} className="flex gap-1 items-start">
+          <div className="flex-1 space-y-0.5">
+            <input
+              type="text"
+              value={item.name}
+              onChange={(e) => updateItem(i, { name: e.target.value })}
+              placeholder="Ability name"
+              maxLength={STAT_BLOCK_LIMITS.maxEntryNameLength}
+              className="input-cozy w-full text-xs font-semibold"
+            />
+            <textarea
+              value={item.description}
+              onChange={(e) => updateItem(i, { description: e.target.value })}
+              placeholder="Description..."
+              maxLength={STAT_BLOCK_LIMITS.maxEntryDescriptionLength}
+              rows={2}
+              className="input-cozy w-full text-xs resize-none"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => removeItem(i)}
+            className="p-1 mt-1 text-ink-muted hover:text-danger-ink transition-colors shrink-0"
+            title="Remove"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addItem}
+        disabled={items.length >= STAT_BLOCK_LIMITS.maxListEntries}
+        className="flex items-center gap-1 text-[10px] text-brand-ink hover:text-brand-ink/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Plus className="w-3 h-3" /> Add entry
+      </button>
+    </div>
+  );
+}

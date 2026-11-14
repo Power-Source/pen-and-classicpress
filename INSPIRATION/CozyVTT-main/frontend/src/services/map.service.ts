@@ -1,0 +1,96 @@
+// ============================================
+// Map Service
+// API calls for map management
+// ============================================
+
+import api from './api';
+import type { CampaignMap, CreateMapRequest, UpdateMapRequest, Token, CreateTokenRequest } from '@/types';
+import type { WallSegment, WallsAdded } from '@/types/walls';
+
+class MapService {
+  /**
+   * Get all maps for a campaign (lightweight list, no tokens)
+   */
+  async getMaps(campaignId: string): Promise<CampaignMap[]> {
+    const response = await api.listMaps(campaignId);
+    return response.maps;
+  }
+
+  /**
+   * Get a single map with full data (tokens, annotations)
+   */
+  async getMap(campaignId: string, mapId: string): Promise<CampaignMap> {
+    const response = await api.getMap(campaignId, mapId);
+    return response.map;
+  }
+
+  /**
+   * Create a new map (GM only)
+   */
+  async createMap(campaignId: string, data: CreateMapRequest): Promise<CampaignMap> {
+    const response = await api.createMap(campaignId, data);
+    return response.map;
+  }
+
+  /**
+   * Update map properties (GM only)
+   */
+  async updateMap(campaignId: string, mapId: string, data: UpdateMapRequest): Promise<CampaignMap> {
+    const response = await api.updateMap(campaignId, mapId, data);
+    return response.map;
+  }
+
+  /**
+   * Add many walls to a map in one request (GM only), as Mapmaker's Room
+   * does when its painting is saved; the wall tool adds walls over the live
+   * connection. Walls the map refuses are skipped and listed.
+   */
+  async addWalls(campaignId: string, mapId: string, segments: Array<Omit<WallSegment, 'id'>>): Promise<WallsAdded> {
+    return api.addWalls(campaignId, mapId, segments);
+  }
+
+  /**
+   * Import a UVTT/DD2VTT file — creates a map with embedded image and wall data.
+   */
+  async importUVTT(
+    campaignId: string,
+    file: File,
+    name?: string,
+    gridSize?: number,
+    options?: { confirm?: boolean; includeObjectWalls?: boolean },
+  ): Promise<{ map: CampaignMap; wallCount: number; portalCount: number; totalSegments: number; lightCount: number }> {
+    return api.importUVTT(campaignId, file, name, gridSize, options);
+  }
+
+  /**
+   * Delete a map (GM only) — cannot delete the active/current map
+   */
+  async deleteMap(campaignId: string, mapId: string): Promise<void> {
+    await api.deleteMap(campaignId, mapId);
+  }
+
+  /**
+   * Set a map as the current/active map for the campaign (GM only)
+   */
+  async setCurrentMap(campaignId: string, mapId: string): Promise<void> {
+    await api.setCurrentMap(campaignId, mapId);
+  }
+
+  /**
+   * Add a token to a map (GM only)
+   */
+  async addToken(campaignId: string, mapId: string, data: CreateTokenRequest): Promise<Token> {
+    const response = await api.addToken(campaignId, mapId, data);
+    return response.token;
+  }
+
+  /**
+   * Remove a token from a map (GM only)
+   */
+  async deleteToken(campaignId: string, mapId: string, tokenId: string): Promise<void> {
+    await api.deleteToken(campaignId, mapId, tokenId);
+  }
+}
+
+const mapService = new MapService();
+export default mapService;

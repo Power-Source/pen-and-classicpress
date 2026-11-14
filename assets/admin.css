@@ -1,0 +1,170 @@
+.pspp-admin {
+	max-width: 1100px;
+	overflow-wrap: anywhere;
+}
+
+.pspp-admin *,
+.pspp-admin *::before,
+.pspp-admin *::after {
+	box-sizing: border-box;
+}
+
+.pspp-admin input[type="text"],
+.pspp-admin input[type="number"],
+.pspp-admin select,
+.pspp-admin textarea {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	min-height: 44px;
+	margin: 6px 0 0;
+	font-size: 16px;
+}
+
+.pspp-admin label,
+.pspp-admin legend {
+	font-weight: 600;
+}
+
+.pspp-admin .button,
+.pspp-admin .button-primary {
+	min-height: 44px;
+	padding: 6px 16px;
+	white-space: normal;
+	line-height: 1.8;
+}
+
+.pspp-admin input[type="checkbox"] {
+	flex: 0 0 auto;
+	margin: 0 10px 0 0;
+}
+
+.pspp-admin .pspp-check {
+	display: flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 8px;
+	cursor: pointer;
+}
+
+.pspp-rules {
+	margin-block: 28px;
+	padding: clamp(12px, 3vw, 24px);
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	border-radius: 6px;
+}
+
+.pspp-admin .pspp-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+	gap: 12px;
+	min-width: 0;
+}
+
+.pspp-grid p {
+	min-width: 0;
+	margin-block: 8px;
+}
+
+.pspp-field {
+	min-width: 0;
+	margin: 20px 0;
+	padding: 16px;
+	border: 1px solid #8c8f94;
+	border-radius: 4px;
+}
+
+.pspp-field > legend {
+	padding-inline: 6px;
+}
+
+.pspp-numeric {
+	padding: 0;
+	border: 0;
+}
+
+.pspp-actions,
+.pspp-dice {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.pspp-actions > .button {
+	flex: 1 1 120px;
+}
+
+.pspp-dice .pspp-check {
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+}
+
+.pspp-multiline {
+	white-space: pre-wrap;
+}
+
+.pspp-snapshot {
+	min-width: 0;
+	padding: 12px;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+}
+
+.pspp-character-values dt {
+	font-weight: 600;
+}
+
+.pspp-character-values dd {
+	margin: 4px 0 16px;
+}
+
+.pspp-character-list a,
+.pspp-campaign-list a,
+.pspp-navigation a {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 6px 12px;
+}
+
+.pspp-status {
+	font-weight: 600;
+}
+
+.pspp-color-inputs {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.pspp-color-inputs input[type="color"] {
+	flex: 0 0 48px;
+	width: 48px;
+	height: 44px;
+	padding: 3px;
+}
+
+.pspp-color-inputs input[type="text"] {
+	min-width: 0;
+}
+
+.pspp-contrast-warning {
+	padding-inline-start: 10px;
+	border-inline-start: 4px solid #b32d2e;
+	font-weight: 600;
+}
+
+.pspp-admin [hidden] {
+	display: none !important;
+}
+
+@media (max-width: 600px) {
+	.pspp-admin .submit .button {
+		width: 100%;
+	}
+
+	.pspp-field {
+		padding: 10px;
+	}
+}

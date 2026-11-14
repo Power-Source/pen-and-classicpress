@@ -1,0 +1,307 @@
+<p align="center">
+  <img src="assets/default-logo.png" alt="CozyVTT Logo" width="300" />
+</p>
+
+<p align="center">
+  <a href="https://cozyvtt.com">cozyvtt.com</a>
+</p>
+
+A self-hosted, browser-based Virtual Tabletop (VTT) platform. Designed for ease of use and narrative-driven tabletop RPG campaigns where atmosphere matters more than mechanics.
+
+> **Self-hosted** — you own your data. One instance can host multiple concurrent campaigns run by different game masters (GMs) for different player groups.
+
+---
+
+## ⚠️ Self-Hosted Reality Check
+
+CozyVTT is a self-hosted, community-maintained project run **by you** on **your hardware**. It is provided as-is, with no warranty, no SLA, and no central support — see the [AGPL-3.0 License](LICENSE) for the legal version of this.
+
+**You are responsible for the security and uptime of your instance.** We do our best (Argon2id passwords, MFA, magic-byte file validation, per-endpoint rate limiting, security headers on the app page, a backend that runs as an unprivileged user — the full list is under [Features → Security](#security)), but the operating environment is yours.
+
+**Recommended deployment posture** for a public-facing instance:
+
+- Run on a small VPS rather than your home network
+- Front it with a **[Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)** (free, hides your origin IP, no open ports needed, automatic DDoS protection) or a similar reverse proxy / WAF
+- Keep the instance updated as security patches land — watch this repo
+- Set a strong `SESSION_SECRET` (32+ char random) and your own `DATABASE_PASSWORD` — the production build refuses to start while either is still the placeholder, or while `SESSION_SECRET` is shorter than 32 characters
+- Use the built-in MFA: every administrator account must turn it on within 7 days, and it is worth having on every account
+- Configure regular database backups (`backend/scripts/backup.sh` + cron — see [DEPLOYMENT.md](docs/DEPLOYMENT.md))
+- Review the **Hardening Checklist** in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) before flipping public
+
+If those words mean nothing to you, run CozyVTT **only on your local network** (e.g. via a Tailscale node, ZeroTier, or just LAN-accessible) until you've leveled up your sysadmin chops. That's a perfectly valid way to play — your campaigns aren't worse for being LAN-only, and you skip the whole attack-surface conversation.
+
+If you find a security issue, please report it privately per [SECURITY.md](SECURITY.md) rather than filing a public issue.
+
+---
+
+## Features
+
+### Platform
+- **Multi-campaign** — one server, unlimited campaigns, isolated from each other
+- **Role-based access control** — Platform Admin, Campaign GM, Player, and Spectator roles; the GM seat can be handed to another member without losing ownership of the campaign; players and spectators can leave a campaign on their own
+- **Setup wizard** — guided first-run initialization; no manual database seeding required. It asks for a one-time setup token printed in the backend log, so only the person running the server can create the first administrator
+- **Admin Panel** — user management, system settings, activity logs, uploaded files, instance backups (database and uploaded files)
+- **Works on phones and tablets** — below 1,024 pixels wide the campaign page has a layout of its own: the map across the screen, a bar of Map, Chat, Dice, Initiative, Party and More along the bottom, and each panel in a sheet over the map; menus open as lists from the bottom of the screen, and Back closes what is open. On a phone on its side the bar moves into the header. A tablet turned across 1,024 pixels switches layout without losing anything; CozyVTT can also go on the home screen from the browser's own menu
+- **Keyboard and screen reader support** — dialogs and side panels are named, keep focus and close on Escape; the dice and chat logs announce new entries; initiative runs from the keyboard; a token can be selected, moved, turned and stepped through from the keyboard, a screen reader hears which one is selected, and **?** lists the map's shortcuts; reduced-motion settings are honoured
+
+### Campaign Tools
+- **Interactive map canvas** — upload map images or draw a map in CozyVTT, place tokens, click a token to pick it up and click a square to put it down, or select it and move it with the arrow keys, with every move shown to the table in real time; on a tablet, slide a token with your finger or tap it and tap a square, tap a token for its details, press and hold a token, a door, a character or a combatant for its menu, and pinch to zoom
+- **Draw a map in CozyVTT** — the GM makes a blank map of the size and colour they choose and paints it with a brush, an eraser, lines, curves, rectangles, ellipses, polygons, rooms that add their own walls, stamps, textures, a fill bucket, text and an eyedropper, by mouse, finger or stylus, on a phone or a tablet too, with undo and redo and a draft kept in the browser until it is saved, then saves it as the map's picture, during play too; tokens, walls, lights and fog work on it as on any map
+- **Prepare a map while the table plays** — the GM opens any map on their own screen to set up its walls, lights, fog, tokens and drawings while the players stay on theirs and are sent nothing of it, then brings everyone over with one button
+- **Token system** — player, NPC, and object token types with disposition (friendly/neutral/hostile), HP bars, conditions, stat blocks, and notes; three display modes (pog, top-down, full-art); tokens turn to face any direction; colored-letter placeholders for tokens without images; the GM can hide a token from players or obscure what it is, and players are sent only what they may see of each token
+- **Creature library** — browse, search, and place creatures from the SRD bestiary (imported from Open5e by an administrator, with one button) or custom campaign-specific templates; per-campaign favorites with star toggle; duplicate SRD creatures to customize; edit custom creatures in-place; save token images back to templates
+- **Token templates** — save reusable token configurations (image, stats, HP, size, disposition, full NPC stat block); place from library or save from map context menu; copy templates between campaigns the GM owns
+- **NPC right-click rolls** — GMs right-click any NPC token to roll abilities, saves, skills, attacks, and damage parsed from its stat block; advantage/disadvantage selector for d20 systems; free-form custom roll fallback for systems whose stat blocks have nothing to parse
+- **Campaign export/import** — export campaigns as portable `.cozyvtt` archives; import on any CozyVTT instance; includes maps, tokens, drawings, creatures, templates, and assets; multi-step preview flow; optional audio toggle; secured against path traversal, zip bombs, and malicious files
+- **Walls & dynamic lighting** — GM-drawn wall segments (walls, doors, windows) with raycasting visibility; draw, polygon, and brush drawing modes; snap-to-grid and snap-to-endpoint; split, select, erase, and merge point tools; multi-select with Shift, a drag-box or Ctrl+A, then move or delete the lot together; snap-to-wall door/window placement (auto-splits existing walls); players only see what their character can: bright light clearly, dim light and the token's darkvision at half, nothing beyond, and light never reveals through a wall — a lit room is visible only to someone with line of sight into it; per-map Global Illumination lights everything in line of sight for tables that prefer it; explored areas are remembered per player and shown in grey until seen again; door interactions for both GM and players; bright/dim light radii matching 5E and Fantasy d20 rules; named light presets (Candle, Torch, Lamp, Lantern, Campfire); overlapping dim zones combine to bright
+- **Universal VTT import/export** — bring in a `.uvtt`, `.dd2vtt` or `.df2vtt` map from Dungeondraft, Dungeon Alchemist, Czepeku and others, with its walls, doors and lights already placed, and export any map back out. One file is one map, as the format intends; if a file's walls reach outside its own picture, CozyVTT says so before importing rather than leaving you to wonder
+- **Fog of war** — drag a box to reveal or hide chunks of the map; the selection snaps to whole grid squares, with animated fade transitions
+- **Spirit layer** — a second canvas layer for ethereal / astral / out-of-body scenes, hidden from players by default
+- **Initiative tracker** — real-time combat turn order that follows each token; the GM runs it and players roll their own initiative. Players see every combatant the GM has not hidden, on the map the table is looking at and on their own plane, even one they cannot yet find in the dark or under fog, and a creature's hit points only when the GM turns its HP bar on. The acting token is ringed on the map for everyone, hovering a name highlights its token (and vice versa), and clicking or tapping a combatant's name, or right-clicking its row, opens their sheet and rolls
+- **Map pings** — press Tab, use the map's **Ping** button, or on a touch screen double tap or press and hold the map, to mark a spot for the whole table; a dot with radiating rings in your own colour, labelled with your name
+- **Drawing on the map** — the GM and the players sketch on the map with a pen, lines, arrows, rectangles, ellipses, polygons and text labels in any colour and width, seen by the table live as they are drawn; a laser pointer whose trail fades for everyone; the GM can turn players' drawing off with **Players may draw**, keep a drawing to themselves, erase anyone's or clear the map, and a player erases their own; by mouse, finger or stylus
+- **Vibe tracker** — time-of-day periods (dawn, day, dusk and night by default, all editable) that tint the map with a colour filter
+- **Ambient atmosphere** — six visual effects (rain, mist, leaves, sparkles, snow, wind) and ambient audio independently per campaign
+- **Session management** — start, pause, resume, and end sessions with full state capture (token positions, map, vibe)
+- **Resizable session workspace** — on a computer or a tablet held sideways, drag to resize or collapse the roster, map, and side panels; a tabbed sidebar keeps Chat, Dice, Initiative, Notes and Session full-height, with an unread-message badge; layout persists per browser
+
+### Character Sheets
+- **5E (SRD 5.1)** — full sheet with stats, skills, saving throws, attacks, spells, inventory
+- **Fantasy d20 (ORC)** — attributes, saves, perception, skills, lore skills, strikes
+- **Horror d100** — characteristics and their rolls, skills with specialties, weapons and armor, Sanity, story notes
+- **Flexible / Custom** — JSON-based freeform character sheets for any system
+
+### Dice System
+- **Full dice notation** — `1d20+5`, `2d6`, `4d6kh3` (keep highest), advantage/disadvantage
+- **Real-time results** — rolls appear in the Dice panel for the whole table
+- **Secret rolls** — hidden from the other players; your GM can still see them, and they stay in your own list marked as secret
+- **Dice history** — a running log of the session's rolls that survives a refresh, filtered per person by the server
+- **Saved rolls** — name a dice expression and it becomes a one-click button in the dice panel, with a character and a purpose of its own if you like; private to you and scoped to one campaign, with the expression checked when you save it so a saved roll always works
+
+### Communication
+- **Campaign chat** — in-session messaging between all members
+- **Whispers** — a chat message to one member, seen by the two of you alone, from the **To** list or with `/w` (or `/whisper`) and a name
+- **System messages** — automatic notices when a session starts, pauses, resumes or ends, when the GM changes the time of day, and when the spirit layer is revealed or hidden
+- **Personal notes** — private per-campaign notes in Markdown, with a rendered preview and autosave; readable only by their author, enforced server-side
+- **Documents** — upload a PDF, plain text or Markdown rulebook or handout, or write one in the app, and read it without leaving CozyVTT; a GM shares documents with a campaign, and every member reads them from inside the session; text and Markdown documents can be edited by their uploader
+- **Session history** — every finished session with its date, length and the recap the GM wrote; the GM can edit or clear any past recap
+
+### Theming & Customization
+- **16 built-in color themes** — warm, cool, dark, neutral, and vibrant palettes
+- **Per-user themes** — each account picks its own theme and font from the profile page; preferences persist across logout/login
+- **Custom theme** — pick primary, accent, background, and text colors to create a unique look
+- **Character sheets follow the theme** — every sheet takes the theme's paper, text, and colors, so a sheet reads as well in a dark theme as the rest of the app
+- **8 font families** — open-source typefaces including medieval, elegant, modern, handwritten, and scholarly options, served by your own instance: visitors' browsers never fetch them from another site, and they work on a network with no internet access
+- **Live preview** — theme and font changes preview instantly before saving
+- **Default theme** — admin selects the theme shown on the login page and applied to brand-new users
+- **Custom branding** — the instance logo, mascot, and favicon can be replaced (swap the images in `frontend/public/` before building; an admin upload UI is [planned](docs/FUTURE_FEATURES.md))
+
+### Security
+- **Argon2id password hashing** (64 MB memory cost, timeCost 3)
+- **TOTP multi-factor authentication** with hashed backup codes, required on administrator accounts
+- **Session-based authentication** with rolling expiry, "remember me", and a 30-day limit on any sign-in
+- **Password reset** via email (SMTP configurable)
+- **Admin-approval registration** (optional)
+- **File upload validation** — magic-byte content checks (not just MIME header), size limits by type; text uploads must genuinely be text, and documents are served as plain text or PDF, never as a web page
+- **Per-endpoint rate limiting** — global API limit, strict auth limit, 5 changes of one's own email address an hour per account, asset upload limit (configurable via `ASSET_UPLOAD_RATE_LIMIT`), a limit on campaign invitation emails per GM, and per-account limits on everything sent to the live table, set far above what a game sends
+- **Security headers on the app page** — a Content-Security-Policy that allows script only from your own instance, plus `X-Frame-Options`, `nosniff`, `Referrer-Policy` and `Permissions-Policy`. Injected script cannot run, the app cannot be framed by another site, and the browser will not send data to an address CozyVTT does not use. The Docker setup sends them; an install without Docker gets them from the Nginx example in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#5-serve-with-nginx)
+- **WebSocket campaign isolation** — server-authenticated campaign membership; no client-spoofing
+- **The backend runs as an unprivileged user** — the container starts as root only long enough to fix ownership on your mounted folders, then drops to `appuser` before the app itself runs. In the two nginx containers the master process runs as root, as nginx's own image does, and the worker processes that handle requests run as the unprivileged `nginx` user. The database container runs PostgreSQL as the unprivileged `postgres` user, as its official image does. Every container runs with `no-new-privileges` and drops every Linux capability except the few its start-up needs, such as changing a folder's owner and switching user, and the frontend, the proxy and the backend have read-only filesystems, apart from the folders each writes to
+- **Production refuses to start** with a placeholder `SESSION_SECRET` or `DATABASE_PASSWORD`, or a `SESSION_SECRET` shorter than 32 characters
+- See [SECURITY.md](SECURITY.md) for the vulnerability disclosure policy
+
+---
+
+## Game Systems
+
+| System | Character Sheet | Status |
+|--------|----------------|--------|
+| 5E (SRD 5.1) | Full | Available |
+| Fantasy d20 (ORC) | Full | Available |
+| Horror d100 | Full | Available |
+| Flexible / Custom | JSON freeform | Available |
+
+---
+
+## Tech Stack
+
+**Backend**
+- Node.js + Express + TypeScript (strict mode)
+- PostgreSQL 15 + Prisma ORM
+- Socket.io for real-time WebSocket events
+- Argon2id password hashing
+- Multer + Sharp for file uploads and thumbnail generation
+- Nodemailer for transactional email
+- Zod for runtime request validation
+- Jest for testing
+
+**Frontend**
+- React 19 + TypeScript (strict mode)
+- Vite build tooling
+- Tailwind CSS 4 with custom design tokens
+- Zustand for live session state; TanStack Query (React Query) for REST data
+- Socket.io client
+- Axios for REST API calls
+- react-resizable-panels for the session workspace
+- Framer Motion for animations (reduced-motion aware)
+- Vitest + Testing Library
+
+---
+
+## Quick Start
+
+### Requirements
+
+- Docker 24+ with Docker Compose v2, for the recommended install below
+- Node.js 26+ and PostgreSQL 14+, only to install without Docker (see [Manual Deployment](docs/DEPLOYMENT.md#manual-deployment))
+- Chrome or Edge 111, Firefox 128 or Safari 16.4 (iPadOS 16.4 on an iPad), or newer: Chrome, Edge and Safari from 2023, Firefox from 2024. An older browser may not load the app, or may draw parts of it wrongly
+- SMTP server (optional — required for password reset and invitation emails)
+
+### Docker (Recommended)
+
+```bash
+git clone https://github.com/CheekyChinchilla/CozyVTT.git
+cd CozyVTT
+
+# Copy it, then set at least DATABASE_PASSWORD and SESSION_SECRET (see docs/DEPLOYMENT.md)
+cp .env.example .env
+
+# Production stack (hardened, what end-users run)
+docker compose up -d --build
+```
+
+Navigate to `http://localhost` and complete the setup wizard. It asks for the setup token the backend printed when it started: `docker compose logs backend | grep "setup token"` shows it.
+
+### Local Development
+
+If you've cloned the repo to hack on CozyVTT itself, use the dev compose file instead — it enables hot reload, publishes the frontend, backend and database ports on this computer only, and runs `NODE_ENV=development`:
+
+```bash
+docker compose -f docker-compose.dev.yml up
+```
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full dev setup (including running outside Docker).
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for production deployment with Nginx and SSL.
+
+---
+
+## Configuration
+
+Most runtime configuration is managed through the Admin Panel after setup. Email (SMTP) and upload limits are set in `.env`; the Admin Panel shows them and can send a test email:
+
+| Tab | Setting | Description |
+|-----|---------|-------------|
+| Users | Invite User | Email someone a link to join and choose their own password (needs SMTP; link valid 7 days) |
+| Users | Create User | Generate a temporary password to hand over yourself — for instances without email |
+| Settings | Instance Name | Displayed in the browser title and emails |
+| Settings | Allow Public Registration | Whether new users can self-register |
+| Settings | Require Admin Approval | New registrations must be approved before login |
+| Settings | SMTP | Shows the email settings from `.env`, with **Send Test Email** |
+| Settings | Upload Size Limits | Shows the per-type file size limits from `.env` (maps, tokens, audio, avatars, documents) |
+| Appearance | Default Theme | Theme shown on the login page and used for new users (each user can override from their profile) |
+| Appearance | Default Font | Default font family applied alongside the default theme |
+| Appearance | Custom Theme | Build a palette from primary, accent, background, and text colors, with a live readability check |
+
+However an account is added, its first sign-in ends with the person choosing their own password — an
+admin-issued temporary password cannot be used for anything else.
+
+Instance branding (logo, mascot, favicon) is **not** set from the Admin Panel yet — see
+[Appearance & Theming](docs/USER_GUIDE.md#appearance--theming) for how to change it today.
+
+### Default Upload Limits
+
+| Type | Default | Environment variable |
+|------|---------|----------------------|
+| Map images | 50 MB | `MAX_MAP_SIZE_MB` |
+| Token images | 5 MB | `MAX_TOKEN_SIZE_MB` |
+| Audio files | 20 MB | `MAX_AUDIO_SIZE_MB` |
+| Avatar images | 2 MB | `MAX_AVATAR_SIZE_MB` |
+| Documents (PDF, text, Markdown) | 50 MB | `MAX_DOCUMENT_SIZE_MB` |
+
+Set these in `.env` and apply them with `docker compose up -d`; no rebuild is needed, but `docker compose restart` keeps the old values. If you raise one, raise your reverse proxy's body limit to match (`NGINX_MAX_BODY_SIZE` for the bundled Nginx). See [Upload Size Limits](docs/DEPLOYMENT.md#upload-size-limits).
+
+Pictures also have fixed limits: at most 16,384 pixels on each side, and for an animated GIF or WebP at most 1,000 frames and 200 million pixels across them for a map, 50 million for a token or an avatar.
+
+---
+
+## User Roles
+
+### Platform Roles
+| Role | Description |
+|------|-------------|
+| `ADMIN` | Full platform access — manage users, campaigns, system settings |
+| `USER` | Can create and join campaigns |
+
+### Campaign Roles
+| Role | Description |
+|------|-------------|
+| `GM` | The game master: full campaign control — manage maps, tokens, sessions, members |
+| `PLAYER` | Can view maps, move their own tokens, roll dice, chat and whisper, draw on the map while the GM allows it, and leave the campaign |
+| `SPECTATOR` | Watches the map, chats, whispers and pings; keeps private notes and dice macros; can leave the campaign; cannot roll dice or initiative, move or edit tokens, draw on the map, or edit a character |
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [User Guide](docs/USER_GUIDE.md) | End-user guide for all platform features |
+| [GM Guide](docs/GM_GUIDE.md) | GM-specific features and workflows |
+| [Player Guide](docs/PLAYER_GUIDE.md) | Quick-start guide for players |
+| [Development Setup](docs/DEVELOPMENT.md) | Local development guide |
+| [Architecture](docs/ARCHITECTURE.md) | System architecture and design decisions |
+| [Deployment](docs/DEPLOYMENT.md) | Production deployment guide |
+| [Contributing](docs/CONTRIBUTING.md) | How to contribute to CozyVTT |
+| [Game Systems](docs/GAME_SYSTEMS.md) | How to add new game system support |
+| [API Reference](docs/API_REFERENCE.md) | REST API and WebSocket event reference |
+| [API changes](docs/api-changes/README.md) | What changed for programs driving CozyVTT, release by release |
+| [WebSocket Events](backend/docs/WEBSOCKET_DOCUMENTATION.md) | Detailed Socket.io event schema |
+| [Future Features](docs/FUTURE_FEATURES.md) | Backlog of planned work |
+| [Security Policy](SECURITY.md) | How to report vulnerabilities |
+| [Changelog](CHANGELOG.md) | Release history |
+| [Third-Party Credits](THIRD_PARTY_CREDITS.md) | Licences of the fonts, icons, pictures, libraries and game content CozyVTT uses |
+| [Game Content Notices](GAME_CONTENT_NOTICES.md) | The licences of the game rules CozyVTT uses, and the credits they ask for |
+
+---
+
+## Community Projects
+
+Built by other people, on their own terms. They are not part of CozyVTT, are not maintained by this project, and are listed because they are useful — check their own documentation and licence before running them.
+
+| Project | What it does |
+|---------|--------------|
+| [cozyvtt-mcp](https://github.com/yanjingzhaisun/cozyvtt-mcp) | An MCP bridge that lets an AI assistant act in a campaign — post to chat, roll dice, move tokens, change maps and run initiative. MIT licensed, independent of this codebase. |
+
+A note on building things like this. CozyVTT's HTTP and WebSocket surfaces are **not a public API**: they are what the web client calls, they are not versioned, and they carry no compatibility promise, so they can change in any release. They *can* be driven by a program — signing in with your own email and password returns a session cookie that authenticates both, and a script can do exactly what the web client does, as that user with that user's permissions. Unsupported is the honest word for it, not impossible.
+
+That is why `cozyvtt-mcp` pins to a CozyVTT version and keeps a compatibility table. Check that table before pairing the two: the surface it builds on is unversioned and can change in any release.
+
+---
+
+## Asset Storage
+
+Uploaded files are stored in `backend/uploads/` organized by type:
+
+```
+uploads/
+  maps/        Map images and thumbnails
+  tokens/      Token images and thumbnails
+  audio/       Ambient audio files
+  avatars/     User profile avatars
+  documents/   PDF, text and Markdown documents
+```
+
+Backups made from the Admin Panel are not kept here: they go in `backend/backups/`.
+
+---
+
+## License
+
+GNU Affero General Public License v3.0 — see [LICENSE](LICENSE) for details.
+
+CozyVTT is free to use, self-host, and fork. The AGPLv3 requires that any modified version you run as a network service must also make its source code available under the same license.
+
+For third-party font and content licenses, see [THIRD_PARTY_CREDITS.md](THIRD_PARTY_CREDITS.md).
+
+The open game rules CozyVTT draws on are not under the AGPLv3: the SRD 5.1 material stays under Creative Commons Attribution 4.0, and the material taken from rules released under the ORC License stays under that licence. [GAME_CONTENT_NOTICES.md](GAME_CONTENT_NOTICES.md) has their notices and says what each game system takes from them, and the app shows their credits in **About CozyVTT**. If you host CozyVTT for others, leave that window reachable: the rules' licences ask for these credits.

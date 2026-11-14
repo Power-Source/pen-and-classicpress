@@ -1,0 +1,257 @@
+/**
+ * Campaign Invitation Routes
+ * Campaign Invitations
+ */
+
+import { Router, Response } from 'express';
+import { AuthenticatedRequest } from '../middleware/rbac';
+import { authenticated } from '../middleware/compose';
+import { prisma } from '../config/database';
+import { broadcastToCampaign } from '../websocket/utils';
+import logger from '../utils/logger';
+import { acceptInvitationSchema } from '../validators/invitations';
+import { systemsCompatible } from '../utils/gameSystemCompatibility';
+import { clearGmNotes } from '../utils/gmNotes';
+import { standingInvitation } from '../utils/invitationState';
+
+const router = Router();
+
+/**
+ * A check that failed inside the accept transaction, answered as a 400. Thrown
+ * so the transaction rolls back whatever it had already written.
+ */
+class AcceptRefused extends Error {}
+
+/**
+ * GET /api/invitations
+ * Get user's pending invitations
+ */
+router.get('/', authenticated, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+
+    const invitations = await prisma.campaignInvitation.findMany({
+      where: {
+        userId,
+        ...standingInvitation(),
+      },
+      include: {
+        campaign: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            gameSystem: true,
+            status: true,
+            owner: {
+              select: {
+                displayName: true,
+              },
+            },
+            // Who runs the game, which is not the owner once it has been
+            // handed over; the invitation names this member as its GM.
+            memberships: {
+              where: { role: 'GM' },
+              take: 1,
+              select: { user: { select: { displayName: true } } },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    // The GM goes as `gm`, and as `dm` too for this release, the name
+    // versions before 1.7.0 gave it, so a script made for one still reads it.
+    return res.json(invitations.map(({ campaign: { memberships, ...campaign }, ...invitation }) => {
+      const gm = memberships[0]?.user ?? null;
+      return { ...invitation, campaign: { ...campaign, gm, dm: gm } };
+    }));
+  } catch (error) {
+    logger.error('Error fetching invitations', { err: error });
+    return res.status(500).json({ message: 'Failed to fetch invitations' });
+  }
+});
+
+/**
+ * POST /api/invitations/:id/accept
+ * Accept invitation and join campaign with selected characters
+ * Body: { characterIds: string[] }
+ */
+router.post('/:id/accept', authenticated, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const { id: invitationId } = req.params;
+    const parsed = acceptInvitationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: parsed.error.issues[0]?.message ?? 'Invalid character selection',
+      });
+    }
+    const { characterIds } = parsed.data;
+
+    // Verify invitation exists and belongs to user
+    const invitation = await prisma.campaignInvitation.findUnique({
+      where: { id: invitationId },
+      include: { campaign: true },
+    });
+
+    // Someone else's invitation answers as one that is not there.
+    if (!invitation || invitation.userId !== userId) {
+      return res.status(404).json({ message: 'Invitation not found' });
+    }
+
+    if (invitation.status !== 'PENDING') {
+      return res.status(400).json({ message: 'Invitation already processed' });
+    }
+
+    // Check if invitation is expired
+    if (invitation.expiresAt && new Date() > invitation.expiresAt) {
+      return res.status(400).json({ message: 'Invitation expired' });
+    }
+
+    // Verify all characters belong to user and are compatible with campaign
+    if (characterIds.length > 0) {
+      const characters = await prisma.character.findMany({
+        where: {
+          id: { in: characterIds },
+          userId,
+        },
+      });
+
+      if (characters.length !== characterIds.length) {
+        return res.status(400).json({ message: 'Invalid character selection' });
+      }
+
+      // Check if any characters are already assigned to a campaign
+      const assignedCharacter = characters.find((c) => c.campaignId !== null);
+      if (assignedCharacter) {
+        return res.status(400).json({
+          message: `Character "${assignedCharacter.name}" is already assigned to a campaign`,
+        });
+      }
+
+      // The same rule as assigning a character from the Characters page.
+      const incompatibleCharacter = characters.find(
+        (c) => !systemsCompatible(c.gameSystem, invitation.campaign.gameSystem)
+      );
+      if (incompatibleCharacter) {
+        return res.status(400).json({
+          message: `Character "${incompatibleCharacter.name}" is not compatible with campaign game system`,
+        });
+      }
+    }
+
+    // Use transaction to ensure consistency. The checks above ran outside it,
+    // so the two that another request can change meanwhile are made again by
+    // the writes themselves: the invitation is accepted only while it is still
+    // pending, and a character is brought only while it is still in no
+    // campaign. Either failing undoes the rest.
+    const result = await prisma
+      .$transaction(async (tx) => {
+        const accepted = await tx.campaignInvitation.updateMany({
+          where: { id: invitationId, status: 'PENDING' },
+          data: { status: 'ACCEPTED' },
+        });
+        if (accepted.count === 0) throw new AcceptRefused('Invitation already processed');
+
+        // Create campaign membership
+        const membership = await tx.campaignMembership.create({
+          data: {
+            userId,
+            campaignId: invitation.campaignId,
+            role: 'PLAYER',
+            characterIds,
+          },
+        });
+
+        // Assign characters to campaign. Each leaves any GM's Notes
+        // behind: they belong to the GM of a campaign it was in before.
+        if (characterIds.length > 0) {
+          for (const characterId of characterIds) await clearGmNotes(tx, characterId);
+          const assigned = await tx.character.updateMany({
+            where: {
+              id: { in: characterIds },
+              userId,
+              campaignId: null,
+            },
+            data: {
+              campaignId: invitation.campaignId,
+            },
+          });
+          if (assigned.count !== characterIds.length) {
+            throw new AcceptRefused('A selected character has just been assigned to a campaign');
+          }
+        }
+
+        return membership;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof AcceptRefused) return error;
+        throw error;
+      });
+    if (result instanceof AcceptRefused) return res.status(400).json({ message: result.message });
+
+    // Broadcast roster.updated to campaign members
+    try {
+      broadcastToCampaign(invitation.campaignId, 'roster.updated', {
+        action: 'member.joined',
+        userId,
+        campaignId: invitation.campaignId,
+        characterIds,
+      });
+    } catch (error) {
+      logger.error('Failed to broadcast roster update', { err: error });
+      // Don't fail the request if broadcast fails
+    }
+
+    return res.json({
+      message: 'Invitation accepted',
+      membership: result,
+    });
+  } catch (error) {
+    logger.error('Error accepting invitation', { err: error });
+    return res.status(500).json({ message: 'Failed to accept invitation' });
+  }
+});
+
+/**
+ * POST /api/invitations/:id/decline
+ * Decline invitation
+ */
+router.post('/:id/decline', authenticated, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const { id: invitationId } = req.params;
+
+    // Verify invitation exists and belongs to user
+    const invitation = await prisma.campaignInvitation.findUnique({
+      where: { id: invitationId },
+    });
+
+    // Someone else's invitation answers as one that is not there.
+    if (!invitation || invitation.userId !== userId) {
+      return res.status(404).json({ message: 'Invitation not found' });
+    }
+
+    if (invitation.status !== 'PENDING') {
+      return res.status(400).json({ message: 'Invitation already processed' });
+    }
+
+    // Update invitation status
+    await prisma.campaignInvitation.update({
+      where: { id: invitationId },
+      data: { status: 'DECLINED' },
+    });
+
+    return res.json({ message: 'Invitation declined' });
+  } catch (error) {
+    logger.error('Error declining invitation', { err: error });
+    return res.status(500).json({ message: 'Failed to decline invitation' });
+  }
+});
+
+export default router;

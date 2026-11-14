@@ -1,0 +1,313 @@
+# Demokampagne: Die letzte Fracht von Nebelhafen
+
+Stand: PS Pen & Paper 0.7.0 · Probespiel vom 14. November 2026.
+
+**Spoilerhinweis:** Dieses Dokument zeigt die vollständige Demorunde
+einschließlich privatem und verdecktem Ergebnis. Es enthält keine echten
+Kampagnengeheimnisse und ist selbst kein geschützter Spielleiterbereich.
+Private Inhalte gehören nicht in öffentlich erreichbare Dokumentationsdateien.
+
+## Die angelegte Demo öffnen
+
+[Die letzte Fracht von Nebelhafen – Demo](http://ps-dev.local/pen-paper/spielbereich/?pspp_campaign=592)
+
+Der Link gilt nur auf der lokalen Entwicklungswebsite. Andere Installationen
+erhalten weder die Kampagne noch Demokonten automatisch.
+Die zuvor vorhandene **„Demo Kampagne“** wurde nicht verändert.
+
+Es bleiben bewusst drei getrennte, nicht administrative Demokonten erhalten:
+
+| Anzeigename | Kampagnenrolle | Figur |
+|---|---|---|
+| Demo-Spielleitung | Spielleiter und Kampagnenersteller | Keine Spielerfigur |
+| Demo-Spielerin Mara | Spieler | Mara Zahnrad |
+| Demo-Spieler Jorin | Spieler | Jorin Funkenflug |
+
+Die Konten haben zufällig erzeugte Kennwörter, keine veröffentlichten
+Standardzugänge. Für eine eigene Anmeldung bei Bedarf als Website-Administrator
+ein neues Kennwort im jeweiligen Benutzerprofil setzen. Die Konten haben keine
+hinterlegten persönlichen E-Mail-Adressen; eine E-Mail-Kennwortrücksetzung ist
+deshalb nicht der vorgesehene Weg.
+
+Administratoren können die Kampagne bereits über den Spielbereich öffnen.
+Die Demo-Spielleitung hat nur die zusätzliche Berechtigung, Kampagnen zu
+erstellen, nicht globale Administratorrechte.
+
+## Ausgangslage
+
+Im Steampunk-Hafen Nebelhafen liegt eine versiegelte Wetterkapsel in Kiste 17.
+Sie muss vor der Abfahrt eines Luftschiffs zu Dock 3 gelangen.
+Die direkte Brücke ist gesperrt, und im Frachtmanifest fehlt eine Angabe.
+
+Mara, eine Luftschiffmechanikerin, setzt ihr Dampfseil ein.
+Jorin, ein archivkundiger Kurier, untersucht die Unterlagen.
+Die Spielleitung bestimmt verdeckt das verfügbare Zeitfenster.
+
+Diese Geschichte ist ein optionales Beispiel. Im Plugin ist kein
+Steampunk-Regelwerk fest eingebaut.
+
+## Einfache Demoregeln
+
+- Erlaubte Würfel: W6 und W20. Die Runde verwendet 2W6 für Figurenproben.
+- Genau einen freigegebenen Attributwert addieren.
+- Gesamt **ab 10:** gelungen.
+- Gesamt **7–9:** gelungen mit einer Komplikation.
+- Gesamt **bis 6:** ein Hindernis entsteht; die Gruppe braucht einen anderen Weg.
+- Die Spielleitung interpretiert das Ergebnis. Diese Schwellen werden vom
+  Plugin nicht automatisch ausgewertet.
+- Das Dampfseil kostet nach vorheriger Vereinbarung einen Punkt Dampf,
+  unabhängig vom Ergebnis. Der Verbrauch wird separat beantragt und freigegeben.
+
+| Feld | Typ und Grenzen | Mara | Jorin |
+|---|---|---:|---:|
+| Geschick | Attribut, 0–4 | 3 | 1 |
+| Verstand | Attribut, 0–4 | 1 | 3 |
+| Mut | Attribut, 0–4 | 2 | 2 |
+| Dampf, später Kesseldruck | Ressource, 0–6 | zunächst 4/6 | 4/6 |
+| Hintergrund | Langer Text | Mechanikerin | Kurier |
+
+Startwerte der Attributvorlage sind jeweils 1; die abweichenden Demowerte
+wurden als Spieleranträge eingereicht und durch die Spielleitung geprüft.
+Es gibt dabei keinen automatisch geprüften Punktepool.
+
+## So verlief das Spiel gegen die eigenen Rollen
+
+### 1. Figuren einreichen und freigeben
+
+Beide Spieler erstellten ihren Bogen über den tatsächlichen Frontend-Endpunkt.
+Zunächst existierten nur offene Anträge, noch keine gültigen Charakterstände.
+Die getrennte Spielleiterrolle gab beide Anträge frei.
+Erst danach wurden die Charaktere für Attributproben verwendet.
+
+Die Erstanlage und die Freigabe stehen als getrennte Ereignisse im Protokoll.
+Die bebilderte Erklärung dazu steht im [Handbuch](handbuch.md#5-charaktere-und-freigaben).
+
+### 2. Mara und die Nebelbrücke
+
+Mara wählte `2W6`, ihren Charakter und das Attribut **Geschick**.
+Sichtbarkeit: **Gruppe**.
+
+**Tatsächlich gespeichert: 1 + 1 + 3 = 5.**
+
+Nach den Demoregeln entstand ein Hindernis. Die Spielleitung erzählte:
+Das Dampfseil findet am gesperrten Übergang keinen brauchbaren Haltepunkt.
+Die Gruppe muss die Kiste über einen längeren Servicesteg zum Dock bringen.
+
+Das ist kein automatisch berechneter „kritischer Fehlschlag“.
+Es wurde nicht erneut gewürfelt, um ein gefälligeres Ergebnis zu erhalten.
+Der vorher vereinbarte Werkzeugeinsatz kostete trotzdem einen Ressourcenpunkt.
+
+![Maras tatsächliches Ergebnis von fünf](images/05-wuerfelergebnis.png)
+
+### 3. Jorin und das Frachtmanifest
+
+Jorin wählte `2W6` und **Verstand**. Sichtbarkeit: **Privat**.
+
+**Tatsächlich gespeichert: 2 + 4 + 3 = 9.**
+
+Erfolg mit Komplikation: Jorin erkannte die Wetterstation als Empfängerin.
+Die genaue Übergabestelle war aber unleserlich; am Dock musste die Gruppe
+erst bei der Hafenregistratur nachfragen.
+
+Jorin und die Spielleitung konnten diesen Wurf lesen. In Maras tatsächlicher
+Frontend-Antwort fehlten Anlass und Ergebnis des privaten Wurfs.
+
+### 4. Verdecktes Zeitfenster
+
+Jorin löste zusätzlich eine ausdrücklich erlaubte verdeckte `W6`-Probe aus.
+Für dieses Beispiel legte die Spielleitung fest:
+
+- 1–2: knappes Zeitfenster;
+- 3–4: normales Zeitfenster;
+- 5–6: großzügiges Zeitfenster.
+
+**Gespeichert wurde eine 5.** Ausschließlich die Spielleitung sah sie.
+Jorin erhielt nur eine Speicherbestätigung ohne Ergebnis oder Wurfkennung
+in der Weiterleitung; auch Mara erhielt den Eintrag nicht.
+
+Die Spielleitung beschrieb daraus genügend Zeit für Servicesteg und Rückfrage.
+Die Kapsel konnte trotz der Komplikationen übergeben werden.
+Diese Erzählentscheidung steht hier im Bericht, nicht in einem bereits
+vorhandenen Szenenmodul.
+
+### 5. Eine beantragte Verbesserung ablehnen
+
+Mara beantragte anschließend Geschick **3 → 4**.
+Die Spielleitung lehnte die Verbesserung ab, weil keine Entwicklung
+vereinbart worden war.
+
+Der gültige Wert blieb **3**. Antrag und Ablehnung sind nachvollziehbar.
+Die früher gespeicherte Gruppenprobe blieb unverändert bei **5**.
+
+### 6. Den Ressourcenverbrauch freigeben
+
+Mara beantragte separat Dampf **4/6 → 3/6**.
+Vor der Freigabe blieb der gültige Stand bei 4/6; nach der Bestätigung
+war er 3/6. Das persönliche Maximum blieb 6.
+
+Der Wurf selbst hatte nichts automatisch abgezogen.
+Die Vorher-/Nachher-Ansicht zeigt den offenen Antrag und seine Übernahme:
+
+![Historische Ressourcenfreigabe](images/08-ressourcenfreigabe.png)
+
+### 7. Eine Ressource gefahrlos umbenennen
+
+Die Spielleitung benannte **„Dampf“ in „Kesseldruck“** um.
+Die interne Feldkennung blieb dieselbe. Mara behielt **3/6**, Jorin **4/6**.
+Alte Charakterereignisse zeigen weiterhin den damaligen Namen „Dampf“.
+
+## Erhaltener Endstand
+
+| Figur | Geschick | Verstand | Mut | Kesseldruck | Offener Antrag |
+|---|---:|---:|---:|---:|---|
+| Mara Zahnrad | 3 | 1 | 2 | 3/6 | Keiner |
+| Jorin Funkenflug | 1 | 3 | 2 | 4/6 | Keiner |
+
+Die Demo enthält **drei echte Würfe und insgesamt 13 Spielereignisse**:
+zwei Regelstände, zwei Erstanlagen, zwei anfängliche Freigaben, drei Würfe
+und vier Ereignisse für Ablehnung und Ressourcenfreigabe.
+Es wurde kein falscher Szenenveröffentlichungseintrag erzeugt.
+
+Zum Weiterspielen eine neue Probe mit einem neuen Anlass ausführen.
+Die gespeicherten alten Ergebnisse sind keine Schaltflächen zum erneuten Würfeln.
+Wer dieselbe Ausgangslage möchte, kann den Ressourcenwert über eine neue,
+nachvollziehbare Charakteränderung wiederherstellen.
+
+## Was tatsächlich geprüft wurde
+
+Die Einrichtung erfolgte über vorhandene Pluginfunktionen, ohne direkte
+SQL-Manipulation von Charakterwerten oder Würfelergebnissen.
+Spieleranträge, Würfe, Freigaben und Ablehnungen liefen über echte
+Frontend-HTTP-Anfragen mit getrennten authentifizierten Sitzungen.
+Diese kurzlebigen Prüfsitzungen wurden anschließend wieder beendet.
+
+| Prüfung | Beobachtung |
+|---|---|
+| Erstanlage mit Freigabepflicht | Zunächst nur Antrag; danach gültiger Bogen |
+| Gruppenwurf | Für beide Spieler sichtbar |
+| Privater Wurf | Für Jorin und Spielleitung, nicht für Mara sichtbar |
+| Verdeckter Spielerwurf | Keine Zahlen für die beiden Spieler |
+| Abgelehnte Verbesserung | Gültiger Wert bleibt unverändert |
+| Ressourcenverbrauch | Erst nach Freigabe gültig |
+| Ressourcenname ändern | Kennung, Werte und alte Historie bleiben erhalten |
+| Zugriff ohne Anmeldung | Keine Kampagnen- oder Wurfinhalte |
+| Private Seiten | `no-store`-Cache-Header vorhanden |
+| Mobile Ergebnisansicht | Bei 390 Pixeln passend, Screenshot im Handbuch |
+
+### Ergänzende Prüfung des Spieltischs mit Version 0.8.0
+
+Die ursprünglichen drei Würfe und 13 Spielereignisse bleiben unverändert.
+Zusätzlich wurden Maras Anwesenheit, AFK mit „Küche“, Rückkehr und das Beenden
+der Statusanzeige über echte Browseraktionen geprüft. Eine echte Chatnachricht
+von Mara erschien im Chat der Spielleitung. Gefälschte Moderatorrollen eines
+Spielers und nicht angemeldete Chat-Zugriffe wurden zurückgewiesen.
+
+Die neue Oberfläche wurde bei 320, 390, 768, 1024 und 1440 Pixeln ohne
+horizontalen Überlauf geprüft. Zugwechsel, Konflikte, Protokollierung und der
+Entzug von Mitgliedschaft beziehungsweise Moderation wurden mit getrennten,
+anschließend entfernten Integrations-Testdaten geprüft, nicht durch
+Veränderung der Demowerte.
+
+**Gefundene Website-Einschränkung:** Der normale Demo-Spielleiter erhielt beim
+Backend-Aufruf eine HTTP-302-Weiterleitung zur Dashboard-Adresse mit
+`wdeb_on`. Die konkrete verursachende Komponente wurde in diesem Probespiel
+nicht abschließend zugeordnet oder verändert. Der Zugriff auf eigene
+Frontend-Kampagnendaten und Freigabeaktionen funktionierte.
+Die Backend-Abbildungen stammen deshalb aus der Administratoransicht.
+
+Das ist ein Funktions- und Ablaufcheck auf dieser Entwicklungswebsite,
+keine vollständige Zertifizierung aller Plattformversionen, Plugins,
+Endgeräte oder Barrierefreiheitsanforderungen.
+
+### Ergänzende Prüfung mit Version 0.9.0
+
+- Echte HTTP-Anmeldung temporärer Website-Benutzer, öffentliche Vorschau und
+  Beitrittsanfragen geprüft. Offene Anträge gewährten keinen Spielzugriff;
+  Freigabe und Ablehnung wurden über die Frontend-Spielleitung ausgeführt.
+- Hintergrundbild über das echte Upload-Formular gespeichert und entfernt.
+  Mitglieder erhielten eingebettete Bilddaten, Gäste keine Bilddaten oder
+  öffentliche Medienadresse.
+- Die getrennten Verwaltungsbereiche einschließlich der Backend-Untermenüs
+  geöffnet. Die Charakterverwaltung zeigte Mara nur ihren eigenen Bogen.
+- Netzwerk-Superadmin ohne Unterwebsite-Mitgliedschaft im Integrationstest
+  für private Inhalte, Spieltisch und Chat-Moderation geprüft.
+- Spielbereiche, Gruppenleiste, Chat und Spielleitereinstellungen bei
+  320, 390, 768, 1024 und 1440 Pixeln ohne horizontalen Seitenüberlauf geprüft.
+  Im abschließenden Browserlauf traten keine JavaScript- oder Netzwerkfehler auf.
+- Alle fünf Integrationstests bestanden. Temporäre Kampagnen, Benutzer,
+  Bilddaten und eigens angelegte Sitzungen wurden entfernt.
+
+Die drei ursprünglichen Würfe, Charakterwerte und das Regelwerk wurden dabei
+nicht geändert. Zwischenzeitliche bewusste Zugangseinstellungen durch die
+Administration wurden nicht zurückgesetzt.
+Die Abbildungen 09–12 zeigen die aktuelle Oberfläche.
+
+### Ergänzende Prüfung der Universumsgrundlage mit Version 0.10.0
+
+Eine getrennte, anschließend vollständig entfernte Testwelt wurde mit einem
+normalen Spielleiterkonto im Frontend erstellt. Kampagnenauswahl, unverbindliche
+Vorschau und ausdrücklich bestätigte Zuordnung wurden über die echten Formulare
+ausgeführt. Geöffnete Bearbeitungsformulare und der Änderungsverlauf passten bei
+320, 390, 768, 1024 und 1440 Pixeln; keine JavaScript-Fehler wurden erkannt.
+Die bestehende ClassicPress-Adminleiste erzeugte beim Administratorkonto
+unabhängig vom Plugin einen Überlauf von etwa fünf Pixeln bei 320 Pixeln.
+Dieser fremde Oberflächenbereich wurde nicht verändert; der abschließende
+Spielleitertest verwendete ein Testkonto ohne Frontend-Adminleiste.
+
+Der zusätzliche Universums-Integrationstest prüfte insbesondere unveränderte
+Regeln, offene Charakterfreigaben, alte Würfe und Mitgliedschaften sowie
+Revisionskonflikte und Rücknahme bei Protokollfehlern. Alle sechs
+Integrationstestsuiten bestanden. Die persistente Demokampagne wurde nicht
+einem Universum zugeordnet.
+
+Ein temporärer englischer MO-Katalog wurde kompiliert und über den normalen
+Plugin-Textdomain-Loader erfolgreich geladen. Die Testübersetzung wurde danach
+wieder entfernt; dauerhaft enthalten ist die POT-Vorlage, noch keine englische
+Übersetzung.
+
+### Ergänzende Prüfung der Basisbögen mit Version 0.11.0
+
+Eine separate Prüfwelt mit zwei Kampagnen wurde über echte Frontend-Formulare
+einer normalen Spielleitung bedient: Regelvorlage mit Mut, Stufe und Ausdauer
+anlegen, Basisbogen erstellen, die Vorlage ausdrücklich übernehmen und
+denselben Bogen einmal gemeinsam und einmal als unabhängige Kopie aufnehmen.
+Nur bereits aufgenommene Teilnehmer konnten übernommen werden.
+
+Lokale Auflagen setzten Mut auf 2 und Stufe auf 1. Anschließend wurde Mut im
+Basisbogen von 5 auf 8 erhöht: Die gemeinsame Runde behielt ihre freigegebene
+Auflage 2, die unabhängige Kopie blieb bei 5. Das separate Spielerkonto sah
+seinen effektiven Bogen, aber weder die private Weltbeschreibung noch das
+Auflagenformular. Sein tatsächlicher Attributwurf verwendete Mut 2 und
+protokollierte die verwendete Basisrevision 2.
+
+Geöffnete Regel- und Auflagenformulare sowie Spielerbogen und Würfeloberfläche
+passten bei 320, 390, 768, 1024 und 1440 Pixeln ohne horizontalen Überlauf;
+es wurden keine JavaScript-Fehler erkannt. Die Abbildungen 13 und 14 im
+Handbuch stammen aus dieser Prüfwelt. Temporäre Charaktere, Würfe, Ereignisse,
+Chat-Sitzungscaches und Konten wurden danach entfernt. Die Regeln, beiden
+Charakterstände und drei ursprünglichen Würfe der persistenten Demo wurden
+vorher und nachher verglichen und blieben unverändert.
+
+Alle sieben Integrationstestsuiten bestanden. Der neue Kontexttest deckt
+zusätzlich Revisionskonflikte, gemeinsame Fortschritte ohne Auflagen,
+Zurücknehmen von Auflagen, Spielerfreigaben für unabhängige Kopien, unveränderte
+historische Würfe, fehlende Basisbögen, beschädigte Kontextdaten und
+Rücknahme bei fehlgeschlagener Protokollveröffentlichung ab.
+
+## Was vor einem vollständig integrierten Abenteuer noch fehlt
+
+1. **Story Builder:** Kapitel, Szenen, getrennte Geheimnisse, Entwürfe,
+   Spielervorschau und kontrollierte Veröffentlichung beziehungsweise Rücknahme.
+2. **Selbstständige Spielleiter auf dieser Website:** Die Backend-Weiterleitung
+   klären; nicht durch pauschale Administratorrechte umgehen.
+3. **Optionale Kommunikation:** PS Chat ist inzwischen geschützt eingebunden.
+   Für PS Wiki fehlen noch die kampagnenbezogenen Rechteprüfungen.
+4. **Späterer Ausbau:** Migration bestehender Kampagnen, universumsweite
+   Teilnahme, Punktepool, Inventar und komplexe Würfelregeln, sofern das
+   gewählte System sie benötigt. Basisbögen und lokale Zahlenauflagen sind
+   seit Version 0.11.0 vorhanden.
+
+**Fazit:** Eine begleitete Runde mit Charakterbögen, Würfeln und Spielprotokoll
+ist möglich. Der komplette Erzählablauf innerhalb des Plugins fehlt noch.
+
+[Zum Pluginhandbuch](handbuch.md) · [Zur Roadmap](../ROADMAP.md)

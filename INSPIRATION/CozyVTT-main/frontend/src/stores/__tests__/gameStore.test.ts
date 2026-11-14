@@ -1,0 +1,428 @@
+/**
+ * Game store unit tests.
+ *
+ * Locks in the two contracts the session screen depends on:
+ *  1. Targeted actions mutate the normalized token map correctly and
+ *     synchronously (socket handlers rely on getState() read-after-write).
+ *  2. The movement-ignoring selector really does skip re-renders for
+ *     position-only updates — that's what keeps the sidebar static
+ *     while tokens are dragged.
+ */
+
+import { describe, it, expect, beforeEach } from 'vitest';
+import { act, renderHook } from '@testing-library/react';
+import {
+  useGameStore,
+  useTokenList,
+  useTokenListIgnoringMovement,
+  useCurrentTurnTokenId,
+} from '../gameStore';
+import type { CombatState, Token } from '@/types';
+import type { Drawing } from '@/types/drawings';
+import { TokenLayer, TokenType } from '@/types';
+
+function makeCombat(overrides: Partial<CombatState> = {}): CombatState {
+  return { active: true, round: 1, currentTokenId: 'a', combatants: [], ...overrides };
+}
+
+function makeToken(id: string, overrides: Partial<Token> = {}): Token {
+  return {
+    id,
+    characterId: null,
+    name: `Token ${id}`,
+    imageUrl: '',
+    position: { x: 0, y: 0 },
+    size: { width: 1, height: 1 },
+    layer: TokenLayer.TOKEN,
+    visible: true,
+    controlledBy: null,
+    rotation: 0,
+    conditions: [],
+    metadata: {},
+    type: TokenType.NPC,
+    disposition: null,
+    hp: null,
+    showHpBar: false,
+    ...overrides,
+  } as Token;
+}
+
+beforeEach(() => {
+  useGameStore.getState().clearGameState();
+});
+
+describe('gameStore actions', () => {
+  it('setTokens normalizes the list and preserves order', () => {
+    useGameStore.getState().setTokens([makeToken('b'), makeToken('a')]);
+    const s = useGameStore.getState();
+    expect(s.tokenOrder).toEqual(['b', 'a']);
+    expect(s.tokens['a'].name).toBe('Token a');
+  });
+
+  it('applyTokenMove updates only position and keeps other field identities', () => {
+    const token = makeToken('a', { conditions: ['stunned'] });
+    useGameStore.getState().setTokens([token]);
+    useGameStore.getState().applyTokenMove('a', { x: 7, y: 3 });
+
+    const after = useGameStore.getState().tokens['a'];
+    expect(after.position).toEqual({ x: 7, y: 3 });
+    // Non-positional fields keep reference identity (spread of prev token)
+    expect(after.conditions).toBe(token.conditions);
+    // Unknown ids are a no-op, not a crash or a phantom token
+    useGameStore.getState().applyTokenMove('ghost', { x: 1, y: 1 });
+    expect(useGameStore.getState().tokens['ghost']).toBeUndefined();
+  });
+
+  it('writes are synchronous — read-after-write in the same tick sees the update', () => {
+    useGameStore.getState().setTokens([makeToken('a')]);
+    useGameStore.getState().applyTokenMove('a', { x: 5, y: 5 });
+    // This is the contract socket handlers rely on (multiple events in one macro-task)
+    expect(useGameStore.getState().tokens['a'].position).toEqual({ x: 5, y: 5 });
+  });
+
+  it('addToken appends once; re-adding the same id does not duplicate order', () => {
+    useGameStore.getState().addToken(makeToken('a'));
+    useGameStore.getState().addToken(makeToken('a', { name: 'Renamed' }));
+    const s = useGameStore.getState();
+    expect(s.tokenOrder).toEqual(['a']);
+    expect(s.tokens['a'].name).toBe('Renamed');
+  });
+
+  it('revealToken patches position for known tokens but preserves local fields', () => {
+    useGameStore.getState().setTokens([makeToken('a', { visible: false })]);
+    useGameStore.getState().revealToken(makeToken('a', { visible: true, position: { x: 9, y: 9 } }));
+    const known = useGameStore.getState().tokens['a'];
+    expect(known.position).toEqual({ x: 9, y: 9 });
+    expect(known.visible).toBe(false); // locally-known visibility wins
+
+    useGameStore.getState().revealToken(makeToken('new', { position: { x: 2, y: 2 } }));
+    expect(useGameStore.getState().tokenOrder).toEqual(['a', 'new']);
+  });
+
+  it('removeToken / patchToken / replaceToken behave and no-op on unknown ids', () => {
+    useGameStore.getState().setTokens([makeToken('a'), makeToken('b')]);
+
+    useGameStore.getState().patchToken('a', { visible: false });
+    expect(useGameStore.getState().tokens['a'].visible).toBe(false);
+
+    useGameStore.getState().replaceToken(makeToken('b', { name: 'Replaced' }));
+    expect(useGameStore.getState().tokens['b'].name).toBe('Replaced');
+
+    useGameStore.getState().removeToken('a');
+    expect(useGameStore.getState().tokenOrder).toEqual(['b']);
+
+    // Unknown ids: no-ops
+    useGameStore.getState().patchToken('ghost', { visible: false });
+    useGameStore.getState().replaceToken(makeToken('ghost'));
+    useGameStore.getState().removeToken('ghost');
+    expect(useGameStore.getState().tokenOrder).toEqual(['b']);
+  });
+});
+
+// A token someone else is carrying: the frames move where it is drawn, and
+// only the drop moves where it stands, which is what sight, lighting and
+// explored memory read. Without that, a GM carrying a player's token about
+// showed that player everything along the way and saved it to their memory.
+describe('receiveTokenMove', () => {
+  beforeEach(() => {
+    useGameStore.getState().setTokens([makeToken('a', { position: { x: 2, y: 3 } })]);
+  });
+
+  it('a drag frame moves where the token is drawn, never where it stands', () => {
+    useGameStore.getState().receiveTokenMove('a', { x: 9, y: 3 }, true);
+    const s = useGameStore.getState();
+    expect(s.tokens.a.position).toEqual({ x: 2, y: 3 });
+    expect(s.heldAt.a).toEqual({ x: 9, y: 3 });
+  });
+
+  it('the drop moves where it stands and forgets where it was carried', () => {
+    const store = useGameStore.getState();
+    store.receiveTokenMove('a', { x: 9, y: 3 }, true);
+    store.receiveTokenMove('a', { x: 10, y: 4 }, false);
+    const s = useGameStore.getState();
+    expect(s.tokens.a.position).toEqual({ x: 10, y: 4 });
+    expect(s.heldAt.a).toBeUndefined();
+  });
+
+  it('a frame back to where it stands ends the hold, as a cancelled drag sends', () => {
+    const store = useGameStore.getState();
+    store.receiveTokenMove('a', { x: 9, y: 3 }, true);
+    store.receiveTokenMove('a', { x: 2, y: 3 }, true);
+    const s = useGameStore.getState();
+    expect(s.tokens.a.position).toEqual({ x: 2, y: 3 });
+    expect(s.heldAt.a).toBeUndefined();
+  });
+
+  it('a new token list, or the token leaving, forgets the hold', () => {
+    const store = useGameStore.getState();
+    store.receiveTokenMove('a', { x: 9, y: 3 }, true);
+    store.removeToken('a');
+    expect(useGameStore.getState().heldAt.a).toBeUndefined();
+    store.setTokens([makeToken('a')]);
+    store.receiveTokenMove('a', { x: 9, y: 3 }, true);
+    store.setTokens([makeToken('a')]);
+    expect(useGameStore.getState().heldAt).toEqual({});
+  });
+});
+
+describe('selector hooks', () => {
+  it('useTokenList re-renders on token movement (canvas needs live positions)', () => {
+    useGameStore.getState().setTokens([makeToken('a')]);
+    const counts = { renders: 0 };
+    const { result } = renderHook(() => {
+      counts.renders += 1;
+      return useTokenList();
+    });
+    const initial = counts.renders;
+
+    act(() => {
+      useGameStore.getState().applyTokenMove('a', { x: 4, y: 4 });
+    });
+
+    expect(counts.renders).toBeGreaterThan(initial);
+    expect(result.current[0].position).toEqual({ x: 4, y: 4 });
+  });
+
+  it('useTokenListIgnoringMovement skips position-only updates but sees other changes', () => {
+    useGameStore.getState().setTokens([makeToken('a'), makeToken('b')]);
+    const counts = { renders: 0 };
+    const { result } = renderHook(() => {
+      counts.renders += 1;
+      return useTokenListIgnoringMovement();
+    });
+    const initial = counts.renders;
+
+    // Position-only stream (the token.moved hot path) — no re-render
+    act(() => {
+      useGameStore.getState().applyTokenMove('a', { x: 1, y: 1 });
+      useGameStore.getState().applyTokenMove('a', { x: 2, y: 2 });
+      useGameStore.getState().applyTokenMove('b', { x: 3, y: 3 });
+    });
+    expect(counts.renders).toBe(initial);
+
+    // Non-positional change — must re-render, with fresh positions visible
+    act(() => {
+      useGameStore.getState().patchToken('a', { visible: false });
+    });
+    expect(counts.renders).toBeGreaterThan(initial);
+    expect(result.current.find((t) => t.id === 'a')?.visible).toBe(false);
+    expect(result.current.find((t) => t.id === 'b')?.position).toEqual({ x: 3, y: 3 });
+
+    // Add/remove — must re-render
+    const before = counts.renders;
+    act(() => {
+      useGameStore.getState().addToken(makeToken('c'));
+    });
+    expect(counts.renders).toBeGreaterThan(before);
+    expect(result.current).toHaveLength(3);
+  });
+});
+
+describe('combat state', () => {
+  it('starts inactive and clears with the rest of the session', () => {
+    expect(useGameStore.getState().combat.active).toBe(false);
+    expect(useGameStore.getState().combat.currentTokenId).toBeNull();
+
+    useGameStore.getState().setCombatState(makeCombat());
+    expect(useGameStore.getState().combat.currentTokenId).toBe('a');
+
+    useGameStore.getState().clearGameState();
+    expect(useGameStore.getState().combat.active).toBe(false);
+    expect(useGameStore.getState().combat.currentTokenId).toBeNull();
+  });
+
+  it('useCurrentTurnTokenId reports null while combat is inactive', () => {
+    // The server keeps currentTokenId populated after `initiative.end` in some
+    // paths; the map must key off `active`, not the raw id, or a ring lingers
+    // on the map after combat is over.
+    const { result } = renderHook(() => useCurrentTurnTokenId());
+    expect(result.current).toBeNull();
+
+    act(() => {
+      useGameStore.getState().setCombatState(makeCombat({ active: false, currentTokenId: 'a' }));
+    });
+    expect(result.current).toBeNull();
+
+    act(() => {
+      useGameStore.getState().setCombatState(makeCombat({ active: true, currentTokenId: 'a' }));
+    });
+    expect(result.current).toBe('a');
+  });
+
+  it('does not re-render turn subscribers when only a combatant HP ticks', () => {
+    let renders = 0;
+    const combatants = [
+      { tokenId: 'a', mapId: 'map-1', name: 'A', imageUrl: '', initiative: 10, hp: { current: 9, max: 10, temp: 0 }, type: 'npc' as const, disposition: null, characterId: null },
+    ];
+    useGameStore.getState().setCombatState(makeCombat({ combatants }));
+
+    const { result } = renderHook(() => {
+      renders++;
+      return useCurrentTurnTokenId();
+    });
+    const initial = renders;
+
+    act(() => {
+      useGameStore.getState().setCombatState(makeCombat({
+        combatants: [{ ...combatants[0], hp: { current: 4, max: 10, temp: 0 } }],
+      }));
+    });
+    expect(renders).toBe(initial);
+    expect(result.current).toBe('a');
+
+    act(() => {
+      useGameStore.getState().setCombatState(makeCombat({ currentTokenId: 'b', combatants }));
+    });
+    expect(renders).toBeGreaterThan(initial);
+    expect(result.current).toBe('b');
+  });
+});
+
+describe('cross-highlight peek', () => {
+  it('records which side is pointing', () => {
+    useGameStore.getState().setPeekToken('a', 'tracker');
+    expect(useGameStore.getState().peekTokenId).toBe('a');
+    expect(useGameStore.getState().peekSource).toBe('tracker');
+
+    useGameStore.getState().setPeekToken(null, 'tracker');
+    expect(useGameStore.getState().peekTokenId).toBeNull();
+    expect(useGameStore.getState().peekSource).toBeNull();
+  });
+
+  it('ignores a clear from the side that is not currently pointing', () => {
+    // The map's mouse-leave can fire after the pointer has reached the
+    // tracker; without this guard it would cancel the tracker's highlight.
+    useGameStore.getState().setPeekToken('a', 'tracker');
+    useGameStore.getState().setPeekToken(null, 'map');
+    expect(useGameStore.getState().peekTokenId).toBe('a');
+    expect(useGameStore.getState().peekSource).toBe('tracker');
+  });
+
+  it('clears with the rest of the session', () => {
+    useGameStore.getState().setPeekToken('a', 'map');
+    useGameStore.getState().clearGameState();
+    expect(useGameStore.getState().peekTokenId).toBeNull();
+    expect(useGameStore.getState().peekSource).toBeNull();
+  });
+});
+
+/**
+ * The token this page has selected, for the keyboard and the ring. A full
+ * resend of the map reaches every page after anyone's change to a token, so
+ * a new list keeps the selection while it still holds the token.
+ */
+describe('the selected token', () => {
+  it('is nothing until a token is selected, and can be cleared', () => {
+    useGameStore.getState().setTokens([makeToken('a')]);
+    expect(useGameStore.getState().selectedTokenId).toBeNull();
+
+    useGameStore.getState().selectToken('a');
+    expect(useGameStore.getState().selectedTokenId).toBe('a');
+
+    useGameStore.getState().selectToken(null);
+    expect(useGameStore.getState().selectedTokenId).toBeNull();
+  });
+
+  it('survives a new token list that still holds it', () => {
+    useGameStore.getState().setTokens([makeToken('a'), makeToken('b')]);
+    useGameStore.getState().selectToken('b');
+
+    useGameStore.getState().setTokens([makeToken('b', { rotation: 90 }), makeToken('c')]);
+
+    expect(useGameStore.getState().selectedTokenId).toBe('b');
+  });
+
+  it('goes with a new token list that does not hold it', () => {
+    useGameStore.getState().setTokens([makeToken('a')]);
+    useGameStore.getState().selectToken('a');
+
+    useGameStore.getState().setTokens([makeToken('b')]);
+
+    expect(useGameStore.getState().selectedTokenId).toBeNull();
+  });
+
+  it('goes when its token leaves the map, and stays when another does', () => {
+    useGameStore.getState().setTokens([makeToken('a'), makeToken('b')]);
+    useGameStore.getState().selectToken('a');
+
+    useGameStore.getState().removeToken('b');
+    expect(useGameStore.getState().selectedTokenId).toBe('a');
+
+    useGameStore.getState().removeToken('a');
+    expect(useGameStore.getState().selectedTokenId).toBeNull();
+  });
+
+  it('goes when the session is cleared', () => {
+    useGameStore.getState().setTokens([makeToken('a')]);
+    useGameStore.getState().selectToken('a');
+
+    useGameStore.getState().clearGameState();
+
+    expect(useGameStore.getState().selectedTokenId).toBeNull();
+  });
+});
+
+/**
+ * The drawings on the map on screen, as this member is sent them, in the
+ * order they are drawn, with this page's own adds still on their way.
+ */
+describe("the map's drawings", () => {
+  const drawing = (id: string, extra: Partial<Drawing> = {}): Drawing => ({
+    id, authorId: 'me', audience: 'ALL', layer: 'MARKUP', kind: 'line', color: '#d94f3d', fillColor: null, width: 4,
+    rotation: 0, sortKey: 0, points: [[0, 0], [10, 10]], text: null, createdAt: '2026-10-27T10:00:00.000Z', ...extra,
+  });
+  const ids = () => useGameStore.getState().drawings.map((d) => d.id);
+
+  beforeEach(() => {
+    useGameStore.getState().clearGameState();
+  });
+
+  it('is replaced whole for a map, in drawing order: sortKey, then the time made, then the id', () => {
+    useGameStore.getState().setDrawings('map-a', [
+      drawing('late', { createdAt: '2026-10-27T10:00:05.000Z' }),
+      drawing('b', { createdAt: '2026-10-27T10:00:01.000Z' }),
+      drawing('a', { createdAt: '2026-10-27T10:00:01.000Z' }),
+      drawing('under', { sortKey: -1, createdAt: '2026-10-27T11:00:00.000Z' }),
+    ]);
+
+    expect(ids()).toEqual(['under', 'a', 'b', 'late']);
+    expect(useGameStore.getState().drawingsMapId).toBe('map-a');
+  });
+
+  it('takes a new drawing in its place in the order, and the same drawing again in place of the old', () => {
+    useGameStore.getState().setDrawings('map-a', [drawing('a', { createdAt: '2026-10-27T10:00:01.000Z' }), drawing('c', { createdAt: '2026-10-27T10:00:03.000Z' })]);
+
+    useGameStore.getState().putDrawing(drawing('b', { createdAt: '2026-10-27T10:00:02.000Z' }));
+    useGameStore.getState().putDrawing(drawing('a', { createdAt: '2026-10-27T10:00:01.000Z', color: '#111111' }));
+
+    expect(ids()).toEqual(['a', 'b', 'c']);
+    expect(useGameStore.getState().drawings[0].color).toBe('#111111');
+  });
+
+  it('puts the stored drawing in place of the one this page drew while it was on its way', () => {
+    useGameStore.getState().setDrawings('map-a', [drawing('pending:op1', { createdAt: '9999-01-01T00:00:00.000Z' })]);
+
+    useGameStore.getState().putDrawing(drawing('stored', { createdAt: '2026-10-27T10:00:09.000Z' }), 'pending:op1');
+
+    expect(ids()).toEqual(['stored']);
+  });
+
+  it('lets go of one drawing, or of every one a test picks', () => {
+    useGameStore.getState().setDrawings('map-a', [drawing('a'), drawing('b', { authorId: 'them' }), drawing('c', { audience: 'GM' })]);
+
+    useGameStore.getState().removeDrawing('a');
+    expect(ids()).toEqual(['b', 'c']);
+
+    useGameStore.getState().removeDrawings((d) => d.audience === 'GM');
+    expect(ids()).toEqual(['b']);
+  });
+
+  it('goes when the session is cleared', () => {
+    useGameStore.getState().setDrawings('map-a', [drawing('a')]);
+
+    useGameStore.getState().clearGameState();
+
+    expect(useGameStore.getState().drawings).toEqual([]);
+    expect(useGameStore.getState().drawingsMapId).toBeNull();
+  });
+});

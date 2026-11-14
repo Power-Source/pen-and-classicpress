@@ -1,0 +1,787 @@
+.pspp-page {
+	max-width: 1800px;
+	margin: 0 auto;
+	padding: 16px;
+}
+
+.pspp-standalone {
+	margin: 0;
+	background: #10191e;
+	font-family: system-ui, sans-serif;
+}
+
+.pspp-standalone .pspp-page > h1 {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+}
+
+.pspp-table {
+	padding-bottom: 70px;
+}
+
+.pspp-game .pspp-table-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 12px;
+	padding: 16px 24px;
+	border-bottom: 1px solid var(--pspp-border);
+}
+
+.pspp-game .pspp-table-header h2 {
+	margin: 4px 0 0;
+	font: 700 clamp(18px, 2vw, 25px)/1.2 Georgia, serif;
+}
+
+.pspp-game .pspp-table-header p {
+	margin: 0;
+}
+
+.pspp-eyebrow {
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.13em;
+}
+
+.pspp-game .pspp-turn-banner {
+	padding: 9px 16px;
+	border: 1px solid var(--pspp-accent);
+	border-radius: 30px;
+	font-weight: 700;
+}
+
+.pspp-table-tools,
+.pspp-table-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 20px;
+}
+
+.pspp-table-tools a,
+.pspp-table-tabs a {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+}
+
+.pspp-table-tools {
+	margin: 0;
+	padding: 0 24px;
+	font-size: 13px;
+	border-bottom: 1px solid var(--pspp-border);
+	background: var(--pspp-surface);
+}
+
+.pspp-mobile-turn { display: none; }
+
+.pspp-game .pspp-table-tabs {
+	margin: 0;
+	padding: 8px 24px;
+	gap: 8px;
+}
+
+.pspp-game .pspp-table-tabs a {
+	padding: 8px 18px;
+	border-radius: 4px;
+	border: 1px solid transparent;
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.pspp-game .pspp-table-tabs [aria-current] {
+	background: var(--pspp-primary);
+	color: var(--pspp-primary-text);
+	border-color: var(--pspp-primary);
+}
+
+.pspp-table-layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0;
+}
+
+.pspp-table:not(.pspp-table-ready) .pspp-table-layout {
+	display: block;
+}
+
+.pspp-game .pspp-table-panel {
+	min-width: 0;
+	padding: clamp(16px, 3vw, 40px);
+	border: 0;
+	border-top: 1px solid var(--pspp-border);
+	border-radius: 0;
+	background: var(--pspp-surface);
+}
+
+.pspp-table-group { grid-column: 1; grid-row: 1; }
+.pspp-table-stage,
+.pspp-table-character { grid-column: 1; grid-row: 2; }
+
+.pspp-game .pspp-table-group { padding: 14px 24px; }
+.pspp-party-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px; margin-bottom: 12px; }
+.pspp-game .pspp-party-heading h2 { margin: 0; font: 700 16px system-ui, sans-serif; }
+.pspp-party-heading a { display: inline-flex; align-items: center; min-height: 44px; font-size: 13px; }
+
+.pspp-game .pspp-table-panel h2 {
+	margin: 8px 0 18px;
+	font: 700 24px/1.2 Georgia, serif;
+}
+
+.pspp-game .pspp-table-panel .pspp-rules {
+	padding: 0;
+	border: 0;
+	margin: 0;
+}
+
+.pspp-game .pspp-party {
+	display: flex;
+	gap: 12px;
+	overflow-x: auto;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.pspp-party li,
+.pspp-sheet-heading {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+}
+
+.pspp-game .pspp-party li {
+	flex: 0 0 210px;
+	padding: 10px 14px;
+	border: 1px solid var(--pspp-border);
+	border-radius: 6px;
+	background: var(--pspp-background);
+}
+
+.pspp-party li > div {
+	min-width: 0;
+}
+
+.pspp-party strong,
+.pspp-party small,
+.pspp-party [data-member-label],
+.pspp-party li > div > span {
+	display: block;
+}
+
+.pspp-party small,
+.pspp-party li > div > span {
+	font-size: 12px;
+}
+
+.pspp-game .pspp-portrait {
+	flex: 0 0 46px;
+	width: 46px;
+	height: 46px;
+	display: inline-grid;
+	place-items: center;
+	border: 1px solid var(--pspp-border);
+	border-radius: 50%;
+	background: var(--pspp-background);
+	font: 700 25px Georgia, serif;
+}
+
+.pspp-game .pspp-party .is-turn {
+	border-inline-start: 4px solid var(--pspp-accent);
+	padding-inline-start: 8px;
+}
+
+.pspp-game .pspp-party [data-member-status="afk"] .pspp-portrait {
+	border-style: dashed;
+}
+
+.pspp-party [data-member-status="online"] .pspp-portrait { box-shadow: 0 0 0 3px var(--pspp-accent); }
+.pspp-party [data-member-status="offline"] .pspp-portrait { opacity: 0.5; }
+
+.pspp-table-intro {
+	font: 18px/1.8 Georgia, serif;
+	margin-top: 14px;
+}
+
+.pspp-table-prompts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 24px;
+}
+
+.pspp-game .pspp-table-prompts a {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 10px 16px;
+	border: 1px solid var(--pspp-border);
+	border-radius: 4px;
+	text-decoration: none;
+	background: var(--pspp-surface);
+}
+
+.pspp-game .pspp-scene {
+	position: relative;
+	isolation: isolate;
+	min-height: 56vh;
+	display: flex;
+	align-items: end;
+	background-color: var(--pspp-background);
+	background-image: var(--pspp-table-image, radial-gradient(ellipse at 85% 20%, color-mix(in srgb, var(--pspp-primary) 30%, var(--pspp-background)), var(--pspp-background)));
+	background-size: cover;
+	background-position: center;
+}
+
+.pspp-scene::before {
+	content: "";
+	position: absolute;
+	inset: 20px;
+	z-index: -1;
+	pointer-events: none;
+	border: 1px solid var(--pspp-border);
+	outline: 1px solid var(--pspp-border);
+	outline-offset: 6px;
+	opacity: 0.35;
+}
+
+.pspp-scene-caption {
+	width: min(100%, 720px);
+	padding: clamp(20px, 3vw, 40px);
+	background: var(--pspp-surface);
+	background: color-mix(in srgb, var(--pspp-surface) 94%, transparent);
+	border-inline-start: 3px solid var(--pspp-accent);
+}
+
+.pspp-scene-lead { font: 18px/1.6 Georgia, serif; }
+.pspp-game .pspp-scene h2 {
+	font-size: clamp(27px, 4vw, 52px);
+	line-height: 1.1;
+	margin-block: 14px 24px;
+}
+
+.pspp-stage-story > summary {
+	cursor: pointer;
+	min-height: 44px;
+	padding-block: 10px;
+	font-weight: 600;
+}
+
+.pspp-game .pspp-table-character {
+	background: var(--pspp-background);
+}
+
+.pspp-game .pspp-table-character > .description {
+	margin-bottom: 28px;
+}
+
+.pspp-game .pspp-sheet {
+	max-width: 1100px;
+	margin: 0 auto 28px;
+	padding: clamp(18px, 4vw, 48px);
+	border: 1px solid var(--pspp-border);
+	outline: 1px solid var(--pspp-border);
+	outline-offset: -8px;
+	background: var(--pspp-surface);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.pspp-game .pspp-sheet h3 {
+	margin: 4px 0;
+	font: 700 clamp(26px, 4vw, 40px)/1.3 Georgia, serif;
+}
+
+.pspp-sheet-heading { padding-bottom: 24px; }
+.pspp-game .pspp-sheet-heading .pspp-portrait { flex-basis: 72px; width: 72px; height: 80px; border-radius: 36px 36px 4px 4px; font-size: 40px; }
+.pspp-game .pspp-sheet-section h4 { border-block: 3px double var(--pspp-border); padding: 10px; text-align: center; font: 700 19px Georgia, serif; }
+.pspp-sheet-section { margin-bottom: 28px; }
+
+.pspp-sheet-fields {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+	gap: 12px 24px;
+}
+
+.pspp-game .pspp-sheet-fields > div {
+	min-width: 0;
+	border-bottom: 1px solid var(--pspp-border);
+	padding-block: 8px;
+}
+
+.pspp-sheet-wide { grid-column: 1 / -1; }
+.pspp-sheet-stat { text-align: center; }
+.pspp-game .pspp-sheet-fields dt { font-size: 13px; }
+.pspp-game .pspp-sheet-fields dd { margin: 6px 0 0; }
+.pspp-game .pspp-sheet-stat dd { font: 700 30px/1.2 Georgia, serif; }
+.pspp-rating { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+.pspp-rating i { width: 10px; height: 10px; border: 1px solid currentColor; border-radius: 50%; }
+.pspp-rating .is-filled { background: currentColor; }
+.pspp-sheet meter { display: block; width: 100%; height: 18px; accent-color: var(--pspp-accent); }
+.pspp-game .pspp-pending { border-inline-start: 3px solid var(--pspp-accent); padding-inline-start: 12px; }
+.pspp-game .pspp-fold { margin-top: 16px; }
+.pspp-game .pspp-fold > summary { min-height: 44px; padding-block: 10px; cursor: pointer; font-weight: 700; }
+.pspp-game .pspp-table-feedback:empty { display: none; }
+.pspp-presence-controls { border-block: 1px solid var(--pspp-border); margin-block: 18px; padding-block: 14px; }
+.pspp-group-controls { max-width: 680px; }
+.pspp-table-ready .pspp-group-controls:not([open]) { display: none; }
+.pspp-settings-section { border-bottom: 1px solid var(--pspp-border); margin-bottom: 24px; padding-bottom: 24px; }
+.pspp-table-settings > * { max-width: 900px; margin-inline: auto; }
+.pspp-admission { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-block: 16px; }
+.pspp-game input[type="file"] { display: block; max-width: 100%; margin-top: 14px; font: inherit; }
+.pspp-game .pspp-presence-controls button { font-size: 13px; padding-inline: 10px; }
+.pspp-game .pspp-table-stage .pspp-grid { grid-template-columns: 1fr; }
+.pspp-game .pspp-table-stage .pspp-dice-choices { grid-template-columns: repeat(auto-fit, minmax(65px, 1fr)); }
+
+.pspp-game .pspp-chat-dock {
+	position: fixed;
+	right: 24px;
+	bottom: 16px;
+	z-index: 9990;
+	width: min(390px, calc(100vw - 32px));
+	background: var(--pspp-surface);
+	color: var(--pspp-text);
+	border: 1px solid var(--pspp-border);
+	border-radius: 10px;
+	box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+}
+
+.pspp-game .pspp-chat-dock > summary {
+	min-height: 48px;
+	padding: 12px 18px;
+	cursor: pointer;
+	font-weight: 700;
+}
+
+.pspp-chat-body {
+	max-height: 65vh;
+	max-height: 65dvh;
+	overflow: auto;
+	padding: 0 14px 14px;
+}
+
+.pspp-game .pspp-chat-body h2 { font-size: 20px; }
+.pspp-game .pspp-chat-body .psource-chat-box { max-width: 100%; }
+
+.pspp-game .pspp-chat-body .psource-chat-box {
+	--psource-color-bg-default: var(--pspp-surface);
+	--psource-color-bg-secondary: var(--pspp-background);
+	--psource-color-bg-tertiary: var(--pspp-surface);
+	--psource-color-text-primary: var(--pspp-text);
+	--psource-color-text-secondary: var(--pspp-text);
+	--psource-color-border-light: var(--pspp-border);
+	--psource-color-primary: var(--pspp-accent);
+	--psource-color-border: var(--pspp-border);
+	--psource-chat-control-size: 44px;
+	--psource-chat-control-icon-size: 18px;
+}
+
+.pspp-game .pspp-chat-body div.psource-chat-box div.psource-chat-module-messages-list div.psource-chat-row p.psource-chat-message {
+	background: var(--pspp-background);
+	border-color: var(--pspp-border);
+	color: var(--pspp-text);
+}
+
+.pspp-game .pspp-chat-body div.psource-chat-box div.psource-chat-module-message-area button.psource-chat-send-button {
+	min-width: 44px;
+	min-height: 44px;
+	background: var(--pspp-primary) !important;
+	color: var(--pspp-primary-text) !important;
+}
+
+@media (max-width: 760px) {
+	.pspp-page { padding: 8px; }
+	.pspp-table { padding-bottom: 170px; }
+	.pspp-game .pspp-table-layout { display: grid; }
+	.pspp-game .pspp-table-panel { padding: 16px; }
+	.pspp-game .pspp-table-tabs {
+		position: fixed;
+		bottom: 0;
+		inset-inline: 0;
+		z-index: 10;
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		background: var(--pspp-background);
+		border-top: 1px solid var(--pspp-border);
+		padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+		gap: 4px;
+	}
+	.pspp-game .pspp-table-tabs a { justify-content: center; padding: 8px 3px; font-size: 13px; }
+	.pspp-mobile-turn { display: block; grid-column: 1 / -1; padding: 4px; font-size: 13px; font-weight: 700; }
+	.pspp-game .pspp-chat-dock { right: 12px; bottom: calc(104px + env(safe-area-inset-bottom)); width: min(390px, calc(100vw - 24px)); }
+	.pspp-game .pspp-table-header { gap: 12px; padding: 16px; }
+	.pspp-table-tools { padding-inline: 16px; gap: 4px 16px; }
+	.pspp-game .pspp-party li { flex-basis: 185px; }
+	.pspp-game .pspp-scene { min-height: 54svh; padding: 24px 16px; }
+	.pspp-scene-caption { padding: 20px 16px; }
+	.pspp-sheet-heading { align-items: start; gap: 12px; }
+	.pspp-game .pspp-sheet-heading .pspp-portrait { flex-basis: 48px; width: 48px; height: 60px; font-size: 30px; }
+}
+
+.pspp-page > h1 {
+	overflow-wrap: anywhere;
+}
+
+.pspp-game {
+	--pspp-background: #f1f5f9;
+	--pspp-surface: #ffffff;
+	--pspp-text: #172033;
+	--pspp-primary: #334155;
+	--pspp-primary-text: #ffffff;
+	--pspp-accent: #1d4ed8;
+	--pspp-border: #64748b;
+	box-sizing: border-box;
+	width: 100%;
+	min-width: 0;
+	padding: clamp(12px, 3vw, 28px);
+	border: 1px solid var(--pspp-border);
+	border-radius: 8px;
+	background: var(--pspp-background);
+	color: var(--pspp-text);
+	font-size: 16px;
+	line-height: 1.6;
+	text-align: start;
+	overflow-wrap: anywhere;
+}
+
+.pspp-game.pspp-workspace { padding: 0; overflow: clip; border-radius: 4px; }
+.pspp-game.pspp-lobby { max-width: 850px; margin: 6vh auto; padding: clamp(20px, 6vw, 64px); border-block: 4px double var(--pspp-border); }
+.pspp-workspace > .pspp-table > .notice,
+.pspp-workspace .pspp-table-feedback { margin-inline: 24px; }
+
+.pspp-game *,
+.pspp-game *::before,
+.pspp-game *::after {
+	box-sizing: border-box;
+}
+
+.pspp-game h2,
+.pspp-game h3,
+.pspp-game h4,
+.pspp-game p,
+.pspp-game label,
+.pspp-game legend,
+.pspp-game dt,
+.pspp-game dd {
+	color: var(--pspp-text);
+}
+
+.pspp-game h2 {
+	font-size: clamp(22px, 3vw, 30px);
+}
+
+.pspp-game h3 {
+	font-size: 21px;
+}
+
+.pspp-game h4 {
+	font-size: 18px;
+}
+
+.pspp-game a {
+	color: var(--pspp-accent);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.pspp-game .pspp-navigation,
+.pspp-game .pspp-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+}
+
+.pspp-game .pspp-navigation a,
+.pspp-game .pspp-campaign-list a,
+.pspp-game .pspp-character-list a,
+.pspp-game .pspp-roll-log a,
+.pspp-game .pspp-card h3 a {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 6px;
+}
+
+.pspp-game .pspp-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+	gap: 16px;
+	min-width: 0;
+}
+
+.pspp-game .pspp-card,
+.pspp-game .pspp-rules,
+.pspp-game .pspp-snapshot,
+.pspp-game .pspp-field {
+	min-width: 0;
+	padding: clamp(10px, 2vw, 20px);
+	border: 1px solid var(--pspp-border);
+	border-radius: 6px;
+	background: var(--pspp-surface);
+	color: var(--pspp-text);
+}
+
+.pspp-game .pspp-rules {
+	margin-block: 24px;
+}
+
+.pspp-game .pspp-field {
+	margin: 12px 0;
+}
+
+.pspp-game .pspp-field legend {
+	padding-inline: 6px;
+	font-weight: 600;
+}
+
+.pspp-game form {
+	margin: 0;
+}
+
+.pspp-game label {
+	display: block;
+	font-weight: 600;
+}
+
+.pspp-game input[type="text"],
+.pspp-game input[type="number"],
+.pspp-game select,
+.pspp-game textarea {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	min-height: 44px;
+	margin: 6px 0 0;
+	padding: 8px 10px;
+	border: 1px solid var(--pspp-border);
+	border-radius: 4px;
+	background: var(--pspp-surface);
+	color: var(--pspp-text);
+	font: inherit;
+	font-size: 16px;
+	line-height: 1.5;
+}
+
+.pspp-game .button,
+.pspp-game button,
+.pspp-game input[type="submit"] {
+	display: inline-flex;
+	justify-content: center;
+	align-items: center;
+	min-height: 44px;
+	max-width: 100%;
+	margin: 6px 0;
+	padding: 8px 16px;
+	border: 1px solid var(--pspp-border);
+	border-radius: 4px;
+	background: var(--pspp-surface);
+	color: var(--pspp-text);
+	font: inherit;
+	line-height: 1.5;
+	text-decoration: none;
+	text-transform: none;
+	white-space: normal;
+	cursor: pointer;
+}
+
+.pspp-game .button-primary {
+	border-color: var(--pspp-primary);
+	background: var(--pspp-primary);
+	color: var(--pspp-primary-text);
+}
+
+.pspp-game :focus-visible {
+	outline: 3px solid var(--pspp-accent);
+	outline-offset: 3px;
+}
+
+.pspp-game .pspp-multiline {
+	white-space: pre-wrap;
+}
+
+.pspp-game .pspp-character-values dt {
+	font-weight: 600;
+}
+
+.pspp-game .pspp-character-values dd {
+	margin: 4px 0 16px;
+}
+
+.pspp-game .notice {
+	margin: 12px 0;
+	padding: 8px 16px;
+	border: 1px solid var(--pspp-border);
+	background: var(--pspp-surface);
+}
+
+.pspp-game .description {
+	font-size: 0.9em;
+}
+
+.pspp-game .screen-reader-text {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.pspp-game [hidden] {
+	display: none !important;
+}
+
+.pspp-game .pspp-dice-choices {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+	gap: 10px;
+	margin-block: 16px;
+}
+
+.pspp-game .pspp-die-choice {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px;
+	margin: 0;
+}
+
+.pspp-game .pspp-die-choice:hover {
+	outline: 2px solid var(--pspp-accent);
+	outline-offset: 2px;
+}
+
+.pspp-game .pspp-dice-quick > input {
+	max-width: 120px;
+}
+
+.pspp-game .pspp-die-visual {
+	position: relative;
+	display: inline-block;
+	width: 72px;
+	max-width: 100%;
+	height: 72px;
+	filter: drop-shadow(0 5px 3px rgba(0, 0, 0, 0.18));
+}
+
+.pspp-game .pspp-die-visual svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.pspp-game .pspp-die-shell {
+	fill: var(--pspp-background);
+	stroke: var(--pspp-accent);
+	stroke-width: 2.5;
+	stroke-linejoin: round;
+}
+
+.pspp-game .pspp-die-facets {
+	fill: none;
+	stroke: var(--pspp-accent);
+	stroke-width: 1;
+}
+
+.pspp-game .pspp-die-center {
+	fill: var(--pspp-surface);
+}
+
+.pspp-game .pspp-die-number {
+	position: absolute;
+	top: 54%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	color: var(--pspp-text);
+	font: 700 18px/1 system-ui, sans-serif;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.pspp-game .pspp-dice-stage {
+	display: flex;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 20px;
+	padding: 24px 12px;
+	margin-block: 16px;
+	border: 1px solid var(--pspp-border);
+	border-radius: 12px;
+	background: radial-gradient(ellipse at 50% 40%, var(--pspp-surface), var(--pspp-background));
+	perspective: 700px;
+}
+
+.pspp-game .pspp-die {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.pspp-game .pspp-dice-stage.is-rolling .pspp-die-visual {
+	animation: pspp-die-tumble 750ms ease-out both;
+	animation-delay: calc(var(--pspp-die-index) * 25ms);
+}
+
+.pspp-game .pspp-roll-total {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 12px;
+	font-weight: 600;
+}
+
+.pspp-game .pspp-roll-total output {
+	color: var(--pspp-text);
+	font-size: clamp(36px, 6vw, 56px);
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+}
+
+.pspp-game .pspp-roll-log {
+	display: grid;
+	gap: 16px;
+	padding: 0;
+	margin-block: 16px;
+	list-style: none;
+}
+
+.pspp-game details > summary {
+	display: list-item;
+	min-height: 44px;
+	padding-block: 10px;
+	cursor: pointer;
+}
+
+.pspp-game button:disabled,
+.pspp-game input[type="submit"]:disabled {
+	cursor: wait;
+	opacity: 0.7;
+}
+
+@keyframes pspp-die-tumble {
+	0% { transform: translateY(-12px) rotateX(120deg) rotateY(-160deg) rotateZ(-50deg) scale(0.65); }
+	45% { transform: translateY(3px) rotateX(-35deg) rotateY(45deg) rotateZ(20deg) scale(1.05); }
+	75% { transform: translateY(-4px) rotateX(12deg) rotateY(-10deg) rotateZ(-8deg); }
+	100% { transform: translateY(0) rotateX(0) rotateY(0) rotateZ(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.pspp-game .pspp-dice-stage.is-rolling .pspp-die-visual {
+		animation: none;
+	}
+}
+
+@media (max-width: 600px) {
+	.pspp-game .pspp-actions > .button,
+	.pspp-game .submit .button {
+		width: 100%;
+	}
+}

@@ -1,0 +1,243 @@
+import { Socket } from 'socket.io';
+import type { SessionData, Store } from 'express-session';
+import type { CampaignRole } from '@prisma/client';
+import { prisma } from '../config/database';
+import logger from '../utils/logger';
+import { sessionIsSignedIn, sessionHasAgedOut } from '../services/signedIn';
+import { pastAdminMfaDeadline } from '../services/adminMfaPolicy';
+import { NOT_A_MEMBER_MESSAGE } from '../middleware/rbac';
+
+/**
+ * WebSocket Authentication Middleware
+ * Connection & Authentication
+ *
+ * Every WebSocket connection is authenticated against the Express session store
+ * before any campaign events are processed.
+ */
+
+export interface AuthenticatedSocket extends Socket {
+  userId?: string;
+  campaignId?: string;
+  role?: string;
+  /** The login session this socket was opened under, so ending that sign-in can end the socket. */
+  sessionId?: string;
+  /**
+   * When that sign-in was made, as the session said at the handshake, so the
+   * sweep (signInSweep.ts) can end the socket at the sign-in limit without
+   * reading the store. Undefined for a sign-in from before the field existed,
+   * until the sweep finds it stamped in the store.
+   */
+  signedInAt?: number;
+  /** The `authenticate` in progress, so the next one on this socket waits for it (events.ts). */
+  authenticating?: Promise<void>;
+  /**
+   * On a GM's socket, the player whose explored memory its Player Preview is
+   * showing, as its last `exploration:request` named them: the one other
+   * member's memory it is sent as it grows.
+   */
+  previewingMemoryOf?: string;
+  /**
+   * Put the tokens this socket is carrying in a campaign back where they
+   * stand on that table's screens (handlers/tokens.ts), for when the socket
+   * stops being in it while its connection stays open.
+   */
+  releaseHeldTokens?: (campaignId: string) => void;
+}
+
+/**
+ * The fields authentication sets on a socket. `fetchSockets()` hands back a
+ * RemoteSocket, whose type does not know about them; with the default
+ * in-memory adapter the objects are the sockets themselves, so the fields are
+ * there to read and write. Casting to this, not to a literal of its own,
+ * keeps the fields declared once.
+ */
+export type AuthenticatedFields = Pick<AuthenticatedSocket, 'userId' | 'campaignId' | 'role' | 'sessionId' | 'releaseHeldTokens'>;
+
+/**
+ * Whether the account has to set up two-factor authentication before it may
+ * use the live table: an administrator past the deadline, whom the REST gate
+ * (middleware/adminMfa) refuses almost everything. Logged as the
+ * password-change refusal is.
+ */
+async function mustSetUpMfaFirst(user: Parameters<typeof pastAdminMfaDeadline>[0]): Promise<boolean> {
+  if (!(await pastAdminMfaDeadline(user))) return false;
+  logger.warn('WebSocket rejected: two-factor authentication required', { userId: user.id });
+  return true;
+}
+
+/**
+ * Where a socket's sign-in stands: still live, past the sign-in limit, ended
+ * some other way, or not known because the session store could not be read.
+ */
+export type SocketSignIn = 'live' | 'aged-out' | 'ended' | 'unreadable';
+
+/**
+ * Whether the sign-in this socket was opened under still exists in the session
+ * store and is still this user's. The handshake checks the session once; a
+ * sign-in that ends later (signing out, expiry, a password change elsewhere)
+ * leaves the socket open, so `authenticate` asks this before letting it join
+ * a campaign, and the sweep (signInSweep.ts) asks it every few minutes. Read
+ * through the socket's own session store, the one the handshake used. A store
+ * error is 'unreadable', handed to `onStoreError`: joining a campaign takes it
+ * as ended, and the sweep leaves the socket alone, since a moment's trouble
+ * with the store would otherwise sign every player out mid-game. A sign-in
+ * time found in the store is cached on the socket, which is how one from
+ * before the field existed gets its limit.
+ *
+ * The two-factor deadline passes with time, so a socket opened within an
+ * administrator's 7 days is stopped here once they are over. A database
+ * error while the deadline is checked lets the socket through, as the REST
+ * gate lets the request through.
+ */
+export async function socketSignIn(
+  socket: AuthenticatedSocket,
+  now = Date.now(),
+  onStoreError?: (error: unknown) => void
+): Promise<SocketSignIn> {
+  const { sessionStore } = socket.request as { sessionStore?: Store };
+  const sessionId = socket.sessionId;
+  const userId = socket.userId;
+  if (!sessionStore || !sessionId || !userId) return 'ended';
+  const read = await new Promise<{ ok: true; stored: Partial<SessionData> | null } | { ok: false; error: unknown }>((resolve) => {
+    sessionStore.get(sessionId, (err: unknown, found) => resolve(err ? { ok: false, error: err } : { ok: true, stored: found ?? null }));
+  });
+  if (!read.ok) {
+    onStoreError?.(read.error);
+    return 'unreadable';
+  }
+  const { stored } = read;
+  if (!sessionIsSignedIn(stored) || stored.userId !== userId) return 'ended';
+  if (typeof stored.signedInAt === 'number') socket.signedInAt = stored.signedInAt;
+  if (sessionHasAgedOut(stored, now)) return 'aged-out';
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, platformRole: true, mfaEnabled: true, createdAt: true },
+    });
+    return user && (await mustSetUpMfaFirst(user)) ? 'ended' : 'live';
+  } catch (error) {
+    logger.error('Error checking the administrator two-factor policy', { err: error });
+    return 'live';
+  }
+}
+
+/** Whether the socket's sign-in is still live (socketSignIn). */
+export async function socketSessionIsLive(socket: AuthenticatedSocket): Promise<boolean> {
+  return (await socketSignIn(socket)) === 'live';
+}
+
+/**
+ * Authenticate an incoming WebSocket connection via the shared Express session.
+ * Attaches userId to the socket on success.
+ */
+export async function authenticateSocket(socket: AuthenticatedSocket): Promise<boolean> {
+  try {
+    // express-session attaches `session` to the underlying request, but the
+    // socket.io type for `socket.request` is the bare Node IncomingMessage and
+    // knows nothing about it.
+    //
+    // Borrowing the real `SessionData` rather than re-declaring the field:
+    // a local `{ userId?: string }` would keep compiling if that field were
+    // renamed, and this socket would then silently reject every connection
+    // while the REST routes failed loudly at build time.
+    const { session, sessionID } = socket.request as { session?: Partial<SessionData>; sessionID?: string };
+
+    // The same question the REST guards ask (services/signedIn): a session
+    // still at the two-factor step is not signed in, user id or not.
+    if (!sessionIsSignedIn(session) || sessionHasAgedOut(session)) {
+      return false;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { id: true, mustChangePassword: true, platformRole: true, mfaEnabled: true, createdAt: true },
+    });
+
+    if (!user) {
+      return false;
+    }
+
+    // Same gates the REST API applies: an account that still has to replace
+    // an admin-issued password cannot play over the socket either, nor an
+    // administrator past the two-factor deadline.
+    if (user.mustChangePassword) {
+      logger.warn('WebSocket rejected: password change required', { userId: user.id });
+      return false;
+    }
+    if (await mustSetUpMfaFirst(user)) {
+      return false;
+    }
+
+    socket.userId = user.id;
+    socket.sessionId = sessionID;
+    socket.signedInAt = session.signedInAt;
+    return true;
+  } catch (error) {
+    logger.error('WebSocket authentication error', { err: error });
+    return false;
+  }
+}
+
+/**
+ * Why `authenticateCampaign` turned a socket away: no such campaign, not a
+ * member of it, a socket that never signed in, or a failure inside the
+ * server. The `authenticate` handler tells a socket the first two with
+ * `campaign.access.revoked`, and the others with a plain `error`.
+ */
+export type CampaignRefusal = 'no-campaign' | 'not-member' | 'not-signed-in' | 'failed';
+
+export type CampaignCheck =
+  | { success: true; role: CampaignRole }
+  | { success: false; refusal: CampaignRefusal; error: string };
+
+/**
+ * Check that the socket's user belongs to the campaign, and report their role.
+ *
+ * Reports only. The `authenticate` handler owns the socket's campaign and role
+ * fields, because it has to leave the previous campaign's room first, and it
+ * can only know which room that was if nothing has overwritten the id yet.
+ */
+export async function authenticateCampaign(
+  socket: AuthenticatedSocket,
+  campaignId: string
+): Promise<CampaignCheck> {
+  try {
+    if (!socket.userId) {
+      return { success: false, refusal: 'not-signed-in', error: 'Socket not authenticated' };
+    }
+
+    // Verify campaign exists
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      select: { id: true },
+    });
+
+    if (!campaign) {
+      return { success: false, refusal: 'no-campaign', error: 'Campaign not found' };
+    }
+
+    // Verify user is a member of the campaign
+    const membership = await prisma.campaignMembership.findUnique({
+      where: {
+        userId_campaignId: {
+          userId: socket.userId,
+          campaignId,
+        },
+      },
+      select: { role: true },
+    });
+
+    if (!membership) {
+      return { success: false, refusal: 'not-member', error: NOT_A_MEMBER_MESSAGE };
+    }
+
+    return {
+      success: true,
+      role: membership.role,
+    };
+  } catch (error) {
+    logger.error('WebSocket campaign authentication error', { err: error });
+    return { success: false, refusal: 'failed', error: 'Internal server error' };
+  }
+}

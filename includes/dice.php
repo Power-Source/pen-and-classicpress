@@ -97,7 +97,7 @@ function ps_pen_paper_roll_dice( $campaign_id, $input, $rules_revision ) {
 	$attribute_snapshot = null;
 	$recipient = get_current_user_id();
 	if ( '' !== $input['character'] ) {
-		if ( ! preg_match( '/^([1-9]\d{0,18}):([1-9]\d{0,18})(?::([1-9]\d{0,18}))?$/D', $input['character'], $ids ) || (string) (int) $ids[1] !== $ids[1] || (string) (int) $ids[2] !== $ids[2] ) {
+		if ( ! preg_match( '/^([1-9]\d{0,18}):([1-9]\d{0,18})(?::([1-9]\d{0,18}))?(?::g(?:0|[1-9]\d{0,18}):(?:0|[1-9]\d{0,18}))?$/D', $input['character'], $ids ) || (string) (int) $ids[1] !== $ids[1] || (string) (int) $ids[2] !== $ids[2] ) {
 			return new WP_Error( 'invalid_character', __( 'Bitte wähle einen gültigen Charakter.', 'ps-pen-paper' ) );
 		}
 		$character = ps_pen_paper_get_character( $campaign, (int) $ids[1] );
@@ -113,6 +113,7 @@ function ps_pen_paper_roll_dice( $campaign_id, $input, $rules_revision ) {
 		}
 		$recipient = (int) $character->post_author;
 		$character_snapshot = array( 'id' => $character->ID, 'name' => $state['active']['name'], 'owner_id' => $recipient, 'revision' => $state['revision'] );
+		if ( isset( $state['equipment'] ) ) { $character_snapshot['equipment'] = $state['equipment']; }
 		if ( isset( $state['context'] ) ) {
 			$character_snapshot['context'] = array(
 				'mode' => $state['context']['mode'], 'source_id' => $state['context']['source_id'],
@@ -185,6 +186,17 @@ function ps_pen_paper_get_roll( $campaign, $roll_id ) {
 		}
 	}
 	$is_private_reader = 'private' === $event['visibility'] && ( get_current_user_id() === (int) $post->post_author || get_current_user_id() === $event['recipient_id'] );
+	if ( isset( $event['character'] ) && is_array( $event['character'] ) && array_key_exists( 'equipment', $event['character'] ) ) {
+		$gear = $event['character']['equipment'];
+		if ( ! is_array( $gear ) || ! isset( $gear['revision'], $gear['schema_revision'], $gear['bonuses'] ) ||
+			! is_int( $gear['revision'] ) || $gear['revision'] < 0 || ! is_int( $gear['schema_revision'] ) || $gear['schema_revision'] < 0 ||
+			! is_array( $gear['bonuses'] ) || count( $gear['bonuses'] ) > 30 ) {
+			return new WP_Error( 'invalid_roll', __( 'Die gespeicherte Ausrüstungsherkunft des Wurfs ist beschädigt.', 'ps-pen-paper' ) );
+		}
+		foreach ( $gear['bonuses'] as $id => $bonus ) {
+			if ( ! is_string( $id ) || ! is_int( $bonus ) || abs( $bonus ) > 30000000 ) { return new WP_Error( 'invalid_roll', __( 'Die gespeicherten Ausrüstungsboni des Wurfs sind beschädigt.', 'ps-pen-paper' ) ); }
+		}
+	}
 	if ( ! ps_pen_paper_can_manage_campaign( $campaign ) && 'group' !== $event['visibility'] && ! $is_private_reader ) {
 		return $error;
 	}

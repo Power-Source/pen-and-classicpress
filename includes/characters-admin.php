@@ -114,7 +114,7 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 	<?php
 }
 
-function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id = 0 ) {
+function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id = 0, $overview_url = '' ) {
 	$rules = ps_pen_paper_get_rules( $campaign->ID );
 	?>
 	<section id="pspp-characters" class="pspp-rules" aria-labelledby="pspp-characters-heading">
@@ -131,7 +131,9 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 			}
 			$state = ps_pen_paper_character_state( $campaign, $character );
 			if ( is_wp_error( $state ) ) {
-				echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p></section>';
+				echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p>';
+				ps_pen_paper_render_character_equipment( $campaign, $character, $page_id );
+				echo '</section>';
 				return;
 			}
 			if ( 'pspp_campaign' === $campaign->post_type ) {
@@ -139,12 +141,15 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 			}
 			$owner = get_userdata( (int) $character->post_author );
 			?>
-			<p class="pspp-navigation"><a href="<?php echo esc_url( 'pspp_universe' === $campaign->post_type ? ps_pen_paper_universe_url( $campaign->ID, $page_id ) : ( $page_id ? ps_pen_paper_game_url( $page_id, $campaign->ID ) : ps_pen_paper_admin_url( $campaign->ID ) ) ); ?>"><?php esc_html_e( 'Zur Bogenübersicht', 'ps-pen-paper' ); ?></a></p>
+			<p class="pspp-navigation"><a href="<?php echo esc_url( $overview_url ? $overview_url : ( 'pspp_universe' === $campaign->post_type ? ps_pen_paper_universe_url( $campaign->ID, $page_id ) : ( $page_id ? ps_pen_paper_game_url( $page_id, $campaign->ID ) : ps_pen_paper_admin_url( $campaign->ID ) ) ) ); ?>"><?php esc_html_e( 'Zur Bogenübersicht', 'ps-pen-paper' ); ?></a></p>
 			<p><strong><?php esc_html_e( 'Besitzer:', 'ps-pen-paper' ); ?></strong> <?php echo esc_html( $owner ? $owner->display_name : __( 'Gelöschter Benutzer', 'ps-pen-paper' ) ); ?></p>
 			<div class="pspp-grid">
-				<section class="pspp-snapshot">
+				<section class="pspp-snapshot pspp-sheet"<?php $sheet_style_result = 'pspp_campaign' === $campaign->post_type ? ps_pen_paper_sheet_attributes( $campaign ) : true; ?>>
+					<?php if ( is_wp_error( $sheet_style_result ) ) { echo '<p role="alert">' . esc_html( $sheet_style_result->get_error_message() ) . '</p>'; } ?>
 					<h3><?php esc_html_e( 'Gültiger Stand', 'ps-pen-paper' ); ?></h3>
+					<?php ps_pen_paper_render_portrait( $campaign, $character, $state['active'] ? $state['active']['name'] : __( 'Neu', 'ps-pen-paper' ) ); ?>
 					<?php ps_pen_paper_render_character_snapshot( $state['active'], $rules ); ?>
+					<?php if ( isset( $state['equipment'] ) && $state['equipment']['bonuses'] ) : ?><p><?php esc_html_e( 'Angezeigte Werte enthalten freigegebene Ausrüstungsboni.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 				</section>
 				<?php if ( $state['pending'] ) : ?>
 					<section class="pspp-snapshot">
@@ -163,6 +168,8 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 					</section>
 				<?php endif; ?>
 			</div>
+			<?php ps_pen_paper_render_portrait_form( $campaign, $character, $page_id ); ?>
+			<?php ps_pen_paper_render_character_equipment( $campaign, $character, $page_id ); ?>
 			<?php if ( 'pspp_campaign' === $campaign->post_type ) { ps_pen_paper_render_character_context( $campaign, $character, $state, $page_id ); } ?>
 			<?php if ( isset( $state['context'] ) && 'shared' === $state['context']['mode'] ) : ?>
 				<p><?php esc_html_e( 'Dieser Bogen folgt dem freigegebenen Basisstand. Grundwerte ändert nur die Universumsleitung; die Kampagnenleitung kann getrennte Auflagen setzen.', 'ps-pen-paper' ); ?></p>
@@ -170,9 +177,9 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 				<p><?php esc_html_e( 'Das Bearbeitungsformular ändert die unabhängigen Grundwerte dieser Kampagnenkopie. Getrennte Auflagen bleiben dabei bestehen.', 'ps-pen-paper' ); ?></p>
 			<?php endif; ?>
 			<?php if ( ps_pen_paper_can_edit_character( $campaign, $character ) ) : ?>
-				<?php if ( $page_id ) : ?><details class="pspp-fold"><summary><?php esc_html_e( 'Bogen bearbeiten', 'ps-pen-paper' ); ?></summary><?php endif; ?>
+				<?php if ( $page_id || $overview_url ) : ?><details class="pspp-fold"><summary><?php esc_html_e( 'Bogen bearbeiten', 'ps-pen-paper' ); ?></summary><?php endif; ?>
 				<?php ps_pen_paper_render_character_form( $campaign, $rules, $character, $page_id ); ?>
-				<?php if ( $page_id ) : ?></details><?php endif; ?>
+				<?php if ( $page_id || $overview_url ) : ?></details><?php endif; ?>
 			<?php endif; ?>
 		<?php else : ?>
 			<?php $characters = ps_pen_paper_get_characters( $campaign ); ?>

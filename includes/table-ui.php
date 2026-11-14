@@ -18,9 +18,10 @@ function ps_pen_paper_render_table_sheet( $campaign, $page_id ) {
 			continue;
 		}
 		?>
-		<article class="pspp-sheet">
+		<article class="pspp-sheet"<?php $sheet_style_result = ps_pen_paper_sheet_attributes( $campaign ); ?>>
+			<?php if ( is_wp_error( $sheet_style_result ) ) { echo '<p role="alert">' . esc_html( $sheet_style_result->get_error_message() ) . '</p>'; } ?>
 			<div class="pspp-sheet-heading">
-				<span class="pspp-portrait" aria-hidden="true"><?php echo esc_html( wp_html_excerpt( $state['active'] ? $state['active']['name'] : __( 'Neu', 'ps-pen-paper' ), 1, '' ) ); ?></span>
+				<?php ps_pen_paper_render_portrait( $campaign, $character, $state['active'] ? $state['active']['name'] : __( 'Neu', 'ps-pen-paper' ) ); ?>
 				<div><span class="pspp-eyebrow"><?php esc_html_e( 'Charakterbogen', 'ps-pen-paper' ); ?></span>
 					<h3><?php echo esc_html( $state['active'] ? $state['active']['name'] : __( 'Noch nicht freigegeben', 'ps-pen-paper' ) ); ?></h3>
 				</div>
@@ -61,6 +62,7 @@ function ps_pen_paper_render_table_sheet( $campaign, $page_id ) {
 				<?php endforeach; ?>
 			<?php endif; ?>
 			<?php if ( $state['pending'] ) : ?><p class="pspp-pending"><?php esc_html_e( 'Freigabe ausstehend – die gültigen Werte bleiben unverändert.', 'ps-pen-paper' ); ?></p><?php endif; ?>
+			<?php if ( isset( $state['equipment'] ) && $state['equipment']['bonuses'] ) : ?><p><?php esc_html_e( 'Freigegebene Ausrüstungsboni sind in den angezeigten Werten enthalten. Grundwerte bleiben unverändert.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 			<?php if ( isset( $state['context'] ) ) : ?><p><?php echo esc_html( ps_pen_paper_character_context_modes()[ $state['context']['mode'] ] . ' · ' . __( 'Kampagnenauflagen sind berücksichtigt.', 'ps-pen-paper' ) ); ?></p><?php endif; ?>
 			<a class="button" href="<?php echo esc_url( ps_pen_paper_character_url( $campaign->ID, $character->ID, $page_id ) ); ?>"><?php echo esc_html( $state['pending'] && ps_pen_paper_can_manage_campaign( $campaign ) ? __( 'Antrag prüfen', 'ps-pen-paper' ) : __( 'Bogen öffnen / bearbeiten', 'ps-pen-paper' ) ); ?></a>
 		</article>
@@ -107,6 +109,8 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 			<?php if ( $is_gm ) : ?><a data-table-view="folio" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-folio' ); ?>"><?php esc_html_e( 'Spielleitermappe', 'ps-pen-paper' ); ?></a><?php endif; ?>
 			<?php if ( $is_gm ) : ?><a data-table-view="settings" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-settings' ); ?>"><?php esc_html_e( 'Rundeneinstellungen', 'ps-pen-paper' ); ?></a><?php endif; ?>
 			<?php if ( $is_gm ) : ?><a data-table-view="story" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-story' ); ?>"><?php esc_html_e( 'Szenen & Karten', 'ps-pen-paper' ); ?></a><?php endif; ?>
+			<?php if ( $is_gm && ps_pen_paper_community_available() ) : ?><a data-table-view="equipment" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-equipment' ); ?>"><?php esc_html_e( 'Gegenstände', 'ps-pen-paper' ); ?></a><?php endif; ?>
+			<?php if ( ps_pen_paper_community_url() ) : ?><a href="<?php echo esc_url( ps_pen_paper_community_url() ); ?>"><?php esc_html_e( 'Mein Charakterprofil', 'ps-pen-paper' ); ?></a><?php endif; ?>
 		</nav>
 		<?php ps_pen_paper_render_notice(); ?>
 		<?php if ( is_wp_error( $backdrop ) ) : ?><p role="alert"><?php echo esc_html( $backdrop->get_error_message() ); ?></p><?php endif; ?>
@@ -188,6 +192,7 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 				<section id="pspp-handouts" class="pspp-table-panel pspp-table-stage" data-table-panel="handouts"><?php ps_pen_paper_render_handouts( $campaign, $page_id ); ?></section>
 				<?php if ( $is_gm ) : ?>
 					<section id="pspp-folio" class="pspp-table-panel pspp-table-stage" data-table-panel="folio"><?php ps_pen_paper_render_folio( $campaign, $page_id ); ?></section>
+					<?php if ( ps_pen_paper_community_available() ) : ?><section id="pspp-equipment" class="pspp-table-panel pspp-table-stage" data-table-panel="equipment"><?php ps_pen_paper_render_equipment_catalogue( $campaign, $page_id ); ?></section><?php endif; ?>
 					<section id="pspp-story" class="pspp-table-panel pspp-table-stage" data-table-panel="story"><?php ps_pen_paper_render_story( $campaign, $page_id ); ?></section>
 					<section id="pspp-settings" class="pspp-table-panel pspp-table-stage pspp-table-settings" data-table-panel="settings"><?php ps_pen_paper_render_access_settings( $campaign, $page_id ); ?></section>
 				<?php endif; ?>

@@ -40,7 +40,9 @@ function ps_pen_paper_render_event_details( $event ) {
 		<?php foreach ( array( 'before' => __( 'Vorher', 'ps-pen-paper' ), 'after' => __( 'Nachher', 'ps-pen-paper' ) ) as $key => $label ) : ?>
 			<section class="pspp-snapshot">
 				<h4><?php echo esc_html( $label . ' · ' . sprintf( __( 'Revision %d', 'ps-pen-paper' ), $event[ $key ]['revision'] ) ); ?></h4>
-				<?php if ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) : ?>
+				<?php if ( in_array( $event['kind'], array( 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved' ), true ) ) : ?>
+					<?php ps_pen_paper_render_equipment_history( $event['kind'], $event[ $key ] ); ?>
+				<?php elseif ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) : ?>
 					<?php foreach ( array( 'draft' => __( 'Entwurf', 'ps-pen-paper' ), 'published' => __( 'Freigegebener Stand', 'ps-pen-paper' ) ) as $scope => $heading ) :
 						$scene = $event[ $key ][ $scope ];
 						?>
@@ -139,7 +141,9 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 					<?php else : ?>
 						<p><strong><?php echo esc_html( $labels[ $event['kind'] ] ); ?></strong></p>
 						<?php
-						if ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) {
+						if ( in_array( $event['kind'], array( 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved' ), true ) ) {
+							$snapshot = array( 'name' => $labels[ $event['kind'] ] );
+						} elseif ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) {
 							$snapshot = array( 'name' => $event['after']['draft']['title'] );
 						} elseif ( in_array( $event['kind'], array( 'folio_saved', 'folio_published', 'folio_withdrawn' ), true ) ) {
 							$snapshot = array( 'name' => $event['after']['draft']['title'] );

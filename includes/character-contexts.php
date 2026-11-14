@@ -53,14 +53,15 @@ function ps_pen_paper_context_snapshot( $snapshot, $rules ) {
 	return ps_pen_paper_validate_character( $snapshot, $rules );
 }
 
-function ps_pen_paper_character_state( $scope, $character ) {
+function ps_pen_paper_character_state( $scope, $character, $with_equipment = true ) {
 	if ( ! ps_pen_paper_get_character( $scope, $character->ID ) ) {
 		return new WP_Error( 'forbidden', __( 'Dieser Charakterstand ist für dich nicht verfügbar.', 'ps-pen-paper' ) );
 	}
 	$state = ps_pen_paper_raw_character_state( $character->ID );
-	if ( is_wp_error( $state ) || ! array_key_exists( 'context', $state ) ) {
+	if ( is_wp_error( $state ) ) {
 		return $state;
 	}
+	if ( ! array_key_exists( 'context', $state ) ) { return $with_equipment ? ps_pen_paper_apply_gear( $scope, $character, $state ) : $state; }
 	$rules = ps_pen_paper_get_rules( $scope->ID );
 	$context = ps_pen_paper_validate_context( $state['context'], $rules );
 	if ( is_wp_error( $context ) ) {
@@ -92,11 +93,12 @@ function ps_pen_paper_character_state( $scope, $character ) {
 			$state['active']['values'][ $id ] = $value;
 		}
 	}
-	return $state;
+	return $with_equipment ? ps_pen_paper_apply_gear( $scope, $character, $state ) : $state;
 }
 
 function ps_pen_paper_character_token( $character, $state ) {
-	return $character->ID . ':' . $state['revision'] . ( isset( $state['base_revision'] ) ? ':' . $state['base_revision'] : '' );
+	return $character->ID . ':' . $state['revision'] . ( isset( $state['base_revision'] ) ? ':' . $state['base_revision'] : '' ) .
+		( isset( $state['equipment'] ) ? ':g' . $state['equipment']['revision'] . ':' . $state['equipment']['schema_revision'] : '' );
 }
 
 function ps_pen_paper_context_campaign( $campaign_id ) {
@@ -187,7 +189,7 @@ function ps_pen_paper_save_character_context( $campaign_id, $id, $revision, $bas
 	if ( ! ps_pen_paper_can_access_site() || ! $character || ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
 		return new WP_Error( 'forbidden', __( 'Nur die Spielleitung darf Kampagnenauflagen freigeben.', 'ps-pen-paper' ) );
 	}
-	$effective = ps_pen_paper_character_state( $campaign, $character );
+	$effective = ps_pen_paper_character_state( $campaign, $character, false );
 	if ( is_wp_error( $effective ) ) {
 		return $effective;
 	}
@@ -233,6 +235,12 @@ function ps_pen_paper_save_character_context( $campaign_id, $id, $revision, $bas
 	}
 	foreach ( $context['overrides'] as $field => $value ) {
 		$source['values'][ $field ] = $value;
+	}
+	if ( ps_pen_paper_community_available() ) {
+		$gear = ps_pen_paper_gear_state( $id );
+		if ( is_wp_error( $gear ) ) { return $gear; }
+		$gear_check = ps_pen_paper_gear_bonus( $campaign, $gear['active'], $source );
+		if ( is_wp_error( $gear_check ) ) { return $gear_check; }
 	}
 	return ps_pen_paper_save_document_event( $campaign_id, $id, '_pspp_character', $before, $after, array(
 		'kind' => 'character_context', 'visibility' => 'owner', 'recipient_id' => (int) $character->post_author,

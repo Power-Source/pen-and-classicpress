@@ -37,9 +37,13 @@ function ps_pen_paper_backdrop_image( $campaign ) {
 }
 
 function ps_pen_paper_private_image( $campaign, $asset_id ) {
-	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_campaign( $campaign ) ) {
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_character_scope( $campaign ) ) {
 		return new WP_Error( 'forbidden', __( 'Dieses Bild ist für dich nicht verfügbar.', 'ps-pen-paper' ) );
 	}
+	return ps_pen_paper_private_image_data( $campaign, $asset_id );
+}
+
+function ps_pen_paper_private_image_data( $campaign, $asset_id ) {
 	$asset = get_post( $asset_id );
 	if ( ! $asset || 'pspp_asset' !== $asset->post_type || 'private' !== $asset->post_status ||
 		(int) $asset->post_parent !== (int) $campaign->ID ||
@@ -50,9 +54,9 @@ function ps_pen_paper_private_image( $campaign, $asset_id ) {
 	return 'data:' . $asset->post_mime_type . ';base64,' . $asset->post_content;
 }
 
-function ps_pen_paper_store_private_image( $campaign_id, $path ) {
-	$campaign = ps_pen_paper_get_campaign( $campaign_id );
-	if ( ! ps_pen_paper_can_access_site() || ! $campaign || ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
+function ps_pen_paper_store_private_image( $campaign_id, $path, $character_id = 0 ) {
+	$campaign = ps_pen_paper_get_character_scope( $campaign_id );
+	if ( ! ps_pen_paper_can_access_site() || ! $campaign || ( ! ps_pen_paper_can_manage_character_scope( $campaign ) && ! ( $character_id && ps_pen_paper_can_edit_portrait( $campaign, $character_id ) ) ) ) {
 		return new WP_Error( 'forbidden', __( 'Nur die Spielleitung darf Bilder hochladen.', 'ps-pen-paper' ) );
 	}
 	$info = is_string( $path ) && is_file( $path ) && is_readable( $path ) ? wp_getimagesize( $path ) : false;
@@ -109,7 +113,7 @@ function ps_pen_paper_save_backdrop( $campaign_id, $path, $revision ) {
 }
 
 function ps_pen_paper_delete_campaign_assets( $post_id, $post ) {
-	if ( 'pspp_campaign' !== $post->post_type ) {
+	if ( ! in_array( $post->post_type, array( 'pspp_campaign', 'pspp_universe' ), true ) ) {
 		return;
 	}
 	$assets = get_posts( array( 'post_type' => 'pspp_asset', 'post_status' => 'private', 'post_parent' => $post_id, 'posts_per_page' => -1, 'fields' => 'ids' ) );

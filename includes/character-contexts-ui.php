@@ -90,6 +90,7 @@ function ps_pen_paper_render_universe_characters( $universe, $page_id ) {
 			<?php ps_pen_paper_render_rules( $universe, true, $page_id ); ?>
 		</details>
 		<?php ps_pen_paper_render_characters( $universe, 0, $page_id ); ?>
+		<section id="pspp-equipment"><?php ps_pen_paper_render_equipment_catalogue( $universe, $page_id ); ?></section>
 		<h3><?php esc_html_e( 'In eine Kampagne übernehmen', 'ps-pen-paper' ); ?></h3>
 		<p><?php esc_html_e( 'Nur bereits aufgenommene Besitzer können mitspielen. Zuerst übernimmt eine leere Kampagne ausdrücklich die Regelvorlage mit denselben Feldkennungen; bestehende Regelwerke werden nicht überschrieben.', 'ps-pen-paper' ); ?></p>
 		<?php

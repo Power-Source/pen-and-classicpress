@@ -170,7 +170,7 @@ function ps_pen_paper_save_character( $campaign_id, $character_id, $owner_id, $i
 		return new WP_Error( 'forbidden', __( 'Du darfst diesen Charakter nicht bearbeiten.', 'ps-pen-paper' ) );
 	}
 	if ( $character ) {
-		$current = ps_pen_paper_character_state( $campaign, $character );
+		$current = ps_pen_paper_character_state( $campaign, $character, false );
 		if ( is_wp_error( $current ) ) { return $current; }
 	}
 	$rules = ps_pen_paper_get_rules( $campaign_id );
@@ -191,6 +191,8 @@ function ps_pen_paper_save_character( $campaign_id, $character_id, $owner_id, $i
 	if ( is_wp_error( $snapshot ) ) {
 		return $snapshot;
 	}
+	$gear_check = ps_pen_paper_check_character_gear( $campaign, $character, $snapshot );
+	if ( is_wp_error( $gear_check ) ) { return $gear_check; }
 	$state = $previous;
 	$state['revision']++;
 	if ( ! $is_gm && 'approval' === ps_pen_paper_character_mode( $rules ) ) {
@@ -244,6 +246,8 @@ function ps_pen_paper_review_character( $campaign_id, $character_id, $decision, 
 	$state = $previous;
 	$state['revision']++;
 	if ( 'approve' === $decision ) {
+		$gear_check = ps_pen_paper_check_character_gear( $campaign, $character, $state['pending'] );
+		if ( is_wp_error( $gear_check ) ) { return $gear_check; }
 		$state['active'] = $state['pending'];
 	}
 	$state['pending'] = null;

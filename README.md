@@ -41,6 +41,8 @@ Ein erster digitaler Spieltisch und eine optionale PS-Chat-Anbindung sind vorhan
 Ein erster Szeneneditor mit geschütztem Kartentisch ist seit Version 0.12.0
 vorhanden. Seit 0.13.0 ergänzen Kapitel, geschützte Text-/Bild-Handouts und eine
 private Spielleitermappe die Abenteuerverwaltung.
+Version 0.14.0 ergänzt private Charakterporträts und Bogenhintergründe sowie
+PS-Community-gebundene Profilansicht, Gegenstandskataloge und Ausrüstung.
 
 ## Geschützter Spielbereich im Frontend
 
@@ -73,6 +75,68 @@ Seiten-Caches oder CDNs die Spielbereich-Seite einschließlich aller
 Abfrageparameter ausdrücklich vom Caching ausschließen.** Solche Systeme
 können bereits vor dem Start des Plugins antworten. `noindex` ersetzt keine
 Zugriffsprüfung.
+
+## Charaktergestaltung und PS Community seit Version 0.14.0
+
+Charakterporträts und dekorative Kampagnen-Bogenhintergründe gehören zum Kern.
+Porträts sind nur für Besitzer und Spielleitung sichtbar, nicht als öffentliche
+Benutzeravatare oder Bilder in der gemeinsamen Teilnehmerleiste.
+Spieleränderungen folgen der Charakterpolitik: Freigabe, direkt oder nur
+Spielleitung. Porträtanträge bleiben von Werteanträgen getrennt.
+Den Bogenhintergrund richtet die Spielleitung unter **Rundeneinstellungen** ein.
+Er wird dezent hinter dem gültigen Bogen dargestellt. Geschützte PNG-/JPEG-/WebP-
+Bilder bis 2 MiB und 3000 × 3000 Pixel liegen ohne öffentliche Mediathek-URL
+in der Datenbank. Historische Bilder bleiben bis zur Löschung ihres Ursprungs
+erhalten; kleine Dateien und Datenbanksicherungen sind wichtig.
+
+Mit aktivem **PS Community** und geladenen Profil-Tab-Schnittstellen erscheint
+im **eigenen** Profil der Tab **Pen & Paper**. In der lokalen Community-Version
+benötigt das die Module Profil und Aktivität sowie eine veröffentlichte,
+in Community zugeordnete Profilseite. Dort wählt der Besitzer seinen
+Kampagnencharakter, bearbeitet den Bogen und verwaltet Porträt und Ausrüstung.
+Formulare werden direkt auf der Profilseite verarbeitet; eine Backend-Freigabe
+ist dafür nicht nötig. Fremde Profilaufrufe und native Community-AJAX-Aufrufe
+erhalten keine fremden Bögen. Freundschaften vergeben keine Kampagnenrechte.
+Auch die Profilseite einschließlich ihrer Parameter vom Seiten-Cache ausschließen.
+
+**Inventar, Gegenstandskatalog und Ausrüstung benötigen PS Community.**
+Ohne diese Integration bleiben Daten erhalten, Bestandsänderungen gesperrt
+und Ausrüstungsboni inaktiv. Charaktere, Würfel, Porträts und Geschichten
+funktionieren weiter. Handel ist noch nicht implementiert.
+
+Die Spielleitung konfiguriert unter **Gegenstände**:
+
+- Bis zu 30 Slots mit stabiler Kennung, eigenem Namen und passendem
+  Gegenstandstyp, etwa `kopf | Kopf | kopfbedeckung`.
+- Bis zu 30 frei benannte Seltenheitsstufen mit Farbe und Text. Eine Stufe wie
+  „Episch“ erzeugt selbst keine Multiplikatoren oder anderen Regeln.
+- Gegenstandsvorlagen mit Beschreibung, geschützter Grafik, freien
+  Eigenschaften und ausdrücklich eingetragenen ganzzahligen Boni.
+- Einen gemeinsamen Universumskatalog und ergänzende lokale Kampagnenvorlagen.
+  Kampagnen konfigurieren ihre Slots selbst; ohne Universum gilt nur ihr Katalog.
+
+Über den jeweiligen Charakter gibt die Spielleitung **konkrete Exemplare**
+aus. Jedes Exemplar behält seinen damaligen Vorlagenstand; spätere
+Vorlagenänderungen verändern ausgegebene Gegenstände nicht.
+Ein Charakter besitzt zunächst höchstens 100 einzelne Exemplare.
+Ein Exemplar darf genau einen passenden Slot belegen. Slotauswahl, Besitz
+und Freigabepolitik werden auf dem Server geprüft.
+
+Angelegte, freigegebene Boni werden auf Zahlen-/Attributfelder addiert, ohne
+Grundwerte zu überschreiben. Bogen und Würfe verwenden dieselben effektiven
+Werte; Wurfergebnisse speichern die damaligen Boni und Revisionen.
+Feldgrenzen gelten auch nach Addition. Unzulässige Ausrüstung, Grundwert-
+oder Auflagenänderungen werden abgelehnt. Führt ein späterer gemeinsamer
+Basisfortschritt zu einem unzulässigen lokalen Ausrüstungsstand, erscheint
+ein Fehler statt stiller Kürzung oder erfundener Werte. Im eigenen Profil
+bleibt **Ausrüstung prüfen** erreichbar: Besitzer beantragen das Ablegen,
+die Spielleitung kann es freigeben oder unmittelbar korrigieren.
+
+Schema- und Vorlagenhistorie bleiben der Spielleitung vorbehalten;
+Inventar- und Porträthistorie sehen nur Besitzer und aktuelle Spielleitung.
+Es gibt keine Handelsoberfläche, Stapelmengen, automatische Gegenstandssynchronisierung,
+Mehrfachslot-Belegung, Lösch-/Entzugsoberfläche oder frei positionierbaren
+grafischen Slotdesigner. Die erste Slotoberfläche verwendet zugängliche Auswahlfelder.
 
 ## Digitaler Spieltisch
 
@@ -159,7 +223,8 @@ Tablet passt sich die Anordnung an; schmale Ansichten wechseln zwischen
 **Spiel**, **Mein Bogen**, **Würfel** und **Gruppe**. Regelwerk und Protokoll
 werden separat geöffnet, Charaktereingaben erst bei Bedarf eingeblendet.
 Spielleiter sehen auch fremde Bögen und Freigaben; Spieler weiterhin nur ihre
-eigenen. Die Buchstabenplaketten sind Platzhalter, noch kein Bild-Avatarsystem.
+eigenen. Die gemeinsame Teilnehmerleiste verwendet weiterhin Buchstabenplaketten;
+private Charakterporträts erscheinen nur auf berechtigten Charakterbögen.
 
 ### Teilnahme und Einstieg
 
@@ -472,6 +537,15 @@ Spieler- und Spielleiterinhalte wie Namen, Regeln und Geschichten bleiben eigene
 Inhalte und werden nicht durch gettext übersetzt.
 
 ## Entwicklungstest
+
+`tests/equipment-integration.php` prüft die Community-Sperre mit erhaltenen
+Beständen, echte Community-Profil-Tab-Schnittstellen, private Porträts und
+Freigaben, Vorlagenstände, Slot-/Besitzprüfungen, additive Boni und Grenzen,
+Wurfherkunft, gemeinsame Basisbögen, reparierbare ungültige Ausrüstung sowie
+Protokollrücknahme und Bildbereinigung. Der Test lädt die lokale
+PS-Community-Profil-API; das Community-Plugin muss daneben installiert sein.
+Ausführung wie bei den übrigen Integrationstests mit
+`--skip-plugins --skip-themes eval-file`.
 
 `tests/folio-integration.php` prüft die private Spielleitermappe, geordnete
 Kapitel, kampagnenbezogene Verknüpfungen, ausdrückliche Handoutfreigaben,

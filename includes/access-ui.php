@@ -150,6 +150,7 @@ function ps_pen_paper_render_access_settings( $campaign, $page_id = 0 ) {
 		<summary><?php esc_html_e( 'Farben & Lesbarkeit anpassen', 'ps-pen-paper' ); ?></summary>
 		<?php ps_pen_paper_render_style_settings( $campaign, $page_id ); ?>
 	</details>
+	<?php ps_pen_paper_render_sheet_style_form( $campaign, $page_id ); ?>
 	<p><a href="<?php echo esc_url( ps_pen_paper_admin_url( $campaign->ID ) ); ?>"><?php esc_html_e( 'Weitere Vorbereitung: Regeln und Mitgliederverwaltung', 'ps-pen-paper' ); ?></a></p>
 	<?php
 }

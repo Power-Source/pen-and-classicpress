@@ -1,6 +1,7 @@
 # Demokampagne: Die letzte Fracht von Nebelhafen
 
-Stand: PS Pen & Paper 0.7.0 · Probespiel vom 14. November 2026.
+Ursprüngliches Probespiel: Version 0.7.0 · 14. November 2026.
+Fortgeschriebener Prüfbericht bis Version 0.14.0.
 
 **Spoilerhinweis:** Dieses Dokument zeigt die vollständige Demorunde
 einschließlich privatem und verdecktem Ergebnis. Es enthält keine echten
@@ -372,6 +373,78 @@ zusätzlich kampagnenfremde Verknüpfungen, Revisionskonflikte, Protokollschutz,
 entzogene Mitgliedschaften und Rückabwicklung bei Speicherfehlern ab.
 Die Abbildungen 17 und 18 im Handbuch stammen aus dieser dauerhaften Demo.
 
+### Live-Fortsetzung: Charakterprofil und Ausrüstung mit Version 0.14.0
+
+Nach ausdrücklicher Zustimmung wurde **PS Community nur auf der
+Demo-Unterwebsite** aktiviert und die dortige
+[Profilseite](http://ps-dev.local/pen-paper/profile/?tab=pspp) eingerichtet.
+Es gab keine netzwerkweite Aktivierung. Normale angemeldete Demospieler
+finden im eigenen Profil den Tab **Pen & Paper** und ihre eigene Figur.
+Eine Freundschaft oder ein fremder Profilaufruf öffnet keinen Charakterbogen.
+
+Die bestehende Kampagne enthält jetzt dauerhaft:
+
+- Die Slots **Kopf**, **Arme** und **Brust** mit getrennten passenden Typen.
+- Die frei benannten Seltenheiten **Normal** und **Episch**.
+- **Lotsenkappe der Zuversicht**, episch, mit eigener geschützter Grafik,
+  Material-/Herkunftsangaben und ausdrücklich eingetragenem **Mut +1**.
+- **Mechanikerweste**, normal, mit Werkzeugschlaufen und Zustandsangabe,
+  aber ohne automatische Werteboni.
+- Je ein konkretes Exemplar beider Vorlagen in Maras Inventar, freigegeben
+  am Kopf beziehungsweise an der Brust. Der Armslot bleibt leer.
+- Maras eigenes privates, freigegebenes Charakterporträt sowie ein dezenter
+  Nebelhafen-Bogenhintergrund. Alle Grafiken wurden lokal für die Demo gezeichnet.
+
+Tessa überreicht Mara die Ausrüstung auf dem Servicesteg. Die Kappe erinnert
+an ihre Verantwortung für Kiste 17. Mara beantragte die Belegung im echten
+Community-Profil; erst die getrennte Spielleiterfreigabe machte den Bonus
+wirksam. Der Grundbogen behält **Mut 2**, Bogenanzeige und Würfel verwenden
+mit der Kappe **Mut 3**. Auch das Porträt durchlief einen eigenen Antrag
+und eine eigene Freigabe.
+
+Die tatsächliche anschließende Gruppenprobe wurde einmal gespeichert:
+**5 + 5 + Mut 3 = 13**, Wurf **#3022**. Sie behält Ausrüstungsrevision 4,
+Slotrevision 1 und den enthaltenen Bonus +1. Nach den Demoregeln ist die
+Probe gelungen: Mara übernimmt ruhig die Verantwortung und stimmt den
+nächsten Weg mit Jorin ab. Es gab keinen automatischen Ressourcenverbrauch,
+keine Änderung der Erfolgsregeln und keinen Wiederholungswurf für die Abbildung.
+
+Die private Spielleiternotiz **Fortsetzung – Die Verantwortung für Kiste 17**
+hält den tatsächlichen Verlauf und den nächsten Anknüpfungspunkt fest.
+**Auf dem Servicesteg** bleibt aktiv; **Die Laterne an Dock 3** ist weiter
+vorbereitet, ohne die Gruppe automatisch in eine neue Szene zu versetzen.
+
+Der Browsertest benutzte die bestehenden Konten der Demo-Spielleitung,
+Mara und Jorin. Geprüft wurden echte Vorlagen-, Ausgabe-, Porträt- und
+Ausrüstungsformulare, die Rückkehr zum eigenen Profil, Freigaben,
+effektive Werte und der gespeicherte Wurf. Jorin erhielt weder über die
+fremde Profilansicht noch über einen direkten nativen Community-AJAX-Aufruf
+Zugriff auf Maras Inventar. Der native AJAX-Tabwechsel lud dagegen Maras
+eigene Charakterliste. Die Profilansicht blieb bei 320, 375, 768, 1024 und
+1440 Pixeln ohne internen horizontalen Überlauf; keine JavaScript-Fehler.
+Die Abbildungen 19–22 im Handbuch zeigen diese echten gespeicherten Zustände.
+
+Zusätzlich wurde mit demselben Spielerkonto eine ausdrücklich temporäre
+Prüffigur über den echten Profil-Bogeneditor von 5 auf 6 geändert:
+Der gültige Wert blieb 5, nur der Antrag wurde 6. Profil-POSTs für fremde
+Charaktere und für Ausgabeaktionen wurden ausdrücklich abgewiesen.
+Der vollständig aufgeklappte Editor von Maras unverändertem Bogen wurde
+ebenfalls bei allen fünf Breiten geprüft. Die zusätzliche Prüfrunde,
+Prüffigur und ihre Ereignisse wurden danach entfernt.
+
+Regelmetadaten, beide ursprünglichen Charakter-Grunddokumente und die
+drei ursprünglichen Würfe wurden vor und nach den Browserdurchläufen
+verglichen und blieben unverändert. Ausrüstung und Porträt liegen in
+getrennten Dokumenten. Alle eigens angelegten Testsitzungen wurden gezielt
+widerrufen, bestehende Anmeldungen blieben erhalten.
+
+Die zehn Integrationstestsuiten einschließlich der neuen Ausrüstungsprüfung
+decken zusätzlich eingefrorene Vorlagenstände, gefälschte Exemplare,
+doppelte/falsche Slotbelegung, Grenzen, veraltete Wurfauswahl, erhaltene
+Bestände bei inaktiver Community, gemeinsame Basisbögen und deren
+reparierbare Ausrüstungsfehler sowie Protokollrücknahme und Bildbereinigung ab.
+Handel und ein grafischer Slotdesigner sind noch nicht umgesetzt.
+
 ## Was vor einem vollständig integrierten Abenteuer noch fehlt
 
 1. **Story Builder weiter ausbauen:** Redaktioneller Komfort, weitere
@@ -383,13 +456,14 @@ Die Abbildungen 17 und 18 im Handbuch stammen aus dieser dauerhaften Demo.
 3. **Optionale Kommunikation:** PS Chat ist inzwischen geschützt eingebunden.
    Für PS Wiki fehlen noch die kampagnenbezogenen Rechteprüfungen.
 4. **Späterer Ausbau:** Migration bestehender Kampagnen, universumsweite
-   Teilnahme, Punktepool, Inventar und komplexe Würfelregeln, sofern das
+   Teilnahme, Punktepool, Handel und komplexe Würfelregeln, sofern das
    gewählte System sie benötigt. Basisbögen und lokale Zahlenauflagen sind
    seit Version 0.11.0 vorhanden.
 
 **Fazit:** Eine begleitete Runde mit Charakterbögen, Würfeln, Kapiteln,
-Erzählszenen, Handouts und privater Spielleitermappe ist möglich. Der
-Kartentisch bleibt eine optionale Hilfe; Inventar und weitere Spielmaterialien
-bleiben Ausbauziele.
+Erzählszenen, Handouts und privater Spielleitermappe ist möglich. Mit
+PS Community ergänzen Charakterprofil, Inventar und Ausrüstung den Ablauf.
+Der Kartentisch bleibt eine optionale Hilfe; Handel und weitere
+Spielmaterialien bleiben Ausbauziele.
 
 [Zum Pluginhandbuch](handbuch.md) · [Zur Roadmap](../ROADMAP.md)

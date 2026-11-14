@@ -2,14 +2,14 @@
 # This file is distributed under the same license as the PS Pen & Paper plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: PS Pen & Paper 0.13.0\n"
+"Project-Id-Version: PS Pen & Paper 0.14.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/ps-pen-paper\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-14T19:51:49+00:00\n"
+"POT-Creation-Date: 2026-11-14T21:29:21+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Source-Language: de_DE\n"
@@ -18,7 +18,7 @@ msgstr ""
 #. Plugin Name of the plugin
 #: ps-pen-paper.php
 #: includes/admin.php:9
-#: includes/admin.php:375
+#: includes/admin.php:383
 msgid "PS Pen & Paper"
 msgstr ""
 
@@ -45,7 +45,7 @@ msgid "Das Bild wurde nicht vollständig hochgeladen. Bitte prüfe die Dateigrö
 msgstr ""
 
 #: includes/access-ui.php:46
-#: includes/frontend.php:120
+#: includes/frontend.php:124
 msgid "Diese Kampagne ist für dich nicht verfügbar."
 msgstr ""
 
@@ -58,7 +58,7 @@ msgid "Spieltisch, Teilnehmer, Bilder, Charaktere, Würfe und Chat bleiben den M
 msgstr ""
 
 #: includes/access-ui.php:57
-#: includes/frontend.php:92
+#: includes/frontend.php:96
 msgid "Anmelden"
 msgstr ""
 
@@ -95,7 +95,7 @@ msgid "Die Spielleitung entscheidet, wer mitspielt. Eine freigegebene Vorschau �
 msgstr ""
 
 #: includes/access-ui.php:95
-#: includes/events-ui.php:149
+#: includes/events-ui.php:153
 msgid "Zugang & Privatsphäre"
 msgstr ""
 
@@ -191,7 +191,7 @@ msgstr ""
 msgid "Farben & Lesbarkeit anpassen"
 msgstr ""
 
-#: includes/access-ui.php:153
+#: includes/access-ui.php:154
 msgid "Weitere Vorbereitung: Regeln und Mitgliederverwaltung"
 msgstr ""
 
@@ -244,356 +244,358 @@ msgid "Die Mitgliedschaft konnte nicht gespeichert werden. Die Anfrage bleibt of
 msgstr ""
 
 #: includes/admin.php:10
+#: includes/community.php:29
 msgid "Pen & Paper"
 msgstr ""
 
-#: includes/admin.php:76
+#: includes/admin.php:77
 msgid "Du hast keine Berechtigung für diese Aktion."
 msgstr ""
 
-#: includes/admin.php:98
+#: includes/admin.php:102
 msgid "Du darfst keine Kampagnen erstellen."
 msgstr ""
 
-#: includes/admin.php:102
-#: includes/admin.php:253
+#: includes/admin.php:106
+#: includes/admin.php:259
 msgid "Bitte gib einen Kampagnennamen ein."
 msgstr ""
 
-#: includes/admin.php:118
+#: includes/admin.php:122
 msgid "Die Kampagne konnte nicht erstellt werden."
 msgstr ""
 
-#: includes/admin.php:123
+#: includes/admin.php:127
 msgid "Die Mitgliedschaft konnte nicht gespeichert werden; die unvollständige Kampagne konnte nicht entfernt werden. Bitte prüfe die Website."
 msgstr ""
 
-#: includes/admin.php:125
+#: includes/admin.php:129
 msgid "Die Kampagne konnte nicht vollständig gespeichert werden."
 msgstr ""
 
-#: includes/admin.php:133
+#: includes/admin.php:137
 msgid "Nur Administratoren dürfen diese Berechtigung ändern."
 msgstr ""
 
-#: includes/admin.php:138
+#: includes/admin.php:142
 msgid "Bitte wähle einen gültigen Benutzer und eine gültige Aktion."
 msgstr ""
 
-#: includes/admin.php:148
+#: includes/admin.php:152
 msgid "Die Berechtigung konnte nicht gespeichert werden."
 msgstr ""
 
-#: includes/admin.php:158
+#: includes/admin.php:162
 msgid "Du darfst diese Kampagne nicht aufrufen."
 msgstr ""
 
-#: includes/admin.php:164
+#: includes/admin.php:168
 msgid "Die Spielbereich-Seite ist nicht mehr verfügbar. Es wurde nicht gewürfelt."
 msgstr ""
 
-#: includes/admin.php:167
+#: includes/admin.php:171
 msgid "Die Wurfdaten wurden nicht vollständig übertragen. Es wurde nicht gewürfelt."
 msgstr ""
 
-#: includes/admin.php:188
+#: includes/admin.php:192
 msgid "Die Spielbereich-Seite ist nicht mehr verfügbar. Bitte öffne den Charakterbogen erneut."
 msgstr ""
 
-#: includes/admin.php:194
+#: includes/admin.php:199
 msgid "Der Charakterbogen wurde nicht vollständig übertragen. Es wurde nichts gespeichert."
 msgstr ""
 
-#: includes/admin.php:213
+#: includes/admin.php:219
 msgid "Du darfst diese Kampagne nicht verwalten."
 msgstr ""
 
-#: includes/admin.php:219
+#: includes/admin.php:225
 #: includes/character-contexts-ui.php:16
 #: includes/universes-ui.php:10
 msgid "Die Spielbereich-Seite ist nicht mehr verfügbar."
 msgstr ""
 
-#: includes/admin.php:222
+#: includes/admin.php:228
 msgid "Die Farben wurden nicht vollständig übertragen. Es wurde nichts gespeichert."
 msgstr ""
 
-#: includes/admin.php:239
+#: includes/admin.php:245
 msgid "Das Formular wurde nicht vollständig übertragen. Es wurde nichts gespeichert."
 msgstr ""
 
-#: includes/admin.php:267
+#: includes/admin.php:273
 msgid "Die Kampagne konnte nicht gespeichert werden."
 msgstr ""
 
-#: includes/admin.php:272
+#: includes/admin.php:278
 msgid "Name und Beschreibung wurden gespeichert, aber der Archivstatus konnte nicht gespeichert werden."
 msgstr ""
 
-#: includes/admin.php:281
+#: includes/admin.php:287
 msgid "Bitte wähle einen gültigen Benutzer und eine gültige Kampagnenrolle."
 msgstr ""
 
-#: includes/admin.php:284
+#: includes/admin.php:290
 msgid "Dieser Benutzer ist bereits Mitglied. Entferne ihn zuerst, um seine Rolle zu ändern."
 msgstr ""
 
-#: includes/admin.php:287
+#: includes/admin.php:293
 msgid "Das Mitglied konnte nicht gespeichert werden."
 msgstr ""
 
-#: includes/admin.php:296
+#: includes/admin.php:302
 msgid "Der Ersteller der Kampagne kann nicht entfernt werden."
 msgstr ""
 
-#: includes/admin.php:299
+#: includes/admin.php:305
 msgid "Dieses Kampagnenmitglied wurde nicht gefunden."
 msgstr ""
 
-#: includes/admin.php:302
+#: includes/admin.php:308
 msgid "Das Mitglied konnte nicht entfernt werden."
 msgstr ""
 
-#: includes/admin.php:307
+#: includes/admin.php:313
 msgid "Unbekannte Aktion."
 msgstr ""
 
-#: includes/admin.php:312
+#: includes/admin.php:319
 msgid "Es gibt ungespeicherte Änderungen. Möchtest du sie verwerfen?"
 msgstr ""
 
-#: includes/admin.php:329
+#: includes/admin.php:337
 msgid "Benutzer auswählen"
 msgstr ""
 
-#: includes/admin.php:339
+#: includes/admin.php:347
 msgid "Kampagne erstellt."
 msgstr ""
 
-#: includes/admin.php:340
+#: includes/admin.php:348
 msgid "Kampagne gespeichert."
 msgstr ""
 
-#: includes/admin.php:341
+#: includes/admin.php:349
 msgid "Mitglied hinzugefügt."
 msgstr ""
 
-#: includes/admin.php:342
+#: includes/admin.php:350
 msgid "Mitglied entfernt."
 msgstr ""
 
-#: includes/admin.php:343
+#: includes/admin.php:351
 msgid "Berechtigung aktualisiert."
 msgstr ""
 
-#: includes/admin.php:344
+#: includes/admin.php:352
 msgid "Regelwerk gespeichert."
 msgstr ""
 
-#: includes/admin.php:345
+#: includes/admin.php:353
 msgid "Charakterstand gespeichert. Offene Anträge werden erst durch Freigabe wirksam."
 msgstr ""
 
-#: includes/admin.php:346
+#: includes/admin.php:354
 msgid "Frontend-Gestaltung gespeichert."
 msgstr ""
 
-#: includes/admin.php:347
+#: includes/admin.php:355
 msgid "Wurf gespeichert."
 msgstr ""
 
-#: includes/admin.php:348
+#: includes/admin.php:356
 msgid "Verdeckter Wurf gespeichert. Nur Spielleiter sehen das Ergebnis."
 msgstr ""
 
-#: includes/admin.php:349
+#: includes/admin.php:357
 msgid "Teilnahme angefragt. Die Spielleitung entscheidet über deine Aufnahme."
 msgstr ""
 
-#: includes/admin.php:350
+#: includes/admin.php:358
 msgid "Beitrittsanfrage entschieden."
 msgstr ""
 
-#: includes/admin.php:351
+#: includes/admin.php:359
 msgid "Rundeneinstellungen gespeichert."
 msgstr ""
 
-#: includes/admin.php:352
+#: includes/admin.php:360
 msgid "Universum gespeichert."
 msgstr ""
 
-#: includes/admin.php:353
+#: includes/admin.php:361
 msgid "Universumszuordnung gespeichert. Kampagnendaten und Rechte bleiben unverändert."
 msgstr ""
 
-#: includes/admin.php:354
+#: includes/admin.php:362
 msgid "Universumsvorlage, Basisbogen oder Kampagnenkontext gespeichert."
 msgstr ""
 
-#: includes/admin.php:355
+#: includes/admin.php:363
 msgid "Szenenaktion gespeichert. Freigabe und Anzeige am Tisch sind getrennte Schritte."
 msgstr ""
 
-#: includes/admin.php:356
+#: includes/admin.php:364
 msgid "Mappenaktion gespeichert. Nur ausdrücklich freigegebene Handouts sind für die Runde sichtbar."
 msgstr ""
 
-#: includes/admin.php:366
+#: includes/admin.php:374
 msgid "Du hast keine Berechtigung, diese Seite aufzurufen."
 msgstr ""
 
-#: includes/admin.php:371
+#: includes/admin.php:379
 msgid "Du darfst diese Kampagne nicht ansehen."
 msgstr ""
 
-#: includes/admin.php:376
+#: includes/admin.php:384
 msgid "Frontend-Spielbereich: Veröffentliche eine Seite mit [ps_pen_paper]. Optional steht die Seitenvorlage „PS Pen & Paper – Spielbereich“ ohne Theme-Layout zur Verfügung."
 msgstr ""
 
-#: includes/admin.php:380
+#: includes/admin.php:388
 msgid "← Alle Kampagnen"
 msgstr ""
 
-#: includes/admin.php:401
+#: includes/admin.php:409
 #: includes/dashboard.php:11
 #: includes/dashboard.php:26
 #: includes/dashboard.php:40
 msgid "Kampagnen"
 msgstr ""
 
-#: includes/admin.php:403
+#: includes/admin.php:411
 msgid "Noch keine Kampagnen vorhanden."
 msgstr ""
 
-#: includes/admin.php:411
+#: includes/admin.php:419
 msgid "(archiviert)"
 msgstr ""
 
-#: includes/admin.php:418
+#: includes/admin.php:426
 msgid "Neue Kampagne"
 msgstr ""
 
-#: includes/admin.php:420
-#: includes/admin.php:480
+#: includes/admin.php:428
+#: includes/admin.php:488
 msgid "Name"
 msgstr ""
 
-#: includes/admin.php:422
-#: includes/admin.php:482
+#: includes/admin.php:430
+#: includes/admin.php:490
+#: includes/equipment-ui.php:109
 msgid "Beschreibung"
 msgstr ""
 
-#: includes/admin.php:424
+#: includes/admin.php:432
 msgid "Kampagne erstellen"
 msgstr ""
 
-#: includes/admin.php:432
+#: includes/admin.php:440
 msgid "Berechtigung zum Erstellen von Universen und Kampagnen"
 msgstr ""
 
-#: includes/admin.php:433
+#: includes/admin.php:441
 msgid "Administratoren können immer Universen und Kampagnen erstellen. Die bestehende Erstellberechtigung gilt für beide Bereiche. Hier kannst du sie weiteren Mitgliedern dieser Website geben oder entziehen."
 msgstr ""
 
-#: includes/admin.php:444
+#: includes/admin.php:452
 msgid "Zusätzlich berechtigt:"
 msgstr ""
 
-#: includes/admin.php:445
+#: includes/admin.php:453
 msgid "Niemand"
 msgstr ""
 
-#: includes/admin.php:448
-#: includes/admin.php:533
+#: includes/admin.php:456
+#: includes/admin.php:542
 msgid "Benutzer"
 msgstr ""
 
-#: includes/admin.php:449
+#: includes/admin.php:457
 msgid "Aktion"
 msgstr ""
 
-#: includes/admin.php:451
+#: includes/admin.php:459
 msgid "Berechtigung erteilen"
 msgstr ""
 
-#: includes/admin.php:452
+#: includes/admin.php:460
 msgid "Berechtigung entziehen"
 msgstr ""
 
-#: includes/admin.php:454
+#: includes/admin.php:462
 msgid "Berechtigung speichern"
 msgstr ""
 
-#: includes/admin.php:469
+#: includes/admin.php:477
 msgid "Kampagneneinstellungen"
 msgstr ""
 
-#: includes/admin.php:470
+#: includes/admin.php:478
 msgid "Würfel / Protokoll"
 msgstr ""
 
-#: includes/admin.php:471
-#: includes/events-ui.php:122
-#: includes/table-ui.php:104
+#: includes/admin.php:479
+#: includes/events-ui.php:124
+#: includes/table-ui.php:106
 msgid "Spielprotokoll"
 msgstr ""
 
-#: includes/admin.php:472
+#: includes/admin.php:480
 #: includes/characters-admin.php:121
 msgid "Charaktere"
 msgstr ""
 
-#: includes/admin.php:473
-#: includes/table-ui.php:105
+#: includes/admin.php:481
+#: includes/table-ui.php:107
 msgid "Regelwerk"
 msgstr ""
 
-#: includes/admin.php:475
+#: includes/admin.php:483
 msgid "Style"
 msgstr ""
 
-#: includes/admin.php:484
+#: includes/admin.php:492
 msgid "Kampagne archivieren"
 msgstr ""
 
-#: includes/admin.php:485
+#: includes/admin.php:493
 msgid "Kampagne speichern"
 msgstr ""
 
-#: includes/admin.php:502
+#: includes/admin.php:511
 msgid "Mitglieder"
 msgstr ""
 
-#: includes/admin.php:504
+#: includes/admin.php:513
 msgid "Der Ersteller bleibt Spielleiter und kann nicht entfernt werden. Alle Mitglieder müssen bereits Benutzer dieser Website sein."
 msgstr ""
 
-#: includes/admin.php:517
+#: includes/admin.php:526
 #, php-format
 msgid "Gelöschter Benutzer #%d"
 msgstr ""
 
-#: includes/admin.php:518
-#: includes/admin.php:537
+#: includes/admin.php:527
+#: includes/admin.php:546
 msgid "Spielleiter"
 msgstr ""
 
-#: includes/admin.php:518
-#: includes/admin.php:536
-#: includes/table-ui.php:92
+#: includes/admin.php:527
+#: includes/admin.php:545
+#: includes/table-ui.php:94
 msgid "Spieler"
 msgstr ""
 
-#: includes/admin.php:524
+#: includes/admin.php:533
 msgid "Entfernen"
 msgstr ""
 
-#: includes/admin.php:531
-#: includes/admin.php:539
+#: includes/admin.php:540
+#: includes/admin.php:548
 msgid "Mitglied hinzufügen"
 msgstr ""
 
-#: includes/admin.php:534
+#: includes/admin.php:543
 msgid "Rolle in dieser Kampagne"
 msgstr ""
 
@@ -609,47 +611,47 @@ msgstr ""
 msgid "Dieses Bild ist für dich nicht verfügbar."
 msgstr ""
 
-#: includes/backdrop.php:48
+#: includes/backdrop.php:52
 msgid "Der Hintergrund ist nicht mehr verfügbar. Bitte lade ihn in den Rundeneinstellungen erneut hoch."
 msgstr ""
 
-#: includes/backdrop.php:56
+#: includes/backdrop.php:60
 msgid "Nur die Spielleitung darf Bilder hochladen."
 msgstr ""
 
-#: includes/backdrop.php:61
+#: includes/backdrop.php:65
 msgid "Bitte verwende ein PNG-, JPEG- oder WebP-Bild mit höchstens 2 MiB und 3000 × 3000 Pixeln. SVG und externe Bildadressen sind nicht erlaubt."
 msgstr ""
 
-#: includes/backdrop.php:65
+#: includes/backdrop.php:69
 msgid "Das hochgeladene Bild konnte nicht gelesen werden."
 msgstr ""
 
-#: includes/backdrop.php:72
+#: includes/backdrop.php:76
 msgid "Das Bild konnte nicht gespeichert werden."
 msgstr ""
 
-#: includes/backdrop.php:78
+#: includes/backdrop.php:82
 msgid "Nur die Spielleitung darf den Hintergrund ändern."
 msgstr ""
 
-#: includes/backdrop.php:85
+#: includes/backdrop.php:89
 msgid "Der Hintergrund wurde inzwischen geändert. Bitte lade die Seite neu."
 msgstr ""
 
-#: includes/backdrop.php:98
+#: includes/backdrop.php:102
 msgid "Ein nicht zugeordneter Hintergrund konnte nicht entfernt werden. Bitte informiere den Administrator."
 msgstr ""
 
-#: includes/backdrop.php:100
+#: includes/backdrop.php:104
 msgid "Der Hintergrund konnte nicht zugeordnet werden. Bitte lade die Seite neu."
 msgstr ""
 
-#: includes/backdrop.php:105
+#: includes/backdrop.php:109
 msgid "Der neue Hintergrund ist gespeichert, aber der alte konnte nicht entfernt werden. Bitte informiere den Administrator."
 msgstr ""
 
-#: includes/backdrop.php:118
+#: includes/backdrop.php:122
 msgid "Ein privates Kampagnenbild konnte nicht gelöscht werden. Die Kampagnenlöschung wurde angehalten."
 msgstr ""
 
@@ -690,71 +692,71 @@ msgstr ""
 msgid "Universumsregelwerk bearbeiten"
 msgstr ""
 
-#: includes/character-contexts-ui.php:93
+#: includes/character-contexts-ui.php:94
 msgid "In eine Kampagne übernehmen"
 msgstr ""
 
-#: includes/character-contexts-ui.php:94
+#: includes/character-contexts-ui.php:95
 msgid "Nur bereits aufgenommene Besitzer können mitspielen. Zuerst übernimmt eine leere Kampagne ausdrücklich die Regelvorlage mit denselben Feldkennungen; bestehende Regelwerke werden nicht überschrieben."
 msgstr ""
 
-#: includes/character-contexts-ui.php:106
+#: includes/character-contexts-ui.php:107
 msgid "Zuerst das Universumsregelwerk speichern."
 msgstr ""
 
-#: includes/character-contexts-ui.php:111
+#: includes/character-contexts-ui.php:112
 msgid "Die aktuelle Universumsvorlage als eigenständiges Kampagnenregelwerk übernehmen. Spätere Änderungen werden nicht automatisch synchronisiert."
 msgstr ""
 
-#: includes/character-contexts-ui.php:112
+#: includes/character-contexts-ui.php:113
 msgid "Regelvorlage übernehmen"
 msgstr ""
 
-#: includes/character-contexts-ui.php:115
+#: includes/character-contexts-ui.php:116
 msgid "Das bestehende Kampagnenregelwerk hat andere Feldkennungen oder Wertebereiche. Eine automatische Migration ist zum Schutz der Bögen gesperrt."
 msgstr ""
 
-#: includes/character-contexts-ui.php:119
+#: includes/character-contexts-ui.php:120
 msgid "Freigegebener Basisbogen"
 msgstr ""
 
-#: includes/character-contexts-ui.php:121
+#: includes/character-contexts-ui.php:122
 msgid "Basisbogen auswählen"
 msgstr ""
 
-#: includes/character-contexts-ui.php:133
+#: includes/character-contexts-ui.php:134
 msgid "Fortschritt in dieser Kampagne"
 msgstr ""
 
-#: includes/character-contexts-ui.php:135
+#: includes/character-contexts-ui.php:136
 msgid "Gemeinsam: Freigegebene Basisänderungen erscheinen auch hier; Bearbeitung nur durch die Universumsleitung. Kopie: Der aktuelle freigegebene Stand wird unabhängig weitergeführt. Offene Basisanträge werden nie übernommen. Ein späterer Moduswechsel ist noch nicht verfügbar."
 msgstr ""
 
-#: includes/character-contexts-ui.php:137
+#: includes/character-contexts-ui.php:138
 msgid "Diesen Bogen im gewählten Modus aufnehmen, ohne Mitgliedschaften zu verändern."
 msgstr ""
 
-#: includes/character-contexts-ui.php:138
+#: includes/character-contexts-ui.php:139
 msgid "Basisbogen übernehmen"
 msgstr ""
 
-#: includes/character-contexts-ui.php:153
+#: includes/character-contexts-ui.php:154
 msgid "Kampagnenkontext"
 msgstr ""
 
-#: includes/character-contexts-ui.php:155
+#: includes/character-contexts-ui.php:156
 msgid "Die angezeigten gültigen Werte enthalten die freigegebenen Kampagnenauflagen. Diese überschreiben weder den Basisbogen noch andere Runden. Leere Auflagenfelder übernehmen den Grundwert. Ressourcen bleiben unverändert; eine optionale Stufe kann als frei benanntes Zahlenfeld angepasst werden."
 msgstr ""
 
-#: includes/character-contexts-ui.php:159
+#: includes/character-contexts-ui.php:160
 msgid "Kampagnenauflagen bearbeiten"
 msgstr ""
 
-#: includes/character-contexts-ui.php:172
+#: includes/character-contexts-ui.php:173
 msgid "Notiz für Besitzer und Spielleitung"
 msgstr ""
 
-#: includes/character-contexts-ui.php:175
+#: includes/character-contexts-ui.php:176
 msgid "Kampagnenauflagen freigeben"
 msgstr ""
 
@@ -786,59 +788,59 @@ msgstr ""
 msgid "Dieser Charakterstand ist für dich nicht verfügbar."
 msgstr ""
 
-#: includes/character-contexts.php:76
+#: includes/character-contexts.php:77
 msgid "Die Verbindung zum Basisbogen oder dessen Regelwerk ist nicht mehr gültig. Es werden keine Ersatzwerte verwendet."
 msgstr ""
 
-#: includes/character-contexts.php:81
+#: includes/character-contexts.php:82
 msgid "Der freigegebene Basisbogen ist nicht verfügbar. Bitte informiere die Universumsleitung."
 msgstr ""
 
-#: includes/character-contexts.php:105
+#: includes/character-contexts.php:107
 msgid "Nur die Kampagnenleitung darf Basisbögen übernehmen."
 msgstr ""
 
-#: includes/character-contexts.php:113
+#: includes/character-contexts.php:115
 msgid "Für eine Übernahme musst du auch das zugeordnete Universum verwalten dürfen."
 msgstr ""
 
-#: includes/character-contexts.php:127
+#: includes/character-contexts.php:129
 msgid "Die Vorlage fehlt, wurde geändert oder die Kampagne besitzt bereits Regeln beziehungsweise Bögen. Nur eine ausdrücklich bestätigte leere Kampagne kann die Vorlage übernehmen."
 msgstr ""
 
-#: includes/character-contexts.php:152
+#: includes/character-contexts.php:154
 msgid "Basisbogen oder Vorlage fehlen, wurden geändert oder passen nicht zur Kampagne. Bitte lade die Übernahme neu."
 msgstr ""
 
-#: includes/character-contexts.php:155
+#: includes/character-contexts.php:157
 msgid "Der Besitzer des Basisbogens muss bereits Mitglied dieser Kampagne sein. Die Übernahme fügt niemanden hinzu."
 msgstr ""
 
-#: includes/character-contexts.php:158
+#: includes/character-contexts.php:160
 msgid "Bitte wähle gemeinsamen Fortschritt oder eine unabhängige Kopie und bestätige die Übernahme."
 msgstr ""
 
-#: includes/character-contexts.php:172
+#: includes/character-contexts.php:174
 msgid "Der Kampagnenbogen konnte nicht erstellt werden."
 msgstr ""
 
-#: includes/character-contexts.php:188
+#: includes/character-contexts.php:190
 msgid "Nur die Spielleitung darf Kampagnenauflagen freigeben."
 msgstr ""
 
-#: includes/character-contexts.php:200
+#: includes/character-contexts.php:202
 msgid "Bogen, Basisstand oder Regeln wurden inzwischen geändert. Bitte lade die Kampagnenauflagen neu."
 msgstr ""
 
-#: includes/character-contexts.php:203
+#: includes/character-contexts.php:205
 msgid "Bitte prüfe die Auflagen und die Notiz mit höchstens 2000 Bytes."
 msgstr ""
 
-#: includes/character-contexts.php:211
+#: includes/character-contexts.php:213
 msgid "Auflagen müssen ganze Zahlen sein; ein leeres Feld übernimmt den Grundwert."
 msgstr ""
 
-#: includes/character-contexts.php:228
+#: includes/character-contexts.php:230
 msgid "Der Basisbogen wurde während der Bearbeitung geändert. Bitte lade die Seite neu."
 msgstr ""
 
@@ -906,62 +908,72 @@ msgstr ""
 msgid "Du darfst diesen Charakter nicht ansehen."
 msgstr ""
 
-#: includes/characters-admin.php:142
+#: includes/characters-admin.php:144
 msgid "Zur Bogenübersicht"
 msgstr ""
 
-#: includes/characters-admin.php:143
+#: includes/characters-admin.php:145
 msgid "Besitzer:"
 msgstr ""
 
-#: includes/characters-admin.php:143
+#: includes/characters-admin.php:145
 msgid "Gelöschter Benutzer"
 msgstr ""
 
-#: includes/characters-admin.php:146
-#: includes/events-ui.php:92
+#: includes/characters-admin.php:149
+#: includes/equipment-ui.php:230
+#: includes/events-ui.php:94
 msgid "Gültiger Stand"
 msgstr ""
 
-#: includes/characters-admin.php:151
-#: includes/events-ui.php:95
+#: includes/characters-admin.php:150
+#: includes/table-ui.php:24
+msgid "Neu"
+msgstr ""
+
+#: includes/characters-admin.php:152
+msgid "Angezeigte Werte enthalten freigegebene Ausrüstungsboni."
+msgstr ""
+
+#: includes/characters-admin.php:156
+#: includes/events-ui.php:97
 msgid "Offener Antrag"
 msgstr ""
 
-#: includes/characters-admin.php:158
+#: includes/characters-admin.php:163
 msgid "Freigeben"
 msgstr ""
 
-#: includes/characters-admin.php:159
+#: includes/characters-admin.php:164
 msgid "Antrag verwerfen"
 msgstr ""
 
-#: includes/characters-admin.php:168
+#: includes/characters-admin.php:175
 msgid "Dieser Bogen folgt dem freigegebenen Basisstand. Grundwerte ändert nur die Universumsleitung; die Kampagnenleitung kann getrennte Auflagen setzen."
 msgstr ""
 
-#: includes/characters-admin.php:170
+#: includes/characters-admin.php:177
 msgid "Das Bearbeitungsformular ändert die unabhängigen Grundwerte dieser Kampagnenkopie. Getrennte Auflagen bleiben dabei bestehen."
 msgstr ""
 
-#: includes/characters-admin.php:173
+#: includes/characters-admin.php:180
 msgid "Bogen bearbeiten"
 msgstr ""
 
-#: includes/characters-admin.php:180
+#: includes/characters-admin.php:187
 msgid "Noch keine sichtbaren Charaktere vorhanden."
 msgstr ""
 
-#: includes/characters-admin.php:192
+#: includes/characters-admin.php:199
 msgid "Charakter ohne freigegebenen Stand"
 msgstr ""
 
-#: includes/characters-admin.php:194
+#: includes/characters-admin.php:201
 #: includes/dashboard.php:94
 msgid "Freigabe ausstehend"
 msgstr ""
 
-#: includes/characters-admin.php:201
+#: includes/characters-admin.php:208
 msgid "Vor dem ersten Charakter muss ein Spielleiter das Regelwerk speichern."
 msgstr ""
 
@@ -1001,23 +1013,23 @@ msgstr ""
 msgid "Der Charakter muss einem Mitglied dieser Kampagne gehören."
 msgstr ""
 
-#: includes/characters.php:214
+#: includes/characters.php:216
 msgid "Der Charakter konnte nicht erstellt werden."
 msgstr ""
 
-#: includes/characters.php:224
+#: includes/characters.php:226
 msgid "Der Charakter ist unvollständig gespeichert und konnte nicht entfernt werden. Bitte informiere den Administrator."
 msgstr ""
 
-#: includes/characters.php:235
+#: includes/characters.php:237
 msgid "Nur Spielleiter dürfen Charakteränderungen freigeben."
 msgstr ""
 
-#: includes/characters.php:239
+#: includes/characters.php:241
 msgid "Der Antrag wurde inzwischen geändert oder bereits bearbeitet. Lade die Seite neu."
 msgstr ""
 
-#: includes/characters.php:242
+#: includes/characters.php:244
 msgid "Ungültige Freigabeaktion."
 msgstr ""
 
@@ -1036,6 +1048,39 @@ msgstr ""
 
 #: includes/chat.php:46
 msgid "Der Rundenchat benötigt PS Chat mit der Spieltisch-Schnittstelle. Bitte wende dich an die Website-Administration."
+msgstr ""
+
+#: includes/community.php:37
+msgid "Dieser Charakterbereich ist privat."
+msgstr ""
+
+#: includes/community.php:40
+msgid "Meine Charaktere"
+msgstr ""
+
+#: includes/community.php:44
+msgid "Die Charakterauswahl ist ungültig."
+msgstr ""
+
+#: includes/community.php:49
+msgid "Dieser Charakter gehört nicht zu deinem zugänglichen Profilbereich."
+msgstr ""
+
+#: includes/community.php:64
+msgid "Ausrüstung prüfen"
+msgstr ""
+
+#: includes/community.php:65
+#: includes/table-ui.php:26
+msgid "Noch nicht freigegeben"
+msgstr ""
+
+#: includes/community.php:87
+msgid "Die Profilintegration ist nicht mehr verfügbar. Bitte öffne deinen Charakter im Spielbereich erneut."
+msgstr ""
+
+#: includes/community.php:105
+msgid "Diese Profilaktion ist nicht erlaubt. Bitte öffne deinen eigenen Charakter erneut."
 msgstr ""
 
 #: includes/dashboard.php:9
@@ -1140,119 +1185,129 @@ msgstr ""
 msgid "Charakter:"
 msgstr ""
 
+#. translators: 1: Inventory revision, 2: Slot schema revision.
+#: includes/dice-ui.php:47
+#, php-format
+msgid "Ausrüstungsrevision %1$d · Slotrevision %2$d"
+msgstr ""
+
+#: includes/dice-ui.php:49
+msgid "Enthaltener Ausrüstungsbonus:"
+msgstr ""
+
 #. translators: 1: Base character ID, 2: Source revision, 3: Campaign character revision.
-#: includes/dice-ui.php:50
+#: includes/dice-ui.php:59
 #, php-format
 msgid "Basisbogen #%1$d · Basisrevision %2$d · Kontextrevision %3$d"
 msgstr ""
 
-#: includes/dice-ui.php:57
+#: includes/dice-ui.php:66
 msgid "Gesamtergebnis:"
 msgstr ""
 
-#: includes/dice-ui.php:71
+#: includes/dice-ui.php:80
 msgid "Würfelbühne"
 msgstr ""
 
-#: includes/dice-ui.php:72
+#: includes/dice-ui.php:81
 msgid "Ergebnisse werden auf dem Server gewürfelt und vor der Anzeige gespeichert. Die Animation verändert kein Ergebnis."
 msgstr ""
 
-#: includes/dice-ui.php:74
+#: includes/dice-ui.php:83
 msgid "Ungültige Wurfauswahl oder Protokollseite."
 msgstr ""
 
-#: includes/dice-ui.php:82
+#: includes/dice-ui.php:91
 msgid "Gespeichertes Ergebnis"
 msgstr ""
 
-#: includes/dice-ui.php:103
+#: includes/dice-ui.php:112
 #, php-format
 msgid "%d weitere Würfel stehen in den Einzelwerten."
 msgstr ""
 
-#: includes/dice-ui.php:105
+#: includes/dice-ui.php:114
 msgid "Gesamt"
 msgstr ""
 
-#: includes/dice-ui.php:105
+#: includes/dice-ui.php:114
 msgid "Gesamtergebnis"
 msgstr ""
 
-#: includes/dice-ui.php:106
+#: includes/dice-ui.php:115
 msgid "Einzelwürfe und Modifikatoren"
 msgstr ""
 
-#: includes/dice-ui.php:114
+#: includes/dice-ui.php:123
 msgid "Anzahl für die Schnellwahl"
 msgstr ""
 
-#: includes/dice-ui.php:118
+#: includes/dice-ui.php:127
 #, php-format
 msgid "W%s wählen"
 msgstr ""
 
-#: includes/dice-ui.php:124
+#: includes/dice-ui.php:133
 msgid "Die Schnellwahl ersetzt den Ausdruck. Kombinationen kannst du darunter direkt eingeben."
 msgstr ""
 
-#: includes/dice-ui.php:128
+#: includes/dice-ui.php:137
 msgid "Würfelausdruck"
 msgstr ""
 
-#: includes/dice-ui.php:130
+#: includes/dice-ui.php:139
 msgid "Zum Beispiel 3W6 + 2 oder W20 + 2W6 - 1. Höchstens 10 Gruppen und insgesamt 100 Würfel; Modifikator bis ±1000000. W und D sind erlaubt."
 msgstr ""
 
-#: includes/dice-ui.php:132
+#: includes/dice-ui.php:141
 msgid "Für Charakter"
 msgstr ""
 
-#: includes/dice-ui.php:134
+#: includes/dice-ui.php:143
 msgid "Ohne Charakter"
 msgstr ""
 
-#: includes/dice-ui.php:148
+#: includes/dice-ui.php:157
 msgid "Attributwert addieren"
 msgstr ""
 
-#: includes/dice-ui.php:149
+#: includes/dice-ui.php:158
 msgid "Wähle für den Attributwert zuerst einen Charakter."
 msgstr ""
 
-#: includes/dice-ui.php:150
+#: includes/dice-ui.php:159
 msgid "Keinen Wert addieren"
 msgstr ""
 
-#: includes/dice-ui.php:159
+#: includes/dice-ui.php:168
 msgid "Verwendet wird der freigegebene Zahlenwert, kein automatisch berechneter Systembonus. Gruppenwürfe teilen auch gewählten Charakternamen und Attributwert mit der Gruppe."
 msgstr ""
 
-#: includes/dice-ui.php:160
+#: includes/dice-ui.php:169
 msgid "Sichtbarkeit"
 msgstr ""
 
-#: includes/dice-ui.php:163
+#: includes/dice-ui.php:172
 msgid "Bisherige Sichtbarkeit nicht mehr erlaubt – bitte neu wählen"
 msgstr ""
 
-#: includes/dice-ui.php:169
+#: includes/dice-ui.php:178
 msgid "Bei verdeckten Proben erhalten Spieler nur eine Speicherbestätigung, kein Ergebnis."
 msgstr ""
 
-#: includes/dice-ui.php:170
+#: includes/dice-ui.php:179
 msgid "Anlass (optional)"
 msgstr ""
 
-#: includes/dice-ui.php:173
+#: includes/dice-ui.php:182
 msgid "Jetzt würfeln"
 msgstr ""
 
-#: includes/dice-ui.php:174
+#: includes/dice-ui.php:183
 msgid "Der Wurf wird gewürfelt und gespeichert …"
 msgstr ""
 
-#: includes/dice-ui.php:177
+#: includes/dice-ui.php:186
 msgid "Wähle im Regelwerk mindestens einen erlaubten Würfel und eine Sichtbarkeit, um zu würfeln."
 msgstr ""
 
@@ -1312,24 +1367,267 @@ msgstr ""
 msgid "Der Charakter wurde geändert oder ist noch nicht freigegeben. Lade die Würfeloberfläche neu."
 msgstr ""
 
-#: includes/dice.php:131
+#: includes/dice.php:132
 msgid "Wähle ein Zahlen- oder Attributfeld dieses Charakters."
 msgstr ""
 
-#: includes/dice.php:135
+#: includes/dice.php:136
 msgid "Für einen Attributwert musst du einen Charakter auswählen."
 msgstr ""
 
-#: includes/dice.php:166
+#: includes/dice.php:167
 msgid "Dieser Wurf ist für dich nicht verfügbar."
 msgstr ""
 
-#: includes/dice.php:176
+#: includes/dice.php:177
 msgid "Ein gespeicherter Wurf ist beschädigt. Bitte informiere den Administrator."
 msgstr ""
 
-#: includes/dice.php:184
+#: includes/dice.php:185
 msgid "Der gespeicherte Wurfkontext ist beschädigt. Bitte informiere den Administrator."
+msgstr ""
+
+#: includes/dice.php:194
+msgid "Die gespeicherte Ausrüstungsherkunft des Wurfs ist beschädigt."
+msgstr ""
+
+#: includes/dice.php:197
+msgid "Die gespeicherten Ausrüstungsboni des Wurfs sind beschädigt."
+msgstr ""
+
+#: includes/equipment-ui.php:8
+#: includes/equipment-ui.php:11
+msgid "Das Bild wurde nicht vollständig übertragen."
+msgstr ""
+
+#: includes/equipment-ui.php:21
+msgid "Dieser Spielbereich ist nicht verfügbar."
+msgstr ""
+
+#: includes/equipment-ui.php:22
+msgid "Das Formular wurde nicht vollständig übertragen."
+msgstr ""
+
+#: includes/equipment-ui.php:36
+msgid "Bitte wähle entweder ein neues Bild oder das Entfernen."
+msgstr ""
+
+#: includes/equipment-ui.php:80
+msgid "Gegenstände & Ausrüstung"
+msgstr ""
+
+#: includes/equipment-ui.php:81
+msgid "Vorlagen sind keine Inventargegenstände. Ausgabe erfolgt ausdrücklich am Charakter. Universumsvorlagen stehen zugeordneten Kampagnen zur Verfügung; sie gewähren keine Teilnahme- oder Handelsrechte."
+msgstr ""
+
+#: includes/equipment-ui.php:82
+msgid "Slots und Seltenheitsstufen konfigurieren"
+msgstr ""
+
+#: includes/equipment-ui.php:84
+msgid "Slots: Kennung | Bezeichnung | Gegenstandstyp, eine Zeile pro Slot"
+msgstr ""
+
+#: includes/equipment-ui.php:87
+msgid "Seltenheiten: Kennung | Bezeichnung | #Farbe, eine Zeile pro Stufe"
+msgstr ""
+
+#: includes/equipment-ui.php:90
+msgid "Kennungen und Typen: kleine lateinische Buchstaben, Ziffern, _ oder -. Bestehende Kennungen bleiben erhalten. Namen und Farben sind änderbar. Seltenheit erzeugt niemals automatisch Boni. Kampagnen konfigurieren ihre Slots selbst."
+msgstr ""
+
+#: includes/equipment-ui.php:91
+msgid "Ausrüstungsvorlage speichern"
+msgstr ""
+
+#: includes/equipment-ui.php:95
+msgid "Der Ursprung eines Gegenstands fehlt."
+msgstr ""
+
+#: includes/equipment-ui.php:105
+msgid "Gegenstandsvorlage bearbeiten"
+msgstr ""
+
+#: includes/equipment-ui.php:105
+msgid "Neue Gegenstandsvorlage"
+msgstr ""
+
+#: includes/equipment-ui.php:108
+msgid "Gegenstandsname"
+msgstr ""
+
+#: includes/equipment-ui.php:110
+msgid "Gegenstandstyp / passende Slotart"
+msgstr ""
+
+#: includes/equipment-ui.php:111
+msgid "Seltenheitsstufe"
+msgstr ""
+
+#: includes/equipment-ui.php:111
+msgid "Bitte wählen"
+msgstr ""
+
+#: includes/equipment-ui.php:114
+msgid "Eigenschaften: Bezeichnung | Wert, eine Zeile pro Eigenschaft"
+msgstr ""
+
+#: includes/equipment-ui.php:117
+msgid "Automatische additive Boni beim Anlegen"
+msgstr ""
+
+#: includes/equipment-ui.php:122
+msgid "Gegenstandsgrafik hochladen / ersetzen"
+msgstr ""
+
+#: includes/equipment-ui.php:123
+msgid "Geschützte PNG-/JPEG-/WebP-Bilder bis 2 MiB und 3000 × 3000 Pixel. Kleine Grafiken bevorzugen. Änderungen gelten nur für spätere Ausgaben, nicht für vorhandene Exemplare."
+msgstr ""
+
+#: includes/equipment-ui.php:124
+msgid "Gegenstandsvorlage speichern"
+msgstr ""
+
+#: includes/equipment-ui.php:132
+msgid "Inventar und Ausrüstung sind ohne PS Community inaktiv; gespeicherte Gegenstände bleiben erhalten."
+msgstr ""
+
+#: includes/equipment-ui.php:136
+msgid "Die Ausrüstung ist nicht verfügbar. Bitte informiere die Spielleitung."
+msgstr ""
+
+#: includes/equipment-ui.php:138
+msgid "Inventar & Ausrüstung"
+msgstr ""
+
+#: includes/equipment-ui.php:141
+msgid "Der Gegenstandsursprung fehlt."
+msgstr ""
+
+#: includes/equipment-ui.php:149
+#: includes/equipment-ui.php:167
+msgid "Leer"
+msgstr ""
+
+#: includes/equipment-ui.php:156
+msgid "Ein Exemplar belegt höchstens einen passenden Slot. Boni werden addiert; die erlaubten Feldgrenzen bleiben verbindlich. Im Freigabemodus bleibt bis zur Zustimmung die bisherige Belegung wirksam."
+msgstr ""
+
+#: includes/equipment-ui.php:156
+msgid "Ausrüstung speichern / einreichen"
+msgstr ""
+
+#: includes/equipment-ui.php:159
+msgid "Ausrüstungsfreigabe ausstehend. Die Auswahl oben zeigt den Antrag, nicht die wirksame Belegung."
+msgstr ""
+
+#: includes/equipment-ui.php:162
+msgid "Ausrüstung freigeben"
+msgstr ""
+
+#: includes/equipment-ui.php:162
+msgid "Ausrüstungsantrag verwerfen"
+msgstr ""
+
+#: includes/equipment-ui.php:176
+msgid "Ein Exemplar ausgeben:"
+msgstr ""
+
+#: includes/equipment-ui.php:185
+msgid "Charakterporträt"
+msgstr ""
+
+#: includes/equipment-ui.php:186
+msgid "Freigegebenes Porträt"
+msgstr ""
+
+#: includes/equipment-ui.php:186
+msgid "Porträtantrag"
+msgstr ""
+
+#: includes/equipment-ui.php:193
+msgid "Ohne Bild"
+msgstr ""
+
+#: includes/equipment-ui.php:197
+msgid "PNG, JPEG oder WebP bis 2 MiB und 3000 × 3000 Pixel. Privat für Besitzer und Spielleitung, kein öffentlicher Benutzeravatar. Spieleränderungen folgen der Charakter-Freigabepolitik; Wertefreigaben bleiben getrennt."
+msgstr ""
+
+#: includes/equipment-ui.php:198
+msgid "Porträt einreichen / speichern"
+msgstr ""
+
+#: includes/equipment-ui.php:198
+msgid "Porträt entfernen / beantragen"
+msgstr ""
+
+#: includes/equipment-ui.php:200
+msgid "Porträt freigeben"
+msgstr ""
+
+#: includes/equipment-ui.php:200
+msgid "Porträtantrag verwerfen"
+msgstr ""
+
+#: includes/equipment-ui.php:208
+msgid "Bogenhintergrund der Kampagne"
+msgstr ""
+
+#: includes/equipment-ui.php:210
+msgid "Dekoratives Bild für alle eigenen Charakterbögen dieser Kampagne. Es erscheint dezent hinter den Werten, nicht im öffentlichen Profil. PNG/JPEG/WebP bis 2 MiB und 3000 × 3000 Pixel."
+msgstr ""
+
+#: includes/equipment-ui.php:210
+msgid "Bogenhintergrund speichern"
+msgstr ""
+
+#: includes/equipment-ui.php:210
+msgid "Bogenhintergrund entfernen"
+msgstr ""
+
+#: includes/equipment-ui.php:221
+msgid "Geschütztes Hintergrundbild:"
+msgstr ""
+
+#: includes/equipment-ui.php:227
+#: includes/events-ui.php:72
+msgid "Geschütztes Bild:"
+msgstr ""
+
+#: includes/equipment-ui.php:228
+msgid "Noch keine Vorlage."
+msgstr ""
+
+#: includes/equipment-ui.php:230
+msgid "Antrag"
+msgstr ""
+
+#: includes/equipment-ui.php:233
+msgid "Kein Antrag"
+msgstr ""
+
+#: includes/equipment-ui.php:234
+msgid "Geschütztes Porträt:"
+msgstr ""
+
+#: includes/equipment-ui.php:237
+msgid "Vorlagenrevision:"
+msgstr ""
+
+#: includes/equipment.php:6
+msgid "Ausrüstungsdaten fehlen, sind ungültig oder wurden geändert. Bitte lade den aktuellen Stand neu."
+msgstr ""
+
+#: includes/equipment.php:10
+msgid "Gegenstandskatalog, Inventar und Ausrüstung benötigen aktives PS Community mit Profil-Schnittstellen."
+msgstr ""
+
+#: includes/equipment.php:66
+msgid "Vorhandene Slot- und Seltenheitskennungen müssen erhalten bleiben; Slottypen dürfen nicht umgedeutet werden."
+msgstr ""
+
+#: includes/equipment.php:224
+msgid "Die angelegten Boni würden einen erlaubten Charakterwertebereich überschreiten. Bitte Ausrüstung oder Grundwerte zuerst anpassen."
 msgstr ""
 
 #: includes/events-ui.php:9
@@ -1385,114 +1683,110 @@ msgstr ""
 msgid "Revision %d"
 msgstr ""
 
-#: includes/events-ui.php:44
+#: includes/events-ui.php:46
 #: includes/folio-ui.php:94
 msgid "Entwurf"
 msgstr ""
 
-#: includes/events-ui.php:44
+#: includes/events-ui.php:46
 msgid "Freigegebener Stand"
 msgstr ""
 
-#: includes/events-ui.php:49
-#: includes/events-ui.php:61
+#: includes/events-ui.php:51
+#: includes/events-ui.php:63
 msgid "Nicht freigegeben"
 msgstr ""
 
-#: includes/events-ui.php:53
+#: includes/events-ui.php:55
 #: includes/maps-ui.php:167
 msgid "Geheimnisse – nur Spielleitung"
 msgstr ""
 
-#: includes/events-ui.php:54
+#: includes/events-ui.php:56
 msgid "Kartenbild:"
 msgstr ""
 
-#: includes/events-ui.php:54
+#: includes/events-ui.php:56
 msgid "Raster:"
 msgstr ""
 
-#: includes/events-ui.php:59
+#: includes/events-ui.php:61
 msgid "Privater Entwurf"
 msgstr ""
 
-#: includes/events-ui.php:59
+#: includes/events-ui.php:61
 msgid "Freigegebenes Handout"
 msgstr ""
 
-#: includes/events-ui.php:66
+#: includes/events-ui.php:68
 msgid "Sortiernummer:"
 msgstr ""
 
-#: includes/events-ui.php:67
+#: includes/events-ui.php:69
 msgid "Kapitel / Szene:"
 msgstr ""
 
-#: includes/events-ui.php:68
+#: includes/events-ui.php:70
 msgid "Szenenfolge:"
 msgstr ""
 
-#: includes/events-ui.php:70
-msgid "Geschütztes Bild:"
-msgstr ""
-
-#: includes/events-ui.php:79
-#: includes/events-ui.php:151
+#: includes/events-ui.php:81
+#: includes/events-ui.php:155
 #: includes/universes-ui.php:143
 #: includes/universes-ui.php:169
 msgid "Ohne Universum"
 msgstr ""
 
-#: includes/events-ui.php:83
+#: includes/events-ui.php:85
 msgid "Öffentlicher Teaser"
 msgstr ""
 
-#: includes/events-ui.php:83
+#: includes/events-ui.php:85
 msgid "Geschlossene Kampagne"
 msgstr ""
 
-#: includes/events-ui.php:84
+#: includes/events-ui.php:86
 msgid "Anfragen mit Freigabe"
 msgstr ""
 
-#: includes/events-ui.php:84
+#: includes/events-ui.php:86
 msgid "Persönliche Aufnahme"
 msgstr ""
 
-#: includes/events-ui.php:123
+#: includes/events-ui.php:125
 msgid "Würfe, Charakteränderungen, Freigaben und Regeländerungen. Du siehst nur Einträge, für die du berechtigt bist. Der Änderungsverlauf beginnt mit der Einführung dieser Funktion."
 msgstr ""
 
-#: includes/events-ui.php:127
+#: includes/events-ui.php:129
 msgid "Diese Protokollseite enthält keine für dich sichtbaren Ereignisse."
 msgstr ""
 
-#: includes/events-ui.php:133
+#: includes/events-ui.php:135
 msgid "Privat: Charakterbesitzer und Spielleiter"
 msgstr ""
 
-#: includes/events-ui.php:138
+#: includes/events-ui.php:140
 msgid "Wurfdetails"
 msgstr ""
 
-#: includes/events-ui.php:158
+#: includes/events-ui.php:162
 #, php-format
 msgid "Revision %1$d → %2$d"
 msgstr ""
 
-#: includes/events-ui.php:159
+#: includes/events-ui.php:163
 msgid "Änderung ansehen: Vorher / Nachher"
 msgstr ""
 
-#: includes/events-ui.php:165
+#: includes/events-ui.php:169
 msgid "Protokollseiten"
 msgstr ""
 
-#: includes/events-ui.php:166
+#: includes/events-ui.php:170
 msgid "Neuere Ereignisse"
 msgstr ""
 
-#: includes/events-ui.php:167
+#: includes/events-ui.php:171
 msgid "Ältere Ereignisse"
 msgstr ""
 
@@ -1572,52 +1866,72 @@ msgstr ""
 msgid "Handout zurückgenommen"
 msgstr ""
 
-#: includes/events.php:46
+#: includes/events.php:28
+msgid "Charakterporträt geändert oder geprüft"
+msgstr ""
+
+#: includes/events.php:29
+msgid "Bogengestaltung geändert"
+msgstr ""
+
+#: includes/events.php:30
+msgid "Slots und Seltenheiten geändert"
+msgstr ""
+
+#: includes/events.php:31
+msgid "Gegenstandsvorlage gespeichert"
+msgstr ""
+
+#: includes/events.php:32
+msgid "Inventar oder Ausrüstung geändert"
+msgstr ""
+
+#: includes/events.php:51
 msgid "Ein unvollständiger Protokolleintrag konnte nicht entfernt werden. Bitte informiere den Administrator."
 msgstr ""
 
-#: includes/events.php:54
+#: includes/events.php:59
 msgid "Der Protokolleintrag konnte nicht veröffentlicht werden."
 msgstr ""
 
-#: includes/events.php:72
+#: includes/events.php:77
 msgid "Der Protokolleintrag konnte nicht gespeichert werden."
 msgstr ""
 
-#: includes/events.php:76
+#: includes/events.php:81
 msgid "Der Protokolleintrag konnte nicht vollständig gespeichert werden. Es wurde nichts übernommen."
 msgstr ""
 
-#: includes/events.php:108
+#: includes/events.php:113
 msgid "Die Änderung konnte nicht gespeichert werden. Lade die Seite neu, um zwischenzeitliche Änderungen zu prüfen."
 msgstr ""
 
-#: includes/events.php:120
+#: includes/events.php:125
 #, php-format
 msgid "Die Änderung wurde gespeichert, aber ihre Protokollierung ist unvollständig. Eine sichere Rücknahme war nicht möglich. Bitte informiere den Administrator über Protokolleintrag #%d."
 msgstr ""
 
-#: includes/events.php:122
+#: includes/events.php:127
 msgid "Die Änderung konnte nicht vollständig gespeichert werden und wurde zurückgenommen. Bitte lade die Seite neu."
 msgstr ""
 
-#: includes/events.php:128
+#: includes/events.php:133
 msgid "Dieser Protokolleintrag ist für dich nicht verfügbar."
 msgstr ""
 
-#: includes/events.php:141
+#: includes/events.php:146
 msgid "Ein Protokolleintrag ist beschädigt. Bitte informiere den Administrator."
 msgstr ""
 
-#: includes/events.php:148
+#: includes/events.php:153
 msgid "Die wirksamen Kontextstände im Protokoll sind unvollständig. Bitte informiere den Administrator."
 msgstr ""
 
-#: includes/events.php:157
+#: includes/events.php:162
 msgid "Du darfst dieses Spielprotokoll nicht lesen."
 msgstr ""
 
-#: includes/events.php:160
+#: includes/events.php:165
 msgid "Ungültige Protokollseite."
 msgstr ""
 
@@ -1650,7 +1964,7 @@ msgid "Noch keine Handouts freigegeben."
 msgstr ""
 
 #: includes/folio-ui.php:80
-#: includes/table-ui.php:107
+#: includes/table-ui.php:109
 msgid "Spielleitermappe"
 msgstr ""
 
@@ -1804,60 +2118,60 @@ msgstr ""
 msgid "PS Pen & Paper – Spielbereich"
 msgstr ""
 
-#: includes/frontend.php:46
+#: includes/frontend.php:49
 msgid "Ungültige Spielbereich-Aktion. Bitte öffne das Formular erneut."
 msgstr ""
 
-#: includes/frontend.php:82
-#: includes/frontend.php:107
+#: includes/frontend.php:86
+#: includes/frontend.php:111
 msgid "Die angeforderte Kampagne oder der Charakter ist ungültig."
 msgstr ""
 
-#: includes/frontend.php:92
+#: includes/frontend.php:96
 msgid "Bitte melde dich an, um deine Kampagnen zu sehen."
 msgstr ""
 
-#: includes/frontend.php:92
+#: includes/frontend.php:96
 msgid "Noch kein Konto? Nutze die normale Registrierung dieser Website, falls angeboten, oder kontaktiere den Betreiber. Anschließend brauchst du die Aufnahme in deine Runde durch die Spielleitung."
 msgstr ""
 
-#: includes/frontend.php:97
+#: includes/frontend.php:101
 msgid "Bitte verwende den Spielbereich auf einer veröffentlichten Seite."
 msgstr ""
 
-#: includes/frontend.php:102
+#: includes/frontend.php:106
 msgid "Dieser Verwaltungsbereich ist nicht verfügbar."
 msgstr ""
 
-#: includes/frontend.php:117
+#: includes/frontend.php:121
 msgid "Du hast keinen Zugriff auf den Spielbereich dieser Website."
 msgstr ""
 
-#: includes/frontend.php:123
+#: includes/frontend.php:127
 msgid "Dieser Charakter ist für dich nicht verfügbar."
 msgstr ""
 
-#: includes/frontend.php:145
+#: includes/frontend.php:149
 msgid "Deine Kampagnen"
 msgstr ""
 
-#: includes/frontend.php:148
+#: includes/frontend.php:152
 msgid "Du bist noch keiner Kampagne zugeordnet."
 msgstr ""
 
-#: includes/frontend.php:150
+#: includes/frontend.php:154
 msgid "Lass dir von der Spielleitung den Kampagnenlink geben."
 msgstr ""
 
-#: includes/frontend.php:151
+#: includes/frontend.php:155
 msgid "Öffne den Link und wähle „Teilnahme beantragen“, sofern die Runde Anfragen erlaubt. Andernfalls nimmt dich die Spielleitung persönlich auf."
 msgstr ""
 
-#: includes/frontend.php:152
+#: includes/frontend.php:156
 msgid "Nach der Freigabe erscheint die Runde hier. Unter „Mein Bogen“ kannst du deinen Charakter erstellen und gegebenenfalls zur Freigabe einreichen."
 msgstr ""
 
-#: includes/frontend.php:162
+#: includes/frontend.php:166
 msgid "Archiviert"
 msgstr ""
 
@@ -2435,7 +2749,7 @@ msgid "So wirken Hintergrund und Text deines Spielbereichs."
 msgstr ""
 
 #: includes/styles.php:134
-#: includes/table-ui.php:24
+#: includes/table-ui.php:25
 msgid "Charakterbogen"
 msgstr ""
 
@@ -2485,7 +2799,7 @@ msgid "Gestaltung speichern"
 msgstr ""
 
 #: includes/table-ui.php:11
-#: includes/table-ui.php:177
+#: includes/table-ui.php:181
 msgid "Bögen & Freigaben"
 msgstr ""
 
@@ -2497,242 +2811,246 @@ msgstr ""
 msgid "Nur du und die Spielleitung sehen deine Werte."
 msgstr ""
 
-#: includes/table-ui.php:23
-msgid "Neu"
-msgstr ""
-
-#: includes/table-ui.php:25
-msgid "Noch nicht freigegeben"
-msgstr ""
-
-#: includes/table-ui.php:30
+#: includes/table-ui.php:31
 msgid "Profil & Hintergrund"
 msgstr ""
 
-#: includes/table-ui.php:31
+#: includes/table-ui.php:32
 msgid "Attribute & Werte"
 msgstr ""
 
-#: includes/table-ui.php:32
+#: includes/table-ui.php:33
 msgid "Ressourcen"
 msgstr ""
 
-#: includes/table-ui.php:63
+#: includes/table-ui.php:64
 msgid "Freigabe ausstehend – die gültigen Werte bleiben unverändert."
 msgstr ""
 
-#: includes/table-ui.php:64
+#: includes/table-ui.php:65
+msgid "Freigegebene Ausrüstungsboni sind in den angezeigten Werten enthalten. Grundwerte bleiben unverändert."
+msgstr ""
+
+#: includes/table-ui.php:66
 msgid "Kampagnenauflagen sind berücksichtigt."
 msgstr ""
 
-#: includes/table-ui.php:65
+#: includes/table-ui.php:67
 msgid "Antrag prüfen"
 msgstr ""
 
-#: includes/table-ui.php:65
+#: includes/table-ui.php:67
 msgid "Bogen öffnen / bearbeiten"
 msgstr ""
 
-#: includes/table-ui.php:68
+#: includes/table-ui.php:70
 msgid "Dein erster Bogen wartet noch auf dich. Öffne unten „Neuen Charakter erstellen“."
 msgstr ""
 
-#: includes/table-ui.php:68
+#: includes/table-ui.php:70
 msgid "In dieser Runde erstellt die Spielleitung deinen Charakter. Bitte wende dich an sie."
 msgstr ""
 
-#: includes/table-ui.php:70
+#: includes/table-ui.php:72
 msgid "Neuen Charakter erstellen"
 msgstr ""
 
-#: includes/table-ui.php:74
+#: includes/table-ui.php:76
 msgid "Die Spielleitung muss zuerst das Regelwerk einrichten."
 msgstr ""
 
-#: includes/table-ui.php:84
+#: includes/table-ui.php:86
 msgid "Am Tisch"
 msgstr ""
 
-#: includes/table-ui.php:84
+#: includes/table-ui.php:86
 msgid "Offline"
 msgstr ""
 
-#: includes/table-ui.php:85
+#: includes/table-ui.php:87
 msgid "Kurze Pause"
 msgstr ""
 
-#: includes/table-ui.php:85
+#: includes/table-ui.php:87
 msgid "Nicht gemeldet"
 msgstr ""
 
-#: includes/table-ui.php:86
-#: includes/table-ui.php:155
+#: includes/table-ui.php:88
+#: includes/table-ui.php:159
 #: includes/table.php:25
 #: includes/table.php:67
 msgid "Freies Spiel"
 msgstr ""
 
-#: includes/table-ui.php:86
+#: includes/table-ui.php:88
 msgid "Am Zug:"
 msgstr ""
 
-#: includes/table-ui.php:87
+#: includes/table-ui.php:89
 msgid "Zugzuordnung nicht mehr verfügbar"
 msgstr ""
 
-#: includes/table-ui.php:88
+#: includes/table-ui.php:90
 msgid "Die Runde konnte nicht aktualisiert werden. Bitte erneut versuchen."
 msgstr ""
 
-#: includes/table-ui.php:89
+#: includes/table-ui.php:91
 msgid "Anwesenheit wird geteilt"
 msgstr ""
 
-#: includes/table-ui.php:90
+#: includes/table-ui.php:92
 msgid "Anwesenheitsanzeige beendet"
 msgstr ""
 
-#: includes/table-ui.php:91
+#: includes/table-ui.php:93
 msgid "Neue Nachrichten"
 msgstr ""
 
-#: includes/table-ui.php:92
+#: includes/table-ui.php:94
 msgid "Spielleitung"
 msgstr ""
 
-#: includes/table-ui.php:97
+#: includes/table-ui.php:99
 msgid "PS Pen & Paper / Spielleitung"
 msgstr ""
 
-#: includes/table-ui.php:97
+#: includes/table-ui.php:99
 msgid "PS Pen & Paper / Spieltisch"
 msgstr ""
 
-#: includes/table-ui.php:102
+#: includes/table-ui.php:104
 msgid "Spieltisch"
 msgstr ""
 
-#: includes/table-ui.php:103
+#: includes/table-ui.php:105
 msgid "Kampagnen wechseln"
 msgstr ""
 
-#: includes/table-ui.php:106
+#: includes/table-ui.php:108
 msgid "Handouts"
 msgstr ""
 
-#: includes/table-ui.php:108
+#: includes/table-ui.php:110
 msgid "Rundeneinstellungen"
 msgstr ""
 
-#: includes/table-ui.php:109
+#: includes/table-ui.php:111
 msgid "Szenen & Karten"
 msgstr ""
 
-#: includes/table-ui.php:117
-msgid "Spieltisch-Bereiche"
+#: includes/table-ui.php:112
+msgid "Gegenstände"
 msgstr ""
 
-#: includes/table-ui.php:119
-msgid "Spiel"
-msgstr ""
-
-#: includes/table-ui.php:120
-msgid "Bögen"
-msgstr ""
-
-#: includes/table-ui.php:120
-msgid "Mein Bogen"
+#: includes/table-ui.php:113
+msgid "Mein Charakterprofil"
 msgstr ""
 
 #: includes/table-ui.php:121
+msgid "Spieltisch-Bereiche"
+msgstr ""
+
+#: includes/table-ui.php:123
+msgid "Spiel"
+msgstr ""
+
+#: includes/table-ui.php:124
+msgid "Bögen"
+msgstr ""
+
+#: includes/table-ui.php:124
+msgid "Mein Bogen"
+msgstr ""
+
+#: includes/table-ui.php:125
 msgid "Würfel"
 msgstr ""
 
-#: includes/table-ui.php:122
+#: includes/table-ui.php:126
 msgid "Gruppe"
 msgstr ""
 
-#: includes/table-ui.php:126
+#: includes/table-ui.php:130
 msgid "Am Spieltisch"
 msgstr ""
 
-#: includes/table-ui.php:127
+#: includes/table-ui.php:131
 msgid "Anwesenheit & Pause"
 msgstr ""
 
-#: includes/table-ui.php:140
+#: includes/table-ui.php:144
 msgid "Anwesenheit, Pausen & Zugsteuerung"
 msgstr ""
 
-#: includes/table-ui.php:140
+#: includes/table-ui.php:144
 msgid "Anwesenheit & kurze Pause"
 msgstr ""
 
-#: includes/table-ui.php:142
+#: includes/table-ui.php:146
 msgid "Anwesenheit teilen"
 msgstr ""
 
-#: includes/table-ui.php:144
+#: includes/table-ui.php:148
 msgid "Pausennotiz (optional)"
 msgstr ""
 
-#: includes/table-ui.php:145
+#: includes/table-ui.php:149
 msgid "Kurz in der Küche …"
 msgstr ""
 
-#: includes/table-ui.php:146
+#: includes/table-ui.php:150
 msgid "Kurze Pause / AFK"
 msgstr ""
 
-#: includes/table-ui.php:147
+#: includes/table-ui.php:151
 msgid "Wieder da"
 msgstr ""
 
-#: includes/table-ui.php:148
+#: includes/table-ui.php:152
 msgid "Status nicht mehr teilen"
 msgstr ""
 
-#: includes/table-ui.php:150
+#: includes/table-ui.php:154
 msgid "Freiwillig. Nach zwei Minuten ohne Meldung erscheint dein Status als offline. Keine Anwesenheitshistorie."
 msgstr ""
 
-#: includes/table-ui.php:154
+#: includes/table-ui.php:158
 msgid "Wer ist am Zug?"
 msgstr ""
 
-#: includes/table-ui.php:158
+#: includes/table-ui.php:162
 msgid "Zug festlegen"
 msgstr ""
 
-#: includes/table-ui.php:166
+#: includes/table-ui.php:170
 msgid "Eure Welt. Eure Geschichte."
 msgstr ""
 
-#: includes/table-ui.php:169
+#: includes/table-ui.php:173
 msgid "Vollständige Rundeneinleitung lesen"
 msgstr ""
 
-#: includes/table-ui.php:172
+#: includes/table-ui.php:176
 msgid "Diese Kampagne ist als archiviert gekennzeichnet."
 msgstr ""
 
-#: includes/table-ui.php:175
+#: includes/table-ui.php:179
 msgid "Ersten Charakter erstellen"
 msgstr ""
 
-#: includes/table-ui.php:177
+#: includes/table-ui.php:181
 msgid "Meinen Charakterbogen öffnen"
 msgstr ""
 
-#: includes/table-ui.php:179
+#: includes/table-ui.php:183
 msgid "Probe würfeln"
 msgstr ""
 
-#: includes/table-ui.php:180
+#: includes/table-ui.php:184
 msgid "Was bisher geschah"
 msgstr ""
 
-#: includes/table-ui.php:195
+#: includes/table-ui.php:200
 msgid "Ohne JavaScript stehen die Bereiche untereinander zur Verfügung. Anwesenheit und Zugsteuerung benötigen JavaScript."
 msgstr ""
 

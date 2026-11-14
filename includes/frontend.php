@@ -42,6 +42,9 @@ function ps_pen_paper_handle_frontend_action() {
 		return;
 	}
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
+	if ( in_array( $operation, array( 'save_equipment_schema', 'save_item', 'grant_item', 'equip_items', 'review_gear', 'save_portrait', 'save_sheet_style' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) {
+		ps_pen_paper_handle_admin_action();
+	}
 	if ( ! in_array( $operation, array( 'save_character', 'review_character', 'roll_dice', 'request_membership', 'review_membership', 'save_access', 'save_backdrop', 'save_style', 'save_universe', 'link_universe', 'save_universe_rules', 'save_base_character', 'adopt_universe_rules', 'attach_base_character', 'save_character_context', 'save_scene', 'publish_scene', 'withdraw_scene', 'select_scene', 'save_folio', 'publish_folio', 'withdraw_folio' ), true ) || ps_pen_paper_posted_id( 'pspp_frontend_page' ) !== get_queried_object_id() ) {
 		ps_pen_paper_fail( __( 'Ungültige Spielbereich-Aktion. Bitte öffne das Formular erneut.', 'ps-pen-paper' ) );
 	}
@@ -56,8 +59,9 @@ function ps_pen_paper_enqueue_frontend() {
 	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.1' );
 	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.7.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
-	wp_enqueue_script( 'ps-pen-paper-table', $url . 'assets/table.js', array(), '0.13.0', true );
+	wp_enqueue_script( 'ps-pen-paper-table', $url . 'assets/table.js', array(), '0.14.0', true );
 	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.13.0' );
+	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.14.0' );
 	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.12.0' );
 	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array( 'ps-pen-paper-table' ), '0.13.0', true );
 	wp_enqueue_script( 'ps-pen-paper-style', $url . 'assets/styles.js', array(), '0.7.0', true );

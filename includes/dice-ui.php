@@ -41,6 +41,15 @@ function ps_pen_paper_render_roll_details( $event ) {
 		<li><?php echo esc_html( __( 'Modifikator:', 'ps-pen-paper' ) . ' ' . $event['modifier'] ); ?></li>
 		<?php if ( $event['character'] ) : ?>
 			<li><?php echo esc_html( __( 'Charakter:', 'ps-pen-paper' ) . ' ' . $event['character']['name'] ); ?></li>
+			<?php if ( isset( $event['character']['equipment'] ) ) : ?>
+				<li><?php
+				/* translators: 1: Inventory revision, 2: Slot schema revision. */
+				echo esc_html( sprintf( __( 'Ausrüstungsrevision %1$d · Slotrevision %2$d', 'ps-pen-paper' ), $event['character']['equipment']['revision'], $event['character']['equipment']['schema_revision'] ) );
+				if ( $event['attribute'] && isset( $event['character']['equipment']['bonuses'][ $event['attribute']['id'] ] ) ) {
+					echo ' · ' . esc_html( __( 'Enthaltener Ausrüstungsbonus:', 'ps-pen-paper' ) . ' ' . $event['character']['equipment']['bonuses'][ $event['attribute']['id'] ] );
+				}
+				?></li>
+			<?php endif; ?>
 			<?php if ( isset( $event['character']['context'] ) ) :
 				$context = $event['character']['context'];
 				?>

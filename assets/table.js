@@ -39,7 +39,7 @@
 		});
 	}
 
-	const hashes = { '#pspp-play': 'play', '#pspp-sheet': 'sheet', '#pspp-group': 'group', '#pspp-dice': 'dice', '#pspp-log': 'log', '#pspp-rulebook': 'rules', '#pspp-settings': 'settings', '#pspp-story': 'story', '#pspp-folio': 'folio', '#pspp-handouts': 'handouts' };
+	const hashes = { '#pspp-play': 'play', '#pspp-sheet': 'sheet', '#pspp-group': 'group', '#pspp-dice': 'dice', '#pspp-log': 'log', '#pspp-rulebook': 'rules', '#pspp-settings': 'settings', '#pspp-story': 'story', '#pspp-folio': 'folio', '#pspp-handouts': 'handouts', '#pspp-equipment': 'equipment' };
 	function followHash() {
 		showView(hashes[window.location.hash] || 'play');
 	}

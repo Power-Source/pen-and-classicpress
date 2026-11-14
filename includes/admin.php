@@ -35,6 +35,7 @@ function ps_pen_paper_enqueue_admin_assets( $hook ) {
 	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.12.0' );
 	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array(), '0.13.0', true );
 	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.13.0' );
+	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.14.0' );
 }
 
 function ps_pen_paper_admin_url( $campaign_id = 0 ) {
@@ -77,6 +78,9 @@ function ps_pen_paper_handle_admin_action() {
 	}
 
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
+	if ( in_array( $operation, array( 'save_equipment_schema', 'save_item', 'grant_item', 'equip_items', 'review_gear', 'save_portrait', 'save_sheet_style' ), true ) ) {
+		ps_pen_paper_handle_equipment_action( $operation );
+	}
 	if ( in_array( $operation, array( 'save_folio', 'publish_folio', 'withdraw_folio' ), true ) ) {
 		ps_pen_paper_handle_folio_action( $operation );
 	}
@@ -188,6 +192,7 @@ function ps_pen_paper_handle_admin_action() {
 			ps_pen_paper_fail( __( 'Die Spielbereich-Seite ist nicht mehr verfügbar. Bitte öffne den Charakterbogen erneut.', 'ps-pen-paper' ) );
 		}
 		$character_id = ps_pen_paper_posted_id( 'character_id' );
+		$profile_url = ps_pen_paper_profile_return( $campaign_id, $character_id );
 		$revision = isset( $_POST['character_revision'] ) ? $_POST['character_revision'] : null;
 		if ( 'save_character' === $operation ) {
 			if ( 'complete' !== ps_pen_paper_posted_text( 'character_complete' ) ) {
@@ -205,7 +210,8 @@ function ps_pen_paper_handle_admin_action() {
 		if ( is_wp_error( $result ) ) {
 			ps_pen_paper_fail( $result->get_error_message() );
 		}
-		wp_safe_redirect( add_query_arg( 'pspp_notice', 'character_saved', ps_pen_paper_character_url( $campaign_id, $character_id, $page_id ) ) );
+		$url = $profile_url;
+		wp_safe_redirect( add_query_arg( 'pspp_notice', 'character_saved', $url ? $url : ps_pen_paper_character_url( $campaign_id, $character_id, $page_id ) ) );
 		exit;
 	}
 
@@ -308,8 +314,9 @@ function ps_pen_paper_handle_admin_action() {
 }
 
 function ps_pen_paper_form_start( $operation, $nonce, $campaign_id = 0, $page_id = 0, $multipart = false ) {
+	$action = apply_filters( 'pspp_form_action', $page_id ? get_permalink( $page_id ) : admin_url( 'admin-post.php' ) );
 	?>
-	<form method="post" action="<?php echo esc_url( $page_id ? get_permalink( $page_id ) : admin_url( 'admin-post.php' ) ); ?>"<?php if ( $multipart ) { echo ' enctype="multipart/form-data"'; } ?> data-pspp-form data-unsaved-message="<?php esc_attr_e( 'Es gibt ungespeicherte Änderungen. Möchtest du sie verwerfen?', 'ps-pen-paper' ); ?>">
+	<form method="post" action="<?php echo esc_url( $action ); ?>"<?php if ( $multipart ) { echo ' enctype="multipart/form-data"'; } ?> data-pspp-form data-unsaved-message="<?php esc_attr_e( 'Es gibt ungespeicherte Änderungen. Möchtest du sie verwerfen?', 'ps-pen-paper' ); ?>">
 		<input type="hidden" name="action" value="ps_pen_paper">
 		<input type="hidden" name="pspp_operation" value="<?php echo esc_attr( $operation ); ?>">
 		<?php if ( $page_id ) : ?>
@@ -319,6 +326,7 @@ function ps_pen_paper_form_start( $operation, $nonce, $campaign_id = 0, $page_id
 			<input type="hidden" name="campaign_id" value="<?php echo esc_attr( $campaign_id ); ?>">
 		<?php endif; ?>
 		<?php wp_nonce_field( $nonce ); ?>
+		<?php do_action( 'pspp_form_context' ); ?>
 	<?php
 }
 
@@ -498,6 +506,7 @@ function ps_pen_paper_render_campaign( $campaign ) {
 	<?php ps_pen_paper_render_rules( $campaign, $can_manage ); ?>
 	<?php if ( $can_manage ) : ?><section id="pspp-story" class="pspp-game"><?php ps_pen_paper_render_story( $campaign, 0 ); ?></section><?php endif; ?>
 	<?php if ( $can_manage ) : ?><section id="pspp-folio" class="pspp-game"><?php ps_pen_paper_render_folio( $campaign, 0 ); ?></section><?php endif; ?>
+	<?php if ( $can_manage ) : ?><section id="pspp-equipment" class="pspp-game"><?php ps_pen_paper_render_equipment_catalogue( $campaign, 0 ); ?></section><?php endif; ?>
 	<?php if ( $can_manage ) : ?><section id="pspp-settings"><?php ps_pen_paper_render_access_settings( $campaign ); ?></section><?php endif; ?>
 	<h3><?php esc_html_e( 'Mitglieder', 'ps-pen-paper' ); ?></h3>
 	<?php if ( $can_manage ) : ?>

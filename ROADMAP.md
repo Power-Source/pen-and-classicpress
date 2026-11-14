@@ -58,7 +58,8 @@ einen endgültigen Funktionsumfang.
   Angemeldete Website-Mitglieder können eine Aufnahme beantragen; nur die
   Spielleitung entscheidet. Die interne Beschreibung wird nie zum Teaser.
 - Eigene Hintergrundbilder der Spielfläche werden ohne öffentliche Medien-URL
-  geschützt gespeichert. Bild-Avatare und Bogen-Hintergründe sind noch offen.
+  geschützt gespeichert. Seit 0.14.0 sind auch private Charakterporträts und
+  dekorative Bogenhintergründe vorhanden; öffentliche Charakteravatare bleiben offen.
 - Netzwerk-Superadmins behalten auch ohne Unterwebsite-Mitgliedschaft Zugriff
   auf sämtliche dortigen Spielinhalte und die Chat-Moderation.
 - Version 0.10.0 ergänzt die private Universumsverwaltung im Backend und Frontend.
@@ -77,6 +78,11 @@ einen endgültigen Funktionsumfang.
   Szenenfolgen, Personen, Orten und Notizen sowie bewusst freigegebenen
   Text-/Bild-Handouts. Kapitel- und Szenenverknüpfungen vergeben keine Rechte.
   Neue Szenen beginnen als reine Erzählszenen; Kartenwerkzeuge bleiben optional.
+- Version 0.14.0 ergänzt einen privaten PS-Community-Profil-Tab, lokale und
+  Universums-Gegenstandskataloge, frei benannte Slots/Seltenheiten, konkrete
+  Inventarexemplare und freigabefähige Ausrüstung mit additiven Boni.
+  Ohne Community bleiben Bestände erhalten und Boni inaktiv.
+  Handel und ein grafischer Slotdesigner sind noch nicht vorhanden.
 
 ### Universum vor Kampagne: Grundmodell seit Version 0.11.0
 
@@ -273,8 +279,9 @@ regelabhängige Kampfautomatik.
 - Ohne optionale Chat-Integration und ohne WebSocket-Pflicht funktionieren.
   Häufigkeit der Aktualisierung und Ablaufzeit vor der Umsetzung festlegen.
 
-**Weiterer Ausbau:** Bild-Avatare und Bogen-Hintergründe folgen mit den nötigen
-Medienrechten und Schutzregeln. Bilder für die Spielfläche sind seit 0.9.0
+**Weiterer Ausbau:** Private Charakterporträts und Bogen-Hintergründe sind
+seit 0.14.0 geschützt vorhanden; gemeinsame Teilnehmeravatare sowie ein
+Bildpositions-/Ausschnitteditor bleiben offen. Bilder für die Spielfläche sind seit 0.9.0
 geschützt möglich. Die zentrale Szenenfläche ist seit 0.12.0 angebunden;
 Kapitel und Text-/Bild-Handouts sind seit 0.13.0 vorhanden. Das optionale
 Levelsystem bleibt ein gesonderter Ausbau.
@@ -427,6 +434,39 @@ Rundenteilnehmer.
   Chat-Nachrichten sind eine optionale Anzeige, kein Ersatz für echte Würfe.
 - Ist PS Chat nicht verfügbar, bleibt das Grundsystem nutzbar.
 
+### PS Community: Charakterprofil und optionale Ausrüstung
+
+**Grundlage seit 0.14.0 implementiert; Handel bleibt der nächste Ausbau:**
+
+- Ein eigener Profil-Tab „Pen & Paper“ bündelt die eigenen Charaktere mit
+  ausdrücklicher Auswahl des Kampagnenkontexts. Charakterbearbeitung verwendet
+  weiterhin dieselben Besitzerrechte und Freigaben wie der Spielbereich.
+- Profilbesucher und Freunde erhalten nicht automatisch Zugriff auf Bögen,
+  Inventare oder private Spielinhalte. Freundschaften ersetzen keine
+  Kampagnenmitgliedschaft oder Handelsberechtigung.
+- Inventar, Ausrüstung und Handel setzen aktives PS Community mit den
+  benötigten Schnittstellen und Modulen voraus. Verfügbarkeit auf jeder
+  relevanten Lese- und Schreibschnittstelle prüfen, nicht nur Menüs ausblenden.
+  Ohne die Integration bleiben Charaktere, Würfel, Szenen und Handouts nutzbar.
+- Bei Deaktivierung Daten erhalten und Bestandsänderungen sperren. Noch offene
+  Handelsvorgänge dürfen keine unvollständigen Übertragungen auslösen.
+- Charakterporträts und grundlegende Bogengestaltung bleiben unabhängig von
+  PS Community im Pen-&-Paper-Kern. Benutzeravatar und Charakterporträt sind
+  getrennte Bilder.
+
+Der eigene Profil-Tab, geschützte Inventare, Slotwahl und automatische additive
+Boni sind vorhanden. Charakterbearbeitung verwendet dieselben Freigaben wie
+der Spielbereich. Profilformulare benötigen keine Backend-Anmeldung.
+Bei inaktiver Community werden keine Ausrüstungsboni angewandt; gespeicherte
+Würfe behalten ihre damaligen Werte. Direkte und native Community-AJAX-Aufrufe
+fremder Profilbereiche geben keine Inventare aus.
+
+**Als Nächstes:** revisionssichere Handelsangebote mit ausdrücklich geprüften
+Teilnehmern und Beständen, bewusster Annahme/Ablehnung und sicherem Abbruch
+bei Deaktivierung. Freundschaften dürfen höchstens die Auswahl unterstützen,
+nicht Kampagnen- oder Handelsrechte ersetzen. Außerdem fehlen Entzug/Entfernen
+von Exemplaren, Mengen und ein grafischer, frei positionierbarer Slotdesigner.
+
 ### PS Wiki
 
 PS Wiki eignet sich als optionales **Regel- und Weltlexikon**: Es bietet laut
@@ -450,10 +490,40 @@ oder seine Berechtigungen von ihnen abhängig zu machen.
 
 ## Phase 6: Spielwelt und Ausrüstung
 
+Gegenstandskataloge, geschützte Grafiken, freie Eigenschaften, Seltenheiten,
+konkrete Exemplare, konfigurierte Slots und additive Ausrüstungsboni sind
+seit 0.14.0 umgesetzt. Die erste Oberfläche arbeitet mit Auswahlfeldern,
+nicht mit einem grafischen Papierpuppen- oder Drag-and-drop-Editor.
+Bestände sind auf 100 einzelne Exemplare pro Charakter begrenzt.
+Grundwerte bleiben unverändert; unzulässige kombinierte Werte werden
+ausdrücklich gemeldet und lassen sich durch Ablegen reparieren.
+
 - Seit 0.13.0: private Personen-, Orts- und Notizkarten mit Kapitel- und
   Szenenverknüpfungen. Strukturierte NPC-Eigenschaften bleiben ein späterer Ausbau.
 - Begegnungen, Gegner und Ereignisse für Szenen vorbereiten.
-- Gegenstände, Inventare und Ausrüstung verwalten.
+- Gegenstandsvorlagen in einem gemeinsamen Universumskatalog sowie ergänzend
+  kampagneneigenen Katalogen verwalten. Kampagnen ohne Universum verwenden
+  ausschließlich ihren eigenen Katalog. Gemeinsame Vorlagen erlauben keinen
+  automatischen Handel zwischen Kampagnen.
+- Die Spielleitung erstellt Gegenstände mit Name, Beschreibung, geschützter
+  Grafik und frei definierbaren Eigenschaften beziehungsweise Zahlenwerten.
+  Vorlagen, konkrete Inventargegenstände und angelegte Gegenstände unterscheiden;
+  Vorlagenänderungen überschreiben ausgegebene Exemplare nicht ungefragt.
+- Gegenstandstypen, etwa Kopfbedeckung oder Werkzeug, von frei benennbaren
+  Seltenheitsstufen wie „Normal“ oder „Episch“ trennen. Die Spielleitung legt
+  Bezeichnungen und Darstellungsfarben fest; Farben sind nicht die einzige
+  Kennzeichnung. Keine fest eingebaute Seltenheitsskala oder automatische
+  Wertevervielfachung durch die Seltenheitsstufe.
+- Frei benennbare Ausrüstungsslots auf Charakterbögen konfigurieren, etwa
+  Kopf, Arme, Brust oder eigene Begriffe. Gegenstandstypen bestimmen passende
+  Slots. Inventare bleiben an Charakter und Spielkontext gebunden.
+- Angelegte Gegenstände dürfen ausdrücklich konfigurierte automatische Boni
+  auf Charakterwerte geben. Bonusregeln, belegte Slots und tatsächlicher Besitz
+  werden serverseitig geprüft; Ausrüsten und Ablegen dürfen Grundwerte nicht
+  dauerhaft überschreiben. Darstellung und Würfe müssen dieselben wirksamen
+  Werte verwenden; alte Würfe behalten ihre gespeicherten Werte.
+- Inventar, Ausrüstung und Handel sind PS-Community-gebundene Erweiterungen,
+  keine Voraussetzung für das erzählerische Grundspiel.
 - Seit 0.13.0: Text- und Bild-Handouts gezielt für die Runde freigeben und
   zurücknehmen, mit getrenntem Entwurfsstand und privaten Geheimnissen.
 - Über ein geeignetes Schutzkonzept für private Dateien entscheiden: Normale

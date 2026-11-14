@@ -1,0 +1,12 @@
+:is(.pspp-game, .pspp-admin) .pspp-character-picture { max-width: 180px; max-height: 220px; object-fit: cover; border: 1px solid var(--pspp-border, #64748b); border-radius: .4rem; }
+:is(.pspp-game, .pspp-admin) .pspp-portrait img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.pspp-admin .pspp-portrait { display: inline-flex; width: 72px; height: 80px; }
+:is(.pspp-game, .pspp-admin) .pspp-sheet { position: relative; isolation: isolate; }
+:is(.pspp-game, .pspp-admin) .pspp-sheet::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--pspp-sheet-image, none) center / cover no-repeat; opacity: .08; pointer-events: none; }
+:is(.pspp-game, .pspp-admin) .pspp-item-card { padding: 1rem; margin-block: 1rem; border: 1px solid var(--pspp-border, #64748b); border-radius: .4rem; overflow-wrap: anywhere; }
+:is(.pspp-game, .pspp-admin) .pspp-item-image { max-width: 96px; max-height: 96px; object-fit: contain; }
+:is(.pspp-game, .pspp-admin) .pspp-rarity { border-inline-start: 5px solid var(--pspp-rarity); padding-inline-start: .5rem; }
+:is(.pspp-game, .pspp-admin) .pspp-equipped { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .75rem; }
+:is(.pspp-game, .pspp-admin) .pspp-equipped dd { margin: 0; }
+.pspp-profile { padding: 1rem; }
+.pspp-profile input[type="text"], .pspp-profile textarea, .pspp-profile select { max-width: 100%; }

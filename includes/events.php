@@ -25,6 +25,11 @@ function ps_pen_paper_event_labels() {
 		'folio_saved'         => __( 'Mappeneintrag gespeichert', 'ps-pen-paper' ),
 		'folio_published'     => __( 'Handout freigegeben', 'ps-pen-paper' ),
 		'folio_withdrawn'     => __( 'Handout zurückgenommen', 'ps-pen-paper' ),
+		'portrait_saved'      => __( 'Charakterporträt geändert oder geprüft', 'ps-pen-paper' ),
+		'sheet_style_saved'   => __( 'Bogengestaltung geändert', 'ps-pen-paper' ),
+		'equipment_schema'    => __( 'Slots und Seltenheiten geändert', 'ps-pen-paper' ),
+		'item_saved'          => __( 'Gegenstandsvorlage gespeichert', 'ps-pen-paper' ),
+		'gear_saved'          => __( 'Inventar oder Ausrüstung geändert', 'ps-pen-paper' ),
 	);
 }
 

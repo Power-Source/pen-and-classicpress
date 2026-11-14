@@ -1,6 +1,6 @@
 # PS Pen & Paper – Pluginhandbuch
 
-Stand: Version 0.13.0 · 14. November 2026.
+Stand: Version 0.14.0 · 14. November 2026.
 
 Dieses Handbuch beschreibt den vorhandenen Funktionsumfang, nicht die gesamte
 Roadmap. Die Abbildungen zur Demorunde stammen aus der tatsächlich angelegten
@@ -24,6 +24,8 @@ Eine fremde Partnerprogramm-Debugleiste wurde nur für diese Aufnahmen ausgeblen
 11. [Probleme und Grenzen](#11-probleme-und-grenzen)
 12. [Szenen und Kartentisch](#12-szenen-und-kartentisch)
 13. [Spielleitermappe, Kapitel und Handouts](#13-spielleitermappe-kapitel-und-handouts)
+14. [Porträts und Bogenhintergründe](#14-porträts-und-bogenhintergründe)
+15. [Community-Profil, Gegenstände und Ausrüstung](#15-community-profil-gegenstände-und-ausrüstung)
 
 ## 1. Ist das schon spielbar?
 
@@ -37,10 +39,11 @@ sind seit 0.13.0 enthalten.
 | Getrennte Kampagnen, Mitgliedschaften und Kapitel mit Szenenfolge | Sitzungsplanung und öffentliche Zusammenfassungen |
 | Szenenentwürfe, getrennte Geheimnisse und bewusste Freigaben | Umfangreiche NPC-Verwaltung und Begegnungen |
 | Private Inhaltsvorschau und geschützter Kartentisch | Nebel des Krieges und Zeichenwerkzeuge |
-| Frei benennbare Charakterfelder, Basisbögen und Freigaben | Inventar und Ausrüstung |
+| Frei benennbare Charakterfelder, Basisbögen und Freigaben | Grafischer, frei positionierbarer Slotdesigner |
 | Würfel, Attributwerte und geschützte Ergebnisse | Automatische Erfolgsbewertung oder komplexe Würfelmechaniken |
 | Änderungs- und Wurfprotokoll | Automatisch geprüfter Punktepool |
 | Spielleitermappe, geschützte Text-/Bild-Handouts und responsive Bedienung | Strukturierte NPC-Werte und private PDF-Dateien |
+| Private Porträts sowie Community-gebundene Kataloge, Inventare und Ausrüstung | Handel, Stapelmengen und automatische Gegenstandssynchronisierung |
 
 Die Spielleitung kann Szenentexte und Karten vorbereiten und gezielt anzeigen.
 Die Kampagnenbeschreibung eignet sich weiter für eine gemeinsame Einleitung,
@@ -479,7 +482,9 @@ Betrachter ausgeliefert, nicht über eine öffentliche Mediathek-Adresse.
 die gespeicherten Bilddaten. Ein Ersatzbild entfernt das vorherige; auch beim
 endgültigen Löschen der Kampagne werden ihre Bilddaten gelöscht.
 Für schnelle mobile Darstellung möglichst kleine Dateien verwenden.
-Bild-Avatare und eigene Hintergrundbilder für Charakterbögen folgen später.
+Private Charakterporträts und eigene Bogenhintergründe sind seit 0.14.0
+vorhanden; siehe Abschnitt 14. Für diese Bilder bleiben historische Stände
+erhalten, anders als beim austauschbaren Spieltischhintergrund.
 
 ## 10. Handy und Tablet
 
@@ -522,8 +527,9 @@ Audit-System.
 Der erste **Story-Builder-Ablauf** mit Szenen, getrennten Geheimnissen,
 Inhaltsvorschau, Freigabe, Rücknahme und Protokollierung ist vorhanden.
 Kapitel mit geordneter Szenenfolge, private Personen-/Orts-/Notizkarten und
-Text-/Bild-Handouts sind seit 0.13.0 vorhanden. Inventar, redaktioneller Komfort
-und weitere Handoutdateiformate fehlen noch. Eine normale Medien-URL ist nicht
+Text-/Bild-Handouts sind seit 0.13.0 vorhanden. Community-gebundene Inventare
+und Ausrüstung ergänzen seit 0.14.0 den Charakterbereich. Handel,
+redaktioneller Komfort und weitere Handoutdateiformate fehlen noch. Eine normale Medien-URL ist nicht
 automatisch privat.
 Auch die unterstützten WordPress-, ClassicPress- und PHP-Versionen müssen
 noch verbindlich festgelegt und plattformübergreifend geprüft werden.
@@ -684,7 +690,162 @@ Mappenänderungen, Handoutfreigaben und Rücknahmen besitzen private
 Vorher-/Nachher-Protokolle für die Spielleitung. Die neuen Abbildungen zeigen
 die tatsächlich fortgesetzte Nebelhafen-Demo; ihre Charaktere, Regeln und
 ursprünglichen Würfe wurden dafür nicht zurückgesetzt.
-Keine Spielwerte oder Berechtigungen wurden für die Bilder geändert.
+Für diese Mappenabbildungen wurden keine Spielwerte oder Berechtigungen geändert.
+
+## 14. Porträts und Bogenhintergründe
+
+Diese Gestaltung funktioniert **auch ohne PS Community**.
+
+1. Den eigenen Charakter über **Mein Bogen → Bogen bearbeiten** beziehungsweise
+   die Charakterverwaltung öffnen.
+2. Unter **Charakterporträt** ein PNG-, JPEG- oder WebP-Bild auswählen.
+3. **Porträt einreichen / speichern** drücken. Im Freigabemodus sieht die
+   Spielleitung den Antrag getrennt und wählt **Porträt freigeben** oder
+   **Porträtantrag verwerfen**. Bis dahin bleibt das bisherige Bild gültig.
+4. **Porträt entfernen / beantragen** entfernt das Bild je nach
+   Bearbeitungspolitik sofort oder erst nach Freigabe.
+
+Bei **Nur Spielleiter** können Besitzer keine Bilder ändern. Porträtanträge
+ändern keine Charakterwerte und benötigen keine erneute Wertefreigabe.
+Gemeinsame Basisbögen können trotzdem ein lokales Kampagnenporträt erhalten.
+Das Bild erscheint nur auf berechtigten Charakterbögen für Besitzer und
+Spielleitung, nicht als öffentlicher Community-Avatar oder Teilnehmeravatar.
+
+Den Hintergrund bestimmt die Spielleitung unter **Rundeneinstellungen →
+Bogenhintergrund der Kampagne**. Er erscheint dezent hinter dem gültigen
+Charakterbogen. **Bogenhintergrund entfernen** schaltet die Dekoration aus.
+Ein Ausschnitt-/Positionseditor ist noch nicht vorhanden.
+
+![Maras freigegebenes privates Porträt und dezenter Nebelhafen-Bogenhintergrund](images/20-charakterportraet.png)
+
+Alle drei Bildarten – Porträt, Bogenhintergrund und Gegenstandsgrafik –
+verwenden den privaten Bildspeicher: höchstens 2 MiB und 3000 × 3000 Pixel,
+keine SVGs oder externen Bildadressen. Historische Bilder bleiben für
+Protokolle und ausgegebene Gegenstände bis zur Löschung ihres Ursprungs
+gespeichert. Nur Bilder mit passenden Nutzungsrechten verwenden und die
+Datenbank regelmäßig sichern.
+
+## 15. Community-Profil, Gegenstände und Ausrüstung
+
+### Voraussetzungen und privater Profil-Tab
+
+PS Community auf derselben Website aktivieren. In der lokal geprüften
+Community-Version müssen **Profil** und **Aktivität** eingeschaltet sein,
+damit die Profil-Tab-Schnittstellen geladen werden. Eine veröffentlichte
+Profilseite mit `[cpc-activity-page]` anlegen und in Community zuordnen,
+falls noch keine vorhanden ist. Bei aktiviertem Permalinkmodus muss die
+zugehörige Community-Profiladresse erreichbar sein.
+
+Im **eigenen** Profil **Pen & Paper** öffnen und den eigenen
+Kampagnencharakter auswählen. Alternativ führt **Mein Charakterprofil**
+am Spieltisch dorthin. Im Tab lassen sich Bogen, Porträt und Ausrüstung
+bearbeiten. **Zur Bogenübersicht** führt zur eigenen Profilauswahl zurück.
+Profilformulare werden auf der Frontend-Profilseite verarbeitet und bleiben
+nach dem Speichern dort.
+
+Andere Profilbesucher und Freunde erhalten weder fremde Bögen noch Inventare.
+Auch ein direkter Community-AJAX-Aufruf vergibt keine zusätzlichen Rechte.
+Mitgliedschaft und Charakterbesitz bleiben erforderlich.
+**Die Profilseite einschließlich ihrer Parameter vom Seiten-Cache ausschließen.**
+
+### Als Spielleitung Slots und Seltenheiten festlegen
+
+Im Spielbereich **Gegenstände → Slots und Seltenheitsstufen konfigurieren**
+öffnen. Derselbe Katalog ist in der Backend-Kampagnenverwaltung und für
+Universumsleitungen beim jeweiligen Universum erreichbar.
+
+Beispiel für Slots, eine Zeile pro Slot:
+
+```text
+kopf | Kopf | kopfbedeckung
+arme | Arme | armschutz
+brust | Brust | oberbekleidung
+```
+
+Die drei Teile sind **stabile Kennung | sichtbarer Name | passender
+Gegenstandstyp**. Eine Kopfbedeckung passt nur in einen entsprechend
+konfigurierten Slot. Eine konkrete Instanz darf nicht gleichzeitig mehrere
+Slots belegen. Bestehende Kennungen dürfen nicht entfernt und Slottypen
+nicht umgedeutet werden; Namen bleiben änderbar.
+
+Beispiel für unabhängige Seltenheitsstufen:
+
+```text
+normal | Normal | #52646d
+episch | Episch | #8054a3
+```
+
+Bezeichnungen und Farben bestimmt die Spielleitung. Eine Farbe ist nie die
+einzige Kennzeichnung. **Episch** erzeugt keinen automatischen Multiplikator.
+Bis zu 30 Slots und 30 Seltenheiten sind je Vorlage möglich. Kampagnen legen
+ihre Slots selbst fest, auch wenn sie Universumsgegenstände verwenden.
+
+### Gegenstandsvorlagen erstellen und Exemplare ausgeben
+
+1. **Neue Gegenstandsvorlage** öffnen.
+2. Namen, Beschreibung, Typ und Seltenheit eintragen.
+3. Freie Eigenschaften als `Bezeichnung | Wert` ergänzen.
+4. Optional ausdrücklich ganzzahlige Boni auf Zahlen- oder Attributfelder
+   setzen. Ressourcen und Textfelder sind keine Bonusziele.
+5. Optional eine geschützte Grafik hochladen und die Vorlage speichern.
+6. Den gewünschten Charakter öffnen und **Ein Exemplar ausgeben: …** wählen.
+   Erst diese Aktion erzeugt Besitz; eine Katalogvorlage allein liegt
+   noch in keinem Inventar.
+
+![Tatsächlich angelegte Nebelhafen-Vorlagen mit freien Seltenheiten und geschützter Grafik](images/19-gegenstandskatalog.png)
+
+Zugeordnete Kampagnen können Universumsvorlagen und eigene Ergänzungen
+verwenden. Standalone-Kampagnen verwenden ihren eigenen Katalog.
+Vorlagenänderungen gelten nur für spätere Ausgaben, nicht für bereits
+ausgegebene Exemplare. Ein Charakter besitzt zunächst höchstens 100
+einzelne Exemplare; Stapelmengen und eine Entzugs-/Löschoberfläche fehlen.
+
+### Ausrüstung auswählen und freigeben
+
+Im Charakter unter **Inventar & Ausrüstung** bei jedem Slot ein passendes
+eigenes Exemplar oder **Leer** wählen. Über **Ausrüstung speichern /
+einreichen** speichern. Im Freigabemodus bleibt die bisherige Belegung
+wirksam, bis die Spielleitung **Ausrüstung freigeben** wählt. Die
+Auswahlfelder zeigen bei offenem Antrag den beantragten Stand; die Übersicht
+darunter zeigt die gültige Belegung. Ein neuer Antrag ersetzt den bisherigen.
+
+![Maras eigenes Inventar im privaten Community-Profil mit Kopf-, Arm- und Brustslot](images/21-inventar-profiltab.png)
+
+Angelegte, freigegebene Boni werden addiert; die Grundwerte bleiben erhalten.
+In der Demo gibt die Lotsenkappe **Mut +1**: Grundwert **2**, effektiver
+Bogenwert **3**. Im Bearbeitungsformular steht weiter der Grundwert **2**.
+Den Bonus beim Würfeln **nicht noch einmal** zum Ausdruck addieren.
+
+![Gespeicherte Mutprobe mit Ausrüstungsherkunft: fünf plus fünf plus drei ergibt dreizehn](images/22-ausruestungswurf.png)
+
+Der tatsächliche Wurf verwendet Mut 3 und speichert Ausrüstungsrevision,
+Slotrevision und enthaltene Boni. Alte Würfe ändern sich nicht beim Ablegen
+oder bei späteren Vorlagenänderungen.
+
+### Grenzen, Fehlerbehebung und Deaktivierung
+
+Feldgrenzen gelten einschließlich Boni. Unzulässiges Anlegen oder eine
+unzulässige Grundwert-/Auflagenänderung wird ausdrücklich abgelehnt.
+Bei gemeinsamem Basisfortschritt kann eine andere Kampagnenausrüstung
+nachträglich ungültig werden. Dann werden keine still gekürzten Werte oder
+Würfe erzeugt. Über **Ausrüstung prüfen** in der eigenen Profilübersicht
+bleibt die Slotverwaltung zugänglich. Besitzer können das Ablegen beantragen;
+die Spielleitung kann es freigeben oder unmittelbar korrigieren.
+
+Ohne aktives, verwendbares PS Community sind Katalog, Inventaroperationen
+und Ausrüstung inaktiv; **auch Boni werden dann nicht angewandt**.
+Gespeicherte Bestände werden nicht gelöscht. Charakterbögen, Porträts,
+Geschichten und Würfel bleiben nutzbar. Bereits gespeicherte Würfe behalten
+ihre damaligen Werte. Bei erneuter Aktivierung gelten die gespeicherten
+Belegungen wieder, soweit die aktuellen Wertebereiche sie zulassen.
+
+Schema- und Vorlagenänderungen stehen privat im Spielleiterprotokoll;
+Inventar- und Porträtänderungen sind nur für Besitzer und aktuelle
+Spielleitung sichtbar. Das ist keine Datenbanksicherung.
+
+**Noch offen:** Handel, Stapelmengen, Mehrfachslot-Gegenstände, Entzug/
+Entfernen von Exemplaren und ein frei positionierbarer grafischer Slotdesigner.
+Die aktuelle Oberfläche verwendet zugängliche Auswahlfelder, kein Drag-and-drop.
 
 Weiterlesen: [Demorunde mit Ergebnissen und Prüfbericht](demokampagne.md) ·
 [Technischer Überblick](../README.md) · [Roadmap](../ROADMAP.md).

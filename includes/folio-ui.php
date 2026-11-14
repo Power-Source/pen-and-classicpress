@@ -31,7 +31,8 @@ function ps_pen_paper_handle_folio_action( $operation ) {
 	}
 	if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
 	$url = $page_id ? ps_pen_paper_game_url( $page_id, $campaign_id ) : ps_pen_paper_admin_url( $campaign_id );
-	wp_safe_redirect( add_query_arg( array( 'pspp_folio' => $id, 'pspp_notice' => 'folio_saved' ), $url ) . '#pspp-folio' );
+	$target = 'story' === ps_pen_paper_posted_text( 'folio_return' ) ? '#pspp-story' : '#pspp-folio';
+	wp_safe_redirect( add_query_arg( array( 'pspp_folio' => $id, 'pspp_notice' => 'folio_saved' ), $url ) . $target );
 	exit;
 }
 

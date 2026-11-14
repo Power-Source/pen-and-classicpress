@@ -1,6 +1,6 @@
 # PS Pen & Paper – Pluginhandbuch
 
-Stand: Version 0.14.0 · 14. November 2026.
+Stand: Version 0.16.0 · 15. November 2026.
 
 Dieses Handbuch beschreibt den vorhandenen Funktionsumfang, nicht die gesamte
 Roadmap. Die Abbildungen zur Demorunde stammen aus der tatsächlich angelegten
@@ -26,6 +26,7 @@ Eine fremde Partnerprogramm-Debugleiste wurde nur für diese Aufnahmen ausgeblen
 13. [Spielleitermappe, Kapitel und Handouts](#13-spielleitermappe-kapitel-und-handouts)
 14. [Porträts und Bogenhintergründe](#14-porträts-und-bogenhintergründe)
 15. [Community-Profil, Gegenstände und Ausrüstung](#15-community-profil-gegenstände-und-ausrüstung)
+16. [Währung, Guthaben und Gegenstandsbindung](#16-währung-guthaben-und-gegenstandsbindung)
 
 ## 1. Ist das schon spielbar?
 
@@ -555,9 +556,60 @@ noch verbindlich festgelegt und plattformübergreifend geprüft werden.
 
 ## 12. Szenen und Kartentisch
 
+### Ein Abenteuer am Tisch leiten
+
+Seit **0.15.0** öffnet **Abenteuer & Szenen** zuerst den privaten Abenteuerplan:
+
+1. Kapitel erscheinen mit der in der Spielleitermappe festgelegten Szenenfolge.
+   Nicht zugeordnete Szenen stehen gesondert darunter.
+2. **Jetzt am Tisch** markiert die aktive freigegebene Szene. Die folgende Szene
+   ist als **Nächste Szene im Kapitel** gekennzeichnet. Die Reihenfolge zwingt
+   keinen Lösungsweg auf: Die Spielleitung entscheidet selbst, wohin es geht.
+3. **Vorbereiten / Vorschau / Freigabe** öffnet den Szeneneditor. Der Plan ist
+   beim Bearbeiten eines gespeicherten Entwurfs zunächst eingeklappt.
+4. **Am Tisch anzeigen** wechselt zur bereits freigegebenen Fassung und führt
+   zurück zum Plan. Ein privater Entwurf bietet diese Schaltfläche nicht.
+   Ein Hinweis kennzeichnet Abweichungen zwischen Entwurf und Spielstand;
+   auch bewegte Marker können solche Abweichungen verursachen.
+5. Unter **Aktuelle Szene leiten** stehen die gespeicherten Geheimnisse und
+   direkt mit dieser Szene verknüpfte Personen, Orte, Notizen und Handouts.
+   Alles in diesem Bereich bleibt ausschließlich für die Spielleitung sichtbar.
+6. Einen noch privaten Hinweis aufklappen, die Freigabe ausdrücklich bestätigen
+   und **Handout auf den Tisch legen** wählen. Nur Titel, Text und optionales
+   Bild werden übernommen, niemals die geheimen Ergänzungen. Die Gruppe findet
+   den Hinweis danach unter **Handouts**. Änderungen und Rücknahmen bereits
+   veröffentlichter Handouts erfolgen weiterhin in der Spielleitermappe.
+
+![Privater Abenteuerplan der Nebelhafen-Demo mit aktiver Szene, privatem Folgeentwurf und verknüpftem Handout](images/23-abenteuerplan.png)
+
+*Die Kapitelreihenfolge ist eine Orientierung für die Spielleitung, kein
+automatischer Questablauf. Plan, Entwurfstitel und Geheimnisse erscheinen
+nicht in der Spieleransicht.*
+
+Der Plan zeigt den Stand beim Laden. Wenn eine weitere Spielleitung etwas
+ändert, **Abenteuerplan und Notizen neu laden** verwenden. Die Spielerszene
+aktualisiert sich weiterhin wie im Abschnitt zum Kartentisch beschrieben.
+
+### Probespiel: Von Dock 3 zur Morgenröte
+
+Die bestehende Nebelhafen-Demo steht jetzt in **Die Laterne an Dock 3**.
+Die Spielleitung hat die **Bordkarte für Kiste 17** ausdrücklich freigegeben;
+Mara und Jorin sehen sie zusammen mit dem bisherigen Brief unter **Handouts**.
+**An Bord der Morgenröte** ist die nächste Szene im Kapitel, bleibt aber
+ein privater Entwurf ohne Schaltfläche zum Anzeigen am Tisch.
+
+![Spieleransicht mit dem bisherigen Brief und der neu freigegebenen Bordkarte](images/24-bordkarte.png)
+
+*Die geheimen Ergänzungen aus der Spielleitungsansicht fehlen hier vollständig.
+Der Hinweis legt keine automatische Verladung, Abreise oder Probe fest.*
+
+Für diese Fortsetzung wurde kein neuer Wurf benötigt. Maras bereits
+gespeicherte Probe 13 bleibt der Ausgangspunkt; Charaktere, Ausrüstung
+und Regeln wurden nicht verändert.
+
 ### Als Spielleitung vorbereiten
 
-1. Im Spielbereich **Szenen & Karten** öffnen. Im Backend befindet sich derselbe
+1. Im Spielbereich **Abenteuer & Szenen** öffnen. Im Backend befindet sich derselbe
    Editor in der Kampagnenverwaltung.
 2. Unter **Neue Szene** Titel und freizugebenden Text eintragen.
 3. **Geheimnisse – nur Spielleitung** getrennt ausfüllen. Dieses Feld erscheint
@@ -865,6 +917,79 @@ Spielleitung sichtbar. Das ist keine Datenbanksicherung.
 **Noch offen:** Handel, Stapelmengen, Mehrfachslot-Gegenstände, Entzug/
 Entfernen von Exemplaren und ein frei positionierbarer grafischer Slotdesigner.
 Die aktuelle Oberfläche verwendet zugängliche Auswahlfelder, kein Drag-and-drop.
+
+## 16. Währung, Guthaben und Gegenstandsbindung
+
+Dieser Bereich benötigt aktives PS Community. Die Währung schreibt kein
+Spielsystem vor: Name und Kürzel sind frei, Beträge bleiben **ganze Einheiten**.
+
+### Währung und Kontomodell einstellen
+
+- **Mit Universum:** Unter **Universen → Regelwerk & Basischaraktere →
+  Währung & Guthaben** wählt die Universumsleitung beziehungsweise Administration
+  Name, Kürzel und Kontomodell.
+- **Ohne Universum:** Unter **Rundeneinstellungen → Währung & Guthaben**
+  richtet die Kampagnenleitung eine eigene Währung ein.
+- Zugeordnete Kampagnen übernehmen die Währung und das gewählte Modell aus
+  dem Universum. Es gibt keine automatische Umrechnung oder lokale Zweitwährung.
+
+| Kontomodell im Universum | Wirkung und Buchungsrechte |
+|---|---|
+| Getrennt je Kampagnencharakter | Jede Runde hat ein eigenes Guthaben, auch bei gemeinsamen Charaktergrundwerten. Es bucht die jeweilige Kampagnenleitung. |
+| Gemeinsam am Universumscharakter | Gemeinsam aufgenommene Basisbögen verwenden dasselbe Konto. Nur Universumsleitung beziehungsweise Administration buchen. Lokale Bögen und unabhängige Kopien erhalten kein Ersatzkonto. |
+
+Vor der ersten Buchung kann die Universumsleitung das Modell wechseln.
+Danach bleibt es fest, damit Guthaben weder verschwinden noch doppelt
+verwendet werden. Name und Kürzel bleiben änderbar. Ein Wechsel der
+Universumszuordnung von Kampagnen mit Konten wird gesperrt, bis es eine
+ausdrückliche Guthabenmigration gibt.
+
+![Lokale Währungseinstellungen der Nebelhafen-Demo mit Dockmark und ganzen Einheiten](images/25-waehrungseinstellungen.png)
+
+### Beträge vergeben oder abziehen
+
+1. Als zuständige Spielleitung den Charakterbogen öffnen.
+2. Unter **Guthaben → Guthaben vergeben oder abziehen** die Buchungsart wählen.
+3. Einen **ganzen Betrag ab 1** und eine Begründung eintragen.
+4. Betrag und Buchungsart ausdrücklich bestätigen und
+   **Guthabenbuchung speichern** wählen.
+
+Ein Kontostand darf zwischen **0 und 999999999** liegen. Nachkommastellen,
+Überziehung und Überschreitung der Grenze werden abgewiesen. Ein veraltetes
+Formular fordert zum Neuladen auf; es führt keine zweite Buchung aus.
+Ohne erforderlichen Protokolleintrag wird auch das Guthaben nicht geändert.
+Guthabenbuchungen verändern keine Charakterattribute oder Ressourcen.
+
+Spieler sehen ausschließlich Guthaben ihrer eigenen zugänglichen Charaktere,
+auch im privaten Community-Profil, aber keine Buchungsschaltflächen.
+Kampagnenbuchungen stehen privat im Protokoll für Besitzer und aktuelle
+Spielleitung. Den Verlauf gemeinsamer Konten verwaltet die Universumsleitung
+im Universum. Alte Buchungen behalten damalige Bezeichnungen und Begründungen.
+
+![Maras privates Guthaben von zehn Dockmark ohne Buchungsformular](images/26-charakterguthaben.png)
+
+### Gegenstände binden
+
+Beim Erstellen oder Bearbeiten einer Gegenstandsvorlage unter
+**Gegenstandsbindung** wählen:
+
+- **Charaktergebunden:** Das konkrete Exemplar gehört zu diesem Charakter.
+- **Handelbar:** Das Exemplar ist für einen späteren Handel entsprechend
+  gekennzeichnet.
+
+Beim Ausgeben wird die Auswahl im Exemplar festgehalten. Ein späterer
+Vorlagenwechsel verändert vorhandene Exemplare nicht. **Es gibt noch keine
+Handels-, Kauf-, Verkaufs- oder Übertragungsaktion.** Eine manuelle Geldbuchung
+ist kein automatischer Kauf.
+
+Die Demo enthält jetzt **Dockmark (DM)**: Mara erhält 12 DM, davon werden
+2 DM mit Begründung für Vorräte abgezogen; ihr Stand beträgt **10 DM**.
+Jorin erhält getrennt **8 DM**. Mara besitzt zusätzlich einen gebundenen
+**Bordausweis der Morgenröte** und einen handelbar gekennzeichneten
+**Messingkompass vom Dock**, beide ohne neue Werteboni.
+
+Ohne verwendbares PS Community sind wirtschaftliche Änderungen inaktiv;
+gespeicherte Guthaben und Gegenstände werden nicht gelöscht.
 
 Weiterlesen: [Demorunde mit Ergebnissen und Prüfbericht](demokampagne.md) ·
 [Technischer Überblick](../README.md) · [Roadmap](../ROADMAP.md).

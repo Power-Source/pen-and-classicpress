@@ -85,6 +85,11 @@ einen endgültigen Funktionsumfang.
   Inventarexemplare und freigabefähige Ausrüstung mit additiven Boni.
   Ohne Community bleiben Bestände erhalten und Boni inaktiv.
   Handel und ein grafischer Slotdesigner sind noch nicht vorhanden.
+- Version 0.15.0 ergänzt den privaten Abenteuerplan mit Kapitelreihenfolge,
+  aktueller/nächster Szene und szenenbezogener Regie.
+- Version 0.16.0 ergänzt Währungsname und Kürzel, ganzzahlige Guthaben,
+  einstellbare getrennte oder gemeinsame Konten, zuständige
+  Spielleiterbuchungen und eingefrorene Gegenstandsbindungen.
 
 ### Universum vor Kampagne: Grundmodell seit Version 0.11.0
 
@@ -306,10 +311,30 @@ Das Handbuch beschreibt bereits die erste Spieltisch-Oberfläche.
 Die Module beschreiben fachliche Bereiche und müssen nicht als separate Plugins
 oder als komplizierte technische Architektur umgesetzt werden.
 
-## Aktuelle Priorität: Stabilisierung
+## Aktuelle Priorität: Spielwelt und Wirtschaft
 
-Vor Handel, Währung und automatisierten Abenteuern werden die vorhandenen
-Schreibwege und ihre Konsistenz abgesichert:
+Der spielbare Story-Builder-Ablauf bleibt Grundlage. Seit **0.16.0** stehen
+Währungseinstellungen, getrennte oder gemeinsame Guthaben, protokollierte
+Vergaben/Abzüge und eingefrorene Gegenstandsbindungen bereit. Als Nächstes
+folgen strukturierte Gegner-/NPC-Vorlagen und darauf aufbauend kontrollierte
+Beutetabellen. Handel und Automatisierung folgen erst danach.
+Eine zusätzliche Wiederherstellungs-Verwaltungsoberfläche bleibt zurückgestellt.
+
+Seit **0.15.0** verbindet ein privater Abenteuerplan die bestehenden Werkzeuge:
+
+- [x] Kapitel mit geordneter Szenenfolge, aktive Szene, nächste Szene im
+  jeweiligen Kapitel und nicht zugeordnete Szenen gemeinsam anzeigen.
+- [x] Private Entwürfe, freigegebene und aktive Stände unterscheiden;
+  Wechsel nur zur bereits freigegebenen Fassung ermöglichen.
+- [x] Geheimnisse und direkt szenenbezogene Mappeneinträge beim Leiten
+  bündeln; private Handouts dort ausdrücklich und getrennt freigeben.
+- [x] Den Ablauf in der bestehenden Nebelhafen-Demo fortsetzen und im
+  bebilderten Handbuch erläutern.
+
+### Abgesicherte Grundlagen und spätere Absicherung
+
+Die erledigten Konsistenzkorrekturen bleiben Grundlage. Die offenen Punkte
+werden nach Nutzen priorisiert; sie blockieren nicht jeden Story-Builder-Ausbau:
 
 - [x] Lokale Änderungen an vorhandenen Charakterbögen, Freigaben,
   Kampagnenauflagen und Inventaren verwenden dieselbe Datenbanksperre je
@@ -324,7 +349,8 @@ Schreibwege und ihre Konsistenz abgesichert:
   Verwaltungsformulare prüfen den Revisionsstand; bestehende Zuordnungen
   bleiben ohne nachträglich erfundene Historie erhalten.
 - [ ] Einen bedienbaren Wiederherstellungsablauf für unklar bestätigte Vorgänge
-  und unvollständige Altbestände schaffen. Weitere protokollpflichtige
+  und unvollständige Altbestände schaffen (eigene Verwaltungsoberfläche
+  vorerst zurückgestellt). Weitere protokollpflichtige
   Verwaltungsänderungen ausdrücklich festlegen.
 - [x] Die zentrale Dokument-/Ereignisspeicherung hält Änderungen und Ereignisse
   mit einer gemeinsamen InnoDB-Transaktion zusammen. Ungeeignete Speicherwege
@@ -426,6 +452,11 @@ Berechtigung nachvollziehen.
 
 ## Phase 4: Abenteuer und Szenen
 
+**Seit 0.15.0:** Ein privater Abenteuerplan verbindet Kapitelreihenfolge,
+Szenenstatus, ausdrückliche Szenenwechsel und szenenbezogene Spielleitungsnotizen
+mit der gezielten Handoutfreigabe. Kein automatischer Szenenwechsel,
+keine versteckte Veröffentlichung verknüpfter Inhalte.
+
 - Kampagnen in Kapitel und Szenen gliedern.
 - Beschreibungen und geeignete Medien einbinden.
 - Szenen vorbereiten und gezielt für Spieler freigeben.
@@ -481,7 +512,7 @@ Rundenteilnehmer.
 
 ### PS Community: Charakterprofil und optionale Ausrüstung
 
-**Grundlage seit 0.14.0 implementiert; Währung, Bindung und Handel sind geplant:**
+**Grundlage seit 0.14.0, Währung und Bindung seit 0.16.0 implementiert; Handel geplant:**
 
 - Ein eigener Profil-Tab „Pen & Paper“ bündelt die eigenen Charaktere mit
   ausdrücklicher Auswahl des Kampagnenkontexts. Charakterbearbeitung verwendet
@@ -489,7 +520,7 @@ Rundenteilnehmer.
 - Profilbesucher und Freunde erhalten nicht automatisch Zugriff auf Bögen,
   Inventare oder private Spielinhalte. Freundschaften ersetzen keine
   Kampagnenmitgliedschaft oder Handelsberechtigung.
-- Inventar, Ausrüstung und Handel setzen aktives PS Community mit den
+- Inventar, Ausrüstung, Guthaben und der geplante Handel setzen aktives PS Community mit den
   benötigten Schnittstellen und Modulen voraus. Verfügbarkeit auf jeder
   relevanten Lese- und Schreibschnittstelle prüfen, nicht nur Menüs ausblenden.
   Ohne die Integration bleiben Charaktere, Würfel, Szenen und Handouts nutzbar.
@@ -506,8 +537,9 @@ Bei inaktiver Community werden keine Ausrüstungsboni angewandt; gespeicherte
 Würfe behalten ihre damaligen Werte. Direkte und native Community-AJAX-Aufrufe
 fremder Profilbereiche geben keine Inventare aus.
 
-**Geplanter Ausbau:** Universumswährung, handelbare beziehungsweise
-charaktergebundene Exemplare und revisionssichere Handelsangebote. Beteiligte
+Universumswährung, getrennte oder gemeinsame Guthaben sowie handelbar
+beziehungsweise charaktergebunden gekennzeichnete Exemplare sind seit
+0.16.0 vorhanden. **Geplanter Ausbau:** revisionssichere Handelsangebote. Beteiligte
 stimmen ausdrücklich zu; eine zusätzliche Spielleiterfreigabe ist einstellbar
 und standardmäßig erforderlich. Handelsgrundregeln gehören zum Universum;
 Kampagnen ohne Universum benötigen eine eigene Einstellung. Vererbung,
@@ -593,22 +625,29 @@ ausdrücklich gemeldet und lassen sich durch Ablegen reparieren.
 - Über ein geeignetes Schutzkonzept für private Dateien entscheiden: Normale
   Upload-URLs können direkt erreichbar sein und sind nicht automatisch privat.
 
-### Geplant: Universumswährung, Gegenstandsbindung und Handel
+### Währung und Gegenstandsbindung seit 0.16.0; Handel geplant
 
-**Noch nicht implementiert.** Die seit 0.14.0 vorhandenen Inventare und
-Ausrüstungsboni sind dafür nur die Grundlage.
+**Währung, Guthaben und Bindung implementiert; Handel noch nicht.**
+Die Universumsleitung beziehungsweise Administration wählt in den Einstellungen
+getrennte Kampagnenkonten oder ein gemeinsames Konto am Universumscharakter.
+Kampagnen ohne Universum konfigurieren ihre Währung lokal.
 
-- Pro Universum eine frei benennbare Spielwährung mit Kürzel festlegen.
-  Keine feste Gold-/Silber-/Kupfer-Währung oder Echtgeldanbindung voraussetzen.
-  Stückelung, Genauigkeit und Betragsgrenzen vor der Umsetzung bestimmen.
-- Die berechtigte Spielleitung kann Beträge ausdrücklich vergeben und
-  Korrekturen nachvollziehbar protokollieren. Vergaberechte müssen zum
-  Geltungsbereich des Guthabens passen; eine Kampagnenleitung erhält nicht
-  automatisch Zugriff auf die gesamte Universumswirtschaft.
-- Gegenstandsvorlagen als **handelbar** oder **charaktergebunden** kennzeichnen.
-  Die Eigenschaft beim Ausgeben im konkreten Exemplar festhalten.
-  Vorlagenänderungen dürfen bestehende Bindungen nicht still verändern.
-  Den Umgang mit bereits vorhandenen Exemplaren ausdrücklich festlegen.
+- [x] Frei benennbare Währung mit Kürzel, ausschließlich ganze Einheiten.
+  Kontostände von 0 bis 999999999, keine Nachkommastellen oder Überziehung;
+  keine feste Gold-/Silber-/Kupfer-Währung und keine Echtgeldanbindung.
+- [x] Beträge mit Begründung ausdrücklich vergeben oder abziehen und
+  gemeinsam mit dem Ereignis speichern. Getrennte Konten verwaltet die
+  Kampagnenleitung, gemeinsame Konten nur die Universumsleitung beziehungsweise
+  Administration. Wiederholte veraltete Formulare buchen nicht erneut.
+- [x] Das Kontomodell bleibt nach der ersten Buchung fest. Konten werden bei
+  einer anderen Universumszuordnung nicht umgedeutet; ein solcher Wechsel
+  benötigt eine gesonderte, noch nicht implementierte Guthabenmigration.
+- [x] Vorlagen als **handelbar** oder **charaktergebunden** kennzeichnen und
+  die Eigenschaft im ausgegebenen Exemplar einfrieren. Vorlagenänderungen
+  verändern keine bereits ausgegebenen Bindungen.
+
+**Weiterhin geplant:**
+
 - Verschenken, Tauschen sowie Kaufen und Verkaufen mit vereinbartem Betrag
   ermöglichen. Beide Besitzer müssen den konkreten Bedingungen zustimmen;
   unbekannte Gegenleistungen dürfen nicht automatisch als angenommen gelten.
@@ -623,10 +662,10 @@ Ausrüstungsboni sind dafür nur die Grundlage.
   behandeln. Bei fehlendem PS Community keine wirtschaftlichen Änderungen
   oder unvollständigen Übertragungen ausführen; vorhandene Daten erhalten.
 
-**Noch offen:** getrennte Guthaben je Kampagnencharakter oder gemeinsames
-Guthaben je Universumscharakter; erlaubte Abweichungen von Universumsregeln;
-Handel nur innerhalb einer Kampagne oder auch zwischen Kampagnen desselben
-Universums. Gemeinsame Kataloge allein erlauben keine Übertragung.
+**Noch offen:** Handel nur innerhalb einer Kampagne oder auch zwischen
+Kampagnen desselben Universums sowie mögliche spätere lokale Abweichungen
+von Universumsregeln. Derzeit werden die Währungseinstellungen unverändert
+übernommen. Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
 
 ### Geplant: Strukturierte Gegner, NPCs und Universumsvorlagen
 
@@ -673,8 +712,8 @@ Universums. Gemeinsame Kataloge allein erlauben keine Übertragung.
 
 ### Geplante Umsetzungsreihenfolge
 
-1. Geltungsbereiche und Rechte der Universumswirtschaft klären;
-   Währung, Guthaben und Gegenstandsbindung ergänzen.
+1. **Seit 0.16.0 umgesetzt:** Einstellbare Geltungsbereiche, passende
+   Buchungsrechte, Währung, Guthaben und eingefrorene Gegenstandsbindung.
 2. Strukturierte Gegner-/NPC-Vorlagen und kontrollierte Beutetabellen
    auf Grundlage der vorhandenen Würfelmechanik aufbauen.
 3. Die optionale PS-Wiki-Anbindung mit geschützter Zuordnung und bewusst
@@ -783,8 +822,10 @@ Diese Ideen sind bewusst noch nicht Teil der ersten spielbaren Version:
    geschützten Text-/Bild-Handouts für die gesamte Runde benötigt?
 7. Wie gelten Universums-Handelsregeln in Kampagnen: verbindliche Vererbung,
    ausschließlich strengere lokale Regeln oder frei erlaubte Abweichungen?
-8. Bleiben Guthaben kampagnenbezogen oder werden sie je Universumscharakter
-   geteilt? Welche Leitungen dürfen dann Beträge vergeben und korrigieren?
+8. **Seit 0.16.0 entschieden:** Die Universumsleitung wählt getrennte
+   Kampagnenkonten oder gemeinsame Universumscharakterkonten. Erstere
+   verwaltet die Kampagnenleitung, letztere die Universumsleitung;
+   Administration bleibt berechtigt. Das Modell ist nach Erstbuchung fest.
 9. Welche Übertragungen von Gegenständen und Währung zwischen Kampagnen
    sind zulässig, insbesondere bei automatisierten Abenteuerdurchläufen?
 10. Wie werden Entscheidungen, Proben, Wiedereinstieg und Belohnungen in

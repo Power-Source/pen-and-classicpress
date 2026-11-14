@@ -37,5 +37,15 @@
 #pspp-story > form { margin-block: 20px; }
 #pspp-story > form > label { display: block; margin-block: 12px; }
 .pspp-map-token-row input[type="color"] { width: 100%; min-height: 44px; }
+.pspp-adventure-plan { margin-block: 20px 32px; }
+.pspp-adventure-chapter { margin-block: 20px; padding: 16px; border: 1px solid var(--pspp-border); border-radius: 12px; }
+.pspp-adventure-scenes { padding-inline-start: 24px; }
+.pspp-adventure-scene { padding: 12px; margin-block: 12px; overflow-wrap: anywhere; }
+.pspp-adventure-scene.is-active { border-inline-start: 4px solid var(--pspp-accent); background: var(--pspp-surface); }
+.pspp-adventure-status { margin-block: 8px; }
+.pspp-adventure-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.pspp-adventure-actions form { margin: 0; }
+.pspp-adventure-cues > details { margin-block: 14px; }
+.pspp-adventure-plan .pspp-fold summary { overflow-wrap: anywhere; }
 @keyframes pspp-map-ping { 50% { opacity: 0.3; } }
 @media (prefers-reduced-motion: reduce) { .pspp-map-ping { animation: none; } }

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PS Pen & Paper
  * Description: Ein universeller Baukasten für Pen-and-Paper-Kampagnen.
- * Version: 0.14.0
+ * Version: 0.16.0
  * Author: PSOURCE
  * Text Domain: ps-pen-paper
  * Domain Path: /languages
@@ -31,6 +31,8 @@ require_once __DIR__ . '/includes/folio.php';
 require_once __DIR__ . '/includes/folio-ui.php';
 require_once __DIR__ . '/includes/community.php';
 require_once __DIR__ . '/includes/equipment.php';
+require_once __DIR__ . '/includes/economy.php';
+require_once __DIR__ . '/includes/economy-ui.php';
 require_once __DIR__ . '/includes/appearance.php';
 require_once __DIR__ . '/includes/equipment-ui.php';
 require_once __DIR__ . '/includes/universes.php';

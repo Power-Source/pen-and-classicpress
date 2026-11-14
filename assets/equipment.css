@@ -10,3 +10,7 @@
 :is(.pspp-game, .pspp-admin) .pspp-equipped dd { margin: 0; }
 .pspp-profile { padding: 1rem; }
 .pspp-profile input[type="text"], .pspp-profile textarea, .pspp-profile select { max-width: 100%; }
+.pspp-wallet, .pspp-currency-settings { margin-block: 1.5rem; overflow-wrap: anywhere; min-width: 0; }
+.pspp-wallet-balance strong { font-size: 1.5em; }
+.pspp-wallet form > label, .pspp-currency-settings form > label { display: block; margin-block: .75rem; }
+.pspp-wallet input, .pspp-wallet textarea, .pspp-currency-settings input, .pspp-currency-settings select { max-width: 100%; box-sizing: border-box; }

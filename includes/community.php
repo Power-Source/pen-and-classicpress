@@ -113,6 +113,6 @@ function ps_pen_paper_community_assets() {
 		$url = plugin_dir_url( dirname( __DIR__ ) . '/ps-pen-paper.php' );
 		wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.1' );
 		wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.7.0', true );
-		wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.14.0' );
+		wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.0' );
 	}
 }

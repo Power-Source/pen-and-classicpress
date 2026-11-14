@@ -32,7 +32,7 @@ function ps_pen_paper_handle_scene_action( $operation ) {
 	if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
 	$url = $page_id ? ps_pen_paper_game_url( $page_id, $campaign_id ) : ps_pen_paper_admin_url( $campaign_id );
 	$args = array( 'pspp_notice' => 'scene_saved' );
-	if ( $id ) { $args['pspp_scene'] = $id; }
+	if ( $id && 'select_scene' !== $operation ) { $args['pspp_scene'] = $id; }
 	wp_safe_redirect( add_query_arg( $args, $url ) . '#pspp-story' );
 	exit;
 }
@@ -115,24 +115,120 @@ function ps_pen_paper_render_scene_token( $token, $index, $members ) {
 	<?php
 }
 
+function ps_pen_paper_render_scene_start( $campaign, $page_id, $id, $selection, $label ) {
+	ps_pen_paper_form_start( 'select_scene', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id );
+	?>
+	<input type="hidden" name="scene_id" value="<?php echo esc_attr( $id ); ?>">
+	<input type="hidden" name="scene_revision" value="<?php echo esc_attr( $selection['revision'] ); ?>">
+	<button type="submit"><?php echo esc_html( $label ); ?></button>
+	</form>
+	<?php
+}
+
+function ps_pen_paper_render_adventure_plan( $campaign, $page_id, $plan ) {
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ) { return; }
+	$url = $page_id ? ps_pen_paper_game_url( $page_id, $campaign->ID ) : ps_pen_paper_admin_url( $campaign->ID );
+	$reload_args = array();
+	wp_parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $reload_args );
+	$active = $plan['selection']['scene_id'];
+	$groups = array();
+	$assigned = array();
+	foreach ( $plan['records'] as $id => $record ) {
+		if ( 'chapter' !== $record['draft']['type'] ) { continue; }
+		$groups[] = array( 'id' => $id, 'title' => $record['draft']['title'], 'scenes' => $record['draft']['scene_ids'] );
+		foreach ( $record['draft']['scene_ids'] as $scene_id ) { $assigned[ $scene_id ] = true; }
+	}
+	$unassigned = array_keys( array_diff_key( $plan['scenes'], $assigned ) );
+	if ( $unassigned ) { $groups[] = array( 'id' => 0, 'title' => __( 'Szenen ohne Kapitel', 'ps-pen-paper' ), 'scenes' => $unassigned ); }
+	?>
+	<section class="pspp-adventure-plan" aria-label="<?php esc_attr_e( 'Privater Abenteuerplan', 'ps-pen-paper' ); ?>">
+		<h3><?php esc_html_e( 'Dein Abenteuer im Überblick', 'ps-pen-paper' ); ?></h3>
+		<p><?php esc_html_e( 'Kapitelreihenfolge und Freigaben auf einen Blick. „Am Tisch anzeigen“ wechselt nur zur bereits freigegebenen Fassung; private Entwürfe und Handouts werden nicht automatisch freigegeben.', 'ps-pen-paper' ); ?></p>
+		<?php if ( ! $groups ) : ?><p><?php esc_html_e( 'Lege unten deine erste Szene an. Kapitel und ihre Szenenfolge ordnest du in der Spielleitermappe.', 'ps-pen-paper' ); ?></p><?php endif; ?>
+		<?php foreach ( $groups as $group ) : ?>
+			<section class="pspp-adventure-chapter">
+				<h4><?php echo esc_html( $group['title'] ); ?></h4>
+				<?php if ( $group['id'] ) : ?><a href="<?php echo esc_url( add_query_arg( 'pspp_folio', $group['id'], $url ) . '#pspp-folio' ); ?>"><?php esc_html_e( 'Kapitel und Szenenfolge bearbeiten', 'ps-pen-paper' ); ?></a><?php endif; ?>
+				<?php if ( ! $group['scenes'] ) : ?><p><?php esc_html_e( 'Diesem Kapitel sind noch keine Szenen zugeordnet.', 'ps-pen-paper' ); ?></p><?php endif; ?>
+				<ol class="pspp-adventure-scenes">
+					<?php $next = false; foreach ( $group['scenes'] as $scene_id ) :
+						if ( ! isset( $plan['scenes'][ $scene_id ] ) ) { echo '<li role="alert">' . esc_html__( 'Eine zugeordnete Szene fehlt. Bitte prüfe die Szenenfolge.', 'ps-pen-paper' ) . '</li>'; $next = false; continue; }
+						$scene = $plan['scenes'][ $scene_id ];
+						$is_active = $active === $scene_id && null !== $scene['published'];
+						$public_draft = $scene['draft']; unset( $public_draft['secret'] );
+						?>
+						<li class="pspp-adventure-scene<?php if ( $is_active ) { echo ' is-active'; } ?>" data-adventure-scene="<?php echo esc_attr( $scene_id ); ?>"<?php if ( $is_active ) { echo ' aria-current="step"'; } ?>>
+							<strong><?php echo esc_html( $scene['draft']['title'] ); ?></strong>
+							<p class="pspp-adventure-status"><?php echo esc_html( $is_active ? __( 'Jetzt am Tisch', 'ps-pen-paper' ) : ( $scene['published'] ? __( 'Freigegeben, nicht aktiv', 'ps-pen-paper' ) : __( 'Privater Entwurf', 'ps-pen-paper' ) ) ); ?>
+								<?php if ( $next ) : ?> · <strong><?php esc_html_e( 'Nächste Szene im Kapitel', 'ps-pen-paper' ); ?></strong><?php endif; ?>
+								<?php if ( $scene['published'] && $public_draft !== $scene['published'] ) : ?><br><?php esc_html_e( 'Entwurf weicht vom Spielstand ab. Ein Wechsel zeigt weiterhin die freigegebene Fassung.', 'ps-pen-paper' ); ?><?php endif; ?>
+							</p>
+							<div class="pspp-adventure-actions">
+								<a class="button" href="<?php echo esc_url( add_query_arg( 'pspp_scene', $scene_id, $url ) . '#pspp-story' ); ?>"><?php esc_html_e( 'Vorbereiten / Vorschau / Freigabe', 'ps-pen-paper' ); ?></a>
+								<?php if ( $is_active ) : ?><a class="button" href="<?php echo esc_url( $url . '#pspp-play' ); ?>"><?php esc_html_e( 'Zum Spieltisch', 'ps-pen-paper' ); ?></a>
+								<?php elseif ( $scene['published'] ) : ps_pen_paper_render_scene_start( $campaign, $page_id, $scene_id, $plan['selection'], __( 'Am Tisch anzeigen', 'ps-pen-paper' ) ); endif; ?>
+							</div>
+						</li>
+						<?php $next = $is_active && 0 !== $group['id']; ?>
+					<?php endforeach; ?>
+				</ol>
+			</section>
+		<?php endforeach; ?>
+		<?php if ( isset( $plan['scenes'][ $active ] ) && $plan['scenes'][ $active ]['published'] ) : $current = $plan['scenes'][ $active ]; ?>
+			<details class="pspp-fold pspp-adventure-cues" open>
+				<summary><?php echo esc_html( __( 'Aktuelle Szene leiten:', 'ps-pen-paper' ) . ' ' . $current['published']['title'] ); ?></summary>
+				<p><strong><?php esc_html_e( 'Nur Spielleitung – gespeicherte Notizen', 'ps-pen-paper' ); ?></strong></p>
+				<?php if ( '' !== $current['draft']['secret'] ) : ?><p class="pspp-multiline"><?php echo esc_html( $current['draft']['secret'] ); ?></p><?php endif; ?>
+				<?php foreach ( $plan['records'] as $record_id => $record ) :
+					if ( $record['draft']['scene_id'] !== $active ) { continue; }
+					?>
+					<details class="pspp-fold">
+						<summary><?php echo esc_html( ps_pen_paper_folio_types()[ $record['draft']['type'] ] . ': ' . $record['draft']['title'] ); ?></summary>
+						<p class="pspp-multiline"><?php echo esc_html( $record['draft']['text'] ); ?></p>
+						<?php if ( '' !== $record['draft']['secret'] ) : ?><p class="pspp-multiline"><?php echo esc_html( $record['draft']['secret'] ); ?></p><?php endif; ?>
+						<a href="<?php echo esc_url( add_query_arg( 'pspp_folio', $record_id, $url ) . '#pspp-folio' ); ?>"><?php esc_html_e( 'Mappeneintrag öffnen', 'ps-pen-paper' ); ?></a>
+						<?php if ( 'handout' === $record['draft']['type'] ) : ?>
+							<p><?php echo esc_html( $record['published'] ? __( 'Dieses Handout ist bereits für die Runde verfügbar.', 'ps-pen-paper' ) : __( 'Dieses Handout ist noch privat.', 'ps-pen-paper' ) ); ?></p>
+							<?php if ( ! $record['published'] ) : ps_pen_paper_form_start( 'publish_folio', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
+								<input type="hidden" name="folio_id" value="<?php echo esc_attr( $record_id ); ?>"><input type="hidden" name="folio_revision" value="<?php echo esc_attr( $record['revision'] ); ?>"><input type="hidden" name="folio_return" value="story">
+								<label class="pspp-check"><input type="checkbox" name="folio_confirmation" value="confirmed" required><?php esc_html_e( 'Gespeicherten Titel, Text und das optionale Bild ausdrücklich für die Runde freigeben.', 'ps-pen-paper' ); ?></label>
+								<button type="submit"><?php esc_html_e( 'Handout auf den Tisch legen', 'ps-pen-paper' ); ?></button>
+							</form><?php endif; ?>
+						<?php endif; ?>
+					</details>
+				<?php endforeach; ?>
+			</details>
+		<?php endif; ?>
+		<p><?php esc_html_e( 'Dieser Plan zeigt den Stand beim Laden. Nach Änderungen durch eine andere Spielleitung bitte neu laden.', 'ps-pen-paper' ); ?></p>
+		<form method="get" action="<?php echo esc_url( $url . '#pspp-story' ); ?>">
+			<?php foreach ( $reload_args as $key => $value ) : ?><input type="hidden" name="<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $value ); ?>"><?php endforeach; ?>
+			<button type="submit"><?php esc_html_e( 'Abenteuerplan und Notizen neu laden', 'ps-pen-paper' ); ?></button>
+		</form>
+	</section>
+	<?php
+}
+
 function ps_pen_paper_render_story( $campaign, $page_id ) {
 	if ( ! ps_pen_paper_can_manage_campaign( $campaign ) ) { return; }
 	$id = ps_pen_paper_frontend_id( 'pspp_scene' );
 	$state = is_wp_error( $id ) ? $id : ( $id ? ps_pen_paper_get_scene( $campaign, $id ) : ps_pen_paper_scene_default() );
-	$selection = ps_pen_paper_map_selection( $campaign );
-	if ( is_wp_error( $state ) || is_wp_error( $selection ) ) { echo '<p role="alert">' . esc_html__( 'Die gewählte Szene ist nicht verfügbar.', 'ps-pen-paper' ) . '</p>'; return; }
+	$plan = ps_pen_paper_adventure_plan( $campaign );
+	if ( is_wp_error( $state ) || is_wp_error( $plan ) ) { echo '<p role="alert">' . esc_html__( 'Die gewählte Szene oder der Abenteuerplan ist nicht verfügbar.', 'ps-pen-paper' ) . '</p>'; return; }
+	$selection = $plan['selection'];
 	$base_url = $page_id ? ps_pen_paper_game_url( $page_id, $campaign->ID ) : ps_pen_paper_admin_url( $campaign->ID );
 	$draft = $state['draft'];
 	if ( ! $id ) { $draft['grid'] = 0; }
 	?>
-	<h2><?php esc_html_e( 'Szenen & Karten vorbereiten', 'ps-pen-paper' ); ?></h2>
+	<h2><?php esc_html_e( 'Abenteuer vorbereiten & leiten', 'ps-pen-paper' ); ?></h2>
+	<details class="pspp-fold"<?php if ( ! $id ) { echo ' open'; } ?>>
+		<summary><?php esc_html_e( 'Abenteuerplan und aktuelle Spielleitungsnotizen', 'ps-pen-paper' ); ?></summary>
+		<?php ps_pen_paper_render_adventure_plan( $campaign, $page_id, $plan ); ?>
+	</details>
 	<p><a href="<?php echo esc_url( $base_url . '#pspp-folio' ); ?>"><?php esc_html_e( 'Kapitel und Spielleitermappe öffnen', 'ps-pen-paper' ); ?></a></p>
 	<p><?php esc_html_e( 'Entwurf speichern → private Spielervorschau prüfen → freigeben → am Tisch anzeigen. Entwurfsänderungen verändern nie sofort die Spielersicht. Alle freigegebenen Marker sind für die Runde sichtbar; private Charakterwerte werden nicht übertragen.', 'ps-pen-paper' ); ?></p>
 	<nav class="pspp-navigation"><a href="<?php echo esc_url( $base_url . '#pspp-story' ); ?>"><?php esc_html_e( 'Neue Szene', 'ps-pen-paper' ); ?></a>
-	<?php foreach ( get_posts( array( 'post_type' => 'pspp_scene', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'ASC' ) ) as $post ) :
-		$item = ps_pen_paper_get_scene( $campaign, $post->ID );
-		if ( is_wp_error( $item ) ) { echo '<span role="alert">' . esc_html( $item->get_error_message() ) . '</span>'; continue; }
-		?><a href="<?php echo esc_url( add_query_arg( 'pspp_scene', $post->ID, $base_url ) . '#pspp-story' ); ?>"><?php echo esc_html( $item['draft']['title'] ); ?></a>
+	<?php foreach ( $plan['scenes'] as $scene_id => $item ) :
+		?><a href="<?php echo esc_url( add_query_arg( 'pspp_scene', $scene_id, $base_url ) . '#pspp-story' ); ?>"><?php echo esc_html( $item['draft']['title'] ); ?></a>
 	<?php endforeach; ?></nav>
 	<?php ps_pen_paper_form_start( 'select_scene', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 		<input type="hidden" name="scene_id" value="0"><input type="hidden" name="scene_revision" value="<?php echo esc_attr( $selection['revision'] ); ?>">
@@ -153,10 +249,7 @@ function ps_pen_paper_render_story( $campaign, $page_id ) {
 			</form>
 		<?php endforeach; ?>
 		<?php if ( $state['published'] ) : ?>
-			<?php ps_pen_paper_form_start( 'select_scene', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
-				<input type="hidden" name="scene_id" value="<?php echo esc_attr( $id ); ?>"><input type="hidden" name="scene_revision" value="<?php echo esc_attr( $selection['revision'] ); ?>">
-				<button type="submit"><?php esc_html_e( 'Freigegebene Szene am Tisch anzeigen', 'ps-pen-paper' ); ?></button>
-			</form>
+			<?php ps_pen_paper_render_scene_start( $campaign, $page_id, $id, $selection, __( 'Freigegebene Szene am Tisch anzeigen', 'ps-pen-paper' ) ); ?>
 		<?php endif; ?>
 	<?php endif; ?>
 	<h3><?php esc_html_e( 'Privater Szenenentwurf', 'ps-pen-paper' ); ?></h3>

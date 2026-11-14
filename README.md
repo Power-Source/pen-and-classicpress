@@ -43,6 +43,10 @@ vorhanden. Seit 0.13.0 ergänzen Kapitel, geschützte Text-/Bild-Handouts und ei
 private Spielleitermappe die Abenteuerverwaltung.
 Version 0.14.0 ergänzt private Charakterporträts und Bogenhintergründe sowie
 PS-Community-gebundene Profilansicht, Gegenstandskataloge und Ausrüstung.
+Version 0.15.0 verbindet die vorhandenen Story-Werkzeuge zu einem privaten
+Abenteuerplan mit Kapitelreihenfolge, Szenenstatus und szenenbezogener Regie.
+Version 0.16.0 ergänzt einstellbare Währungen mit ganzzahligen Guthaben,
+protokollierte Spielleiterbuchungen und eingefrorene Gegenstandsbindungen.
 
 ## Geschützter Spielbereich im Frontend
 
@@ -75,6 +79,48 @@ Seiten-Caches oder CDNs die Spielbereich-Seite einschließlich aller
 Abfrageparameter ausdrücklich vom Caching ausschließen.** Solche Systeme
 können bereits vor dem Start des Plugins antworten. `noindex` ersetzt keine
 Zugriffsprüfung.
+
+## Währung und Gegenstandsbindung seit Version 0.16.0
+
+Bei aktivem PS Community stellt die Universumsleitung unter **Universen →
+Regelwerk & Basischaraktere → Währung & Guthaben** Name, Kürzel und Kontomodell
+ein. Die Administration darf diese Einstellungen ebenfalls verwalten:
+
+- **Getrennt je Kampagnencharakter:** Auch bei gemeinsamen Basiswerten hat
+  jede Runde ein eigenes Guthaben. Es bucht die jeweilige Kampagnenleitung.
+- **Gemeinsam am Universumscharakter:** Aufgenommene gemeinsame Basisbögen
+  zeigen dasselbe Konto. Nur Universumsleitung und Administration dürfen
+  buchen; eine Kampagnenleitung erhält dadurch keine universumsweiten Rechte.
+  Lokale Bögen und unabhängige Kopien bekommen in diesem Modell kein
+  stillschweigendes Ersatzkonto.
+
+Kampagnen ohne Universum konfigurieren ihre eigene Währung unter
+**Rundeneinstellungen** und führen getrennte Konten. Zugeordnete Kampagnen
+übernehmen die Währungseinstellungen des Universums ohne lokale Abweichung.
+Nach der ersten Buchung ist das Kontomodell fest; Name und Kürzel bleiben
+änderbar. Eine andere Universumszuordnung bestehender Kampagnenkonten
+benötigt eine noch nicht implementierte Migration und wird ausdrücklich gesperrt.
+
+Im privaten Charakterbogen beziehungsweise Community-Profil steht das
+**Guthaben**. Die zuständige Spielleitung kann Beträge vergeben oder abziehen,
+mit Begründung und Bestätigung. Es gelten ausschließlich ganze Einheiten von
+0 bis 999999999 als Kontostand, keine Nachkommastellen oder Überziehung.
+Revisionsprüfungen verhindern wiederholte Buchungen veralteter Formulare;
+Guthaben, gegebenenfalls die erstmalige Festlegung des Kontomodells und
+Pflichtereignisse werden gemeinsam gespeichert oder zurückgenommen.
+
+Kampagnenbuchungen sind privat im jeweiligen Protokoll sichtbar, für Besitzer
+und aktuelle Kampagnenleitung. Gemeinsame Konten werden im Universum
+protokolliert; diesen Verlauf verwaltet die Universumsleitung. Historische
+Buchungen behalten die damaligen Währungsbezeichnungen und Begründungen.
+
+Gegenstandsvorlagen besitzen **Charaktergebunden** oder **Handelbar**. Jede
+neue Ausgabe friert diese Auswahl im konkreten Exemplar ein. Ändern der
+Vorlage verändert keine ausgegebenen Bindungen. Ältere interne
+Demo-Snapshots ohne Bindungsfeld werden gebunden gelesen, nicht umgeschrieben.
+Eine Handels-, Kauf- oder Übertragungsfunktion ist damit noch nicht vorhanden.
+Ohne verwendbares PS Community sind wirtschaftliche Änderungen gesperrt;
+gespeicherte Guthaben und Gegenstände bleiben erhalten.
 
 ## Charaktergestaltung und PS Community seit Version 0.14.0
 
@@ -140,6 +186,30 @@ grafischen Slotdesigner. Die erste Slotoberfläche verwendet zugängliche Auswah
 
 ## Digitaler Spieltisch
 
+### Abenteuerplan und Spielleitung seit Version 0.15.0
+
+Unter **Abenteuer & Szenen** sieht die Spielleitung Kapitel mit ihrer gespeicherten
+Szenenfolge, Szenen ohne Kapitel sowie den Stand **Privater Entwurf**,
+**Freigegeben, nicht aktiv** oder **Jetzt am Tisch**. Die auf die aktive Szene
+folgende Szene wird innerhalb jedes zugeordneten Kapitels hervorgehoben.
+Das ist eine Orientierung, kein automatischer Abenteuerablauf.
+
+**Vorbereiten / Vorschau / Freigabe** öffnet den bisherigen Szeneneditor;
+**Am Tisch anzeigen** wechselt nur zur bereits freigegebenen Fassung. Weichen
+Entwurf und Spielstand voneinander ab, weist der Plan darauf hin. Dazu können
+auch zwischenzeitlich bewegte Marker gehören. Eine Auswahl veröffentlicht
+keinen neueren Entwurf und gibt keine verbundenen Handouts frei.
+
+**Aktuelle Szene leiten** bündelt die gespeicherten Geheimnisse sowie direkt
+mit dieser Szene verknüpfte Personen, Orte, Notizen und Handouts. Ein noch
+privates Handout lässt sich dort nach ausdrücklicher Bestätigung auf den Tisch
+legen. Überarbeitungen und Rücknahmen bereits veröffentlichter Handouts bleiben
+in der Spielleitermappe. Spieler erhalten weder den Plan noch dessen private
+Titel, Reihenfolge oder Geheimnisse.
+
+Der Plan wird beim Laden aufgebaut. Nach Änderungen durch weitere
+Spielleitungen **Abenteuerplan und Notizen neu laden** verwenden.
+
 ### Spielleitermappe und Handouts seit Version 0.13.0
 
 **Spielleitermappe** im Frontend oder in der Backend-Kampagnenverwaltung sammelt
@@ -171,7 +241,7 @@ Die Karte ist eine optionale Hilfe, nicht das Zentrum des Spiels.
 
 ### Szenen und schlanker Kartentisch seit Version 0.12.0
 
-Die Spielleitung öffnet **Szenen & Karten** im Spielbereich oder in der
+Die Spielleitung öffnet **Abenteuer & Szenen** im Spielbereich oder in der
 Backend-Kampagnenverwaltung. Jede Szene besitzt Titel, freizugebenden Text,
 getrennte Geheimnisse und optional eine Karte. Der Ablauf ist bewusst getrennt:
 **Entwurf speichern → private Inhaltsvorschau prüfen → gespeicherten Entwurf
@@ -616,8 +686,18 @@ Ausführung wie bei den übrigen Integrationstests mit
 Kapitel, kampagnenbezogene Verknüpfungen, ausdrückliche Handoutfreigaben,
 geschützte Bildausgabe, unveränderte veröffentlichte Stände bei
 Entwurfsänderungen, Revisionskonflikte, Protokollschutz und Fehler-Rücknahme.
+Der Abenteuerplan wird auf aktive/nächste und nicht zugeordnete Szenen,
+getrennte Entwurfsstände, fehlende Wechselaktionen für private Szenen,
+bestätigte Handoutformulare und ausschließlich privaten Zugriff geprüft.
 Gäste, Nichtmitglieder und entfernte Mitglieder erhalten keine Handouts.
 Die Prüfung erstellt und entfernt ausschließlich eigene temporäre Daten.
+
+`tests/economy-integration.php` prüft ganzzahlige Betragsgrenzen, Vergabe und
+Abzug, fehlgeschlagene Erstbuchungen einschließlich Rücknahme der
+Kontomodellfestlegung, Wiederholungs-/Revisionskonflikte, getrennte und
+gemeinsame Konten, Universumsrechte, gemeinsame Basissperren, private
+Historie und entzogene Mitgliedschaften. Die Ausrüstungsprüfung ergänzt
+eingefrorene Bindungen und die Ablehnung ungültiger Bindungswerte.
 
 `tests/maps-integration.php` prüft Entwürfe, getrennte Geheimnisse, private
 Kartenbilder, ausdrückliche Freigabe und Szenenauswahl, aktuelle Markerrechte,

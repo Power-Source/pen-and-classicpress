@@ -108,6 +108,9 @@ function ps_pen_paper_preview_universe_link( $campaign_id, $universe_id ) {
 	if ( $before['universe_id'] !== $universe_id && ps_pen_paper_has_shared_characters( $campaign_id ) ) {
 		return new WP_Error( 'context_in_use', __( 'Diese Kampagne nutzt gemeinsame Basisbögen. Ein Universumswechsel oder Lösen ist zum Schutz dieser Verbindungen derzeit gesperrt.', 'ps-pen-paper' ) );
 	}
+	if ( $before['universe_id'] !== $universe_id && ps_pen_paper_campaign_has_wallets( $campaign_id ) ) {
+		return new WP_Error( 'wallets_in_use', __( 'Diese Kampagne hat bereits Guthabenkonten. Eine andere Universumszuordnung benötigt eine ausdrückliche Guthabenmigration und ist derzeit gesperrt.', 'ps-pen-paper' ) );
+	}
 	$documents = array( 0 => array( 'revision' => 0, 'name' => '' ) );
 	foreach ( array_unique( array( $before['universe_id'], $universe_id ) ) as $id ) {
 		if ( $id && ! ps_pen_paper_can_manage_universe( ps_pen_paper_get_universe( $id ) ) ) {
@@ -139,8 +142,15 @@ function ps_pen_paper_save_universe_link( $campaign_id, $universe_id, $revision,
 		return new WP_Error( 'context_in_use', __( 'Diese Kampagne nutzt gemeinsame Basisbögen. Ein Universumswechsel oder Lösen ist zum Schutz dieser Verbindungen derzeit gesperrt.', 'ps-pen-paper' ) );
 	}
 	$after = array( 'revision' => $preview['before']['revision'] + 1, 'universe_id' => $universe_id, 'name' => $preview['universe']['name'] );
-	$result = ps_pen_paper_save_document_event( $campaign_id, $campaign_id, '_pspp_universe_link', $preview['before'], $after, array(
-		'kind' => 'universe_linked', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0,
-	) );
+	$result = ps_pen_paper_atomic_event( $campaign_id, function () use ( $campaign_id, $universe_id, $preview, $after ) {
+		$current = ps_pen_paper_preview_universe_link( $campaign_id, $universe_id );
+		if ( is_wp_error( $current ) ) { return $current; }
+		if ( $current['before'] !== $preview['before'] || $current['universe'] !== $preview['universe'] ) {
+			return new WP_Error( 'conflict', __( 'Die Zuordnung wurde geändert. Bitte prüfe eine neue Vorschau.', 'ps-pen-paper' ) );
+		}
+		return ps_pen_paper_write_document_event( $campaign_id, $campaign_id, '_pspp_universe_link', $preview['before'], $after, array(
+			'kind' => 'universe_linked', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0,
+		), false );
+	} );
 	return is_wp_error( $result ) ? $result : $after;
 }

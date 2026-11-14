@@ -1,7 +1,7 @@
 # Demokampagne: Die letzte Fracht von Nebelhafen
 
 Ursprüngliches Probespiel: Version 0.7.0 · 14. November 2026.
-Fortgeschriebener Prüfbericht bis Version 0.14.0.
+Fortgeschriebener Prüfbericht bis Version 0.16.0.
 
 **Spoilerhinweis:** Dieses Dokument zeigt die vollständige Demorunde
 einschließlich privatem und verdecktem Ergebnis. Es enthält keine echten
@@ -445,12 +445,110 @@ Bestände bei inaktiver Community, gemeinsame Basisbögen und deren
 reparierbare Ausrüstungsfehler sowie Protokollrücknahme und Bildbereinigung ab.
 Handel und ein grafischer Slotdesigner sind noch nicht umgesetzt.
 
+### Live-Fortsetzung: Abenteuerplan und Regie mit Version 0.15.0
+
+Die bestehende Demo wurde mit den Konten der Spielleitung, Mara und Jorin
+über die tatsächlichen Frontend-Formulare fortgesetzt:
+
+- **Die Laterne an Dock 3** ist jetzt ausdrücklich ausgewählt und am Tisch
+  aktiv. Der Szenenwechsel war auf beiden geöffneten Spieleransichten sichtbar.
+- Die Kapitelreihenfolge lautet nun **Auf dem Servicesteg → Die Laterne an
+  Dock 3 → An Bord der Morgenröte**. Der neue dritte Abschnitt ist als
+  reiner Erzählentwurf gespeichert, aber weder freigegeben noch aktiv.
+- Die neue **Bordkarte für Kiste 17** ist mit Dock 3 verknüpft. Sie wurde
+  zunächst nur privat gespeichert und anschließend direkt in der
+  szenenbezogenen Regie nach gesonderter Bestätigung freigegeben. Der
+  Szenenwechsel allein gab das Handout nicht frei.
+- Beide Spieler sehen die Bordkarte und den bisherigen Brief. Weder der
+  private Folgeszenentitel noch die geheimen Ergänzungen oder der
+  Abenteuerplan stehen in ihrem HTML.
+- Die private Notiz **Fortsetzung – Das Frachtzeichen an Dock 3** hält den
+  Anschluss an die bereits gespeicherte Probe 13 fest. Tessa erklärt den
+  Gangway-Zugang; ob die Gruppe an Bord geht und die Wetterkapsel verstaut,
+  bleibt offen. Kein neuer Würfelwurf, keine automatische Abreise und kein
+  Ressourcenverbrauch wurden ausgelöst.
+
+Der Abenteuerplan zeigt die aktuelle Szene, den privaten Folgeentwurf und
+die zu Dock 3 gehörenden Orts-, Notiz- und Handoutkarten gemeinsam. Die
+Schaltfläche **Abenteuerplan und Notizen neu laden** wurde als echter
+Seitenabruf mit erhaltener Kampagnenauswahl geprüft. Der Plan hatte bei
+320, 390, 768, 1024 und 1440 Pixeln keinen internen horizontalen Überlauf.
+Die Abbildungen 23 und 24 im Handbuch zeigen diese gespeicherten Zustände.
+
+Ein Browserlauf wurde wegen einer hängenden Navigation beendet. Die
+gespeicherten Aktionen blieben erhalten; die Nachprüfung isolierte die
+Oberfläche von periodischen Hintergrundabrufen. Eine beim Wiederanlauf
+doppelt erzeugte eigene Zusammenfassungsnotiz wurde gezielt samt ihrem
+Erstellereignis entfernt. Es wurden nur die eigens angelegten
+Testsitzungen widerrufen, keine bestehenden Anmeldungen.
+
+Die drei betroffenen Integrationstestsuiten für Spielleitermappe, Szenen/Karten
+und Spieltisch bestanden. Ergänzte Tests prüfen Kapitelreihenfolge,
+nicht zugeordnete Szenen, Kampagnentrennung, aktive und nächste Szene,
+fehlende Wechselaktionen für private Entwürfe, getrennte Entwurfsstände
+und ausdrücklich bestätigte Handoutfreigaben. PHP-Syntax und
+Übersetzungsvorlage wurden ebenfalls geprüft; die Vorlage meldet weiterhin
+acht bereits bestehende Hinweise auf fehlende Übersetzerkommentare.
+
+Die Regelrevision bleibt **2**, Maras Charakterrevision **6**, Jorins **2**
+und Maras Ausrüstungsrevision **4**. Die Würfe **601, 602, 603 und 3022**
+behalten die Ergebnisse **5, 9, 5 und 13**. Regeln, vollständige
+Charaktermetadaten und historische Wurfstände wurden zusätzlich vor und nach
+der abschließenden Browserprüfung verglichen und blieben unverändert.
+
+### Live-Fortsetzung: Währung und Bindungen mit Version 0.16.0
+
+Die bestehende Nebelhafen-Runde bleibt ohne Universumszuordnung und führt
+jetzt die lokale Währung **Dockmark (DM)**. Die Spielleitung hat die
+Einstellungen und Buchungen über echte Frontend-Formulare gespeichert:
+
+| Charakter | Buchungen | Guthaben |
+|---|---|---|
+| Mara | 12 DM Reisekasse, anschließend 2 DM manueller Abzug für Vorräte | **10 DM** |
+| Jorin | 8 DM getrennte Reisekasse | **8 DM** |
+
+Der Abzug ist ausdrücklich kein automatischer Kauf. Wiederholte Formulare
+und ein manipulierter Dezimalbetrag wurden serverseitig abgewiesen.
+Spieler sehen ihren eigenen Stand ohne Buchungsformular. Maras Guthaben
+erscheint auch in ihrem privaten Community-Profil, nicht beim Zugriff
+durch den anderen Spieler.
+
+Mara erhielt außerdem zwei konkrete, zunächst nicht ausgerüstete Exemplare:
+
+- **Bordausweis der Morgenröte:** charaktergebunden, ohne Wertebonus.
+- **Messingkompass vom Dock:** handelbar gekennzeichnet, ohne Wertebonus.
+
+Die Ausgabe hebt ihre Ausrüstungsrevision von **4 auf 6**. Vorhandene
+Exemplare und belegte Slots bleiben unverändert. Regelrevision **2**,
+Maras Charakterrevision **6**, Jorins **2** und die historischen Würfe
+**601, 602, 603 und 3022** bleiben unverändert; die Ergebnisse sind
+weiterhin **5, 9, 5 und 13**. Der frühere Wurf behält seinen eingefrorenen
+Ausrüstungsstand. Vollständige Charakter-, Regel- und Wurfmetadaten wurden
+vor und nach dem abschließenden Browserlauf verglichen.
+
+Eine eigene temporäre Universums-Prüfwelt bestätigte beide Kontomodelle
+und ihre Änderbarkeit vor der ersten Buchung. Die Währungseinstellungen
+hatten bei **320, 390, 768, 1024 und 1440 Pixeln** keinen internen
+horizontalen Überlauf. Es gab keine JavaScript-Seitenfehler. Periodische
+Hintergrundabrufe waren im fokussierten Browserlauf isoliert; normale
+Seitenaufrufe und Formularübertragungen blieben echt. Die temporäre
+Prüfwelt und ausschließlich die eigens angelegten Anmeldesitzungen
+wurden anschließend entfernt. Abbildungen 25 und 26 zeigen den
+gespeicherten Demo-Zustand.
+
+Die fünf Integrationssuiten für Wirtschaft, Ausrüstung, Universen,
+Ereignisse und Charakterkontexte bestanden. Sie prüfen insbesondere
+Ganzzahlgrenzen, Buchungsrechte, gemeinsame Konten, fehlgeschlagene
+Erstbuchungen mit vollständiger Rücknahme, Revisionskonflikte, private
+Historie und eingefrorene Gegenstandsbindungen.
+
 ## Was vor einem vollständig integrierten Abenteuer noch fehlt
 
 1. **Story Builder weiter ausbauen:** Redaktioneller Komfort, weitere
    Handoutdateiformate und differenzierte Empfänger. Kapitel, eine private
    Spielleitermappe und geschützte Text-/Bild-Handouts sind seit 0.13.0
-   vorhanden; der grundlegende Szenenablauf besteht seit 0.12.0.
+   vorhanden; der grundlegende Szenenablauf besteht seit 0.12.0. Der private
+   Abenteuerplan und die szenenbezogene Regie ergänzen ihn seit 0.15.0.
 2. **Selbstständige Spielleiter auf dieser Website:** Die Backend-Weiterleitung
    klären; nicht durch pauschale Administratorrechte umgehen.
 3. **Optionale Kommunikation:** PS Chat ist inzwischen geschützt eingebunden.
@@ -462,7 +560,8 @@ Handel und ein grafischer Slotdesigner sind noch nicht umgesetzt.
 
 **Fazit:** Eine begleitete Runde mit Charakterbögen, Würfeln, Kapiteln,
 Erzählszenen, Handouts und privater Spielleitermappe ist möglich. Mit
-PS Community ergänzen Charakterprofil, Inventar und Ausrüstung den Ablauf.
+PS Community ergänzen Charakterprofil, Inventar, Ausrüstung und
+protokollierte Guthabenbuchungen den Ablauf.
 Der Kartentisch bleibt eine optionale Hilfe; Handel und weitere
 Spielmaterialien bleiben Ausbauziele.
 

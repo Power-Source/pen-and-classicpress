@@ -31,6 +31,8 @@ function ps_pen_paper_event_labels() {
 		'equipment_schema'    => __( 'Slots und Seltenheiten geändert', 'ps-pen-paper' ),
 		'item_saved'          => __( 'Gegenstandsvorlage gespeichert', 'ps-pen-paper' ),
 		'gear_saved'          => __( 'Inventar oder Ausrüstung geändert', 'ps-pen-paper' ),
+		'currency_saved'      => __( 'Währungseinstellungen gespeichert', 'ps-pen-paper' ),
+		'wallet_saved'        => __( 'Guthaben gebucht', 'ps-pen-paper' ),
 	);
 }
 
@@ -213,6 +215,11 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 		return $error;
 	}
 	$event['id'] = $post->ID;
+	if ( ( 'currency_saved' === $event['kind'] && ( 'gm' !== $event['visibility'] || ! ps_pen_paper_valid_currency( $event['before'] ) || ! ps_pen_paper_valid_currency( $event['after'] ) ) ) ||
+		( 'wallet_saved' === $event['kind'] && ( 'owner' !== $event['visibility'] || ! ps_pen_paper_valid_wallet( $event['before'] ) || ! ps_pen_paper_valid_wallet( $event['after'] ) ||
+			! isset( $event['reason'], $event['character_name'] ) || ! is_string( $event['reason'] ) || '' === trim( $event['reason'] ) || strlen( $event['reason'] ) > 1000 || ! is_string( $event['character_name'] ) ) ) ) {
+		return new WP_Error( 'invalid_event', __( 'Die Währungs- oder Guthabenstände im Protokoll sind beschädigt.', 'ps-pen-paper' ) );
+	}
 	if ( 'membership_saved' === $event['kind'] && ( 'gm' !== $event['visibility'] || ! isset( $event['member_id'], $event['member_name'], $event['member_before'], $event['member_after'] )
 		|| ! is_int( $event['member_id'] ) || $event['member_id'] < 1 || ! is_string( $event['member_name'] )
 		|| ! ps_pen_paper_valid_membership_snapshot( $event['member_before'] ) || ! ps_pen_paper_valid_membership_snapshot( $event['member_after'] ) ) ) {

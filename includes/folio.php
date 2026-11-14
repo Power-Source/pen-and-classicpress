@@ -77,6 +77,20 @@ function ps_pen_paper_folio_records( $campaign ) {
 	return $records;
 }
 
+function ps_pen_paper_adventure_plan( $campaign ) {
+	$records = ps_pen_paper_folio_records( $campaign );
+	if ( is_wp_error( $records ) ) { return $records; }
+	$selection = ps_pen_paper_map_selection( $campaign );
+	if ( is_wp_error( $selection ) ) { return $selection; }
+	$scenes = array();
+	foreach ( get_posts( array( 'post_type' => 'pspp_scene', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'ASC' ) ) as $post ) {
+		$scene = ps_pen_paper_get_scene( $campaign, $post->ID );
+		if ( is_wp_error( $scene ) ) { return $scene; }
+		$scenes[ $post->ID ] = $scene;
+	}
+	return array( 'records' => $records, 'scenes' => $scenes, 'selection' => $selection );
+}
+
 function ps_pen_paper_save_folio( $campaign, $id, $input, $revision, $image_path = null ) {
 	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
 		return new WP_Error( 'forbidden', __( 'Nur die Spielleitung darf die Mappe bearbeiten.', 'ps-pen-paper' ) );

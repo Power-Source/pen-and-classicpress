@@ -72,6 +72,14 @@ function ps_pen_paper_save_equipment_schema( $scope, $input, $revision ) {
 	) );
 }
 
+function ps_pen_paper_item_bindings() {
+	return array( 'bound' => __( 'Charaktergebunden', 'ps-pen-paper' ), 'tradeable' => __( 'Handelbar', 'ps-pen-paper' ) );
+}
+
+function ps_pen_paper_item_binding( $item ) {
+	return isset( $item['binding'] ) ? $item['binding'] : 'bound';
+}
+
 function ps_pen_paper_validate_item( $item ) {
 	if ( ! is_array( $item ) || ! isset( $item['name'], $item['description'], $item['kind'], $item['rarity'], $item['rarity_label'], $item['color'], $item['asset_id'], $item['properties'], $item['bonuses'] ) ||
 		! is_string( $item['name'] ) || '' === trim( $item['name'] ) || strlen( $item['name'] ) > 200 ||
@@ -83,6 +91,7 @@ function ps_pen_paper_validate_item( $item ) {
 		! is_int( $item['asset_id'] ) || $item['asset_id'] < 0 ||
 		! is_array( $item['properties'] ) || count( $item['properties'] ) > 30 ||
 		! is_array( $item['bonuses'] ) || count( $item['bonuses'] ) > 30 ) { return false; }
+	if ( array_key_exists( 'binding', $item ) && ( ! is_string( $item['binding'] ) || ! isset( ps_pen_paper_item_bindings()[ $item['binding'] ] ) ) ) { return false; }
 	foreach ( $item['properties'] as $label => $value ) {
 		if ( ! is_string( $label ) || '' === trim( $label ) || strlen( $label ) > 200 || ! is_string( $value ) || strlen( $value ) > 1000 ) { return false; }
 	}
@@ -133,13 +142,13 @@ function ps_pen_paper_save_item( $scope, $id, $input, $revision, $image_path = n
 	$schema = ps_pen_paper_equipment_schema( $scope );
 	if ( is_wp_error( $before ) || is_wp_error( $schema ) ) { return is_wp_error( $before ) ? $before : $schema; }
 	if ( ! is_string( $revision ) || (string) $before['revision'] !== $revision || ! is_array( $input ) ) { return ps_pen_paper_equipment_error(); }
-	foreach ( array( 'name', 'description', 'kind', 'rarity', 'properties' ) as $key ) { if ( ! isset( $input[ $key ] ) || ! is_string( $input[ $key ] ) ) { return ps_pen_paper_equipment_error(); } }
+	foreach ( array( 'name', 'description', 'kind', 'rarity', 'properties', 'binding' ) as $key ) { if ( ! isset( $input[ $key ] ) || ! is_string( $input[ $key ] ) ) { return ps_pen_paper_equipment_error(); } }
 	if ( ! isset( $schema['rarities'][ $input['rarity'] ] ) || strlen( $input['properties'] ) > 20000 ||
 		( isset( $input['bonuses'] ) && ! is_array( $input['bonuses'] ) ) ) { return ps_pen_paper_equipment_error(); }
 	$rarity = $schema['rarities'][ $input['rarity'] ];
 	$item = array(
 		'name' => sanitize_text_field( $input['name'] ), 'description' => sanitize_textarea_field( $input['description'] ),
-		'kind' => $input['kind'], 'rarity' => $input['rarity'], 'rarity_label' => $rarity['label'], 'color' => $rarity['color'],
+		'kind' => $input['kind'], 'rarity' => $input['rarity'], 'rarity_label' => $rarity['label'], 'color' => $rarity['color'], 'binding' => $input['binding'],
 		'asset_id' => $before['item'] ? $before['item']['asset_id'] : 0, 'properties' => array(), 'bonuses' => array(),
 	);
 	foreach ( preg_split( '/\r\n|\r|\n/', trim( $input['properties'] ) ) as $line ) {
@@ -265,6 +274,7 @@ function ps_pen_paper_save_gear_locked( $campaign, $character_id, $operation, $i
 		if ( ! isset( $catalogue[ $id ] ) || (string) $catalogue[ $id ]['revision'] !== $input['item_revision'] ) { return ps_pen_paper_equipment_error(); }
 		$source = $catalogue[ $id ];
 		$instance = array( 'source_id' => $id, 'scope_id' => $source['scope_id'], 'revision' => $source['revision'], 'item' => $source['item'] );
+		$instance['item']['binding'] = ps_pen_paper_item_binding( $source['item'] );
 		$uuid = wp_generate_uuid4();
 		$after['active']['items'][ $uuid ] = $instance;
 		if ( $after['pending'] ) { $after['pending']['items'][ $uuid ] = $instance; }

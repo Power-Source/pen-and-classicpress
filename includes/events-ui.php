@@ -33,6 +33,7 @@ function ps_pen_paper_render_rule_snapshot( $rules ) {
 
 function ps_pen_paper_render_event_details( $event ) {
 	?>
+	<?php if ( 'wallet_saved' === $event['kind'] ) : ?><p class="pspp-multiline"><?php echo esc_html( $event['reason'] ); ?></p><?php endif; ?>
 	<?php if ( ! in_array( $event['kind'], array( 'universe_saved', 'universe_linked', 'membership_saved' ), true ) ) : ?>
 		<p><?php echo esc_html( sprintf( __( 'Objekt #%1$d · Regelrevision %2$d', 'ps-pen-paper' ), $event['object_id'], $event['rules_revision'] ) ); ?></p>
 	<?php endif; ?>
@@ -40,7 +41,9 @@ function ps_pen_paper_render_event_details( $event ) {
 		<?php foreach ( array( 'before' => __( 'Vorher', 'ps-pen-paper' ), 'after' => __( 'Nachher', 'ps-pen-paper' ) ) as $key => $label ) : ?>
 			<section class="pspp-snapshot">
 				<h4><?php echo esc_html( $label . ' · ' . sprintf( __( 'Revision %d', 'ps-pen-paper' ), $event[ $key ]['revision'] ) ); ?></h4>
-				<?php if ( 'membership_saved' === $event['kind'] ) : ?>
+				<?php if ( in_array( $event['kind'], array( 'currency_saved', 'wallet_saved' ), true ) ) : ?>
+					<?php ps_pen_paper_render_economy_history( $event['kind'], $event[ $key ] ); ?>
+				<?php elseif ( 'membership_saved' === $event['kind'] ) : ?>
 					<?php
 					$member = $event[ 'member_' . $key ];
 					$roles = array( '' => __( 'Kein Kampagnenmitglied', 'ps-pen-paper' ), 'gm' => __( 'Spielleiter', 'ps-pen-paper' ), 'player' => __( 'Spieler', 'ps-pen-paper' ) );
@@ -149,7 +152,11 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 					<?php else : ?>
 						<p><strong><?php echo esc_html( $labels[ $event['kind'] ] ); ?></strong></p>
 						<?php
-						if ( in_array( $event['kind'], array( 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved' ), true ) ) {
+						if ( 'wallet_saved' === $event['kind'] ) {
+							$snapshot = array( 'name' => $event['character_name'] );
+						} elseif ( 'currency_saved' === $event['kind'] ) {
+							$snapshot = array( 'name' => $event['after']['name'] );
+						} elseif ( in_array( $event['kind'], array( 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved' ), true ) ) {
 							$snapshot = array( 'name' => $labels[ $event['kind'] ] );
 						} elseif ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) {
 							$snapshot = array( 'name' => $event['after']['draft']['title'] );

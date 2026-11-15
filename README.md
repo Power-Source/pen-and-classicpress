@@ -326,7 +326,12 @@ Gruppen nicht. Import/Export erhält Teilnehmer, Stimmen, Freigaben und historis
 Nachweise, ohne Kosten oder Belohnungen erneut auszuführen; zusammengelegte
 Benutzer dürfen keine Doppelstimmen erzeugen.
 
-Gegenstandsbedingungen und eigenständige Abenteuerpakete bleiben offen.
+Spielleitung/Admin stellt Universen, Kampagnen und Abenteuer auf der Website
+bereit. Spieler öffnen ihre Kampagne und spielen die freigegebenen Abenteuer
+mit ihrem Charakter nach den dort festgelegten Regeln. Es gibt keine separate
+Paketbibliothek und keinen Abenteuerdatei-Import oder -Download.
+
+Gegenstandsbedingungen bleiben ein weiterer Ausbauschritt.
 
 ## Öffentliches Weltlexikon seit Version 0.19.0
 

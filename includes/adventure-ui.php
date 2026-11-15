@@ -29,6 +29,10 @@ function ps_pen_paper_handle_adventure_action( $operation ) {
 		if ( ! ps_pen_paper_can_manage_campaign( $campaign ) || 'complete' !== ps_pen_paper_posted_text( 'adventure_complete' ) ) { ps_pen_paper_fail( ps_pen_paper_adventure_error()->get_error_message() ); }
 		if ( 'save_adventure' === $operation ) {
 			$result = ps_pen_paper_save_adventure( $campaign, $id, ps_pen_paper_posted_text( 'adventure_title' ), ps_pen_paper_posted_text( 'adventure_start_scene' ), $revision );
+		} elseif ( 'save_adventure_world' === $operation ) {
+			$input = isset( $_POST['adventure_world'] ) ? wp_unslash( $_POST['adventure_world'] ) : null;
+			if ( is_array( $input ) && isset( $input['encounter'] ) && is_array( $input['encounter'] ) && ! isset( $input['encounter']['npcs'] ) ) { $input['encounter']['npcs'] = array(); }
+			$result = ps_pen_paper_save_adventure_world( $campaign, $id, $input, $revision );
 		} elseif ( 'save_adventure_edge' === $operation ) {
 			$input = isset( $_POST['adventure_edge'] ) ? wp_unslash( $_POST['adventure_edge'] ) : null;
 			$result = ps_pen_paper_save_adventure_edge( $campaign, $id, $input, $revision );
@@ -70,7 +74,7 @@ function ps_pen_paper_adventure_condition_operators() {
 
 function ps_pen_paper_adventure_condition_parts() {
 	return array( 'value' => __( 'Wert', 'ps-pen-paper' ), 'current' => __( 'aktueller Wert', 'ps-pen-paper' ), 'maximum' => __( 'Maximum', 'ps-pen-paper' ),
-		'text' => __( 'Text', 'ps-pen-paper' ), 'history' => __( 'vorher ausgeführte Entscheidung (0/1)', 'ps-pen-paper' ) );
+		'text' => __( 'Text', 'ps-pen-paper' ), 'history' => __( 'vorher ausgeführte Entscheidung (0/1)', 'ps-pen-paper' ), 'state' => __( 'Abenteuerzustand', 'ps-pen-paper' ) );
 }
 
 function ps_pen_paper_adventure_conditions_label( $conditions ) {
@@ -86,7 +90,7 @@ function ps_pen_paper_adventure_conditions_label( $conditions ) {
 		' ' . implode( '; ', $parts );
 }
 
-function ps_pen_paper_render_adventure_condition_row( $rules, $index, $edges = array() ) {
+function ps_pen_paper_render_adventure_condition_row( $rules, $index, $edges = array(), $states = array() ) {
 	?>
 	<div data-condition-row>
 		<label><?php esc_html_e( 'Feld und Wert', 'ps-pen-paper' ); ?><select name="adventure_edge[conditions][rows][<?php echo esc_attr( $index ); ?>][target]">
@@ -98,6 +102,7 @@ function ps_pen_paper_render_adventure_condition_row( $rules, $index, $edges = a
 				<?php endforeach; ?>
 			<?php endforeach; ?>
 				<?php foreach ( $edges as $edge ) : ?><option value="<?php echo esc_attr( $edge['id'] . ':history' ); ?>"><?php echo esc_html( __( 'Vorherige Entscheidung:', 'ps-pen-paper' ) . ' ' . $edge['choice'] ); ?></option><?php endforeach; ?>
+				<?php foreach ( $states as $state ) : ?><option value="<?php echo esc_attr( $state['id'] . ':state' ); ?>"><?php echo esc_html( __( 'Abenteuerzustand:', 'ps-pen-paper' ) . ' ' . $state['label'] ); ?></option><?php endforeach; ?>
 		</select></label>
 		<label><?php esc_html_e( 'Vergleich', 'ps-pen-paper' ); ?><select name="adventure_edge[conditions][rows][<?php echo esc_attr( $index ); ?>][operator]">
 			<?php foreach ( ps_pen_paper_adventure_condition_operators() as $operator => $label ) : ?><option value="<?php echo esc_attr( $operator ); ?>"><?php echo esc_html( $label ); ?></option><?php endforeach; ?>
@@ -108,15 +113,15 @@ function ps_pen_paper_render_adventure_condition_row( $rules, $index, $edges = a
 	<?php
 }
 
-function ps_pen_paper_render_adventure_condition_fields( $rules, $edges = array() ) {
+function ps_pen_paper_render_adventure_condition_fields( $rules, $edges = array(), $states = array() ) {
 	?>
 	<fieldset data-condition-editor data-next-index="2"><legend><?php esc_html_e( 'Optionale Wertebedingungen', 'ps-pen-paper' ); ?></legend>
 		<label><?php esc_html_e( 'Bedingungen verknüpfen', 'ps-pen-paper' ); ?><select name="adventure_edge[conditions][mode]">
 			<option value="all"><?php esc_html_e( 'Alle müssen erfüllt sein (UND)', 'ps-pen-paper' ); ?></option>
 			<option value="any"><?php esc_html_e( 'Mindestens eine muss erfüllt sein (ODER)', 'ps-pen-paper' ); ?></option>
 		</select></label>
-		<div data-condition-rows><?php ps_pen_paper_render_adventure_condition_row( $rules, 0, $edges ); ps_pen_paper_render_adventure_condition_row( $rules, 1, $edges ); ?></div>
-		<template data-condition-template><?php ps_pen_paper_render_adventure_condition_row( $rules, '__INDEX__', $edges ); ?></template>
+		<div data-condition-rows><?php ps_pen_paper_render_adventure_condition_row( $rules, 0, $edges, $states ); ps_pen_paper_render_adventure_condition_row( $rules, 1, $edges, $states ); ?></div>
+		<template data-condition-template><?php ps_pen_paper_render_adventure_condition_row( $rules, '__INDEX__', $edges, $states ); ?></template>
 		<button type="button" data-add-condition hidden><?php esc_html_e( 'Weitere Bedingung', 'ps-pen-paper' ); ?></button>
 		<p><?php esc_html_e( 'Bis zu 20 Wertebedingungen je Entscheidung. Geprüft werden aktuelle freigegebene Werte einschließlich aktiver Ausrüstungsboni, nicht offene Anträge. Ressourcenbedingungen prüfen aktuellen Wert oder Maximum und verbrauchen nichts. Ohne Bedingung den Vergleichswert auf 0 lassen.', 'ps-pen-paper' ); ?></p>
 		<p><?php esc_html_e( 'Textfelder unterstützen gleich, ungleich, enthält und enthält nicht (Groß-/Kleinschreibung beachten). Vorherige Entscheidungen prüfen ausschließlich diesen Durchlauf: 1 = ausgeführt, 0 = nicht ausgeführt. Zahlenwerte bleiben ganze Zahlen zwischen −1000000 und 1000000.', 'ps-pen-paper' ); ?></p>
@@ -145,10 +150,14 @@ function ps_pen_paper_adventure_reward_label( $reward, $result = null ) {
 		return __( 'Belohnung aus Beutetabelle:', 'ps-pen-paper' ) . ' ' . $reward['source']['table']['table']['name'];
 	}
 	$row = ps_pen_paper_adventure_reward_rows( $reward )[ $result ? $result['row'] : 0 ];
-	$quantity = $result ? $result['quantity_roll']['total'] : (int) $row['quantity'];
-	$money = $result ? $result['money_roll']['total'] : (int) $row['money'];
+	$components = $result ? ps_pen_paper_adventure_reward_result_components( $reward, $result )
+		: array( 'items' => $row['item'] ? array( array( 'item' => $row['item'], 'quantity' => (int) $row['quantity'] ) ) : array(), 'money' => (int) $row['money'] );
+	if ( is_wp_error( $components ) ) { return $components->get_error_message(); }
+	$money = $components['money'];
 	$parts = array();
-	if ( $quantity > 0 ) { $parts[] = $quantity . ' × ' . $row['item']['item']['name']; }
+	foreach ( $components['items'] as $component ) {
+		if ( $component['quantity'] > 0 ) { $parts[] = $component['quantity'] . ' × ' . $component['item']['item']['name']; }
+	}
 	if ( $money > 0 ) {
 		$currency = ps_pen_paper_adventure_reward_currency( $reward );
 		$parts[] = $money . ' ' . ( $result ? $result['wallet']['after']['symbol'] : $currency['document']['symbol'] );
@@ -228,6 +237,7 @@ function ps_pen_paper_render_adventure_editor( $campaign, $page_id ) {
 			<button type="submit"><?php esc_html_e( 'Abenteuerentwurf speichern', 'ps-pen-paper' ); ?></button>
 		</form>
 		<?php if ( $id ) : ?>
+			<?php ps_pen_paper_render_adventure_world_editor( $campaign, $id, $state, $page_id ); ?>
 			<h4><?php esc_html_e( 'Entscheidungen und Folgeszenen', 'ps-pen-paper' ); ?></h4>
 			<?php if ( ! $draft['edges'] ) : ?><p><?php esc_html_e( 'Noch keine Entscheidung angelegt.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 			<ol><?php foreach ( $draft['edges'] as $edge ) : ?>
@@ -267,7 +277,8 @@ function ps_pen_paper_render_adventure_editor( $campaign, $page_id ) {
 					<input type="hidden" name="adventure_complete" value="complete"><input type="hidden" name="adventure_id" value="<?php echo esc_attr( $id ); ?>"><input type="hidden" name="adventure_revision" value="<?php echo esc_attr( $state['revision'] ); ?>">
 					<label><?php esc_html_e( 'Ausgangsszene', 'ps-pen-paper' ); ?><select name="adventure_edge[from_scene]" required><?php ps_pen_paper_adventure_scene_options( $campaign ); ?></select></label>
 					<label><?php esc_html_e( 'Entscheidungstext', 'ps-pen-paper' ); ?><input type="text" name="adventure_edge[choice]" maxlength="120" required></label>
-					<?php ps_pen_paper_render_adventure_condition_fields( $rules, $draft['edges'] ); ?>
+					<?php ps_pen_paper_render_adventure_condition_fields( $rules, $draft['edges'], $draft['states'] ?? array() ); ?>
+					<?php ps_pen_paper_render_adventure_world_fields( $campaign, $draft ); ?>
 					<label class="pspp-check"><input type="checkbox" name="adventure_edge[gm_review]" value="1"><?php esc_html_e( 'Diese Entscheidung benötigt ausdrücklich eine Spielleiterfreigabe', 'ps-pen-paper' ); ?></label>
 					<p><?php esc_html_e( 'Der Besitzer fragt die Entscheidung an. Erst nach Freigabe kann er sie ausführen; bis dahin gibt es weder Würfelwurf noch Verbrauch oder Belohnung. Die Freigabe gilt einmalig für diese Entscheidung und diesen Durchlauf.', 'ps-pen-paper' ); ?></p>
 					<label><?php esc_html_e( 'Optionale Ressourcenkosten', 'ps-pen-paper' ); ?><select name="adventure_edge[cost_resource]"><option value=""><?php esc_html_e( 'Keine Ressourcenkosten', 'ps-pen-paper' ); ?></option>
@@ -342,6 +353,7 @@ function ps_pen_paper_render_character_adventures( $campaign, $character, $page_
 function ps_pen_paper_render_adventure_run( $campaign, $character, $page_id, $run_id, $run, $character_state ) {
 	$snapshot = $run['snapshot']; $scene = $run['scene_id'] ? $snapshot['scenes'][ $run['scene_id'] ] : null;
 	echo '<div class="pspp-adventure-run" id="pspp-adventure-run-' . esc_attr( $run_id ) . '" data-run-id="' . esc_attr( $run_id ) . '">';
+	ps_pen_paper_render_adventure_world_progress( $snapshot, $run['scene_id'], $run['history'] );
 	if ( isset( $run['approval'] ) ) {
 		echo '<p role="status">' . esc_html( 'pending' === $run['approval']['status']
 			? __( 'Spielleiterentscheidung ausstehend. Der Durchlauf und alle Ressourcen bleiben unverändert.', 'ps-pen-paper' )
@@ -356,6 +368,7 @@ function ps_pen_paper_render_adventure_run( $campaign, $character, $page_id, $ru
 	}
 	if ( $scene ) {
 		echo '<h5>' . esc_html( $scene['title'] ) . '</h5><p class="pspp-multiline">' . esc_html( $scene['text'] ) . '</p>';
+		ps_pen_paper_render_wiki_target_link( $campaign, 'scene:' . $run['scene_id'] );
 	} elseif ( $run['history'] ) {
 		$last = end( $run['history'] ); echo '<p>' . esc_html( $snapshot['title'] . ' · ' . __( 'Abenteuer beendet', 'ps-pen-paper' ) . ' · ' . $last['choice'] ) . '</p>';
 	}
@@ -366,12 +379,14 @@ function ps_pen_paper_render_adventure_run( $campaign, $character, $page_id, $ru
 		foreach ( $choices as $edge ) {
 			$requirement = ps_pen_paper_adventure_requirement_value( $edge, $rules, $character_state );
 			$requirement_blocked = is_wp_error( $requirement ) || ( $requirement && $requirement['value'] < $requirement['minimum'] );
-			$conditions = ps_pen_paper_evaluate_adventure_conditions( $edge, $rules, $character_state, $run['history'], $run['snapshot']['edges'] );
+			$conditions = ps_pen_paper_evaluate_adventure_conditions( $edge, $rules, $character_state, $run['history'], $run['snapshot']['edges'], $snapshot['states'] ?? array() );
 			$conditions_blocked = is_wp_error( $conditions ) || ( $conditions && ! $conditions['met'] );
 			$cost = isset( $edge['resource_cost'] ) ? ps_pen_paper_character_resource_cost( $campaign, $character, $edge['resource_cost']['resource'], $edge['resource_cost']['amount'] ) : null;
 			$cost_blocked = is_wp_error( $cost ) || ( $cost && $cost['after'] < $cost['minimum'] );
 			$reward_context = isset( $edge['reward'] ) ? ps_pen_paper_adventure_reward_context( $campaign, $character, $edge['reward'] ) : null;
-			$blocked = $requirement_blocked || $conditions_blocked || $cost_blocked || is_wp_error( $reward_context );
+			$items = isset( $edge['items'] ) ? ps_pen_paper_adventure_items_result( $edge['items'], (int) $character->ID ) : null;
+			$blocked = $requirement_blocked || $conditions_blocked || $cost_blocked || is_wp_error( $reward_context ) || is_wp_error( $items ) || ( $items && ! $items['met'] );
+			if ( $items ) { echo '<p>' . esc_html( is_wp_error( $items ) ? $items->get_error_message() : ps_pen_paper_adventure_items_label( $items ) ) . '</p>'; }
 			$review_needed = ! empty( $edge['gm_review'] );
 			$review_approved = $review_needed && isset( $run['approval'] ) && $run['approval']['edge_id'] === $edge['id'] &&
 				'approved' === $run['approval']['status'] && ps_pen_paper_adventure_reviewer_authority( $campaign, $run['approval']['reviewer_id'] );

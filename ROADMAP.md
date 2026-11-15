@@ -426,8 +426,9 @@ ist weiterhin kein Ziel.
    erhält den gemeinsamen Fortschritt samt Stimmen und Freigaben.
    Noch offen sind Gegenstandsvoraussetzungen, weitere Ereignisarten,
    Begegnungsabläufe.
-   Wiederverwendbare Abenteuerpakete von Kampagnensicherungen,
-   Teilnehmerkonten und persönlichen Spielständen trennen.
+   Spielleitung/Admin stellt Universen, Kampagnen und Abenteuer direkt bereit.
+   Spieler nutzen die freigegebenen Abläufe mit ihrem Charakter, ohne
+   Paketverwaltung oder Dateiübernahme.
 4. **Regeln und Universen flexibilisieren:** Verwendete Feldstrukturen
    kontrolliert ändern, Kampagnenmigration mit Vorschau und Konfliktauflösung,
    Gemeinsame Basisbögen können bereits ausdrücklich unabhängig weitergeführt
@@ -930,7 +931,7 @@ optionale Ressourcenkosten ergänzen den Ablauf seit 0.22.0 beziehungsweise
 0.23.0; seit 0.24.0 folgen konfigurierbare einmalige Belohnungen.
 Hybride Freigabeschritte und gemeinsame Gruppendurchläufe mit konfigurierbaren
 Entscheidungen, Teilnahme und Wiedereinstieg sind ergänzt. Weitere Voraussetzungen,
-Begegnungen und Abenteuerpakete bleiben Funktionsausbau;
+Begegnungen bleiben Funktionsausbau;
 sie werden nicht pauschal hinter eine abschließende Stabilisierungsphase zurückgestellt.
 
 - [x] Pro Charakter einen eigenen Durchlauf aus einem ausdrücklich
@@ -1031,25 +1032,18 @@ Administration beziehungsweise Spielleitung wählt den Modus innerhalb ihrer Rec
   voraussetzen. Der Schwerpunkt bleibt ein systemoffener Pen-and-Paper-
   Baukasten, kein MMORPG und keine vollständige Tabletop-Engine.
 
-### Wiederverwendbare, eigenständig spielbare Abenteuerpakete
+### Einfacher Zugang zu bereitgestellten Abenteuern
 
-- [ ] Versionierte Pakete aus Szenen, Entscheidungen, Voraussetzungen,
-  möglichen Folgen und benötigten Regel-/Vorlagendaten anbieten.
-  Abenteuerdefinitionen von persönlichen Spielständen und Teilnehmerkonten trennen.
-- [ ] Autoren wählen ausdrücklich, ob und für wen ein Paket bereitgestellt
-  wird. Geheimnisse für automatische Abläufe geschützt behalten; keine
-  privaten Kampagnenprotokolle, Konten oder laufenden Durchläufe mitveröffentlichen.
-- [ ] Übernommene Pakete als unabhängige, kontrolliert anpassbare Kopien verwenden.
-  Solo- und Gruppendurchläufe benötigen den ursprünglichen Autor nicht.
-  Hybride Pakete benötigen eine ausdrücklich zuständige örtliche Spielleitung.
-- [ ] Paketversionen und laufende Durchläufe getrennt halten. Änderungen am
-  Original dürfen laufende Abenteuer nicht ungefragt verändern.
-- [ ] „Pen & Paper“ und „Abenteuer“ als unterschiedliche Bedienbereiche
-  derselben Regel-, Charakter-, Rechte- und Speicherbasis ausbauen, nicht
-  als zwei konkurrierende Engines. Keine Flowchart-, Echtzeit- oder KI-Pflicht.
+Spielleitung/Admin stellt Universen, Kampagnen und Abenteuer direkt auf der
+Website bereit und bestimmt Regeln, Spielmodus, Teilnahme und Freigaben.
+Spieler öffnen ihre Kampagne und spielen die freigegebenen Abenteuer mit
+ihrem Charakter. Es gibt keine Paketbibliothek, keinen JSON-Abenteuerimport
+und keine Übernahme in selbst angelegte Zielkampagnen.
 
-Diese Erweiterung gehört zum Abenteuerausbau. Kampagnenimport/-export ist
-die Speichergrundlage, ersetzt aber kein eigenständiges Abenteuerpaket.
+Abenteuerdefinitionen und persönliche Durchläufe bleiben getrennt.
+Änderungen an der Vorbereitung verändern keine bereits laufenden Durchläufe.
+Die vorhandenen Solo-, Gruppen- und hybriden Abläufe verwenden dieselbe
+Regel-, Charakter-, Rechte- und Speicherbasis.
 
 ## Phase 8: Mögliche spätere Erweiterungen
 

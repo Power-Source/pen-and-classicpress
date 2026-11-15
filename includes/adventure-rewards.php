@@ -14,6 +14,12 @@ function ps_pen_paper_adventure_reward_rows( $reward ) {
 	return 'table' === $reward['source']['kind'] ? $reward['source']['table']['table']['rows'] : array( $reward['source'] );
 }
 
+function ps_pen_paper_adventure_reward_items( $reward ) {
+	if ( ! ps_pen_paper_valid_adventure_reward( $reward ) || null === $reward ) { return ps_pen_paper_adventure_reward_error(); }
+	if ( 'table' === $reward['source']['kind'] ) { return ps_pen_paper_loot_snapshot_items( $reward['source']['table'] ); }
+	return null === $reward['source']['item'] ? array() : array( $reward['source']['item'] );
+}
+
 function ps_pen_paper_valid_adventure_reward( $reward ) {
 	if ( null === $reward ) { return true; }
 	if ( ! is_array( $reward ) || array( 'timing', 'authorizer_id', 'source' ) !== array_keys( $reward ) ||
@@ -22,7 +28,7 @@ function ps_pen_paper_valid_adventure_reward( $reward ) {
 	$source = $reward['source'];
 	if ( 'table' === $source['kind'] ) {
 		return array( 'kind', 'id', 'table' ) === array_keys( $source ) && is_int( $source['id'] ) && $source['id'] > 0 &&
-			ps_pen_paper_valid_loot_table( $source['table'] ) && $source['table']['revision'] > 0;
+			ps_pen_paper_valid_loot_table( $source['table'], 0, array( $source['id'] ) ) && $source['table']['revision'] > 0;
 	}
 	if ( 'fixed' !== $source['kind'] || array( 'kind', 'item', 'quantity', 'money', 'currency' ) !== array_keys( $source ) ||
 		! is_string( $source['quantity'] ) || ! preg_match( '/^(0|[1-9]\d{0,2})$/D', $source['quantity'] ) ||
@@ -112,26 +118,30 @@ function ps_pen_paper_adventure_reward_context( $campaign, $character, $reward )
 	$currency = ps_pen_paper_adventure_reward_currency( $reward );
 	$wallet = $currency ? ps_pen_paper_wallet_context( $campaign, (int) $character->ID ) : null;
 	if ( is_wp_error( $wallet ) ) { return $wallet; }
-	// Reserve enough capacity for every possible result, before any random roll.
-	foreach ( ps_pen_paper_adventure_reward_rows( $reward ) as $row ) {
-		foreach ( array( 'quantity' => 100, 'money' => 999999999 ) as $key => $limit ) {
-			$parsed = ps_pen_paper_loot_spec( $row[ $key ], $limit, 'money' === $key || null === $row['item'] );
-			if ( is_wp_error( $parsed ) ) { return $parsed; }
-			$maximum = $parsed['modifier'];
-			foreach ( $parsed['groups'] as $group ) { $maximum += $group['count'] * $group['sides']; }
-			if ( 'quantity' === $key && ( count( $gear['active']['items'] ) + $maximum > 100 ||
-				( $gear['pending'] && count( $gear['pending']['items'] ) + $maximum > 100 ) ) ) {
-				return new WP_Error( 'inventory_full', __( 'Für alle möglichen Abenteuerbelohnungen muss im aktiven und beantragten Inventar genügend Platz sein. Es wurde noch nicht gewürfelt.', 'ps-pen-paper' ) );
-			}
-			if ( 'money' === $key && $maximum > 0 && ( ! $wallet || 999999999 - $wallet['wallet']['balance'] < $maximum ) ) {
-				return new WP_Error( 'balance_range', __( 'Das Guthaben muss jede mögliche Abenteuerbelohnung aufnehmen können. Es wurde noch nicht gewürfelt.', 'ps-pen-paper' ) );
-			}
-		}
+	if ( 'table' === $reward['source']['kind'] ) { $limits = ps_pen_paper_loot_snapshot_limits( $reward['source']['table'] ); }
+	else {
+		$source = $reward['source'];
+		$limits = array( 'items' => ps_pen_paper_loot_spec_maximum( $source['quantity'], 100, null === $source['item'] ),
+			'money' => ps_pen_paper_loot_spec_maximum( $source['money'], 999999999 ) );
+	}
+	if ( is_wp_error( $limits ) || is_wp_error( $limits['items'] ) || is_wp_error( $limits['money'] ) ) { return ps_pen_paper_adventure_reward_error(); }
+	if ( count( $gear['active']['items'] ) + $limits['items'] > 100 ||
+		( $gear['pending'] && count( $gear['pending']['items'] ) + $limits['items'] > 100 ) ) {
+		return new WP_Error( 'inventory_full', __( 'Für alle möglichen Abenteuerbelohnungen muss im aktiven und beantragten Inventar genügend Platz sein. Es wurde noch nicht gewürfelt.', 'ps-pen-paper' ) );
+	}
+	if ( $limits['money'] > 0 && ( ! $wallet || 999999999 - $wallet['wallet']['balance'] < $limits['money'] ) ) {
+		return new WP_Error( 'balance_range', __( 'Das Guthaben muss jede mögliche Abenteuerbelohnung aufnehmen können. Es wurde noch nicht gewürfelt.', 'ps-pen-paper' ) );
 	}
 	return array( 'gear' => $gear, 'wallet' => $wallet );
 }
 
 function ps_pen_paper_roll_adventure_reward( $reward ) {
+	if ( 'table' === $reward['source']['kind'] && ps_pen_paper_loot_table_has_extended_rewards( $reward['source']['table'] ) ) {
+		$node = ps_pen_paper_loot_roll_node( $reward['source']['id'], $reward['source']['table'], array( '4', '6', '8', '10', '12', '20', '100' ) );
+		if ( is_wp_error( $node ) ) { return $node; }
+		return array( 'roll' => $node['roll'], 'row' => $node['row'], 'quantity_roll' => $node['quantity_roll'],
+			'money_roll' => $node['money_roll'], 'item_ids' => array(), 'wallet' => null, 'node' => $node, 'component_ids' => array() );
+	}
 	$roll = null; $index = 0; $rows = ps_pen_paper_adventure_reward_rows( $reward );
 	if ( 'table' === $reward['source']['kind'] ) {
 		$parsed = ps_pen_paper_loot_spec( 'W' . $reward['source']['table']['table']['die'], 100, false );
@@ -147,23 +157,26 @@ function ps_pen_paper_roll_adventure_reward( $reward ) {
 		'money_roll' => ps_pen_paper_evaluate_dice( $money ), 'item_ids' => array(), 'wallet' => null );
 }
 
-function ps_pen_paper_valid_adventure_reward_result( $reward, $result, $character_id ) {
-	if ( ! is_array( $result ) || array( 'roll', 'row', 'quantity_roll', 'money_roll', 'item_ids', 'wallet' ) !== array_keys( $result ) ||
-		! is_int( $result['row'] ) || ! is_array( $result['item_ids'] ) || array_values( $result['item_ids'] ) !== $result['item_ids'] ) { return false; }
+function ps_pen_paper_adventure_reward_result_components( $reward, $result ) {
+	if ( ! ps_pen_paper_valid_adventure_reward( $reward ) || null === $reward || ! is_array( $result ) ) { return ps_pen_paper_adventure_reward_error(); }
+	if ( isset( $result['node'] ) ) {
+		$node = $result['node'];
+		if ( 'table' !== $reward['source']['kind'] || ! is_array( $node ) || ! isset( $node['table_id'], $node['table'] ) ||
+			$node['table_id'] !== $reward['source']['id'] || $node['table'] !== $reward['source']['table'] ||
+			! ps_pen_paper_valid_loot_node( $node ) ) { return ps_pen_paper_adventure_reward_error(); }
+		return ps_pen_paper_loot_components( $node );
+	}
+	if ( ! isset( $result['row'], $result['quantity_roll']['total'], $result['money_roll']['total'] ) || ! is_int( $result['row'] ) ) { return ps_pen_paper_adventure_reward_error(); }
 	$rows = ps_pen_paper_adventure_reward_rows( $reward );
-	if ( ! isset( $rows[ $result['row'] ] ) ) { return false; }
+	if ( ! isset( $rows[ $result['row'] ] ) || ! empty( $rows[ $result['row'] ]['items'] ) || ! empty( $rows[ $result['row'] ]['nested'] ) ) { return ps_pen_paper_adventure_reward_error(); }
 	$row = $rows[ $result['row'] ];
-	if ( 'table' === $reward['source']['kind'] ) {
-		if ( ! ps_pen_paper_valid_loot_roll( $result['roll'], ps_pen_paper_loot_spec( 'W' . $reward['source']['table']['table']['die'], 100, false ) ) ||
-			$result['roll']['total'] < $row['from'] || $result['roll']['total'] > $row['to'] ) { return false; }
-	} elseif ( null !== $result['roll'] || 0 !== $result['row'] ) { return false; }
-	if ( ! ps_pen_paper_valid_loot_roll( $result['quantity_roll'], ps_pen_paper_loot_spec( $row['quantity'], 100, null === $row['item'] ) ) ||
-		! ps_pen_paper_valid_loot_roll( $result['money_roll'], ps_pen_paper_loot_spec( $row['money'], 999999999 ) ) ||
-		count( $result['item_ids'] ) !== $result['quantity_roll']['total'] || count( array_unique( $result['item_ids'], SORT_REGULAR ) ) !== count( $result['item_ids'] ) ) { return false; }
-	foreach ( $result['item_ids'] as $id ) { if ( ! is_string( $id ) || ! wp_is_uuid( $id ) ) { return false; } }
-	$money = $result['money_roll']['total'];
-	if ( 0 === $money ) { return null === $result['wallet']; }
-	$wallet = $result['wallet']; $currency = ps_pen_paper_adventure_reward_currency( $reward );
+	return array( 'items' => $row['item'] ? array( array( 'item' => $row['item'], 'quantity' => $result['quantity_roll']['total'] ) ) : array(),
+		'money' => $result['money_roll']['total'] );
+}
+
+function ps_pen_paper_valid_adventure_reward_wallet( $reward, $wallet, $character_id, $money ) {
+	if ( 0 === $money ) { return null === $wallet; }
+	$currency = ps_pen_paper_adventure_reward_currency( $reward );
 	return $currency && is_array( $wallet ) && array( 'character_id', 'before', 'after' ) === array_keys( $wallet ) &&
 		is_int( $wallet['character_id'] ) && $wallet['character_id'] > 0 &&
 		( 'universe' === $currency['document']['wallet_mode'] || $wallet['character_id'] === $character_id ) &&
@@ -171,6 +184,47 @@ function ps_pen_paper_valid_adventure_reward_result( $reward, $result, $characte
 		$wallet['before']['currency_id'] === $currency['document']['currency_id'] && $wallet['after']['currency_id'] === $wallet['before']['currency_id'] &&
 		$wallet['before']['currency_scope_id'] === $currency['scope_id'] && $wallet['after']['currency_scope_id'] === $currency['scope_id'] &&
 		$wallet['after']['revision'] === $wallet['before']['revision'] + 1 && $wallet['after']['balance'] === $wallet['before']['balance'] + $money;
+}
+
+function ps_pen_paper_valid_adventure_reward_result( $reward, $result, $character_id ) {
+	if ( null === $reward || ! ps_pen_paper_valid_adventure_reward( $reward ) || ! is_array( $result ) ) { return false; }
+	$keys = array_keys( $result );
+	$legacy = array( 'roll', 'row', 'quantity_roll', 'money_roll', 'item_ids', 'wallet' );
+	$extended = array( 'roll', 'row', 'quantity_roll', 'money_roll', 'item_ids', 'wallet', 'node', 'component_ids' );
+	if ( ! in_array( $keys, array( $legacy, $extended ), true ) ||
+		! is_int( $result['row'] ) || ! is_array( $result['item_ids'] ) || array_values( $result['item_ids'] ) !== $result['item_ids'] ) { return false; }
+	if ( $extended === $keys ) {
+		$node = $result['node'];
+		if ( 'table' !== $reward['source']['kind'] || ! is_array( $node ) || ! isset( $node['table_id'], $node['table'] ) ||
+			$node['table_id'] !== $reward['source']['id'] || $node['table'] !== $reward['source']['table'] ||
+			! ps_pen_paper_valid_loot_node( $node ) || ! is_array( $result['component_ids'] ) ||
+			array_values( $result['component_ids'] ) !== $result['component_ids'] ) { return false; }
+		foreach ( array( 'roll', 'row', 'quantity_roll', 'money_roll' ) as $key ) { if ( $result[ $key ] !== $node[ $key ] ) { return false; } }
+		$components = ps_pen_paper_loot_components( $node );
+		if ( count( $result['component_ids'] ) !== count( $components['items'] ) ) { return false; }
+		$ids = array();
+		foreach ( $components['items'] as $index => $item ) {
+			$group = $result['component_ids'][ $index ];
+			if ( ! is_array( $group ) || array_values( $group ) !== $group || count( $group ) !== $item['quantity'] ) { return false; }
+			foreach ( $group as $uuid ) { if ( ! is_string( $uuid ) || ! wp_is_uuid( $uuid ) ) { return false; } $ids[] = $uuid; }
+		}
+		return $ids === $result['item_ids'] && count( array_unique( $ids, SORT_REGULAR ) ) === count( $ids ) &&
+			ps_pen_paper_valid_adventure_reward_wallet( $reward, $result['wallet'], $character_id, $components['money'] );
+	}
+	$rows = ps_pen_paper_adventure_reward_rows( $reward );
+	if ( ! isset( $rows[ $result['row'] ] ) ) { return false; }
+	$row = $rows[ $result['row'] ];
+	if ( ! empty( $row['items'] ) || ! empty( $row['nested'] ) ) { return false; }
+	if ( 'table' === $reward['source']['kind'] ) {
+		if ( ! ps_pen_paper_valid_loot_roll( $result['roll'], ps_pen_paper_loot_spec( 'W' . $reward['source']['table']['table']['die'], 100, false ) ) ||
+			$result['roll']['total'] < $row['from'] || $result['roll']['total'] > $row['to'] ) { return false; }
+	} elseif ( null !== $result['roll'] || 0 !== $result['row'] ) { return false; }
+	if ( ! ps_pen_paper_valid_loot_roll( $result['quantity_roll'], ps_pen_paper_loot_spec( $row['quantity'], 100, null === $row['item'] ) ) ||
+		! ps_pen_paper_valid_loot_roll( $result['money_roll'], ps_pen_paper_loot_spec( $row['money'], 999999999 ) ) ||
+		count( $result['item_ids'] ) !== $result['quantity_roll']['total'] ) { return false; }
+	foreach ( $result['item_ids'] as $id ) { if ( ! is_string( $id ) || ! wp_is_uuid( $id ) ) { return false; } }
+	return count( array_unique( $result['item_ids'], SORT_REGULAR ) ) === count( $result['item_ids'] ) &&
+		ps_pen_paper_valid_adventure_reward_wallet( $reward, $result['wallet'], $character_id, $result['money_roll']['total'] );
 }
 
 // The caller holds the run, character and currency locks in the progress transaction.
@@ -187,21 +241,30 @@ function ps_pen_paper_write_adventure_reward( $campaign, $character, $reward, $c
 	$result = ps_pen_paper_roll_adventure_reward( $reward );
 	if ( is_wp_error( $result ) ) { return $result; }
 	$row = ps_pen_paper_adventure_reward_rows( $reward )[ $result['row'] ];
-	if ( $result['money_roll']['total'] > 0 ) {
+	$components = isset( $result['node'] ) ? ps_pen_paper_loot_components( $result['node'] ) : array(
+		'items' => $row['item'] ? array( array( 'item' => $row['item'], 'quantity' => $result['quantity_roll']['total'] ) ) : array(),
+		'money' => $result['money_roll']['total'],
+	);
+	if ( $components['money'] > 0 ) {
 		$wallet = $context['wallet'];
-		$written = ps_pen_paper_write_wallet_delta( $wallet, 'grant', $result['money_roll']['total'],
+		$written = ps_pen_paper_write_wallet_delta( $wallet, 'grant', $components['money'],
 			/* translators: %d: private adventure run ID. */
 			sprintf( __( 'Freigegebene Abenteuerbelohnung für Durchlauf #%d', 'ps-pen-paper' ), $run_id ) );
 		if ( is_wp_error( $written ) ) { return $written; }
 		$result['wallet'] = array( 'character_id' => (int) $wallet['character']->ID, 'before' => $wallet['wallet'],
 			'after' => get_post_meta( $wallet['character']->ID, '_pspp_wallet', true ) );
 	}
-	if ( $result['quantity_roll']['total'] > 0 ) {
-		$written = ps_pen_paper_write_item_award_delta( $campaign, $character, $row['item'], $result['quantity_roll']['total'], (string) $context['gear']['revision'] );
+	$gear = $context['gear'];
+	foreach ( $components['items'] as $component ) {
+		$before_ids = array_keys( $gear['active']['items'] );
+		$written = ps_pen_paper_write_item_award_delta( $campaign, $character, $component['item'], $component['quantity'], (string) $gear['revision'] );
 		if ( is_wp_error( $written ) ) { return $written; }
-		$after = ps_pen_paper_gear_state( $character->ID );
-		if ( is_wp_error( $after ) ) { return $after; }
-		$result['item_ids'] = array_values( array_diff( array_keys( $after['active']['items'] ), array_keys( $context['gear']['active']['items'] ) ) );
+		$gear = ps_pen_paper_gear_state( $character->ID );
+		if ( is_wp_error( $gear ) || array_diff( $before_ids, array_keys( $gear['active']['items'] ) ) ) { return ps_pen_paper_adventure_reward_error(); }
+		$ids = array_values( array_diff( array_keys( $gear['active']['items'] ), $before_ids ) );
+		if ( count( $ids ) !== $component['quantity'] ) { return ps_pen_paper_adventure_reward_error(); }
+		$result['item_ids'] = array_merge( $result['item_ids'], $ids );
+		if ( isset( $result['node'] ) ) { $result['component_ids'][] = $ids; }
 	}
 	return ps_pen_paper_valid_adventure_reward_result( $reward, $result, (int) $character->ID ) ? $result : ps_pen_paper_adventure_reward_error();
 }

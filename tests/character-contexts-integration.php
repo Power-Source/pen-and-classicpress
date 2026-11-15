@@ -20,7 +20,7 @@ $check = function ( $condition, $message ) {
 	if ( ! $condition ) { throw new RuntimeException( $message ); }
 };
 try {
-	foreach ( array( 'gm', 'assistant', 'player', 'outsider' ) as $role ) {
+	foreach ( array( 'gm', 'assistant', 'player', 'outsider', 'newcomer' ) as $role ) {
 		$id = wp_insert_user( array( 'user_login' => 'pspp-context-' . wp_generate_password( 12, false ), 'user_pass' => wp_generate_password( 40 ), 'role' => 'subscriber' ) );
 		$check( ! is_wp_error( $id ), 'Fixture user failed.' );
 		$users[ $role ] = $id;
@@ -41,11 +41,45 @@ try {
 	$attribute = $rules['fields'][0]['id'];
 	$level = $rules['fields'][1]['id'];
 	$resource = $rules['fields'][2]['id'];
+	$import_input = $input;
+	foreach ( $import_input['fields'] as $index => &$field ) { $field['id'] = $rules['fields'][ $index ]['id']; }
+	unset( $field );
+	$import_input['fields'][] = array( 'id' => '', 'label' => 'Herkunft', 'type' => 'choice', 'description' => '', 'choices' => "Küste\nBerge", 'start' => 'Küste' );
+	$import_input['allocation_mode'] = 'configured';
+	$import_input['allocation'] = array( 'fields' => array( $attribute ), 'points' => '5' );
+	$import_rules = ps_pen_paper_validate_rules( $import_input, $rules );
+	$check( ! is_wp_error( $import_rules ) && ps_pen_paper_import_rules_valid( $import_rules ), 'Import rejected canonical choice and allocation rules.' );
+	$import_snapshot = array( 'name' => 'Importtest', 'values' => ps_pen_paper_character_values( $import_rules ) );
+	$import_state = array( 'revision' => 1, 'active' => $import_snapshot, 'pending' => null );
+	$check( ps_pen_paper_import_character_valid( $import_state, $import_rules ), 'Import rejected a canonical allocated choice snapshot.' );
+	$bad_import_state = $import_state;
+	$bad_import_state['active']['values'][ $import_rules['fields'][3]['id'] ] = 'Unbekannt';
+	$check( ! ps_pen_paper_import_character_valid( $bad_import_state, $import_rules ), 'Import accepted an unknown choice.' );
+	$bad_import_state = $import_state;
+	$bad_import_state['active']['values'][ $attribute ] = 4;
+	$check( ! ps_pen_paper_import_character_valid( $bad_import_state, $import_rules ), 'Import bypassed the configured attribute allocation.' );
+	$bad_import_state = $import_state;
+	$bad_import_state['active']['extra'] = true;
+	$check( ! ps_pen_paper_import_character_valid( $bad_import_state, $import_rules ), 'Import accepted an extra snapshot key.' );
 	$base_input = array( 'name' => 'Basis C:\Welt', 'values' => array( $attribute => '5', $level => '3', $resource => array( 'current' => '10', 'maximum' => '20' ) ) );
 	$base_id = ps_pen_paper_save_character( $universe_id, 0, $users['player'], $base_input, '0', '1' );
 	$check( ! is_wp_error( $base_id ), 'Universe base character did not save.' );
 	$base = get_post( $base_id );
 	$source = ps_pen_paper_raw_character_state( $base_id );
+	$universe_migration_input = $input;
+	foreach ( $universe_migration_input['fields'] as $index => &$field ) { $field['id'] = $rules['fields'][ $index ]['id']; }
+	unset( $field );
+	$universe_migration_input['fields'][] = array( 'id' => '', 'label' => 'Notiz', 'type' => 'text', 'description' => '', 'start' => '' );
+	$universe_migration_preview = ps_pen_paper_preview_rules_migration( $universe_id, $universe_migration_input, '1' );
+	$check( ! is_wp_error( $universe_migration_preview ), 'Universe migration did not produce a usable preview.' );
+	ob_start();
+	ps_pen_paper_render_rules_migration_preview( $universe, $universe_migration_preview );
+	$universe_migration_html = ob_get_clean();
+	$check( false !== strpos( $universe_migration_html, 'name="pspp_operation" value="save_universe_rules"' ) &&
+		false !== strpos( $universe_migration_html, 'name="rules_migration" value="1"' ) &&
+		false !== strpos( $universe_migration_html, 'value="' . wp_create_nonce( 'pspp_campaign_' . $universe_id ) . '"' ) &&
+		false !== strpos( $universe_migration_html, 'name="migration_preview_hash" value="' . $universe_migration_preview['hash'] . '"' ),
+		'Universe migration posted to the campaign-only action or lost its nonce/preview hash.' );
 	$source['revision']++;
 	$source['pending'] = $source['active'];
 	$source['pending']['name'] = 'PENDING_SECRET';
@@ -79,6 +113,13 @@ try {
 		$check( 'Basis C:\Welt' === $state['active']['name'] && null === $state['pending'], 'Import leaked unapproved base data or corrupted escaping.' );
 	}
 	$check( $source === ps_pen_paper_raw_character_state( $base_id ), 'Import changed the base character.' );
+	$shared_migration_input = $input;
+	foreach ( $shared_migration_input['fields'] as $index => &$field ) { $field['id'] = $rules['fields'][ $index ]['id']; }
+	unset( $field );
+	$shared_migration_input['fields'][0]['max'] = '30';
+	$shared_migration = ps_pen_paper_preview_rules_migration( $universe_id, $shared_migration_input, '1' );
+	$check( is_wp_error( $shared_migration ) && 'shared_schema' === $shared_migration->get_error_code() &&
+		$source === ps_pen_paper_raw_character_state( $base_id ), 'Universe schema migration orphaned active shared campaign sheets.' );
 	wp_set_current_user( $users['assistant'] );
 	$check( is_wp_error( ps_pen_paper_save_character( $universe_id, $base_id, $users['player'], $base_input, '2', '1' ) ) && is_wp_error( ps_pen_paper_adopt_universe_rules( $campaigns[3]->ID, '1', 'confirmed' ) ), 'Campaign GM gained universe administration.' );
 	$shared_character = get_post( $ids[0] );
@@ -249,9 +290,23 @@ try {
 	update_post_meta( $ids[0], '_pspp_character', wp_slash( $broken ) );
 	$check( is_wp_error( ps_pen_paper_character_state( $campaigns[0], $shared_character ) ), 'Corrupt context silently ignored.' );
 	update_post_meta( $ids[0], '_pspp_character', wp_slash( $baseline ) );
-	$check( true === ps_pen_paper_copy_shared_character( $campaigns[0]->ID, $ids[0], '3', '5', '1', 'confirmed' ) &&
+	$check( true === ps_pen_paper_copy_shared_character( $campaigns[0]->ID, $ids[0], (string) $baseline['revision'], '5', '1', 'confirmed' ),
+		'Could not prepare the independent copy for explicit reattachment.' );
+	$detached = ps_pen_paper_raw_character_state( $ids[0] );
+	$detached['revision']++;
+	$detached['active']['values'][ $attribute ] = 7;
+	update_post_meta( $ids[0], '_pspp_character', wp_slash( $detached ) );
+	$reattach_preview = ps_pen_paper_preview_character_reattachment( $campaigns[0]->ID, $ids[0] );
+	$check( ! is_wp_error( $reattach_preview ) && 1 === count( $reattach_preview['conflicts'] ) &&
+		$attribute === $reattach_preview['conflicts'][0]['field_id'], 'Reattachment preview omitted the divergent attribute.' );
+	$reattach = ps_pen_paper_reattach_character( $campaigns[0]->ID, $ids[0], (string) $detached['revision'], '5', '1',
+		array( $attribute => 'copy' ), 'confirmed' );
+	$reattached = ps_pen_paper_raw_character_state( $ids[0] );
+	$check( true === $reattach && 'shared' === $reattached['context']['mode'] && 7 === $reattached['context']['overrides'][ $attribute ] &&
+		9 === ps_pen_paper_raw_character_state( $base_id )['active']['values'][ $attribute ], 'Reattachment did not preserve the explicitly selected copy value or changed the source.' );
+	$check( true === ps_pen_paper_copy_shared_character( $campaigns[0]->ID, $ids[0], (string) $reattached['revision'], '5', '1', 'confirmed' ) &&
 		! is_wp_error( ps_pen_paper_save_universe_link( $campaigns[0]->ID, 0, '1', '0', 'confirmed' ) ) &&
-		9 === ps_pen_paper_character_state( $campaigns[0], $shared_character )['active']['values'][ $attribute ], 'Detaching the last shared character did not permit a safe universe unlink.' );
+		7 === ps_pen_paper_character_state( $campaigns[0], $shared_character )['active']['values'][ $attribute ], 'Detaching the last shared character did not permit a safe universe unlink.' );
 	$standalone = ps_pen_paper_export_campaign( $campaigns[0]->ID, 'local' );
 	$check( ! is_wp_error( $standalone ), 'Detached campaign could not be exported.' );
 	$standalone_parsed = ps_pen_paper_parse_import( json_encode( $standalone, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
@@ -268,6 +323,96 @@ try {
 	}
 	$check( is_array( $historical_roll ) && $standalone_map[ $ids[0] ] === $historical_roll['character']['id'] &&
 		$base_id === $historical_roll['character']['context']['source_id'] && 5 === $historical_roll['attribute']['value'], 'Standalone import changed the old roll, lost its historical base or retained its old active character ID.' );
+	wp_set_current_user( $users['gm'] );
+	$check( ! is_wp_error( ps_pen_paper_adopt_universe_rules( $campaigns[3]->ID, '1', 'confirmed' ) ), 'Could not prepare the base-request campaign.' );
+	wp_set_current_user( $users['player'] );
+	$base_before_request = ps_pen_paper_raw_character_state( $base_id );
+	$request_id = ps_pen_paper_request_base_character( $campaigns[3]->ID, $base_id, (string) $base_before_request['revision'], '1' );
+	$check( is_int( $request_id ) && $request_id > 0, 'Player could not request their own universe base sheet: ' .
+		( is_wp_error( $request_id ) ? $request_id->get_error_code() . ': ' . $request_id->get_error_message() :
+			gettype( $request_id ) . ' ' . wp_json_encode( $request_id ) ) );
+	$request_state = ps_pen_paper_raw_character_state( $request_id );
+	$check( null === $request_state['active'] && $base_before_request['active'] === $request_state['pending'] &&
+		is_wp_error( ps_pen_paper_request_base_character( $campaigns[3]->ID, $other_base_id, '1', '1' ) ), 'Base request exposed or copied another owner’s sheet.' );
+	$check( is_wp_error( ps_pen_paper_character_resource_cost( $campaigns[3], get_post( $request_id ), $resource, 2 ) ),
+		'An unapproved base request spent shared resources.' );
+	wp_set_current_user( $users['gm'] );
+	$check( true === ps_pen_paper_review_character( $campaigns[3]->ID, $request_id, 'approve', (string) $request_state['revision'] ) &&
+		'shared' === ps_pen_paper_raw_character_state( $request_id )['context']['mode'] &&
+		$base_before_request === ps_pen_paper_raw_character_state( $base_id ), 'Base request approval changed the universe sheet or failed to attach it.' );
+	wp_set_current_user( $users['player'] );
+	$resource_character = get_post( $request_id );
+	$alias_before_spend = ps_pen_paper_raw_character_state( $request_id );
+	$shared_cost = ps_pen_paper_character_resource_cost( $campaigns[3], $resource_character, $resource, 2 );
+	$check( ! is_wp_error( $shared_cost ) && isset( $shared_cost['shared_base'] ) &&
+		$base_id === $shared_cost['shared_base']['character_id'] &&
+		$base_before_request['revision'] === $shared_cost['character_revision'], 'Shared cost did not resolve to the authoritative universe sheet and revision.' );
+	$action_edge = array( 'resource_cost' => array( 'resource' => $resource, 'amount' => 2 ) );
+	$action_locks = ps_pen_paper_adventure_action_locks( $campaigns[3], $request_id, $action_edge );
+	$check( ! is_wp_error( $action_locks ) && in_array( $base_id, $action_locks, true ) && in_array( $universe_id, $action_locks, true ),
+		'Adventure action locks omitted the shared base or its universe.' );
+	$shared_spend = ps_pen_paper_adventure_action_transaction( $campaigns[3], $action_locks, $campaigns[3]->ID, function () use ( $campaigns, $resource_character, $shared_cost ) {
+		return ps_pen_paper_write_character_resource_cost( $campaigns[3], $resource_character, $shared_cost );
+	} );
+	$check( true === $shared_spend && 8 === ps_pen_paper_raw_character_state( $base_id )['active']['values'][ $resource ]['current'] &&
+		8 === ps_pen_paper_character_state( $campaigns[3], $resource_character )['active']['values'][ $resource ]['current'] &&
+		$alias_before_spend === ps_pen_paper_raw_character_state( $request_id ),
+		'Shared resource cost was not charged once to the base sheet or duplicated alias resources.' );
+	$replay = ps_pen_paper_adventure_action_transaction( $campaigns[3], $action_locks, $campaigns[3]->ID, function () use ( $campaigns, $resource_character, $shared_cost ) {
+		return ps_pen_paper_write_character_resource_cost( $campaigns[3], $resource_character, $shared_cost );
+	} );
+	$check( is_wp_error( $replay ) && 8 === ps_pen_paper_raw_character_state( $base_id )['active']['values'][ $resource ]['current'],
+		'A stale shared-cost preview spent the resource twice.' );
+	add_post_meta( $campaigns[3]->ID, '_pspp_player', (string) $users['newcomer'] );
+	wp_set_current_user( $users['newcomer'] );
+	ob_start();
+	ps_pen_paper_render_campaign_base_requests( $campaigns[3], 0 );
+	$onboarding_html = ob_get_clean();
+	$check( false !== strpos( $onboarding_html, 'name="pspp_operation" value="request_universe_character"' ) &&
+		false !== strpos( $onboarding_html, 'name="universe_id" value="' . $universe_id . '"' ) &&
+		false !== strpos( $onboarding_html, 'name="character[name]"' ),
+		'A member without an existing base sheet did not receive the universe request form.' );
+	$check( is_wp_error( ps_pen_paper_request_universe_character( $campaigns[0]->ID, $universe_id, $base_input, '1' ) ) &&
+		is_wp_error( ps_pen_paper_request_universe_character( $campaigns[3]->ID, $universe_id, $base_input, '0' ) ),
+		'Universe onboarding accepted a foreign campaign or stale template.' );
+	$new_base_id = ps_pen_paper_request_universe_character( $campaigns[3]->ID, $universe_id, $base_input, '1' );
+	$check( is_int( $new_base_id ) && $new_base_id > 0, 'New universe-sheet onboarding failed: ' .
+		( is_wp_error( $new_base_id ) ? $new_base_id->get_error_code() . ': ' . $new_base_id->get_error_message() :
+			gettype( $new_base_id ) . ' ' . wp_json_encode( $new_base_id ) ) );
+	$new_base_state = ps_pen_paper_raw_character_state( $new_base_id );
+	$check( null === $new_base_state['active'] && null !== $new_base_state['pending'] &&
+		$users['newcomer'] === (int) get_post( $new_base_id )->post_author && $universe_id === (int) get_post( $new_base_id )->post_parent &&
+		! array_key_exists( 'context', $new_base_state ) && null === ps_pen_paper_get_character( $universe, $new_base_id ),
+		'Onboarding activated the unapproved base, assigned another owner or exposed private universe access.' );
+	wp_set_current_user( $users['assistant'] );
+	$check( is_wp_error( ps_pen_paper_review_character( $universe_id, $new_base_id, 'approve', '1' ) ),
+		'A campaign-only GM approved a universe-sheet request.' );
+	wp_set_current_user( $users['gm'] );
+	ob_start();
+	ps_pen_paper_render_characters( $universe, $new_base_id );
+	$base_review_html = ob_get_clean();
+	$check( false !== strpos( $base_review_html, 'name="pspp_operation" value="review_base_character"' ) &&
+		false === strpos( $base_review_html, 'name="pspp_operation" value="review_character"' ),
+		'Universe approval posted to the campaign-only review action.' );
+	$original_post = $_POST;
+	$original_request = $_REQUEST;
+	$redirected = false;
+	$intercept_redirect = static function ( $location ) { throw new RuntimeException( 'universe-review-redirect:' . $location ); };
+	add_filter( 'wp_redirect', $intercept_redirect );
+	try {
+		$_POST = array( 'campaign_id' => (string) $universe_id, 'character_id' => (string) $new_base_id,
+			'character_revision' => '1', 'decision' => 'approve', '_wpnonce' => wp_create_nonce( 'pspp_campaign_' . $universe_id ) );
+		$_REQUEST = $_POST;
+		try { ps_pen_paper_handle_character_context_action( 'review_base_character' ); }
+		catch ( RuntimeException $error ) { $redirected = 0 === strpos( $error->getMessage(), 'universe-review-redirect:' ); if ( ! $redirected ) { throw $error; } }
+	} finally {
+		remove_filter( 'wp_redirect', $intercept_redirect );
+		$_POST = $original_post;
+		$_REQUEST = $original_request;
+	}
+	$check( $redirected && $new_base_state['pending'] === ps_pen_paper_raw_character_state( $new_base_id )['active'] &&
+		null === ps_pen_paper_raw_character_state( $new_base_id )['pending'],
+		'The universe approval UI controller did not approve the pending new sheet.' );
 	delete_post_meta( $campaigns[0]->ID, '_pspp_player', (string) $users['player'] );
 	wp_set_current_user( $users['player'] );
 	$check( null === ps_pen_paper_get_character( $campaigns[0], $ids[0] ) && is_wp_error( ps_pen_paper_roll_dice( $campaigns[0]->ID, $roll_input, '1' ) ), 'Removed member retained contextual access.' );

@@ -76,7 +76,37 @@ try {
 	);
 	$saved_rules = ps_pen_paper_save_rules( $campaign_id, $rule_input, '0' );
 	pspp_test_assert( ! is_wp_error( $saved_rules ) && $saved_rules === ps_pen_paper_get_rules( $campaign_id ), 'Rules did not persist correctly.' );
+	pspp_test_assert( ps_pen_paper_valid_rules_document( $saved_rules ), 'Strict rules document validation rejected a saved ruleset.' );
 	$resource_id = $saved_rules['fields'][0]['id'];
+	$choice_input = $rule_input;
+	foreach ( $choice_input['fields'] as $index => &$field ) { $field['id'] = $saved_rules['fields'][ $index ]['id']; }
+	unset( $field );
+	$choice_input['fields'][] = array( 'id' => '', 'label' => 'Herkunft', 'type' => 'choice', 'description' => '', 'choices' => "Küste\nBerge", 'start' => 'Küste' );
+	$choice_rules = ps_pen_paper_validate_rules( $choice_input, $saved_rules );
+	pspp_test_assert( ! is_wp_error( $choice_rules ) && array( 'Küste', 'Berge' ) === $choice_rules['fields'][2]['choices'], 'Choice field options were not validated.' );
+	$choice_values = array(
+		$resource_id => array( 'current' => '10', 'maximum' => '50' ),
+		$choice_rules['fields'][2]['id'] => 'Berge',
+		$saved_rules['fields'][1]['id'] => 'Hintergrund',
+	);
+	$choice_character = ps_pen_paper_validate_character( array( 'name' => 'Auswahltest', 'values' => $choice_values ), $choice_rules );
+	pspp_test_assert( ! is_wp_error( $choice_character ) && 'Berge' === $choice_character['values'][ $choice_rules['fields'][2]['id'] ], 'A valid choice value was rejected.' );
+	pspp_test_assert( ps_pen_paper_valid_character_snapshot( $choice_character, $choice_rules ), 'Strict character snapshot validation rejected a valid choice.' );
+	$invalid_choice = array( 'name' => 'Auswahltest', 'values' => $choice_values );
+	$invalid_choice['values'][ $choice_rules['fields'][2]['id'] ] = 'Wüste';
+	pspp_test_assert( is_wp_error( ps_pen_paper_validate_character( $invalid_choice, $choice_rules ) ), 'An unknown choice value was accepted.' );
+	$allocation_input = $rule_input;
+	$allocation_input['fields'] = array( array( 'id' => '', 'label' => 'Mut', 'type' => 'attribute', 'description' => '', 'min' => '0', 'max' => '10', 'start' => '5' ) );
+	$allocation_rules = ps_pen_paper_validate_rules( $allocation_input, $saved_rules );
+	$allocation_input['fields'][0]['id'] = $allocation_rules['fields'][0]['id'];
+	$allocation_input['allocation_mode'] = 'configured';
+	$allocation_input['allocation'] = array( 'fields' => array( $allocation_rules['fields'][0]['id'] ), 'points' => '5' );
+	$allocation_rules = ps_pen_paper_validate_rules( $allocation_input, $allocation_rules );
+	pspp_test_assert( ! is_wp_error( $allocation_rules ) && array( $allocation_rules['fields'][0]['id'] ) === $allocation_rules['allocation']['fields'], 'Attribute allocation configuration was rejected.' );
+	$allocation_input['allocation'] = array( 'points' => '5', 'fields' => array( $allocation_rules['fields'][0]['id'] ) );
+	pspp_test_assert( ! is_wp_error( ps_pen_paper_validate_rules( $allocation_input, $allocation_rules ) ), 'Attribute allocation rejected the control order used by the form.' );
+	$allocation_character = ps_pen_paper_validate_character( array( 'name' => 'Punktetest', 'values' => array( $allocation_rules['fields'][0]['id'] => '5' ) ), $allocation_rules );
+	pspp_test_assert( ! is_wp_error( $allocation_character ) && is_wp_error( ps_pen_paper_validate_character( array( 'name' => 'Punktetest', 'values' => array( $allocation_rules['fields'][0]['id'] => '4' ) ), $allocation_rules ) ), 'Attribute allocation did not enforce the exact point total.' );
 	$rename_input = $rule_input;
 	$rename_input['fields'] = array_reverse( $saved_rules['fields'] );
 	foreach ( $rename_input['fields'] as &$field ) {
@@ -190,7 +220,7 @@ try {
 	$invalid_schema = $rename_input;
 	$invalid_schema['fields'][1]['max'] = '200';
 	$schema_result = ps_pen_paper_save_rules( $campaign_id, $invalid_schema, '3' );
-	pspp_test_assert( is_wp_error( $schema_result ) && 'schema_in_use' === $schema_result->get_error_code(), 'Existing character schema was changed incompatibly.' );
+	pspp_test_assert( is_wp_error( $schema_result ) && 'schema_preview_required' === $schema_result->get_error_code(), 'Used field structure bypassed the migration preview.' );
 
 	wp_set_current_user( $user_ids['player'] );
 	$character_input['values'][ $resource_id ]['current'] = '20';
@@ -305,6 +335,9 @@ try {
 	wp_set_current_user( $user_ids['player'] );
 	$html = ps_pen_paper_frontend_shortcode();
 	pspp_test_assert( false !== strpos( $html, $campaign->post_title ) && false === strpos( $html, 'PSPP second test campaign' ), 'Frontend campaign list ignores membership.' );
+	pspp_test_assert( false === strpos( $html, 'pspp_view=packages' ) && false === strpos( $html, 'package_file' ), 'Dashboard still offers adventure package management.' );
+	$_GET = array( 'pspp_view' => 'packages' );
+	pspp_test_assert( false !== strpos( ps_pen_paper_frontend_shortcode(), 'Dieser Verwaltungsbereich ist nicht verfügbar.' ), 'Removed package view still renders.' );
 	$_GET = array( 'pspp_view' => 'characters' );
 	$html = ps_pen_paper_frontend_shortcode();
 	pspp_test_assert( false !== strpos( $html, 'Testcharakter' ) && false !== strpos( $html, esc_url( $return_url ) ), 'Character library lost the owner’s character or frontend detail link.' );
@@ -378,6 +411,28 @@ try {
 	pspp_test_assert( ! $type->publicly_queryable && ! $type->show_in_rest && ! $type->show_ui, 'Campaign post type is exposed.' );
 	$character_type = get_post_type_object( 'pspp_character' );
 	pspp_test_assert( ! $character_type->publicly_queryable && ! $character_type->show_in_rest && ! current_user_can( 'read_post', $character_id ), 'Character is exposed through WordPress.' );
+	$migration_input = $gm_rules_input;
+	$migration_input['fields'][] = array( 'id' => '', 'label' => 'Herkunft', 'type' => 'text', 'description' => '', 'start' => 'Migrationsstart' );
+	$migration_preview = ps_pen_paper_preview_rules_migration( $campaign_id, $migration_input, (string) ps_pen_paper_get_rules( $campaign_id )['revision'] );
+	pspp_test_assert( ! is_wp_error( $migration_preview ) && count( $migration_preview['characters'] ) === 1 &&
+		'active' === $migration_preview['characters'][0]['slot'] && count( $migration_preview['characters'][0]['conflicts'] ) === 1,
+		'Used field migration did not preview its active character conflict.' );
+	$resolutions = array( $migration_preview['characters'][0]['conflicts'][0]['token'] => 'use_default' );
+	$migration_input['fields'][2]['id'] = $migration_preview['after']['fields'][2]['id'];
+	pspp_test_assert( is_wp_error( ps_pen_paper_save_rules_migration( $campaign_id, $migration_input,
+		(string) ps_pen_paper_get_rules( $campaign_id )['revision'], $resolutions, 'confirmed', str_repeat( '0', 64 ) ) ),
+		'A migration accepted a different preview than the explicitly confirmed one.' );
+	pspp_test_assert( true === ps_pen_paper_save_rules_migration( $campaign_id, $migration_input,
+		(string) ps_pen_paper_get_rules( $campaign_id )['revision'], $resolutions, 'confirmed', $migration_preview['hash'] ), 'Confirmed character schema migration failed.' );
+	$migrated = ps_pen_paper_raw_character_state( $character_id );
+	pspp_test_assert( 'Testcharakter' === $migrated['active']['name'] &&
+		'Migrationsstart' === $migrated['active']['values'][ ps_pen_paper_get_rules( $campaign_id )['fields'][2]['id'] ],
+		'Confirmed migration lost the active character or failed to initialize the new field.' );
+	$migration_event = ps_pen_paper_get_events( $campaign )['events'][1];
+	pspp_test_assert( 'character_saved' === $migration_event['kind'] &&
+		ps_pen_paper_valid_character_snapshot( $migration_event['before']['active'], $migration_event['migration_rules_before'] ) &&
+		ps_pen_paper_valid_character_snapshot( $migration_event['after']['active'], $migration_event['migration_rules_after'] ),
+		'Character migration history did not preserve separate historical schemas.' );
 } finally {
 	wp_set_current_user( $original_user );
 	$GLOBALS['wp_query'] = $original_query;

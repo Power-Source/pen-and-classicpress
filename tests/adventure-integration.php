@@ -397,7 +397,7 @@ try {
 	$check( is_int( $cost_base_id ), 'Cost base character fixture failed.' );
 	$cost_base_before = ps_pen_paper_raw_character_state( $cost_base_id );
 	$context_campaigns = array(); $context_characters = array();
-	foreach ( array( 'shared', 'copy' ) as $context_mode ) {
+	foreach ( array( 'copy', 'shared' ) as $context_mode ) {
 		wp_set_current_user( $users['gm'] );
 		$context_campaign_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => 'Cost context fixture' ), true );
 		$check( is_int( $context_campaign_id ), 'Cost context campaign fixture failed.' );
@@ -435,19 +435,20 @@ try {
 		}
 		$result = ps_pen_paper_advance_adventure_run( $context_campaign, $context_run_id, $context_run['snapshot']['edges'][0]['id'], '1' );
 		if ( 'shared' === $context_mode ) {
-			$check( is_wp_error( $result ) && 'resource_cost_shared' === $result->get_error_code() &&
-				$context_before === ps_pen_paper_raw_character_state( $context_character_id ) &&
-				$context_run === get_post_meta( $context_run_id, '_pspp_adventure_run', true ), 'Shared basis was spent through a local adventure.' );
-			$check( true === ps_pen_paper_advance_adventure_run( $context_campaign, $context_run_id, $context_run['snapshot']['edges'][1]['id'], '1' ) &&
-				$context_before === ps_pen_paper_raw_character_state( $context_character_id ),
-				'Shared basis could not take a cost-free alternative.' );
+			$spent_run = get_post_meta( $context_run_id, '_pspp_adventure_run', true );
+			$check( true === $result && $context_before === ps_pen_paper_raw_character_state( $context_character_id ) &&
+				ps_pen_paper_valid_adventure_run( $spent_run ) &&
+				$cost_base_id === $spent_run['history'][0]['resource_cost']['shared_base']['character_id'] &&
+				2 === ps_pen_paper_raw_character_state( $cost_base_id )['active']['values'][ $base_resource ]['current'],
+				'Shared cost did not spend exactly once through the base while preserving the alias.' );
 		} else {
 			$context_after = ps_pen_paper_raw_character_state( $context_character_id );
 			$expected_context = $context_before; $expected_context['revision']++; $expected_context['active']['values'][ $base_resource ]['current'] = 2;
 			$check( true === $result && $expected_context === $context_after, 'Independent copy did not spend locally down to its minimum.' );
 		}
-		$check( $cost_base_before === ps_pen_paper_raw_character_state( $cost_base_id ), 'Local cost changed the universe base character.' );
+		if ( 'copy' === $context_mode ) { $check( $cost_base_before === ps_pen_paper_raw_character_state( $cost_base_id ), 'Local cost changed the universe base character.' ); }
 	}
+	$cost_base_before = ps_pen_paper_raw_character_state( $cost_base_id );
 
 	wp_set_current_user( $users['gm'] );
 	$condition_input = array( 'mode' => 'all', 'rows' => array( array( 'target' => $attribute . ':value', 'operator' => 'eq', 'value' => '6' ) ) );
@@ -888,6 +889,54 @@ try {
 		$check( true === $group_action( 'join', array( 'character_id' => $group_chars['player'] ) ), 'First group join failed.' );
 		wp_set_current_user( $users['other'] );
 		$check( true === $group_action( 'join', array( 'character_id' => $group_chars['other'] ) ), 'Second group join failed.' );
+		$check_world_foundations = function () use ( $check, $users, $campaign, $scenes, $characters ) {
+		wp_set_current_user( $users['gm'] );
+		$world_key = ps_pen_paper_save_item( $campaign, 0, array( 'name' => 'World prerequisite key', 'description' => '',
+			'kind' => 'tool', 'rarity' => 'normal', 'properties' => '', 'binding' => 'tradeable' ), '0' );
+		$check( is_int( $world_key ), 'World prerequisite template failed.' );
+		$world_id = ps_pen_paper_save_adventure( $campaign, 0, 'Independent world route', (string) $scenes['START_ORIGINAL'], '0' );
+		$world_input = array( 'states' => array( array( 'id' => '', 'label' => 'Gate state', 'initial' => 'closed' ) ),
+			'encounter' => array( 'title' => 'Gate encounter', 'phases' => array( (string) $scenes['START_ORIGINAL'], (string) $scenes['SUCCESS_SCENE'] ),
+				'npcs' => array(), 'confirmation' => 'confirmed' ) );
+		$check( true === ps_pen_paper_save_adventure_world( $campaign, $world_id, $world_input, '1' ), 'World definitions failed.' );
+		$world_state = ps_pen_paper_get_adventure( $campaign, $world_id ); $state_id = $world_state['draft']['states'][0]['id'];
+		$world_edge = array( 'from_scene' => (string) $scenes['START_ORIGINAL'], 'choice' => 'Open gate', 'expression' => '',
+			'attribute' => '', 'threshold' => '0', 'success_scene' => (string) $scenes['SUCCESS_SCENE'], 'failure_scene' => '0',
+			'items' => array( 'mode' => 'all', 'rows' => array( array( 'item_id' => (string) $world_key, 'minimum' => '1' ) ) ),
+			'effects' => array( array( 'state' => $state_id, 'value' => 'open', 'when' => 'decision' ) ) );
+		$check( true === ps_pen_paper_save_adventure_edge( $campaign, $world_id, $world_edge, '2' ), 'World decision failed.' );
+		$world_finish = array( 'from_scene' => (string) $scenes['SUCCESS_SCENE'], 'choice' => 'Pass gate', 'expression' => '',
+			'attribute' => '', 'threshold' => '0', 'success_scene' => '0', 'failure_scene' => '0',
+			'conditions' => array( 'mode' => 'all', 'rows' => array( array( 'target' => $state_id . ':state', 'operator' => 'eq', 'value' => 'open' ) ) ) );
+		$check( true === ps_pen_paper_save_adventure_edge( $campaign, $world_id, $world_finish, '3' ) &&
+			true === ps_pen_paper_publish_adventure( $campaign, $world_id, '4', 'confirmed' ), 'World publication failed.' );
+		$world_state = ps_pen_paper_get_adventure( $campaign, $world_id ); $world_edge_id = $world_state['published']['edges'][0]['id'];
+		$bad_world = $world_state['published']; $bad_world['encounters'][0]['phases'] = array_reverse( $bad_world['encounters'][0]['phases'] );
+		$check( ! ps_pen_paper_valid_adventure_publication( $bad_world ), 'Disconnected encounter phases accepted.' );
+		$bad_world = $world_state['published']; $bad_world['edges'][0]['effects'] = 'invalid';
+		$check( ! ps_pen_paper_valid_adventure_publication( $bad_world ), 'Malformed state effects accepted.' );
+		wp_set_current_user( $users['player'] );
+		$world_run = ps_pen_paper_start_adventure_run( $campaign, $world_id, $characters['player'], '5', (string) ps_pen_paper_raw_character_state( $characters['player'] )['revision'] );
+		$check( is_int( $world_run ), 'World run failed.' );
+		$world_before = get_post_meta( $world_run, '_pspp_adventure_run', true );
+		$character_before = ps_pen_paper_raw_character_state( $characters['player'] );
+		$check( is_wp_error( ps_pen_paper_advance_adventure_run( $campaign, $world_run, $world_edge_id, '1' ) ) &&
+			$world_before === get_post_meta( $world_run, '_pspp_adventure_run', true ) &&
+			$character_before === ps_pen_paper_raw_character_state( $characters['player'] ), 'Missing item changed run or character.' );
+		wp_set_current_user( $users['gm'] );
+		$gear_revision = ps_pen_paper_gear_state( $characters['player'] )['revision'];
+		$check( true === ps_pen_paper_save_gear( $campaign, $characters['player'], 'grant_item',
+			array( 'item_id' => (string) $world_key, 'item_revision' => '1' ), (string) $gear_revision ), 'Approved world key grant failed.' );
+		wp_set_current_user( $users['player'] );
+		$check( true === ps_pen_paper_advance_adventure_run( $campaign, $world_run, $world_edge_id, '1' ), 'Approved item did not permit world choice.' );
+		$world_after = get_post_meta( $world_run, '_pspp_adventure_run', true );
+		$check( ps_pen_paper_valid_adventure_run( $world_after ) && 1 === $world_after['history'][0]['items']['rows'][0]['count'] &&
+			'closed' === $world_after['history'][0]['effects'][0]['before'] && 'open' === $world_after['history'][0]['effects'][0]['after'] &&
+			'closed' === ps_pen_paper_adventure_state_values( $world_after['snapshot'], array() )[ $state_id ], 'World receipts or run isolation failed.' );
+		$forged_world = $world_after; $forged_world['history'][0]['effects'][0]['before'] = 'open';
+		$check( ! ps_pen_paper_valid_adventure_run( $forged_world ), 'Forged prior state accepted.' );
+		$check( true === ps_pen_paper_advance_adventure_run( $campaign, $world_run, $world_state['published']['edges'][1]['id'], '2' ), 'State-conditioned continuation failed.' );
+	};
 		wp_set_current_user( $users['outsider'] );
 		$check( null === ps_pen_paper_adventure_group_records( $hybrid )[ $group_id ]['state'] &&
 			is_wp_error( $group_action( 'vote' ) ), 'Unjoined campaign member accessed private group history or voted.' );
@@ -991,6 +1040,7 @@ try {
 
 	wp_set_current_user( $users['outsider'] );
 	$check( is_wp_error( ps_pen_paper_start_adventure_run( $campaign, $adventure_id, $characters['player'], (string) $published['revision'], '1' ) ), 'Nonmember started an adventure run.' );
+	$check_world_foundations();
 	echo "Adventure integration checks passed.\n";
 } finally {
 	wp_set_current_user( $original_user );

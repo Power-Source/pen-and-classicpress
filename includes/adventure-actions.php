@@ -4,12 +4,53 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 function ps_pen_paper_adventure_action_locks( $campaign, $character_id, $edge ) {
 	$locks = array( (int) $campaign->ID, (int) $character_id );
+	if ( isset( $edge['resource_cost'] ) ) {
+		$character = ps_pen_paper_get_character( $campaign, $character_id );
+		if ( ! $character ) { return ps_pen_paper_adventure_error(); }
+		$cost = ps_pen_paper_character_resource_cost( $campaign, $character, $edge['resource_cost']['resource'], $edge['resource_cost']['amount'] );
+		if ( is_wp_error( $cost ) ) { return $cost; }
+		$resource_locks = ps_pen_paper_character_resource_lock_ids( $campaign, $character, $cost );
+		$locks = array_merge( $locks, $resource_locks['character_ids'], $resource_locks['scope_ids'] );
+	}
 	if ( isset( $edge['reward'] ) && ps_pen_paper_adventure_reward_currency( $edge['reward'] ) ) {
 		$wallet = ps_pen_paper_wallet_context( $campaign, $character_id );
 		if ( is_wp_error( $wallet ) ) { return $wallet; }
 		$locks[] = (int) $wallet['character']->ID; $locks[] = (int) $wallet['currency_scope']->ID;
 	}
+	$locks = array_values( array_unique( $locks ) );
+	sort( $locks, SORT_NUMERIC );
 	return $locks;
+}
+
+// Hold both scopes through commit, not just through the resource document write.
+function ps_pen_paper_adventure_action_transaction( $campaign, $locks, $object_id, $write ) {
+	if ( ! $campaign || ! is_array( $locks ) || ! is_int( $object_id ) || $object_id < 1 || ! is_callable( $write ) ) {
+		return ps_pen_paper_adventure_error();
+	}
+	$locks = array_values( array_unique( $locks ) );
+	sort( $locks, SORT_NUMERIC );
+	$scope_ids = array( (int) $campaign->ID );
+	foreach ( $locks as $id ) {
+		if ( ! is_int( $id ) || $id < 1 ) { return ps_pen_paper_adventure_error(); }
+		$post = ps_pen_paper_record_post( $id );
+		if ( ! $post ) { return ps_pen_paper_adventure_error(); }
+		if ( in_array( $post->post_type, array( 'pspp_campaign', 'pspp_universe' ), true ) ) { $scope_ids[] = (int) $post->ID; }
+		elseif ( 0 === strpos( $post->post_type, 'pspp_' ) ) { $scope_ids[] = (int) $post->post_parent; }
+	}
+	$scope_ids = array_values( array_unique( $scope_ids ) );
+	sort( $scope_ids, SORT_NUMERIC );
+	return ps_pen_paper_adventure_locks( $locks, function () use ( $scope_ids, $object_id, $write ) {
+		$lock_scope = function ( $index ) use ( &$lock_scope, $scope_ids, $object_id, $write ) {
+			if ( ! isset( $scope_ids[ $index ] ) ) { return ps_pen_paper_atomic_event( $object_id, $write ); }
+			return ps_pen_paper_scope_lock( $scope_ids[ $index ], function () use ( &$lock_scope, $index, $scope_ids ) {
+				if ( ! ps_pen_paper_scope_observe( $scope_ids[ $index ] ) ) {
+					return new WP_Error( 'scope_changed', __( 'Die Runde oder das Universum wurde inzwischen wiederhergestellt. Bitte lade den aktuellen Stand neu.', 'ps-pen-paper' ) );
+				}
+				return $lock_scope( $index + 1 );
+			} );
+		};
+		return $lock_scope( 0 );
+	} );
 }
 
 function ps_pen_paper_execute_adventure_edge( $campaign, $character, $snapshot, $edge, $history, $locks, $event_id, $review = null ) {
@@ -26,15 +67,26 @@ function ps_pen_paper_execute_adventure_edge( $campaign, $character, $snapshot, 
 	if ( $requirement && $requirement['value'] < $requirement['minimum'] ) {
 		return new WP_Error( 'adventure_requirement_unmet', __( 'Die Voraussetzung für diese Entscheidung ist nicht erfüllt. Lade den Charakterbogen neu. Es wurde kein Fortschritt gespeichert.', 'ps-pen-paper' ) );
 	}
-	$conditions = ps_pen_paper_evaluate_adventure_conditions( $edge, $rules, $character['state'], $history, $snapshot['edges'] );
+	$conditions = ps_pen_paper_evaluate_adventure_conditions( $edge, $rules, $character['state'], $history, $snapshot['edges'], $snapshot['states'] ?? array() );
 	if ( is_wp_error( $conditions ) ) { return $conditions; }
 	if ( $conditions && ! $conditions['met'] ) {
 		return new WP_Error( 'adventure_conditions_unmet', __( 'Die Wertebedingungen für diese Entscheidung sind nicht erfüllt. Es wurden weder Kosten, Belohnung noch Fortschritt gespeichert.', 'ps-pen-paper' ) );
+	}
+	$items = isset( $edge['items'] ) ? ps_pen_paper_adventure_items_result( $edge['items'], (int) $character['post']->ID ) : null;
+	if ( is_wp_error( $items ) ) { return $items; }
+	if ( $items && ! $items['met'] ) {
+		return new WP_Error( 'adventure_items_unmet', __( 'Die benötigten Gegenstände fehlen im freigegebenen Inventar dieser Figur. Es wurden weder Kosten noch Fortschritt gespeichert.', 'ps-pen-paper' ) );
 	}
 	$cost = isset( $edge['resource_cost'] ) ? ps_pen_paper_character_resource_cost( $campaign, $character['post'], $edge['resource_cost']['resource'], $edge['resource_cost']['amount'] ) : null;
 	if ( is_wp_error( $cost ) ) { return $cost; }
 	if ( $cost && $cost['after'] < $cost['minimum'] ) {
 		return new WP_Error( 'adventure_resource_insufficient', __( 'Für diesen Versuch reicht die freigegebene Ressource nicht aus. Es wurden weder Kosten noch Fortschritt gespeichert.', 'ps-pen-paper' ) );
+	}
+	if ( $cost ) {
+		$resource_locks = ps_pen_paper_character_resource_lock_ids( $campaign, $character['post'], $cost );
+		if ( array_diff( array_merge( $resource_locks['character_ids'], $resource_locks['scope_ids'] ), $locks ) ) {
+			return new WP_Error( 'resource_cost_shared_conflict', __( 'Die Verbindung zum Basisbogen wurde inzwischen geändert. Bitte lade den Charakterbogen neu; es wurde nichts übernommen.', 'ps-pen-paper' ) );
+		}
 	}
 	$reward_context = isset( $edge['reward'] ) ? ps_pen_paper_adventure_reward_context( $campaign, $character['post'], $edge['reward'] ) : null;
 	if ( is_wp_error( $reward_context ) ) { return $reward_context; }
@@ -78,5 +130,10 @@ function ps_pen_paper_execute_adventure_edge( $campaign, $character, $snapshot, 
 	}
 	if ( $conditions ) { $entry['conditions'] = $conditions; }
 	if ( ! empty( $edge['gm_review'] ) ) { $entry['review'] = $review; }
+	if ( $items ) { $entry['items'] = $items; }
+	if ( isset( $edge['effects'] ) ) {
+		$entry['effects'] = ps_pen_paper_adventure_effects_result( $edge, $snapshot, $history, $roll );
+		if ( is_wp_error( $entry['effects'] ) ) { return $entry['effects']; }
+	}
 	return $entry;
 }

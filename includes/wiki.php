@@ -160,6 +160,82 @@ function ps_pen_paper_wiki_public_html( $text ) {
 	return wpautop( str_replace( array( '[', ']' ), array( '&#91;', '&#93;' ), esc_html( $text ) ) );
 }
 
+function ps_pen_paper_valid_wiki_links( $state ) {
+	if ( ! is_array( $state ) || array( 'revision', 'links' ) !== array_keys( $state ) ||
+		! is_int( $state['revision'] ) || $state['revision'] < 0 || ! is_array( $state['links'] ) ||
+		count( $state['links'] ) > 200 || ( ! $state['revision'] && $state['links'] ) ) { return false; }
+	foreach ( $state['links'] as $target => $entry_id ) {
+		if ( ! is_string( $target ) || ! preg_match( '/^(?:scene:[1-9]\d{0,10}|field:[a-f0-9-]{36})$/D', $target ) ||
+			! is_int( $entry_id ) || $entry_id < 1 ) { return false; }
+		if ( 0 === strpos( $target, 'field:' ) && ! wp_is_uuid( substr( $target, 6 ) ) ) { return false; }
+	}
+	return true;
+}
+
+function ps_pen_paper_wiki_links_state( $campaign ) {
+	$state = get_post_meta( $campaign->ID, '_pspp_wiki_links', true );
+	if ( '' === $state ) { return array( 'revision' => 0, 'links' => array() ); }
+	return ps_pen_paper_valid_wiki_links( $state ) && $state['revision'] > 0 ? $state : ps_pen_paper_wiki_error();
+}
+
+function ps_pen_paper_wiki_links( $campaign ) {
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ) { return ps_pen_paper_wiki_error(); }
+	return ps_pen_paper_wiki_links_state( $campaign );
+}
+
+function ps_pen_paper_public_wiki_link_entry( $campaign, $entry_id ) {
+	if ( ! ps_pen_paper_wiki_available() ) { return ps_pen_paper_wiki_error(); }
+	$link = ps_pen_paper_get_universe_link( $campaign->ID );
+	if ( is_wp_error( $link ) || ! $link['universe_id'] ) { return ps_pen_paper_wiki_error(); }
+	$post = ps_pen_paper_record_post( $entry_id );
+	$state = get_post_meta( $entry_id, '_pspp_wiki_entry', true );
+	if ( ! $post || 'pspp_wiki_entry' !== $post->post_type || 'private' !== $post->post_status ||
+		(int) $post->post_parent !== $link['universe_id'] || ! ps_pen_paper_valid_wiki_entry( $state ) ) { return ps_pen_paper_wiki_error(); }
+	$wiki = get_post( $state['wiki_id'] );
+	if ( ! $wiki || 'psource_wiki' !== $wiki->post_type || 'publish' !== $wiki->post_status || '' !== $wiki->post_password ||
+		array( $link['universe_id'], $entry_id ) !== get_post_meta( $wiki->ID, '_pspp_wiki_owner', true ) ) { return ps_pen_paper_wiki_error(); }
+	return array( 'id' => (int) $wiki->ID, 'title' => $wiki->post_title, 'url' => get_permalink( $wiki->ID ) );
+}
+
+function ps_pen_paper_wiki_link_for_target( $campaign, $target ) {
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_campaign( $campaign ) ) { return ps_pen_paper_wiki_error(); }
+	if ( is_string( $target ) && 0 === strpos( $target, 'scene:' ) && ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
+		$selection = ps_pen_paper_map_selection( $campaign );
+		$scene = ! is_wp_error( $selection ) && $selection['scene_id'] ? ps_pen_paper_get_scene( $campaign, $selection['scene_id'] ) : null;
+		if ( ! $scene || is_wp_error( $scene ) || ! $scene['published'] || $target !== 'scene:' . $selection['scene_id'] ) { return null; }
+	}
+	$state = ps_pen_paper_wiki_links_state( $campaign );
+	if ( is_wp_error( $state ) ) { return $state; }
+	if ( ! is_string( $target ) || ! isset( $state['links'][ $target ] ) ) { return null; }
+	return ps_pen_paper_public_wiki_link_entry( $campaign, $state['links'][ $target ] );
+}
+
+function ps_pen_paper_save_wiki_link( $campaign, $target, $entry_id, $revision, $rules_revision ) {
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ||
+		! is_string( $target ) || ! is_int( $entry_id ) || $entry_id < 0 ) { return ps_pen_paper_wiki_error(); }
+	return ps_pen_paper_atomic_event( $campaign->ID, function () use ( $campaign, $target, $entry_id, $revision, $rules_revision ) {
+		$campaign = ps_pen_paper_get_campaign( $campaign->ID );
+		if ( ! $campaign || ! ps_pen_paper_can_manage_campaign( $campaign ) ) { return ps_pen_paper_wiki_error(); }
+		$before = ps_pen_paper_wiki_links( $campaign ); $rules = ps_pen_paper_get_rules( $campaign->ID );
+		if ( is_wp_error( $before ) || ! is_string( $revision ) || (string) $before['revision'] !== $revision ||
+			! is_string( $rules_revision ) || (string) $rules['revision'] !== $rules_revision ) { return ps_pen_paper_wiki_error(); }
+		if ( $entry_id ) {
+			if ( 0 === strpos( $target, 'scene:' ) ) {
+				$id = substr( $target, 6 );
+				if ( ! preg_match( '/^[1-9]\d{0,10}$/D', $id ) || is_wp_error( ps_pen_paper_get_scene( $campaign, (int) $id ) ) ) { return ps_pen_paper_wiki_error(); }
+			} elseif ( 0 === strpos( $target, 'field:' ) ) {
+				if ( ! in_array( substr( $target, 6 ), array_column( $rules['fields'], 'id' ), true ) ) { return ps_pen_paper_wiki_error(); }
+			} else { return ps_pen_paper_wiki_error(); }
+			if ( is_wp_error( ps_pen_paper_public_wiki_link_entry( $campaign, $entry_id ) ) ) { return ps_pen_paper_wiki_error(); }
+		} elseif ( ! isset( $before['links'][ $target ] ) ) { return ps_pen_paper_wiki_error(); }
+		$after = $before; $after['revision']++;
+		if ( $entry_id ) { $after['links'][ $target ] = $entry_id; } else { unset( $after['links'][ $target ] ); }
+		if ( ! ps_pen_paper_valid_wiki_links( $after ) ) { return ps_pen_paper_wiki_error(); }
+		return ps_pen_paper_write_document_event( $campaign->ID, $campaign->ID, '_pspp_wiki_links', $before, $after,
+			array( 'kind' => 'wiki_links_saved', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => $rules['revision'] ), false );
+	} );
+}
+
 function ps_pen_paper_save_wiki_entry( $universe, $id, $input, $revision, $config_revision, $confirmation, $publish = false ) {
 	if ( ! ps_pen_paper_wiki_available() || ! ps_pen_paper_can_manage_wiki( $universe ) || 'confirmed' !== $confirmation || ! is_array( $input ) ) { return ps_pen_paper_wiki_error(); }
 	foreach ( array( 'source_id', 'source_revision', 'title', 'content', 'category' ) as $key ) {

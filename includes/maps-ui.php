@@ -61,6 +61,7 @@ function ps_pen_paper_render_map( $campaign, $state, $preview = false ) {
 		data-map-state="<?php echo esc_attr( wp_json_encode( $state ) ); ?>" data-map-labels="<?php echo esc_attr( wp_json_encode( $labels ) ); ?>"<?php if ( ! $scene ) { echo ' hidden'; } ?>>
 		<header class="pspp-map-heading"><span class="pspp-eyebrow"><?php echo esc_html( $preview ? __( 'Private Spielervorschau – gespeicherter Entwurf', 'ps-pen-paper' ) : __( 'Aktuelle Szene', 'ps-pen-paper' ) ); ?></span>
 			<h2 data-map-title><?php echo $scene ? esc_html( $scene['title'] ) : ''; ?></h2>
+			<?php if ( ! $preview && $scene ) { ps_pen_paper_render_wiki_target_link( $campaign, 'scene:' . $scene['id'] ); } ?>
 			<p class="pspp-multiline" data-map-text><?php echo $scene ? esc_html( $scene['text'] ) : ''; ?></p>
 		</header>
 		<div class="pspp-map-tools" data-map-tools hidden>

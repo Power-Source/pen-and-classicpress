@@ -43,6 +43,8 @@ require_once __DIR__ . '/includes/loot-ui.php';
 require_once __DIR__ . '/includes/trade.php';
 require_once __DIR__ . '/includes/trade-ui.php';
 require_once __DIR__ . '/includes/adventure.php';
+require_once __DIR__ . '/includes/adventure-world.php';
+require_once __DIR__ . '/includes/adventure-world-ui.php';
 require_once __DIR__ . '/includes/adventure-actions.php';
 require_once __DIR__ . '/includes/adventure-review.php';
 require_once __DIR__ . '/includes/adventure-review-ui.php';
@@ -70,6 +72,7 @@ require_once __DIR__ . '/includes/frontend.php';
 require_once __DIR__ . '/includes/admin.php';
 
 add_action( 'plugins_loaded', 'ps_pen_paper_load_textdomain' );
+add_action( 'admin_post_pspp_handout_download', 'ps_pen_paper_download_handout' );
 add_action( 'pre_get_posts', 'ps_pen_paper_scope_queries', PHP_INT_MAX );
 add_action( 'init', 'ps_pen_paper_register_campaign_type' );
 add_action( 'init', 'ps_pen_paper_register_character_type' );

@@ -41,7 +41,7 @@ try {
 	wp_set_current_user( $users['player'] );
 	$visible = ps_pen_paper_visible_handouts( $campaign );
 	$check( array( 'title', 'text', 'asset_id' ) === array_keys( $visible[ $id ] ) && false === strpos( wp_json_encode( $visible ), 'HIDDEN_SECRET' ), 'Public projection leaked private data.' );
-	$check( ! is_wp_error( ps_pen_paper_private_image( $campaign, $visible[ $id ]['asset_id'] ) ), 'Released image inaccessible.' );
+	$check( ! is_wp_error( ps_pen_paper_handout_asset( $campaign, $id ) ) && is_wp_error( ps_pen_paper_private_image( $campaign, $visible[ $id ]['asset_id'] ) ), 'Released image unavailable through the guarded handout endpoint or exposed through the generic image API.' );
 	$check( is_wp_error( ps_pen_paper_folio_records( $campaign ) ) && is_wp_error( ps_pen_paper_publish_folio( $campaign, $id, '2', 'confirmed', true ) ), 'Player accessed private folio or withdrew handout.' );
 	ob_start(); ps_pen_paper_render_handouts( $campaign, 27 ); $html = ob_get_clean();
 	$check( false !== strpos( $html, 'PUBLIC_LETTER' ) && false === strpos( $html, 'HIDDEN_SECRET' ), 'Handout HTML privacy failed.' );

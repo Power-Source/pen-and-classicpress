@@ -18,12 +18,14 @@ function ps_pen_paper_prepare_import_known_meta() {
 		'_pspp_wiki', '_pspp_wiki_entry', '_pspp_wiki_owner', '_pspp_item', '_pspp_loot_table',
 		'_pspp_loot_run', '_pspp_trade', '_pspp_adventure', '_pspp_adventure_run', '_pspp_adventure_group',
 		'_pspp_import_epoch', '_pspp_import_receipt', '_pspp_import_backup', '_pspp_import_archive',
+		'_pspp_invitations', '_pspp_wiki_links', '_pspp_handout_asset',
+		'_pspp_item_origin',
 	);
 }
 
 function ps_pen_paper_prepare_import_type_meta() {
 	$campaign = array( '_pspp_gm', '_pspp_player', '_pspp_access', '_pspp_membership', '_pspp_archived',
-		'_pspp_rules', '_pspp_universe_link', '_pspp_turn', '_pspp_scene_selection', '_pspp_backdrop',
+		'_pspp_rules', '_pspp_invitations', '_pspp_wiki_links', '_pspp_universe_link', '_pspp_turn', '_pspp_scene_selection', '_pspp_backdrop',
 		'_pspp_style', '_pspp_sheet_style', '_pspp_equipment_schema', '_pspp_currency', '_pspp_trade_policy',
 		'_pspp_import_epoch', '_pspp_import_receipt', '_pspp_import_backup', '_pspp_import_archive' );
 	$universe = array( '_pspp_rules', '_pspp_universe', '_pspp_sheet_style', '_pspp_equipment_schema',
@@ -35,12 +37,12 @@ function ps_pen_paper_prepare_import_type_meta() {
 		'pspp_character' => array( '_pspp_character', '_pspp_gear', '_pspp_wallet', '_pspp_portrait', '_pspp_import_archive' ),
 		'pspp_roll' => array( '_pspp_roll', '_pspp_visibility', '_pspp_recipient', '_pspp_actor', '_pspp_import_archive' ),
 		'pspp_event' => array( '_pspp_event', '_pspp_visibility', '_pspp_recipient', '_pspp_actor', '_pspp_import_archive' ),
-		'pspp_asset' => array( '_pspp_import_archive' ),
+		'pspp_asset' => array( '_pspp_import_archive', '_pspp_handout_asset' ),
 		'pspp_scene' => array( '_pspp_scene', '_pspp_import_archive' ),
 		'pspp_folio' => array( '_pspp_folio', '_pspp_import_archive' ),
 		'pspp_npc' => array( '_pspp_npc', '_pspp_import_archive' ),
 		'pspp_wiki_entry' => array( '_pspp_wiki_entry', '_pspp_import_archive' ),
-		'pspp_item' => array( '_pspp_item', '_pspp_import_archive' ),
+		'pspp_item' => array( '_pspp_item', '_pspp_item_origin', '_pspp_import_archive' ),
 		'pspp_loot_table' => array( '_pspp_loot_table', '_pspp_import_archive' ),
 		'pspp_loot_run' => array( '_pspp_loot_run', '_pspp_import_archive' ),
 		'pspp_trade' => array( '_pspp_trade', '_pspp_import_archive' ),
@@ -173,6 +175,13 @@ function ps_pen_paper_prepare_import_remap_adventure_graph( &$graph, $scope_id, 
 	$start = ps_pen_paper_prepare_import_scene( (int) $graph['start_scene'], $scope_id, $records, $id_map );
 	if ( is_wp_error( $start ) ) { return $start; }
 	$graph['start_scene'] = $start;
+	foreach ( $graph['encounters'] ?? array() as $index => $encounter ) {
+		foreach ( $encounter['phases'] as $phase => $id ) {
+			$mapped = ps_pen_paper_prepare_import_scene( $id, $scope_id, $records, $id_map );
+			if ( is_wp_error( $mapped ) ) { return $mapped; }
+			$graph['encounters'][ $index ]['phases'][ $phase ] = $mapped;
+		}
+	}
 	foreach ( $graph['edges'] as &$edge ) {
 		foreach ( array( 'from_scene', 'success_scene', 'failure_scene' ) as $key ) {
 			if ( ! isset( $edge[ $key ] ) || ! is_int( $edge[ $key ] ) ) { return ps_pen_paper_prepare_import_error(); }
@@ -220,15 +229,9 @@ function ps_pen_paper_prepare_import_remap_reward( &$reward, $scope_id, $records
 		$table = ps_pen_paper_prepare_import_id( $source['id'], 'pspp_loot_table', $records, $id_map, $scope_id );
 		if ( is_wp_error( $table ) ) { return $table; }
 		$source['id'] = $table;
-		$currency = ps_pen_paper_prepare_import_remap_item_provenance_currency( $source['table']['table']['currency'], $records, $id_map );
-		if ( is_wp_error( $currency ) ) { return $currency; }
-		foreach ( $source['table']['table']['rows'] as &$row ) {
-			if ( null === $row['item'] ) { continue; }
-			$result = ps_pen_paper_prepare_import_remap_item_snapshot( $row['item'], $records, $id_map, $options, $archive,
-				$path . '.source.table.rows.' . $row['from'] . '.item' );
-			if ( is_wp_error( $result ) ) { return $result; }
-		}
-		unset( $row );
+		$mapped = ps_pen_paper_prepare_import_loot_snapshot( $source['table'], $scope_id, $records, $id_map, $options, $archive, $path . '.source.table' );
+		if ( is_wp_error( $mapped ) ) { return $mapped; }
+		$source['table'] = $mapped;
 	} elseif ( 'fixed' === ( $source['kind'] ?? null ) ) {
 		if ( is_array( $source['currency'] ) ) {
 			$currency = ps_pen_paper_prepare_import_remap_item_provenance_currency( $source['currency'], $records, $id_map );
@@ -238,6 +241,35 @@ function ps_pen_paper_prepare_import_remap_reward( &$reward, $scope_id, $records
 			$result = ps_pen_paper_prepare_import_remap_item_snapshot( $source['item'], $records, $id_map, $options, $archive, $path . '.source.item' );
 			if ( is_wp_error( $result ) ) { return $result; }
 		}
+	}
+	return true;
+}
+
+function ps_pen_paper_prepare_import_loot_snapshot( $state, $scope, $records, $id_map, $options, &$archive, $path ) {
+	return ps_pen_paper_loot_snapshot_map( $state,
+		function ( &$item ) use ( $records, $id_map, $options, &$archive, $path ) {
+			return ps_pen_paper_prepare_import_remap_item_snapshot( $item, $records, $id_map, $options, $archive, $path . '.item' );
+		},
+		function ( &$currency ) use ( $records, $id_map ) {
+			return ps_pen_paper_prepare_import_remap_item_provenance_currency( $currency, $records, $id_map );
+		},
+		function ( &$id ) use ( $scope, $records, $id_map ) {
+			$mapped = ps_pen_paper_prepare_import_id( $id, 'pspp_loot_table', $records, $id_map, $scope );
+			if ( is_wp_error( $mapped ) ) { return $mapped; }
+			$id = $mapped; return true;
+		}
+	);
+}
+
+function ps_pen_paper_prepare_import_loot_node( &$node, $scope, $records, $id_map, $options, &$archive, $path ) {
+	$id = ps_pen_paper_prepare_import_id( $node['table_id'], 'pspp_loot_table', $records, $id_map, $scope );
+	if ( is_wp_error( $id ) ) { return $id; }
+	$node['table_id'] = $id;
+	$mapped = ps_pen_paper_prepare_import_loot_snapshot( $node['table'], $scope, $records, $id_map, $options, $archive, $path . '.table' );
+	if ( is_wp_error( $mapped ) ) { return $mapped; }
+	$node['table'] = $mapped;
+	if ( ! empty( $node['nested'] ) ) {
+		return ps_pen_paper_prepare_import_loot_node( $node['nested'], $scope, $records, $id_map, $options, $archive, $path . '.nested' );
 	}
 	return true;
 }
@@ -300,7 +332,7 @@ function ps_pen_paper_prepare_import_validate_roll( $roll ) {
 	return $total === $roll['total'];
 }
 
-function ps_pen_paper_prepare_import_event_snapshot_valid( $kind, $snapshot, $event, $record, $parsed ) {
+function ps_pen_paper_prepare_import_event_snapshot_valid( $kind, $snapshot, $event, $record, $parsed, $side = null ) {
 	if ( ! is_array( $snapshot ) ) { return false; }
 	$document_key = array(
 		'rules_saved' => '_pspp_rules', 'access_saved' => '_pspp_access', 'universe_saved' => '_pspp_universe',
@@ -317,6 +349,7 @@ function ps_pen_paper_prepare_import_event_snapshot_valid( $kind, $snapshot, $ev
 		'trade_policy' => '_pspp_trade_policy', 'trade_changed' => '_pspp_trade',
 		'adventure_saved' => '_pspp_adventure', 'adventure_published' => '_pspp_adventure', 'adventure_run' => '_pspp_adventure_run',
 		'adventure_group' => '_pspp_adventure_group',
+		'invitation_saved' => '_pspp_invitations', 'wiki_links_saved' => '_pspp_wiki_links',
 		'wiki_configured' => '_pspp_wiki', 'wiki_prepared' => '_pspp_wiki_entry', 'wiki_published' => '_pspp_wiki_entry',
 		'currency_saved' => '_pspp_currency', 'wallet_saved' => '_pspp_wallet',
 		'portrait_saved' => '_pspp_portrait', 'sheet_style_saved' => '_pspp_sheet_style',
@@ -390,6 +423,11 @@ function ps_pen_paper_prepare_import_event_snapshot_valid( $kind, $snapshot, $ev
 			null === $snapshot['active'] && null === $snapshot['pending'];
 	}
 	if ( '_pspp_character' === $key ) {
+		if ( 'character_saved' === $kind && isset( $event['migration_rules_before'], $event['migration_rules_after'] ) ) {
+			if ( ! in_array( $side, array( 'before', 'after' ), true ) ) { return false; }
+			$rules = $event[ 'migration_rules_' . $side ];
+			return ps_pen_paper_valid_rules_document( $rules ) && ps_pen_paper_import_character_valid( $snapshot, $rules );
+		}
 		$rules = ps_pen_paper_import_meta( $parsed, $record['parent_id'], '_pspp_rules' );
 		if ( ! is_array( $rules ) && ! empty( $parsed['universe_id'] ) ) {
 			$rules = ps_pen_paper_import_meta( $parsed, $parsed['universe_id'], '_pspp_rules' );
@@ -412,6 +450,7 @@ function ps_pen_paper_prepare_import_event_snapshot_valid( $kind, $snapshot, $ev
 		'_pspp_wiki_entry' => 'ps_pen_paper_valid_wiki_entry', '_pspp_wiki' => 'ps_pen_paper_valid_wiki_config',
 		'_pspp_currency' => 'ps_pen_paper_valid_currency', '_pspp_wallet' => 'ps_pen_paper_valid_wallet',
 		'_pspp_gear' => 'ps_pen_paper_validate_gear_state',
+		'_pspp_invitations' => 'ps_pen_paper_valid_invitations', '_pspp_wiki_links' => 'ps_pen_paper_valid_wiki_links',
 	);
 	if ( isset( $validator[ $key ] ) ) {
 		$valid = call_user_func( $validator[ $key ], $snapshot );
@@ -431,6 +470,15 @@ function ps_pen_paper_prepare_import_validate_event( $event, $record, $parsed ) 
 		! is_array( $event['before'] ) || ! is_array( $event['after'] ) || ! is_array( $event['fields'] ) ||
 		! is_int( $event['rules_revision'] ) || $event['rules_revision'] < 0 ) { return false; }
 	$kind = $event['kind'];
+	if ( array_key_exists( 'migration_rules_before', $event ) || array_key_exists( 'migration_rules_after', $event ) ) {
+		if ( 'character_saved' !== $kind ||
+			! isset( $event['migration_rules_before'], $event['migration_rules_after'] ) ||
+			! ps_pen_paper_valid_rules_document( $event['migration_rules_before'] ) ||
+			! ps_pen_paper_valid_rules_document( $event['migration_rules_after'] ) ||
+			$event['migration_rules_after']['revision'] !== $event['migration_rules_before']['revision'] + 1 ||
+			$event['rules_revision'] !== $event['migration_rules_after']['revision'] ||
+			$event['fields'] !== $event['migration_rules_after']['fields'] ) { return false; }
+	}
 	if ( 'campaign_restored' === $kind ) {
 		return 'gm' === $event['visibility'] && 0 === $event['recipient_id'] &&
 			array( 'revision', 'source_hash', 'backup_id' ) === array_keys( $event['after'] ) &&
@@ -453,12 +501,13 @@ function ps_pen_paper_prepare_import_validate_event( $event, $record, $parsed ) 
 		'folio_saved' => 'gm', 'folio_published' => 'gm', 'folio_withdrawn' => 'gm',
 		'portrait_saved' => 'owner', 'sheet_style_saved' => 'gm', 'equipment_schema' => 'gm',
 		'item_saved' => 'gm', 'gear_saved' => 'owner',
+		'invitation_saved' => 'gm', 'wiki_links_saved' => 'gm',
 	);
 	if ( array_key_exists( $kind, $checks ) ) {
 		$visibility = $checks[ $kind ];
 		if ( ( null !== $visibility && $visibility !== $event['visibility'] ) ||
-			! ps_pen_paper_prepare_import_event_snapshot_valid( $kind, $event['before'], $event, $record, $parsed ) ||
-			! ps_pen_paper_prepare_import_event_snapshot_valid( $kind, $event['after'], $event, $record, $parsed ) ) { return false; }
+			! ps_pen_paper_prepare_import_event_snapshot_valid( $kind, $event['before'], $event, $record, $parsed, 'before' ) ||
+			! ps_pen_paper_prepare_import_event_snapshot_valid( $kind, $event['after'], $event, $record, $parsed, 'after' ) ) { return false; }
 		if ( 'rules_saved' === $kind ) {
 			$scope = $parsed['records'][ $record['parent_id'] ] ?? null;
 			$expected_visibility = $scope && 'pspp_universe' === $scope['type'] ? 'gm' : 'group';
@@ -492,6 +541,13 @@ function ps_pen_paper_prepare_import_validate_event( $event, $record, $parsed ) 
 			! isset( $event['before']['active']['values'][ $cost['id'] ]['current'], $event['after']['active']['values'][ $cost['id'] ]['current'] ) ||
 			$event['before']['active']['values'][ $cost['id'] ]['current'] !== $cost['before'] ||
 			$event['after']['active']['values'][ $cost['id'] ]['current'] !== $cost['after'] ) { return false; }
+		if ( isset( $cost['shared_base'] ) &&
+			( $cost['shared_base']['character_id'] !== $event['object_id'] ||
+				$cost['shared_base']['universe_id'] !== $record['parent_id'] ||
+				! isset( $parsed['records'][ $event['object_id'] ], $parsed['records'][ $record['parent_id'] ] ) ||
+				'pspp_character' !== $parsed['records'][ $event['object_id'] ]['type'] ||
+				$record['parent_id'] !== $parsed['records'][ $event['object_id'] ]['parent_id'] ||
+				'pspp_universe' !== $parsed['records'][ $record['parent_id'] ]['type'] ) ) { return false; }
 	}
 	if ( 'wallet_saved' === $kind && ( ! isset( $event['reason'], $event['character_name'] ) ||
 		! is_string( $event['reason'] ) || '' === trim( $event['reason'] ) || strlen( $event['reason'] ) > 1000 ||
@@ -580,6 +636,10 @@ function ps_pen_paper_prepare_import_validate_known( $key, $value, $record, $par
 		case '_pspp_adventure_group': return ps_pen_paper_valid_adventure_group( $value ) && $value['revision'] > 0;
 		case '_pspp_wiki':
 			return ps_pen_paper_valid_wiki_config( $value );
+		case '_pspp_invitations': return ps_pen_paper_valid_invitations( $value );
+		case '_pspp_wiki_links': return ps_pen_paper_valid_wiki_links( $value );
+		case '_pspp_handout_asset': return '1' === $value;
+		case '_pspp_item_origin': return ps_pen_paper_valid_item_origin( $value );
 		case '_pspp_wiki_entry':
 			return ps_pen_paper_valid_wiki_entry( $value ) && $value['revision'] > 0;
 		case '_pspp_visibility': return in_array( $value, array( 'group', 'owner', 'gm', 'private' ), true );
@@ -674,10 +734,21 @@ function ps_pen_paper_prepare_import_required_record_meta( $record, $meta ) {
 	return true;
 }
 
+function ps_pen_paper_prepare_import_adventure_items( &$edge, $records, $id_map, $options, &$archive, $path ) {
+	foreach ( $edge['items']['rows'] ?? array() as $index => $row ) {
+		$result = ps_pen_paper_prepare_import_remap_item_snapshot( $edge['items']['rows'][ $index ]['item'], $records, $id_map, $options, $archive,
+			$path . '.items.rows.' . $index );
+		if ( is_wp_error( $result ) ) { return $result; }
+	}
+	return true;
+}
+
 function ps_pen_paper_prepare_import_adventure_snapshot( &$snapshot, $scope, $records, $id_map, $options, &$archive, $path ) {
 	$result = ps_pen_paper_prepare_import_remap_adventure_graph( $snapshot, $scope, $records, $id_map );
 	if ( is_wp_error( $result ) ) { return $result; }
 	foreach ( $snapshot['edges'] as &$edge ) {
+		$result = ps_pen_paper_prepare_import_adventure_items( $edge, $records, $id_map, $options, $archive, $path . '.edges.' . $edge['id'] );
+		if ( is_wp_error( $result ) ) { return $result; }
 		if ( ! isset( $edge['reward'] ) ) { continue; }
 		$user = ps_pen_paper_prepare_import_mapped_user( $edge['reward']['authorizer_id'], $options );
 		if ( is_wp_error( $user ) ) { return $user; }
@@ -693,6 +764,11 @@ function ps_pen_paper_prepare_import_adventure_snapshot( &$snapshot, $scope, $re
 function ps_pen_paper_prepare_import_adventure_history( &$history, $owner, $scope, $parsed, $options, $id_map ) {
 	$records = $parsed['records'];
 	foreach ( $history as &$entry ) {
+		foreach ( $entry['items']['rows'] ?? array() as $index => $row ) {
+			if ( ! isset( $id_map[ $row['scope_id'] ], $records[ $row['scope_id'] ] ) ||
+				! in_array( $records[ $row['scope_id'] ]['type'], array( 'pspp_campaign', 'pspp_universe' ), true ) ) { return ps_pen_paper_prepare_import_error(); }
+			$entry['items']['rows'][ $index ]['scope_id'] = $id_map[ $row['scope_id'] ];
+		}
 		if ( isset( $entry['review'] ) ) {
 			$reviewer = ps_pen_paper_prepare_import_mapped_user( $entry['review']['reviewer_id'], $options );
 			if ( is_wp_error( $reviewer ) ) { return $reviewer; }
@@ -847,6 +923,11 @@ function ps_pen_paper_prepare_import_remap_value( $key, &$value, $record, $parse
 			}
 			return true;
 		case '_pspp_folio':
+			foreach ( $value['audience']['users'] ?? array() as $index => $id ) {
+				$user = ps_pen_paper_prepare_import_mapped_user( $id, $options );
+				if ( is_wp_error( $user ) ) { return $user; }
+				$value['audience']['users'][ $index ] = $user;
+			}
 			foreach ( array( 'draft', 'published' ) as $slot ) {
 				if ( null === $value[ $slot ] ) { continue; }
 				$snapshot =& $value[ $slot ];
@@ -871,6 +952,15 @@ function ps_pen_paper_prepare_import_remap_value( $key, &$value, $record, $parse
 				unset( $scene_id, $snapshot );
 			}
 			return true;
+		case '_pspp_invitations':
+			foreach ( $value['users'] as $index => $id ) {
+				$user = ps_pen_paper_prepare_import_mapped_user( $id, $options );
+				if ( is_wp_error( $user ) ) { return $user; }
+				$value['users'][ $index ] = $user;
+			}
+			return ps_pen_paper_valid_invitations( $value ) ? true : ps_pen_paper_prepare_import_error();
+		case '_pspp_item_origin': return true;
+		case '_pspp_handout_asset': return true;
 		case '_pspp_npc':
 			if ( null !== $value['source'] ) {
 				// Template provenance is a frozen origin pointer, not an active link.
@@ -997,6 +1087,8 @@ function ps_pen_paper_prepare_import_remap_value( $key, &$value, $record, $parse
 			$result = ps_pen_paper_prepare_import_remap_adventure_graph( $state['draft'], $record['parent_id'], $records, $id_map );
 			if ( is_wp_error( $result ) ) { return $result; }
 			foreach ( $state['draft']['edges'] as &$edge ) {
+				$result = ps_pen_paper_prepare_import_adventure_items( $edge, $records, $id_map, $options, $archive, $key . '.draft.edges.' . $edge['id'] );
+				if ( is_wp_error( $result ) ) { return $result; }
 				if ( isset( $edge['reward'] ) ) {
 					if ( null !== $edge['reward'] && isset( $edge['reward']['authorizer_id'] ) ) {
 						$user = ps_pen_paper_prepare_import_mapped_user( $edge['reward']['authorizer_id'], $options );
@@ -1013,6 +1105,8 @@ function ps_pen_paper_prepare_import_remap_value( $key, &$value, $record, $parse
 				$result = ps_pen_paper_prepare_import_remap_adventure_graph( $state['published'], $record['parent_id'], $records, $id_map );
 				if ( is_wp_error( $result ) ) { return $result; }
 				foreach ( $state['published']['edges'] as &$edge ) {
+					$result = ps_pen_paper_prepare_import_adventure_items( $edge, $records, $id_map, $options, $archive, $key . '.published.edges.' . $edge['id'] );
+					if ( is_wp_error( $result ) ) { return $result; }
 					if ( isset( $edge['reward'] ) && null !== $edge['reward'] ) {
 						$user = ps_pen_paper_prepare_import_mapped_user( $edge['reward']['authorizer_id'], $options );
 						if ( is_wp_error( $user ) ) { return $user; }
@@ -1113,6 +1207,16 @@ function ps_pen_paper_prepare_import_remap_value( $key, &$value, $record, $parse
 					$key . '.member_id' );
 				if ( is_wp_error( $member ) ) { return $member; }
 				$value['member_id'] = $member;
+			}
+			if ( 'character_resource_spent' === $value['kind'] && isset( $value['resource_cost']['shared_base'] ) ) {
+				$shared =& $value['resource_cost']['shared_base'];
+				$universe = ps_pen_paper_prepare_import_id( $shared['universe_id'], 'pspp_universe', $records, $id_map );
+				$base = ps_pen_paper_prepare_import_id( $shared['character_id'], 'pspp_character', $records, $id_map,
+					$shared['universe_id'] );
+				if ( is_wp_error( $universe ) || is_wp_error( $base ) ) { return ps_pen_paper_prepare_import_error(); }
+				$shared['universe_id'] = $universe;
+				$shared['character_id'] = $base;
+				unset( $shared );
 			}
 			$object = ps_pen_paper_prepare_import_id( $value['object_id'], null, $records, $id_map );
 			if ( is_wp_error( $object ) ) { return $object; }
@@ -1249,7 +1353,7 @@ function ps_pen_paper_prepare_import( $parsed, $options, $id_map, $archive_unkno
 			$valid = ps_pen_paper_prepare_import_validate_known( $key, $value, $record, $parsed );
 			if ( null === $valid || ! $valid ) { return ps_pen_paper_prepare_import_error(); }
 			if ( '_pspp_import_epoch' === $key || '_pspp_import_receipt' === $key || '_pspp_import_backup' === $key ||
-				'_pspp_wiki' === $key || '_pspp_wiki_entry' === $key || '_pspp_wiki_owner' === $key ) {
+				'_pspp_wiki' === $key || '_pspp_wiki_entry' === $key || '_pspp_wiki_owner' === $key || '_pspp_wiki_links' === $key ) {
 				$archive['metadata'][] = array( 'key' => $key, 'value' => $entry['value'] );
 				if ( 0 === strpos( $key, '_pspp_wiki' ) ) {
 					$archive['warnings'][] = __( 'Externe Wiki-Konfiguration und Artikelverknüpfungen wurden als private Herkunftsdaten archiviert und nicht aktiviert.', 'ps-pen-paper' );
@@ -1263,6 +1367,13 @@ function ps_pen_paper_prepare_import( $parsed, $options, $id_map, $archive_unkno
 			} else {
 				$dest['meta'][] = array( 'key' => $key, 'value' => $value );
 			}
+		}
+		if ( 'pspp_item' === $record['type'] ) {
+			$origin = $parsed['meta'][ $source_id ]['_pspp_item_origin'][0] ?? array( 'aliases' => array() );
+			if ( ! in_array( $source_id, $origin['aliases'], true ) ) { $origin['aliases'][] = $source_id; }
+			if ( ! ps_pen_paper_valid_item_origin( $origin ) ) { return ps_pen_paper_prepare_import_error(); }
+			$dest['meta'] = array_values( array_filter( $dest['meta'], function ( $entry ) { return '_pspp_item_origin' !== $entry['key']; } ) );
+			$dest['meta'][] = array( 'key' => '_pspp_item_origin', 'value' => $origin );
 		}
 		$document_key = 'pspp_roll' === $record['type'] ? '_pspp_roll' : ( 'pspp_event' === $record['type'] ? '_pspp_event' : null );
 		if ( $document_key ) {

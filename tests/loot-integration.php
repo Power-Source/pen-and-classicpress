@@ -79,6 +79,93 @@ try {
 	$check( is_wp_error( ps_pen_paper_award_loot( $campaign, $run, $char, '1', '1', '2', 'confirmed' ) ) && $wallet === ps_pen_paper_wallet_context( $campaign, $char )['wallet'] && $gear === ps_pen_paper_gear_state( $char ), 'Repeated award duplicated rewards.' );
 	$none = ps_pen_paper_roll_loot( $campaign, $table, '2', '1', 'No loot', wp_generate_uuid4() );
 	$check( is_int( $none ) && true === ps_pen_paper_award_loot( $campaign, $none, 0, '0', '0', '0', 'confirmed' ), 'No-loot completion failed.' );
+	$char2 = ps_pen_paper_save_character( $campaign->ID, 0, $users['player'], array_merge( $character_input, array( 'name' => 'Second recipient' ) ), '0', '1' );
+	$child_row = array_merge( $row, array( 'label' => 'Nested', 'quantity' => '1', 'money' => '3' ) );
+	$child_input = array( 'name' => 'Nested table', 'die' => '6', 'rows' => array( $child_row ) );
+	$child = ps_pen_paper_save_loot_table( $campaign, 0, $child_input, '0' );
+	$group_row = array_merge( $row, array( 'label' => 'Group', 'quantity' => '2', 'money' => '4', 'items' => $item . ':1', 'nested_id' => (string) $child ) );
+	$group_input = array( 'name' => 'Group table', 'die' => '6', 'rows' => array( $group_row ) );
+	$group = ps_pen_paper_save_loot_table( $campaign, 0, $group_input, '0' );
+	$check( is_int( $char2 ) && is_int( $child ) && is_int( $group ), 'Grouped/nested fixtures failed.' );
+	$cycle = $child_input; $cycle['rows'][0]['items'] = ''; $cycle['rows'][0]['nested_id'] = (string) $group;
+	$check( is_wp_error( ps_pen_paper_save_loot_table( $campaign, $child, $cycle, '1' ) ), 'Nested cycle accepted.' );
+	$group_run = ps_pen_paper_roll_loot( $campaign, $group, '1', '1', 'Grouped split', wp_generate_uuid4() );
+	$group_state = ps_pen_paper_get_loot_run( $campaign, $group_run );
+	$components = ps_pen_paper_loot_components( $group_state['proposal'] );
+	$check( ps_pen_paper_valid_loot_run( $group_state ) && array( 2, 1, 1 ) === array_column( $components['items'], 'quantity' ) && 7 === $components['money'], 'Nested/grouped rolls did not preserve all rewards.' );
+	$split = array(
+		$char => array( 'gear_revision' => '1', 'wallet_revision' => '1', 'currency_revision' => '2', 'items' => array( '1', '1', '0' ), 'money' => '2' ),
+		$char2 => array( 'gear_revision' => '0', 'wallet_revision' => '0', 'currency_revision' => '2', 'items' => array( '1', '0', '1' ), 'money' => '5' ),
+	);
+	$bad_split = $split; $bad_split[ $char2 ]['items'][2] = '0';
+	$check( is_wp_error( ps_pen_paper_award_loot_split( $campaign, $group_run, $bad_split, 'confirmed' ) ), 'Incomplete split accepted.' );
+	$fail = function ( $data, $postarr ) {
+		if ( isset( $postarr['ID'] ) && 'pspp_event' === $data['post_type'] && 'private' === $data['post_status'] ) {
+			$event = get_post_meta( $postarr['ID'], '_pspp_event', true );
+			if ( isset( $event['kind'] ) && 'loot_awarded' === $event['kind'] ) { $data['post_status'] = 'draft'; }
+		}
+		return $data;
+	};
+	add_filter( 'wp_insert_post_data', $fail, 10, 2 );
+	try {
+		$check( is_wp_error( ps_pen_paper_award_loot_split( $campaign, $group_run, $split, 'confirmed' ) ) &&
+			$group_state === ps_pen_paper_get_loot_run( $campaign, $group_run ) && '' === get_post_meta( $char2, '_pspp_gear', true ) &&
+			'' === get_post_meta( $char2, '_pspp_wallet', true ) && $wallet === ps_pen_paper_wallet_context( $campaign, $char )['wallet'], 'Split failure left partial awards.' );
+	} finally { remove_filter( 'wp_insert_post_data', $fail, 10 ); }
+	$check( true === ps_pen_paper_award_loot_split( $campaign, $group_run, $split, 'confirmed' ) &&
+		4 === count( ps_pen_paper_gear_state( $char )['active']['items'] ) && 2 === count( ps_pen_paper_gear_state( $char2 )['active']['items'] ) &&
+		5 === ps_pen_paper_wallet_context( $campaign, $char2 )['wallet']['balance'] &&
+		is_wp_error( ps_pen_paper_award_loot_split( $campaign, $group_run, $split, 'confirmed' ) ), 'Atomic split or replay protection failed.' );
+	$group_table = $group_state['proposal']['table'];
+	$reward = array( 'timing' => 'decision', 'authorizer_id' => $users['gm'], 'source' => array( 'kind' => 'table', 'id' => $group, 'table' => $group_table ) );
+	$check( ps_pen_paper_valid_adventure_reward( $reward ) && array( 'items' => 4, 'money' => 7 ) === ps_pen_paper_loot_snapshot_limits( $group_table ) &&
+		3 === count( ps_pen_paper_adventure_reward_items( $reward ) ), 'Adventure recursive maxima or snapshot traversal failed.' );
+	$mapped = ps_pen_paper_loot_snapshot_map( $group_table, function ( &$instance ) { $instance['source_id'] += 10000; return true; },
+		function ( &$currency ) { $currency['scope_id'] += 10000; return true; },
+		function ( &$nested_id ) { $nested_id += 10000; return true; } );
+	$check( ! is_wp_error( $mapped ) && $group_table !== $mapped && array( 'items' => 4, 'money' => 7 ) === ps_pen_paper_loot_snapshot_limits( $mapped ) &&
+		$child + 10000 === $mapped['table']['rows'][0]['nested']['table_id'] &&
+		count( ps_pen_paper_loot_snapshot_items( $mapped ) ) === 3, 'Recursive item/currency/table mapping failed.' );
+	$rejected_map = ps_pen_paper_loot_snapshot_map( $group_table, function ( &$instance ) { $instance['source_id'] = 0; return true; } );
+	$check( is_wp_error( $rejected_map ) && $group_table === $group_state['proposal']['table'], 'Invalid mapping succeeded or mutated the source snapshot.' );
+	$alternatives = $group_table; $first = $alternatives['table']['rows'][0]; $first['to'] = 3;
+	$second = $first; $second['from'] = 4; $second['to'] = 6; $second['quantity'] = '50'; $second['money'] = '0'; $second['items'] = array(); $second['nested'] = null;
+	$alternatives['table']['rows'] = array( $first, $second );
+	$check( array( 'items' => 50, 'money' => 7 ) === ps_pen_paper_loot_snapshot_limits( $alternatives ), 'Alternative row maxima were incorrectly summed.' );
+	wp_set_current_user( $users['player'] );
+	$character2 = ps_pen_paper_get_character( $campaign, $char2 );
+	$reward_context = ps_pen_paper_adventure_reward_context( $campaign, $character2, $reward );
+	$check( ! is_wp_error( $reward_context ), 'Adventure grouped reward context failed.' );
+	$award_result = null;
+	$award = function () use ( $campaign, $character2, $reward, $reward_context, &$award_result ) {
+		return ps_pen_paper_with_character_locks( array( (int) $character2->ID ), function () use ( $campaign, $character2, $reward, $reward_context, &$award_result ) {
+			return ps_pen_paper_atomic_event( $campaign->ID, function () use ( $campaign, $character2, $reward, $reward_context, &$award_result ) {
+				$award_result = ps_pen_paper_write_adventure_reward( $campaign, $character2, $reward, $reward_context, 123 );
+				return is_wp_error( $award_result ) ? $award_result : 0;
+			} );
+		} );
+	};
+	$gear_events = 0;
+	$fail = function ( $data, $postarr ) use ( &$gear_events ) {
+		if ( isset( $postarr['ID'] ) && 'pspp_event' === $data['post_type'] && 'private' === $data['post_status'] ) {
+			$event = get_post_meta( $postarr['ID'], '_pspp_event', true );
+			if ( isset( $event['kind'] ) && 'gear_saved' === $event['kind'] && 2 === ++$gear_events ) { $data['post_status'] = 'draft'; }
+		}
+		return $data;
+	};
+	add_filter( 'wp_insert_post_data', $fail, 10, 2 );
+	try {
+		$check( is_wp_error( $award() ) && $reward_context['gear'] === ps_pen_paper_gear_state( $char2 ) &&
+			$reward_context['wallet']['wallet'] === ps_pen_paper_wallet_context( $campaign, $char2 )['wallet'], 'Adventure grouped grant failure left partial inventory or money.' );
+	} finally { remove_filter( 'wp_insert_post_data', $fail, 10 ); }
+	$check( true === $award() && ps_pen_paper_valid_adventure_reward_result( $reward, $award_result, $char2 ) &&
+		3 === count( $award_result['component_ids'] ) && 4 === count( $award_result['item_ids'] ) &&
+		12 === ps_pen_paper_wallet_context( $campaign, $char2 )['wallet']['balance'] &&
+		6 === count( ps_pen_paper_gear_state( $char2 )['active']['items'] ), 'Adventure grouped/nested award failed.' );
+	$damaged = $award_result; $damaged['component_ids'][1][] = $damaged['item_ids'][0];
+	$check( ! ps_pen_paper_valid_adventure_reward_result( $reward, $damaged, $char2 ), 'Invalid per-component instance IDs accepted.' );
+	$damaged = $award_result; $damaged['wallet']['after']['balance']--;
+	$check( ! ps_pen_paper_valid_adventure_reward_result( $reward, $damaged, $char2 ), 'Incorrect combined money accepted.' );
 	wp_set_current_user( $users['player'] );
 	$check( is_wp_error( ps_pen_paper_get_loot_run( $campaign, $run ) ) && is_wp_error( ps_pen_paper_get_loot_table( $campaign, $table ) ) && is_wp_error( ps_pen_paper_award_loot( $campaign, $run, $char, '1', '1', '2', 'confirmed' ) ), 'Player accessed private loot.' );
 	ob_start(); ps_pen_paper_render_loot( $campaign, 27 ); $html = ob_get_clean(); $check( '' === $html, 'Player UI leaked loot tables.' );

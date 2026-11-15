@@ -47,11 +47,65 @@ function ps_pen_paper_private_image_data( $campaign, $asset_id ) {
 	$asset = ps_pen_paper_record_post( $asset_id );
 	if ( ! $asset || 'pspp_asset' !== $asset->post_type || 'private' !== $asset->post_status ||
 		(int) $asset->post_parent !== (int) $campaign->ID ||
+		metadata_exists( 'post', $asset_id, '_pspp_handout_asset' ) ||
 		! in_array( $asset->post_mime_type, array( 'image/png', 'image/jpeg', 'image/webp' ), true ) ||
 		! preg_match( '/^[A-Za-z0-9+\/]+=*$/D', $asset->post_content ) ) {
 		return new WP_Error( 'invalid_backdrop', __( 'Der Hintergrund ist nicht mehr verfügbar. Bitte lade ihn in den Rundeneinstellungen erneut hoch.', 'ps-pen-paper' ) );
 	}
 	return 'data:' . $asset->post_mime_type . ';base64,' . $asset->post_content;
+}
+
+function ps_pen_paper_valid_private_asset_content( $mime, $content ) {
+	if ( ! is_string( $mime ) || ! is_string( $content ) || '' === $content || strlen( $content ) > 4 * (int) ceil( 2 * MB_IN_BYTES / 3 ) ) { return false; }
+	$data = base64_decode( $content, true );
+	if ( false === $data || base64_encode( $data ) !== $content || strlen( $data ) > 2 * MB_IN_BYTES ) { return false; }
+	if ( in_array( $mime, array( 'image/png', 'image/jpeg', 'image/webp' ), true ) ) {
+		$info = function_exists( 'getimagesizefromstring' ) ? @getimagesizefromstring( $data ) : false;
+		return is_array( $info ) && isset( $info['mime'], $info[0], $info[1] ) && $info['mime'] === $mime &&
+			$info[0] > 0 && $info[1] > 0 && $info[0] <= 3000 && $info[1] <= 3000;
+	}
+	if ( 'text/plain' === $mime ) {
+		return 1 === preg_match( '//u', $data ) && ! preg_match( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $data );
+	}
+	if ( 'application/pdf' === $mime ) {
+		if ( 1 !== preg_match( '/^%PDF-(?:1\.[0-7]|2\.0)[\r\n]/', $data ) ||
+			1 !== preg_match( '/\b\d+\s+\d+\s+obj\b/', $data ) ||
+			1 !== preg_match( '/startxref\s+(\d+)\s+%%EOF\s*$/D', $data, $match ) || strlen( $match[1] ) > 10 ) { return false; }
+		$offset = (int) $match[1];
+		if ( $offset < 1 || $offset >= strlen( $data ) ) { return false; }
+		$xref = substr( $data, $offset );
+		return 1 === preg_match( '/^xref(?:\r|\n|\s)/', $xref ) ||
+			1 === preg_match( '/^\d+\s+\d+\s+obj\b.{0,65535}?\/Type\s*\/XRef\b/s', $xref );
+	}
+	return false;
+}
+
+function ps_pen_paper_store_handout_asset( $campaign, $path, $filename = null ) {
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ||
+		! is_string( $path ) || ! is_file( $path ) || ! is_readable( $path ) || filesize( $path ) > 2 * MB_IN_BYTES ) {
+		return new WP_Error( 'invalid_handout_asset', __( 'Die Handoutdatei ist nicht verfügbar oder überschreitet 2 MiB.', 'ps-pen-paper' ) );
+	}
+	$data = file_get_contents( $path );
+	if ( ! is_string( $data ) ) { return new WP_Error( 'invalid_handout_asset', __( 'Die Handoutdatei konnte nicht gelesen werden.', 'ps-pen-paper' ) ); }
+	$encoded = base64_encode( $data );
+	$extension = null === $filename ? '' : strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
+	$types = array( 'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'webp' => 'image/webp', 'pdf' => 'application/pdf', 'txt' => 'text/plain' );
+	if ( null === $filename ) {
+		$info = function_exists( 'getimagesizefromstring' ) ? @getimagesizefromstring( $data ) : false;
+		$mime = is_array( $info ) && isset( $info['mime'] ) ? $info['mime'] : '';
+	} else { $mime = isset( $types[ $extension ] ) ? $types[ $extension ] : ''; }
+	if ( ! ps_pen_paper_valid_private_asset_content( $mime, $encoded ) ) {
+		return new WP_Error( 'invalid_handout_asset', __( 'Bitte verwende ein gültiges PNG-, JPEG-, WebP-, PDF- oder UTF-8-Textdokument bis 2 MiB.', 'ps-pen-paper' ) );
+	}
+	$id = wp_insert_post( array( 'post_type' => 'pspp_asset', 'post_status' => 'private', 'post_parent' => $campaign->ID,
+		'post_title' => 'PS Pen & Paper Handout', 'post_author' => get_current_user_id(), 'post_mime_type' => $mime,
+		'post_content' => $encoded, 'meta_input' => array( '_pspp_handout_asset' => '1' ) ), true );
+	if ( is_wp_error( $id ) || ! $id ) { return is_wp_error( $id ) ? $id : new WP_Error( 'save_failed', __( 'Die Handoutdatei konnte nicht gespeichert werden.', 'ps-pen-paper' ) ); }
+	if ( array( '1' ) !== get_post_meta( $id, '_pspp_handout_asset', false ) ) {
+		wp_delete_post( $id, true );
+		return new WP_Error( 'save_failed', __( 'Die Handoutdatei konnte nicht geschützt gespeichert werden.', 'ps-pen-paper' ) );
+	}
+	return $id;
 }
 
 function ps_pen_paper_store_private_image( $campaign_id, $path, $character_id = 0 ) {

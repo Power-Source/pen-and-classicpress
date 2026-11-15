@@ -139,12 +139,11 @@ function ps_pen_paper_parse_import( $json ) {
 			ps_pen_paper_import_user_references( $value, $parsed['users'], ! in_array( $record['type'], array( 'pspp_event', 'pspp_roll' ), true ) );
 		}
 		if ( 'pspp_asset' === $record['type'] ) {
-			$data = base64_decode( $record['content'], true );
-			if ( false === $data || '' === $data || base64_encode( $data ) !== $record['content'] || strlen( $data ) > 2 * MB_IN_BYTES ||
-				! in_array( $record['mime_type'], array( 'image/png', 'image/jpeg', 'image/webp' ), true ) ) { return ps_pen_paper_import_error(); }
-			$image = @getimagesizefromstring( $data );
-			if ( ! $image || $image['mime'] !== $record['mime_type'] || $image[0] < 1 || $image[1] < 1 ||
-				$image[0] > 3000 || $image[1] > 3000 ) { return ps_pen_paper_import_error(); }
+			if ( ! ps_pen_paper_valid_private_asset_content( $record['mime_type'], $record['content'] ) ) { return ps_pen_paper_import_error(); }
+			if ( ! in_array( $record['mime_type'], array( 'image/png', 'image/jpeg', 'image/webp' ), true ) ) {
+				$markers = array_values( array_filter( $record['meta'], function ( $entry ) { return '_pspp_handout_asset' === $entry['key']; } ) );
+				if ( 1 !== count( $markers ) || '1' !== $markers[0]['value'] ) { return ps_pen_paper_import_error(); }
+			}
 		}
 	}
 	$campaign_id = $payload['source']['campaign_id'];
@@ -242,6 +241,15 @@ function ps_pen_paper_parse_import( $json ) {
 
 function ps_pen_paper_import_user_references( $value, &$users, $required = true ) {
 	if ( ! is_array( $value ) ) { return; }
+	if ( isset( $value['users'] ) && is_array( $value['users'] ) &&
+		( ( isset( $value['mode'] ) && in_array( $value['mode'], array( 'all', 'users' ), true ) ) ||
+			array( 'revision', 'users' ) === array_keys( $value ) ) ) {
+		foreach ( $value['users'] as $id ) {
+			if ( ! is_int( $id ) || $id < 1 ) { continue; }
+			if ( ! isset( $users[ $id ] ) ) { $users[ $id ] = array( 'required' => false ); }
+			if ( $required ) { $users[ $id ]['required'] = true; }
+		}
+	}
 	foreach ( $value as $key => $part ) {
 		if ( in_array( $key, array( 'owner_id', 'authorizer_id', 'recipient_id', 'actor_id', 'user_id', 'requester_id', 'reviewer_id' ), true ) && is_int( $part ) && $part > 0 ) {
 			if ( ! isset( $users[ $part ] ) ) { $users[ $part ] = array( 'required' => false ); }

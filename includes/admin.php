@@ -80,7 +80,7 @@ function ps_pen_paper_handle_admin_action() {
 
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
 	$page_id = ps_pen_paper_posted_id( 'pspp_frontend_page' );
-	if ( in_array( $operation, array( 'create', 'update', 'save_rules', 'add_member', 'remove_member' ), true ) ) {
+	if ( in_array( $operation, array( 'create', 'update', 'save_rules', 'save_rules_migration', 'add_member', 'remove_member' ), true ) ) {
 		if ( ! ps_pen_paper_can_access_site() ) {
 			ps_pen_paper_fail( __( 'Du hast keinen Zugriff auf den Spielbereich dieser Website.', 'ps-pen-paper' ) );
 		}
@@ -99,8 +99,9 @@ function ps_pen_paper_handle_admin_action() {
 		}
 	}
 	if ( 'group_adventure' === $operation ) { ps_pen_paper_handle_adventure_group_action(); }
-	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure', 'request_adventure_review', 'review_adventure_run', 'cancel_adventure_review' ), true ) ) { ps_pen_paper_handle_adventure_action( $operation ); }
+	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'save_adventure_world', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure', 'request_adventure_review', 'review_adventure_run', 'cancel_adventure_review' ), true ) ) { ps_pen_paper_handle_adventure_action( $operation ); }
 	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) ) { ps_pen_paper_handle_trade_action( $operation ); }
+	if ( 'save_wiki_link' === $operation ) { ps_pen_paper_handle_wiki_link_action(); }
 	if ( in_array( $operation, array( 'configure_wiki', 'prepare_wiki', 'publish_wiki' ), true ) ) { ps_pen_paper_handle_wiki_action( $operation ); }
 	if ( in_array( $operation, array( 'save_loot_table', 'roll_loot', 'award_loot' ), true ) ) { ps_pen_paper_handle_loot_action( $operation ); }
 	if ( in_array( $operation, array( 'save_npc', 'offer_npc', 'copy_npc', 'approve_npc' ), true ) ) {
@@ -118,13 +119,13 @@ function ps_pen_paper_handle_admin_action() {
 	if ( in_array( $operation, array( 'save_scene', 'publish_scene', 'withdraw_scene', 'select_scene' ), true ) ) {
 		ps_pen_paper_handle_scene_action( $operation );
 	}
-	if ( in_array( $operation, array( 'save_universe_rules', 'save_base_character', 'adopt_universe_rules', 'attach_base_character', 'save_character_context', 'copy_shared_character' ), true ) ) {
+	if ( in_array( $operation, array( 'save_universe_rules', 'save_base_character', 'adopt_universe_rules', 'attach_base_character', 'save_character_context', 'copy_shared_character', 'request_base_character', 'reattach_character' ), true ) ) {
 		ps_pen_paper_handle_character_context_action( $operation );
 	}
 	if ( in_array( $operation, array( 'save_universe', 'link_universe' ), true ) ) {
 		ps_pen_paper_handle_universe_action( $operation );
 	}
-	if ( in_array( $operation, array( 'request_membership', 'review_membership', 'save_access', 'save_backdrop' ), true ) ) {
+	if ( in_array( $operation, array( 'request_membership', 'review_membership', 'save_access', 'save_backdrop', 'invite_user', 'revoke_invitation', 'accept_invitation', 'decline_invitation' ), true ) ) {
 		ps_pen_paper_handle_access_action( $operation );
 	}
 	if ( 'create' === $operation ) {
@@ -271,13 +272,19 @@ function ps_pen_paper_handle_admin_action() {
 		ps_pen_paper_redirect( 'style_saved', $campaign_id );
 	}
 
-	if ( 'save_rules' === $operation ) {
+	if ( 'save_rules' === $operation || 'save_rules_migration' === $operation ) {
 		if ( 'complete' !== ps_pen_paper_posted_text( 'rules_complete' ) ) {
 			ps_pen_paper_fail( __( 'Das Formular wurde nicht vollständig übertragen. Es wurde nichts gespeichert.', 'ps-pen-paper' ) );
 		}
 		$input = isset( $_POST['rules'] ) ? wp_unslash( $_POST['rules'] ) : null;
 		$revision = isset( $_POST['rules_revision'] ) ? $_POST['rules_revision'] : null;
-		$result = ps_pen_paper_save_rules( $campaign_id, $input, $revision );
+		if ( 'save_rules' === $operation && '1' === ps_pen_paper_posted_text( 'pspp_schema_preview' ) ) {
+			ps_pen_paper_show_rules_migration_preview( $campaign, $input, $revision, $page_id );
+		}
+		$result = 'save_rules_migration' === $operation
+			? ps_pen_paper_save_rules_migration( $campaign_id, $input, $revision, isset( $_POST['resolutions'] ) ? wp_unslash( $_POST['resolutions'] ) : array(),
+				ps_pen_paper_posted_text( 'migration_confirmation' ), ps_pen_paper_posted_text( 'migration_preview_hash' ) )
+			: ps_pen_paper_save_rules( $campaign_id, $input, $revision );
 		if ( is_wp_error( $result ) ) {
 			ps_pen_paper_fail( $result->get_error_message() );
 		}

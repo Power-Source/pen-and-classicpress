@@ -10,9 +10,14 @@ function ps_pen_paper_handle_access_action( $operation ) {
 	if ( isset( $_POST['pspp_frontend_page'] ) && ! ps_pen_paper_frontend_page( $page_id ) ) {
 		ps_pen_paper_fail( __( 'Die Spielbereich-Seite ist nicht mehr verfügbar. Bitte öffne das Formular erneut.', 'ps-pen-paper' ) );
 	}
-	check_admin_referer( ( 'request_membership' === $operation ? 'pspp_join_' : 'pspp_campaign_' ) . $campaign_id );
+	check_admin_referer( ( in_array( $operation, array( 'request_membership', 'accept_invitation', 'decline_invitation' ), true ) ? 'pspp_join_' : 'pspp_campaign_' ) . $campaign_id );
 	$revision = isset( $_POST['settings_revision'] ) ? $_POST['settings_revision'] : null;
-	if ( 'request_membership' === $operation ) {
+	if ( in_array( $operation, array( 'invite_user', 'revoke_invitation', 'accept_invitation', 'decline_invitation' ), true ) ) {
+		$operations = array( 'invite_user' => 'invite', 'revoke_invitation' => 'revoke', 'accept_invitation' => 'accept', 'decline_invitation' => 'decline' );
+		$self = in_array( $operation, array( 'accept_invitation', 'decline_invitation' ), true );
+		$result = ps_pen_paper_change_invitation( $campaign_id, $self ? get_current_user_id() : ps_pen_paper_posted_id( 'user_id' ),
+			$operations[ $operation ], ps_pen_paper_posted_text( 'invitation_revision' ), ps_pen_paper_posted_text( 'membership_revision' ) );
+	} elseif ( 'request_membership' === $operation ) {
 		$result = ps_pen_paper_request_membership( $campaign_id );
 	} elseif ( 'review_membership' === $operation ) {
 		$result = ps_pen_paper_review_membership( $campaign_id, ps_pen_paper_posted_id( 'user_id' ), ps_pen_paper_posted_text( 'decision' ), ps_pen_paper_posted_text( 'membership_revision' ) );
@@ -36,12 +41,32 @@ function ps_pen_paper_handle_access_action( $operation ) {
 	}
 	$notice = 'request_membership' === $operation ? 'join_requested' : ( 'review_membership' === $operation ? 'join_reviewed' : 'settings_saved' );
 	$url = $page_id ? ps_pen_paper_game_url( $page_id, $campaign_id ) : ps_pen_paper_admin_url( $campaign_id );
-	wp_safe_redirect( add_query_arg( 'pspp_notice', $notice, $url ) . ( 'request_membership' === $operation ? '' : '#pspp-settings' ) );
+	$self_service = in_array( $operation, array( 'request_membership', 'accept_invitation', 'decline_invitation' ), true );
+	wp_safe_redirect( add_query_arg( 'pspp_notice', $notice, $url ) . ( $self_service ? '' : '#pspp-settings' ) );
 	exit;
 }
 
 function ps_pen_paper_render_campaign_preview( $campaign, $page_id ) {
 	$access = ps_pen_paper_get_access( $campaign->ID );
+	$invitations = ps_pen_paper_can_access_site() ? ps_pen_paper_invitations( $campaign->ID ) : null;
+	if ( is_wp_error( $invitations ) ) { return ps_pen_paper_frontend_message( $invitations->get_error_message() ); }
+	if ( $invitations && in_array( get_current_user_id(), $invitations['users'], true ) ) {
+		$membership = ps_pen_paper_membership_revision( $campaign->ID );
+		if ( is_wp_error( $membership ) ) { return ps_pen_paper_frontend_message( $membership->get_error_message() ); }
+		ob_start();
+		?><div class="pspp-game pspp-lobby">
+			<h2><?php echo esc_html( $campaign->post_title ); ?></h2>
+			<p><?php esc_html_e( 'Du wurdest als Spieler eingeladen. Erst nach deiner Annahme erhältst du Zugriff auf die Runde.', 'ps-pen-paper' ); ?></p>
+			<?php foreach ( array( 'accept_invitation' => __( 'Einladung annehmen', 'ps-pen-paper' ), 'decline_invitation' => __( 'Einladung ablehnen', 'ps-pen-paper' ) ) as $action => $label ) :
+				ps_pen_paper_form_start( $action, 'pspp_join_' . $campaign->ID, $campaign->ID, $page_id ); ?>
+				<input type="hidden" name="invitation_revision" value="<?php echo esc_attr( $invitations['revision'] ); ?>">
+				<input type="hidden" name="membership_revision" value="<?php echo esc_attr( $membership['revision'] ); ?>">
+				<button type="submit"><?php echo esc_html( $label ); ?></button>
+				</form>
+			<?php endforeach; ?>
+		</div><?php
+		return ob_get_clean();
+	}
 	if ( is_wp_error( $access ) || 'teaser' !== $access['visibility'] ) {
 		return ! is_user_logged_in() ? ps_pen_paper_frontend_login( $page_id, $campaign->ID ) : ps_pen_paper_frontend_message( __( 'Diese Kampagne ist für dich nicht verfügbar.', 'ps-pen-paper' ) );
 	}
@@ -84,7 +109,8 @@ function ps_pen_paper_render_access_settings( $campaign, $page_id = 0 ) {
 	$access = ps_pen_paper_get_access( $campaign->ID );
 	$backdrop = ps_pen_paper_get_backdrop( $campaign->ID );
 	$membership = ps_pen_paper_membership_revision( $campaign->ID );
-	foreach ( array( $access, $backdrop, $membership ) as $error ) {
+	$invitations = ps_pen_paper_invitations( $campaign->ID );
+	foreach ( array( $access, $backdrop, $membership, $invitations ) as $error ) {
 		if ( is_wp_error( $error ) ) {
 			echo '<p role="alert">' . esc_html( $error->get_error_message() ) . '</p>';
 			return;
@@ -130,6 +156,25 @@ function ps_pen_paper_render_access_settings( $campaign, $page_id = 0 ) {
 			<input type="hidden" name="settings_complete" value="complete">
 			<?php submit_button( __( 'Zugang speichern', 'ps-pen-paper' ) ); ?>
 		</form>
+	</section>
+	<section class="pspp-settings-section">
+		<h3><?php esc_html_e( 'Einladungen', 'ps-pen-paper' ); ?></h3>
+		<p><?php esc_html_e( 'Lade bestehende Website-Benutzer als Spieler ein und sende ihnen den Kampagnenlink. Erst ihre Annahme gewährt Zugriff; es wird keine Nachricht automatisch versendet.', 'ps-pen-paper' ); ?></p>
+		<?php ps_pen_paper_form_start( 'invite_user', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
+			<input type="hidden" name="invitation_revision" value="<?php echo esc_attr( $invitations['revision'] ); ?>">
+			<label><?php esc_html_e( 'Benutzer', 'ps-pen-paper' ); ?> <?php ps_pen_paper_user_select(); ?></label>
+			<button type="submit"><?php esc_html_e( 'Einladen', 'ps-pen-paper' ); ?></button>
+		</form>
+		<?php if ( ! $invitations['users'] ) : ?><p><?php esc_html_e( 'Keine offenen Einladungen.', 'ps-pen-paper' ); ?></p><?php endif; ?>
+		<?php foreach ( $invitations['users'] as $user_id ) : $user = get_userdata( $user_id ); ?>
+			<div><strong><?php echo esc_html( $user ? $user->display_name . ' · #' . $user_id : sprintf( __( 'Gelöschter Benutzer #%d', 'ps-pen-paper' ), $user_id ) ); ?></strong>
+				<?php ps_pen_paper_form_start( 'revoke_invitation', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
+					<input type="hidden" name="invitation_revision" value="<?php echo esc_attr( $invitations['revision'] ); ?>">
+					<input type="hidden" name="user_id" value="<?php echo esc_attr( $user_id ); ?>">
+					<button type="submit"><?php esc_html_e( 'Einladung zurückziehen', 'ps-pen-paper' ); ?></button>
+				</form>
+			</div>
+		<?php endforeach; ?>
 	</section>
 	<section class="pspp-settings-section">
 		<h3><?php esc_html_e( 'Beitrittsanfragen', 'ps-pen-paper' ); ?></h3>

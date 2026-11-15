@@ -29,13 +29,27 @@ function ps_pen_paper_folio_default() {
 	), 'published' => null );
 }
 
+function ps_pen_paper_valid_handout_audience( $audience ) {
+	if ( ! is_array( $audience ) || array( 'mode', 'users' ) !== array_keys( $audience ) ||
+		! in_array( $audience['mode'], array( 'all', 'users' ), true ) || ! is_array( $audience['users'] ) ||
+		array_values( $audience['users'] ) !== $audience['users'] || count( $audience['users'] ) > 500 ||
+		count( $audience['users'] ) !== count( array_unique( $audience['users'], SORT_REGULAR ) ) ) { return false; }
+	foreach ( $audience['users'] as $user_id ) { if ( ! is_int( $user_id ) || $user_id < 1 ) { return false; } }
+	return 'all' === $audience['mode'] ? ! $audience['users'] : (bool) $audience['users'];
+}
+
+function ps_pen_paper_handout_audience( $snapshot ) {
+	return isset( $snapshot['audience'] ) ? $snapshot['audience'] : array( 'mode' => 'all', 'users' => array() );
+}
+
 function ps_pen_paper_validate_folio_snapshot( $value, $published = false ) {
 	if ( ! is_array( $value ) || ! isset( $value['title'], $value['text'], $value['asset_id'] ) ||
 		! is_string( $value['title'] ) || '' === trim( $value['title'] ) || strlen( $value['title'] ) > 800 ||
 		! is_string( $value['text'] ) || strlen( $value['text'] ) > 20000 ||
 		! is_int( $value['asset_id'] ) || $value['asset_id'] < 0 ) { return false; }
+	if ( array_key_exists( 'audience', $value ) && ! ps_pen_paper_valid_handout_audience( $value['audience'] ) ) { return false; }
 	if ( $published ) {
-		return array( 'title', 'text', 'asset_id' ) === array_keys( $value );
+		return in_array( array_keys( $value ), array( array( 'title', 'text', 'asset_id' ), array( 'title', 'text', 'asset_id', 'audience' ) ), true );
 	}
 	if ( ! isset( $value['type'], $value['secret'], $value['order'], $value['chapter_id'], $value['scene_id'], $value['scene_ids'] ) ||
 		! is_string( $value['type'] ) || ! isset( ps_pen_paper_folio_types()[ $value['type'] ] ) ||
@@ -95,13 +109,13 @@ function ps_pen_paper_adventure_plan( $campaign ) {
 	return array( 'records' => $records, 'scenes' => $scenes, 'selection' => $selection );
 }
 
-function ps_pen_paper_save_folio( $campaign, $id, $input, $revision, $image_path = null ) {
-	return ps_pen_paper_scope_write( $campaign, function () use ( $campaign, $id, $input, $revision, $image_path ) {
-		return ps_pen_paper_save_folio_locked( $campaign, $id, $input, $revision, $image_path );
+function ps_pen_paper_save_folio( $campaign, $id, $input, $revision, $image_path = null, $filename = null ) {
+	return ps_pen_paper_scope_write( $campaign, function () use ( $campaign, $id, $input, $revision, $image_path, $filename ) {
+		return ps_pen_paper_save_folio_locked( $campaign, $id, $input, $revision, $image_path, $filename );
 	} );
 }
 
-function ps_pen_paper_save_folio_locked( $campaign, $id, $input, $revision, $image_path = null ) {
+function ps_pen_paper_save_folio_locked( $campaign, $id, $input, $revision, $image_path = null, $filename = null ) {
 	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
 		return new WP_Error( 'forbidden', __( 'Nur die Spielleitung darf die Mappe bearbeiten.', 'ps-pen-paper' ) );
 	}
@@ -123,6 +137,22 @@ function ps_pen_paper_save_folio_locked( $campaign, $id, $input, $revision, $ima
 		'order' => (int) $input['order'], 'chapter_id' => (int) $input['chapter_id'], 'scene_id' => (int) $input['scene_id'],
 		'scene_ids' => array(), 'asset_id' => $before['draft']['asset_id'],
 	);
+	if ( isset( $input['audience_mode'] ) || isset( $input['audience_users'] ) ) {
+		if ( ! isset( $input['audience_mode'] ) || ! is_string( $input['audience_mode'] ) ||
+			( isset( $input['audience_users'] ) && ! is_array( $input['audience_users'] ) ) ) { return ps_pen_paper_folio_error(); }
+		$users = array();
+		foreach ( isset( $input['audience_users'] ) ? $input['audience_users'] : array() as $user_id ) {
+			if ( ! is_string( $user_id ) || ! preg_match( '/^[1-9]\d{0,10}$/D', $user_id ) ) { return ps_pen_paper_folio_error(); }
+			$user_id = (int) $user_id;
+			$user = ps_pen_paper_site_user( $user_id );
+			if ( ! $user || ! user_can( $user, 'read' ) || ! ps_pen_paper_campaign_role( $campaign, $user_id ) ) { return ps_pen_paper_folio_error(); }
+			$users[] = $user_id;
+		}
+		$draft['audience'] = array( 'mode' => $input['audience_mode'], 'users' => $users );
+		if ( 'handout' !== $draft['type'] || ! ps_pen_paper_valid_handout_audience( $draft['audience'] ) ) { return ps_pen_paper_folio_error(); }
+	} elseif ( isset( $before['draft']['audience'] ) ) {
+		$draft['audience'] = $before['draft']['audience'];
+	}
 	if ( $id && $draft['type'] !== $before['draft']['type'] ) { return ps_pen_paper_folio_error(); }
 	if ( $draft['chapter_id'] ) {
 		$chapter = ps_pen_paper_get_folio( $campaign, $draft['chapter_id'] );
@@ -149,7 +179,7 @@ function ps_pen_paper_save_folio_locked( $campaign, $id, $input, $revision, $ima
 	}
 	$asset_id = 0;
 	if ( null !== $image_path ) {
-		$asset_id = ps_pen_paper_store_private_image( $campaign->ID, $image_path );
+		$asset_id = ps_pen_paper_store_handout_asset( $campaign, $image_path, $filename );
 		if ( is_wp_error( $asset_id ) ) { return $asset_id; }
 		$draft['asset_id'] = $asset_id;
 	}
@@ -182,12 +212,72 @@ function ps_pen_paper_publish_folio( $campaign, $id, $revision, $confirmed, $wit
 	if ( 'handout' !== $before['draft']['type'] || ! is_string( $revision ) || (string) $before['revision'] !== $revision || 'confirmed' !== $confirmed ) {
 		return new WP_Error( 'conflict', __( 'Bitte lade den aktuellen Handoutstand und bestätige die Freigabe beziehungsweise Rücknahme.', 'ps-pen-paper' ) );
 	}
+	$audience = ps_pen_paper_handout_audience( $before['draft'] );
+	if ( ! $withdraw && 'users' === $audience['mode'] && $before['draft']['asset_id'] &&
+		array( '1' ) !== get_post_meta( $before['draft']['asset_id'], '_pspp_handout_asset', false ) ) {
+		return new WP_Error( 'restricted_asset', __( 'Dieses ältere Handoutbild muss für einen eingeschränkten Empfängerkreis erneut hochgeladen werden.', 'ps-pen-paper' ) );
+	}
+	if ( ! $withdraw && 'users' === $audience['mode'] ) {
+		foreach ( $audience['users'] as $user_id ) {
+			$user = ps_pen_paper_site_user( $user_id );
+			if ( ! $user || ! user_can( $user, 'read' ) || ! ps_pen_paper_campaign_role( $campaign, $user_id ) ) {
+				return new WP_Error( 'invalid_audience', __( 'Ein ausgewählter Empfänger ist kein leseberechtigtes Mitglied mehr. Bitte bearbeite den Entwurf.', 'ps-pen-paper' ) );
+			}
+		}
+	}
 	$after = $before;
 	$after['revision']++;
 	$after['published'] = $withdraw ? null : array(
 		'title' => $before['draft']['title'], 'text' => $before['draft']['text'], 'asset_id' => $before['draft']['asset_id'],
 	);
+	if ( ! $withdraw && isset( $before['draft']['audience'] ) ) { $after['published']['audience'] = $audience; }
 	return ps_pen_paper_folio_event( $campaign, $id, $before, $after, $withdraw ? 'folio_withdrawn' : 'folio_published' );
+}
+
+function ps_pen_paper_handout_asset( $campaign, $folio_id, $draft = false ) {
+	$error = new WP_Error( 'forbidden', __( 'Diese Handoutdatei ist nicht verfügbar.', 'ps-pen-paper' ) );
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_campaign( $campaign ) || ( $draft && ! ps_pen_paper_can_manage_campaign( $campaign ) ) ) { return $error; }
+	$folio = ps_pen_paper_get_folio( $campaign, $folio_id );
+	if ( is_wp_error( $folio ) || 'handout' !== $folio['draft']['type'] ) { return $error; }
+	$snapshot = $draft ? $folio['draft'] : $folio['published'];
+	if ( ! $snapshot || ! $snapshot['asset_id'] ) { return $error; }
+	$audience = ps_pen_paper_handout_audience( $snapshot );
+	if ( ! $draft && 'users' === $audience['mode'] && ! in_array( get_current_user_id(), $audience['users'], true ) && ! ps_pen_paper_can_manage_campaign( $campaign ) ) { return $error; }
+	$asset = ps_pen_paper_record_post( $snapshot['asset_id'] );
+	if ( ! $asset || 'pspp_asset' !== $asset->post_type || 'private' !== $asset->post_status ||
+		(int) $asset->post_parent !== (int) $campaign->ID ||
+		( 'users' === $audience['mode'] && array( '1' ) !== get_post_meta( $asset->ID, '_pspp_handout_asset', false ) ) ||
+		! ps_pen_paper_valid_private_asset_content( $asset->post_mime_type, $asset->post_content ) ) { return $error; }
+	return $asset;
+}
+
+function ps_pen_paper_handout_download_url( $campaign, $folio_id, $draft = false ) {
+	$args = array( 'action' => 'pspp_handout_download', 'campaign_id' => $campaign->ID, 'folio_id' => $folio_id, 'draft' => $draft ? '1' : '0' );
+	return wp_nonce_url( add_query_arg( $args, admin_url( 'admin-post.php' ) ), 'pspp_handout_' . $campaign->ID . '_' . $folio_id . '_' . $args['draft'] );
+}
+
+function ps_pen_paper_download_handout() {
+	$campaign_id = isset( $_GET['campaign_id'] ) && is_string( $_GET['campaign_id'] ) && preg_match( '/^[1-9]\d{0,10}$/D', $_GET['campaign_id'] ) ? (int) $_GET['campaign_id'] : 0;
+	$folio_id = isset( $_GET['folio_id'] ) && is_string( $_GET['folio_id'] ) && preg_match( '/^[1-9]\d{0,10}$/D', $_GET['folio_id'] ) ? (int) $_GET['folio_id'] : 0;
+	$draft = isset( $_GET['draft'] ) && is_string( $_GET['draft'] ) ? $_GET['draft'] : '';
+	if ( ! $campaign_id || ! $folio_id || ! in_array( $draft, array( '0', '1' ), true ) ||
+		! isset( $_GET['_wpnonce'] ) || ! is_string( $_GET['_wpnonce'] ) ||
+		! wp_verify_nonce( wp_unslash( $_GET['_wpnonce'] ), 'pspp_handout_' . $campaign_id . '_' . $folio_id . '_' . $draft ) ) {
+		wp_die( esc_html__( 'Diese Handoutdatei ist nicht verfügbar.', 'ps-pen-paper' ), '', array( 'response' => 403 ) );
+	}
+	$asset = ps_pen_paper_handout_asset( ps_pen_paper_get_campaign( $campaign_id ), $folio_id, '1' === $draft );
+	if ( is_wp_error( $asset ) ) { wp_die( esc_html( $asset->get_error_message() ), '', array( 'response' => 403 ) ); }
+	$extensions = array( 'image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp', 'application/pdf' => 'pdf', 'text/plain' => 'txt' );
+	$data = base64_decode( $asset->post_content, true );
+	nocache_headers();
+	header( 'Cache-Control: private, no-store, max-age=0' );
+	header( 'X-Content-Type-Options: nosniff' );
+	header( 'Content-Security-Policy: sandbox; default-src \'none\'' );
+	header( 'Content-Type: ' . $asset->post_mime_type );
+	header( 'Content-Disposition: ' . ( 0 === strpos( $asset->post_mime_type, 'image/' ) ? 'inline' : 'attachment' ) . '; filename="handout.' . $extensions[ $asset->post_mime_type ] . '"' );
+	header( 'Content-Length: ' . strlen( $data ) );
+	echo $data; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	exit;
 }
 
 function ps_pen_paper_visible_handouts( $campaign ) {
@@ -198,7 +288,8 @@ function ps_pen_paper_visible_handouts( $campaign ) {
 	foreach ( get_posts( array( 'post_type' => 'pspp_folio', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'ASC' ) ) as $post ) {
 		$value = ps_pen_paper_get_folio( $campaign, $post->ID );
 		if ( is_wp_error( $value ) ) { return $value; }
-		if ( null !== $value['published'] ) {
+		$audience = null === $value['published'] ? null : ps_pen_paper_handout_audience( $value['published'] );
+		if ( null !== $audience && ( 'all' === $audience['mode'] || in_array( get_current_user_id(), $audience['users'], true ) || ps_pen_paper_can_manage_campaign( $campaign ) ) ) {
 			$handouts[ $post->ID ] = array_intersect_key( $value['published'], array_flip( array( 'title', 'text', 'asset_id' ) ) );
 		}
 	}

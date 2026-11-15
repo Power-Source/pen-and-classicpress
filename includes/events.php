@@ -7,6 +7,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 function ps_pen_paper_event_labels() {
 	return array(
 		'rules_saved'         => __( 'Regelwerk gespeichert', 'ps-pen-paper' ),
+		'invitation_saved'    => __( 'Einladung geändert', 'ps-pen-paper' ),
+		'wiki_links_saved'    => __( 'Wiki-Verknüpfungen geändert', 'ps-pen-paper' ),
 		'campaign_restored'   => __( 'Kampagne wiederhergestellt', 'ps-pen-paper' ),
 		'turn_changed'        => __( 'Zug gewechselt', 'ps-pen-paper' ),
 		'access_saved'        => __( 'Zugangseinstellungen geändert', 'ps-pen-paper' ),
@@ -249,6 +251,13 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 		return $error;
 	}
 	$event['id'] = $post->ID;
+	if ( in_array( $event['kind'], array( 'invitation_saved', 'wiki_links_saved' ), true ) ) {
+		$validator = 'invitation_saved' === $event['kind'] ? 'ps_pen_paper_valid_invitations' : 'ps_pen_paper_valid_wiki_links';
+		if ( 'gm' !== $event['visibility'] || ! $validator( $event['before'] ) || ! $validator( $event['after'] ) ||
+			$event['after']['revision'] !== $event['before']['revision'] + 1 ) {
+			return new WP_Error( 'invalid_event', __( 'Die Einladungs- oder Wiki-Stände im Protokoll sind beschädigt.', 'ps-pen-paper' ) );
+		}
+	}
 	if ( 'character_resource_spent' === $event['kind'] ) {
 		$cost = isset( $event['resource_cost'] ) ? $event['resource_cost'] : null;
 		if ( 'owner' !== $event['visibility'] || ! ps_pen_paper_valid_character_resource_cost( $cost ) ||

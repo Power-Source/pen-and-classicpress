@@ -8,6 +8,64 @@ function ps_pen_paper_wiki_url( $universe, $page_id, $entry_id = 0 ) {
 	return $url . '#pspp-wiki';
 }
 
+function ps_pen_paper_handle_wiki_link_action() {
+	$campaign_id = ps_pen_paper_posted_id( 'campaign_id' ); $page_id = ps_pen_paper_posted_id( 'pspp_frontend_page' );
+	check_admin_referer( 'pspp_campaign_' . $campaign_id );
+	if ( isset( $_POST['pspp_frontend_page'] ) && ! ps_pen_paper_frontend_page( $page_id ) ) { ps_pen_paper_fail( ps_pen_paper_wiki_error()->get_error_message() ); }
+	$entry = ps_pen_paper_posted_text( 'wiki_link_entry' );
+	if ( ! preg_match( '/^(?:0|[1-9]\d{0,10})$/D', $entry ) ) { ps_pen_paper_fail( ps_pen_paper_wiki_error()->get_error_message() ); }
+	$result = ps_pen_paper_save_wiki_link( ps_pen_paper_get_campaign( $campaign_id ), ps_pen_paper_posted_text( 'wiki_link_target' ),
+		(int) $entry, ps_pen_paper_posted_text( 'wiki_link_revision' ), ps_pen_paper_posted_text( 'wiki_link_rules_revision' ) );
+	if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
+	$url = $page_id ? ps_pen_paper_game_url( $page_id, $campaign_id ) : ps_pen_paper_admin_url( $campaign_id );
+	wp_safe_redirect( $url . '#pspp-wiki-links' ); exit;
+}
+
+function ps_pen_paper_render_wiki_target_link( $campaign, $target ) {
+	$link = ps_pen_paper_wiki_link_for_target( $campaign, $target );
+	if ( is_wp_error( $link ) ) { echo '<span role="alert">' . esc_html__( 'Lexikonverknüpfung nicht verfügbar.', 'ps-pen-paper' ) . '</span>'; }
+	elseif ( $link ) { echo '<a href="' . esc_url( $link['url'] ) . '">' . esc_html( $link['title'] ) . '</a>'; }
+}
+
+function ps_pen_paper_render_campaign_wiki_links( $campaign, $page_id ) {
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ) { return; }
+	$state = ps_pen_paper_wiki_links( $campaign ); $rules = ps_pen_paper_get_rules( $campaign->ID );
+	$link = ps_pen_paper_get_universe_link( $campaign->ID );
+	if ( is_wp_error( $state ) || is_wp_error( $link ) ) { echo '<p role="alert">' . esc_html__( 'Lexikonverknüpfungen sind nicht verfügbar.', 'ps-pen-paper' ) . '</p>'; return; }
+	?><section id="pspp-wiki-links"><h3><?php esc_html_e( 'Lexikonverknüpfungen', 'ps-pen-paper' ); ?></h3>
+	<p><?php esc_html_e( 'Verknüpfe Szenen oder Charakterfelder mit öffentlichen Artikeln des zugeordneten Universums. Die Verknüpfung veröffentlicht keine Kampagnendaten und vergibt keine Rechte.', 'ps-pen-paper' ); ?></p>
+	<?php if ( ! $link['universe_id'] || ! ps_pen_paper_wiki_available() ) : ?>
+		<p><?php esc_html_e( 'Ein zugeordnetes Universum und PS Wiki sind erforderlich.', 'ps-pen-paper' ); ?></p>
+	<?php else :
+		$targets = array();
+		foreach ( get_posts( array( 'post_type' => 'pspp_scene', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'posts_per_page' => -1 ) ) as $post ) {
+			$scene = ps_pen_paper_get_scene( $campaign, $post->ID );
+			if ( is_wp_error( $scene ) ) { echo '<p role="alert">' . esc_html( $scene->get_error_message() ) . '</p></section>'; return; }
+			$targets[ 'scene:' . $post->ID ] = __( 'Szene:', 'ps-pen-paper' ) . ' ' . $scene['draft']['title'];
+		}
+		foreach ( $rules['fields'] as $field ) { $targets[ 'field:' . $field['id'] ] = __( 'Charakterfeld:', 'ps-pen-paper' ) . ' ' . $field['label']; }
+		$entries = array();
+		foreach ( get_posts( array( 'post_type' => 'pspp_wiki_entry', 'post_status' => 'private', 'post_parent' => $link['universe_id'], 'posts_per_page' => -1 ) ) as $post ) {
+			$entry = ps_pen_paper_public_wiki_link_entry( $campaign, (int) $post->ID );
+			if ( ! is_wp_error( $entry ) ) { $entries[ $post->ID ] = $entry['title']; }
+		}
+		foreach ( $state['links'] as $target => $entry_id ) : ?>
+			<p><?php echo esc_html( isset( $targets[ $target ] ) ? $targets[ $target ] : $target ); ?> · <?php echo esc_html( isset( $entries[ $entry_id ] ) ? $entries[ $entry_id ] : __( 'Artikel nicht verfügbar', 'ps-pen-paper' ) ); ?></p>
+			<?php ps_pen_paper_form_start( 'save_wiki_link', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
+				<input type="hidden" name="wiki_link_revision" value="<?php echo esc_attr( $state['revision'] ); ?>"><input type="hidden" name="wiki_link_rules_revision" value="<?php echo esc_attr( $rules['revision'] ); ?>">
+				<input type="hidden" name="wiki_link_target" value="<?php echo esc_attr( $target ); ?>"><input type="hidden" name="wiki_link_entry" value="0">
+				<button type="submit"><?php esc_html_e( 'Verknüpfung entfernen', 'ps-pen-paper' ); ?></button></form>
+		<?php endforeach;
+		if ( $targets && $entries ) :
+			ps_pen_paper_form_start( 'save_wiki_link', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
+			<input type="hidden" name="wiki_link_revision" value="<?php echo esc_attr( $state['revision'] ); ?>"><input type="hidden" name="wiki_link_rules_revision" value="<?php echo esc_attr( $rules['revision'] ); ?>">
+			<label><?php esc_html_e( 'Szene oder Feld', 'ps-pen-paper' ); ?><select name="wiki_link_target"><?php foreach ( $targets as $target => $label ) : ?><option value="<?php echo esc_attr( $target ); ?>"><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></label>
+			<label><?php esc_html_e( 'Öffentlicher Artikel', 'ps-pen-paper' ); ?><select name="wiki_link_entry"><?php foreach ( $entries as $entry_id => $title ) : ?><option value="<?php echo esc_attr( $entry_id ); ?>"><?php echo esc_html( $title ); ?></option><?php endforeach; ?></select></label>
+			<button type="submit"><?php esc_html_e( 'Verknüpfung speichern', 'ps-pen-paper' ); ?></button></form>
+		<?php endif;
+	endif; ?></section><?php
+}
+
 function ps_pen_paper_handle_wiki_action( $operation ) {
 	$id = ps_pen_paper_posted_id( 'campaign_id' ); $page_id = ps_pen_paper_posted_id( 'pspp_frontend_page' );
 	check_admin_referer( 'pspp_campaign_' . $id );

@@ -601,7 +601,7 @@ Seit 0.25.0 lassen sich mehrere Wertebedingungen mit UND oder ODER verknüpfen.
 Text- und Fortschrittsbedingungen sowie hybride Spielleiterfreigaben für
 Einzeldurchläufe sind ergänzt. Gemeinsame Gruppendurchläufe mit konfigurierbaren
 Entscheidungen, Teilnahme und Wiedereinstieg sind ebenfalls vorhanden.
-Gegenstandsbedingungen und eigenständige Abenteuerpakete fehlen noch;
+Gegenstandsbedingungen bleiben ein weiterer Ausbauschritt;
 Details stehen in Abschnitt 21.
 Der **Story-Builder** mit Szenen, getrennten Geheimnissen, Inhaltsvorschau,
 Freigabe, Rücknahme und Protokollierung ist vorhanden.
@@ -1562,7 +1562,15 @@ Teilnahmen werden abgewiesen. Nach der Übernahme zählen die aktuellen Rechte
 der örtlichen Spielleitung und tatsächlichen Besitzer.
 
 Kosten und Belohnungen betreffen ausschließlich die jeweils ausführende Figur.
-Gegenstandsbedingungen und eigenständige Abenteuerpakete bleiben weitere Ausbauschritte.
+Gegenstandsbedingungen bleiben ein weiterer Ausbauschritt.
+
+### Abenteuer ohne Dateiübernahme spielen
+
+Spielleitung/Admin stellt Universen, Kampagnen und Abenteuer auf der Website
+bereit und legt Regeln, Spielmodus, Teilnahme und Freigaben fest.
+Spieler öffnen ihre Kampagne und nutzen die dort freigegebenen Abenteuer mit
+ihrem Charakter. Eine separate Paketbibliothek und Abenteuerdatei-Importe oder
+-Downloads gehören nicht zum Spielablauf.
 
 ### Mehrere Wertebedingungen mit UND oder ODER
 

@@ -34,8 +34,10 @@ document.querySelectorAll('[data-condition-editor]').forEach((editor) => {
 	const template = editor.querySelector('[data-condition-template]');
 	const add = editor.querySelector('[data-add-condition]');
 	let next = Number(editor.dataset.nextIndex);
+	const configuredMaxRows = Number(editor.dataset.maxRows);
+	const maxRows = Number.isSafeInteger(configuredMaxRows) && configuredMaxRows > 0 ? configuredMaxRows : 20;
 	const update = () => {
-		add.disabled = list.children.length >= 20;
+		add.disabled = list.children.length >= maxRows;
 		list.querySelectorAll('[data-remove-condition]').forEach((button) => {
 			button.hidden = false;
 			button.disabled = list.children.length <= 1;
@@ -43,7 +45,7 @@ document.querySelectorAll('[data-condition-editor]').forEach((editor) => {
 	};
 	add.hidden = false;
 	add.addEventListener('click', () => {
-		if (list.children.length >= 20) return;
+		if (list.children.length >= maxRows) return;
 		list.insertAdjacentHTML('beforeend', template.innerHTML.replace(/__INDEX__/g, String(next++)));
 		psppDirtyForms.add(editor.closest('form'));
 		list.lastElementChild.querySelector('select').focus();
@@ -109,6 +111,13 @@ document.querySelectorAll('[data-rules-editor]').forEach((editor) => {
 		numeric.hidden = !isNumeric;
 		numeric.disabled = !isNumeric;
 		field.querySelector('[data-resource-note]').hidden = type !== 'resource';
+		const choiceSettings = field.querySelector('[data-choice-settings]');
+		choiceSettings.hidden = type !== 'choice';
+		choiceSettings.querySelectorAll('textarea,input').forEach((input) => { input.disabled = type !== 'choice'; });
+		const textSettings = field.querySelector('[data-text-settings]');
+		const isText = ['text', 'textarea'].includes(type);
+		textSettings.hidden = !isText;
+		textSettings.querySelectorAll('textarea').forEach((input) => { input.disabled = !isText; });
 		const min = numeric.querySelector('[data-number="min"]');
 		const max = numeric.querySelector('[data-number="max"]');
 		const start = numeric.querySelector('[data-number="start"]');

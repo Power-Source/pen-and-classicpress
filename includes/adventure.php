@@ -41,6 +41,14 @@ function ps_pen_paper_valid_adventure_edge( $edge ) {
 		$keys[] = 'gm_review';
 		if ( ! is_bool( $edge['gm_review'] ) ) { return false; }
 	}
+	if ( is_array( $edge ) && array_key_exists( 'items', $edge ) ) {
+		$keys[] = 'items';
+		if ( ! ps_pen_paper_valid_adventure_items( $edge['items'] ) ) { return false; }
+	}
+	if ( is_array( $edge ) && array_key_exists( 'effects', $edge ) ) {
+		$keys[] = 'effects';
+		if ( ! ps_pen_paper_valid_adventure_effects( $edge['effects'] ) ) { return false; }
+	}
 	if ( ! is_array( $edge ) || $keys !== array_keys( $edge ) ||
 		! is_string( $edge['id'] ) || ! wp_is_uuid( $edge['id'] ) ||
 		! is_int( $edge['from_scene'] ) || $edge['from_scene'] < 1 ||
@@ -117,8 +125,8 @@ function ps_pen_paper_valid_adventure_conditions( $conditions ) {
 		! $conditions['rows'] || count( $conditions['rows'] ) > 20 || array_values( $conditions['rows'] ) !== $conditions['rows'] ) { return false; }
 	foreach ( $conditions['rows'] as $row ) {
 		if ( ! is_array( $row ) || array( 'field', 'part', 'operator', 'value' ) !== array_keys( $row ) ||
-			! is_string( $row['field'] ) || ! wp_is_uuid( $row['field'] ) || ! in_array( $row['part'], array( 'value', 'current', 'maximum', 'text', 'history' ), true ) ) { return false; }
-		if ( 'text' === $row['part'] ) {
+			! is_string( $row['field'] ) || ! wp_is_uuid( $row['field'] ) || ! in_array( $row['part'], array( 'value', 'current', 'maximum', 'text', 'history', 'state' ), true ) ) { return false; }
+		if ( in_array( $row['part'], array( 'text', 'state' ), true ) ) {
 			if ( ! is_string( $row['value'] ) || strlen( $row['value'] ) > 2000 ||
 				is_wp_error( ps_pen_paper_compare_adventure_value( '', $row['operator'], $row['value'] ) ) ) { return false; }
 		} elseif ( ! is_int( $row['value'] ) || abs( $row['value'] ) > 1000000 ||
@@ -128,7 +136,11 @@ function ps_pen_paper_valid_adventure_conditions( $conditions ) {
 	return true;
 }
 
-function ps_pen_paper_adventure_condition_field( $row, $rules, $edges = array() ) {
+function ps_pen_paper_adventure_condition_field( $row, $rules, $edges = array(), $states = array() ) {
+	if ( 'state' === $row['part'] ) {
+		foreach ( $states as $state ) { if ( $state['id'] === $row['field'] ) { return array( 'id' => $state['id'], 'label' => $state['label'], 'type' => 'state' ); } }
+		return ps_pen_paper_adventure_conditions_error();
+	}
 	if ( 'history' === $row['part'] ) {
 		foreach ( $edges as $edge ) {
 			if ( $edge['id'] === $row['field'] ) { return array( 'id' => $edge['id'], 'label' => wp_html_excerpt( $edge['choice'], 50, '' ), 'type' => 'history' ); }
@@ -144,7 +156,7 @@ function ps_pen_paper_adventure_condition_field( $row, $rules, $edges = array() 
 	return ps_pen_paper_adventure_conditions_error();
 }
 
-function ps_pen_paper_prepare_adventure_conditions( $rules, $input, $edges = array() ) {
+function ps_pen_paper_prepare_adventure_conditions( $rules, $input, $edges = array(), $states = array() ) {
 	if ( ! is_array( $input ) || ! isset( $input['mode'], $input['rows'] ) ||
 		! in_array( $input['mode'], array( 'all', 'any' ), true ) || ! is_array( $input['rows'] ) || count( $input['rows'] ) > 20 ) {
 		return ps_pen_paper_adventure_conditions_error();
@@ -159,24 +171,29 @@ function ps_pen_paper_prepare_adventure_conditions( $rules, $input, $edges = arr
 		}
 		$target = explode( ':', $row['target'] );
 		if ( 2 !== count( $target ) ) { return ps_pen_paper_adventure_conditions_error(); }
-		if ( 'text' !== $target[1] && ( ! preg_match( '/^-?\d{1,7}$/D', $row['value'] ) || (string) (int) $row['value'] !== $row['value'] ) ) { return ps_pen_paper_adventure_conditions_error(); }
-		$condition = array( 'field' => $target[0], 'part' => $target[1], 'operator' => $row['operator'], 'value' => 'text' === $target[1] ? $row['value'] : (int) $row['value'] );
+		$text = in_array( $target[1], array( 'text', 'state' ), true );
+		if ( ! $text && ( ! preg_match( '/^-?\d{1,7}$/D', $row['value'] ) || (string) (int) $row['value'] !== $row['value'] ) ) { return ps_pen_paper_adventure_conditions_error(); }
+		$condition = array( 'field' => $target[0], 'part' => $target[1], 'operator' => $row['operator'], 'value' => $text ? $row['value'] : (int) $row['value'] );
 		if ( ! ps_pen_paper_valid_adventure_conditions( array( 'mode' => 'all', 'rows' => array( $condition ) ) ) ||
-			is_wp_error( ps_pen_paper_adventure_condition_field( $condition, $rules, $edges ) ) ) { return ps_pen_paper_adventure_conditions_error(); }
+			is_wp_error( ps_pen_paper_adventure_condition_field( $condition, $rules, $edges, $states ) ) ) { return ps_pen_paper_adventure_conditions_error(); }
 		$conditions['rows'][] = $condition;
 	}
 	if ( ! $conditions['rows'] ) { return null; }
 	return ps_pen_paper_valid_adventure_conditions( $conditions ) ? $conditions : ps_pen_paper_adventure_conditions_error();
 }
 
-function ps_pen_paper_evaluate_adventure_conditions( $edge, $rules, $state, $history = array(), $edges = array() ) {
+function ps_pen_paper_evaluate_adventure_conditions( $edge, $rules, $state, $history = array(), $edges = array(), $states = array() ) {
 	if ( ! isset( $edge['conditions'] ) ) { return null; }
 	$result = array( 'mode' => $edge['conditions']['mode'], 'rows' => array(), 'met' => false ); $matches = array();
 	foreach ( $edge['conditions']['rows'] as $row ) {
-		$field = ps_pen_paper_adventure_condition_field( $row, $rules, $edges );
+		$field = ps_pen_paper_adventure_condition_field( $row, $rules, $edges, $states );
 		if ( is_wp_error( $field ) ) { return $field; }
 		$value = $state['active']['values'][ $row['field'] ] ?? null;
-		if ( 'history' === $row['part'] ) {
+		if ( 'state' === $row['part'] ) {
+			$values = ps_pen_paper_adventure_state_values( array( 'states' => $states, 'edges' => $edges ), $history );
+			if ( is_wp_error( $values ) ) { return $values; }
+			$value = $values[ $row['field'] ] ?? null;
+		} elseif ( 'history' === $row['part'] ) {
 			$value = 0;
 			foreach ( $history as $entry ) { if ( $entry['edge_id'] === $row['field'] ) { $value = 1; break; } }
 		} elseif ( in_array( $row['part'], array( 'current', 'maximum' ), true ) ) { $value = is_array( $value ) ? ( $value[ $row['part'] ] ?? null ) : null; }
@@ -200,7 +217,7 @@ function ps_pen_paper_valid_adventure_conditions_result( $conditions, $result ) 
 		if ( ! is_array( $row ) || array( 'field', 'part', 'operator', 'expected', 'value', 'label', 'met' ) !== array_keys( $row ) ||
 			$row['field'] !== $condition['field'] || $row['part'] !== $condition['part'] || $row['operator'] !== $condition['operator'] ||
 			$row['expected'] !== $condition['value'] || ! is_string( $row['label'] ) || '' === $row['label'] || strlen( $row['label'] ) > 200 ||
-			( 'text' === $condition['part'] ? ! is_string( $row['value'] ) || strlen( $row['value'] ) > 20000 :
+			( in_array( $condition['part'], array( 'text', 'state' ), true ) ? ! is_string( $row['value'] ) || strlen( $row['value'] ) > 20000 :
 				! is_int( $row['value'] ) || abs( $row['value'] ) > 1000000 ) ) { return false; }
 		$met = ps_pen_paper_compare_adventure_value( $row['value'], $row['operator'], $row['expected'] );
 		if ( is_wp_error( $met ) || $row['met'] !== $met ) { return false; }
@@ -210,14 +227,14 @@ function ps_pen_paper_valid_adventure_conditions_result( $conditions, $result ) 
 }
 
 function ps_pen_paper_valid_adventure_publication( $published ) {
-	if ( ! is_array( $published ) || array( 'publication', 'rules_revision', 'title', 'start_scene', 'edges', 'scenes' ) !== array_keys( $published ) ||
+	if ( ! is_array( $published ) || ps_pen_paper_adventure_graph_keys( $published, array( 'publication', 'rules_revision', 'title', 'start_scene', 'edges', 'scenes' ) ) !== array_keys( $published ) ||
 		! is_int( $published['publication'] ) || $published['publication'] < 1 ||
 		! is_int( $published['rules_revision'] ) || $published['rules_revision'] < 1 ||
 		! is_string( $published['title'] ) || '' === trim( $published['title'] ) || strlen( $published['title'] ) > 800 ||
 		! is_int( $published['start_scene'] ) || $published['start_scene'] < 1 ||
 		! is_array( $published['edges'] ) || ! $published['edges'] || count( $published['edges'] ) > 100 ||
 		! is_array( $published['scenes'] ) || ! $published['scenes'] || count( $published['scenes'] ) > 30 ||
-		! isset( $published['scenes'][ $published['start_scene'] ] ) ) { return false; }
+		! isset( $published['scenes'][ $published['start_scene'] ] ) || ! ps_pen_paper_valid_adventure_world( $published ) ) { return false; }
 	$ids = array(); $choices = array();
 	foreach ( $published['edges'] as $edge ) {
 		if ( ! ps_pen_paper_valid_adventure_edge( $edge ) || isset( $ids[ $edge['id'] ] ) || ! isset( $published['scenes'][ $edge['from_scene'] ] ) ) { return false; }
@@ -246,7 +263,7 @@ function ps_pen_paper_valid_adventure_state( $state ) {
 		! array_key_exists( 'published', $state ) || ! is_int( $state['revision'] ) || $state['revision'] < 0 ||
 		! is_string( $state['status'] ) || ! in_array( $state['status'], array( 'draft', 'published', 'paused' ), true ) ||
 		! is_int( $state['publication'] ) || $state['publication'] < 0 ||
-		! is_array( $state['draft'] ) || array( 'title', 'start_scene', 'edges' ) !== array_keys( $state['draft'] ) ||
+		! is_array( $state['draft'] ) || ps_pen_paper_adventure_graph_keys( $state['draft'], array( 'title', 'start_scene', 'edges' ) ) !== array_keys( $state['draft'] ) ||
 		! is_string( $state['draft']['title'] ) || strlen( $state['draft']['title'] ) > 800 ||
 		! is_int( $state['draft']['start_scene'] ) || $state['draft']['start_scene'] < 0 ||
 		! is_array( $state['draft']['edges'] ) || count( $state['draft']['edges'] ) > 100 ||
@@ -256,7 +273,7 @@ function ps_pen_paper_valid_adventure_state( $state ) {
 		( $state['revision'] > 0 && ( '' === trim( $state['draft']['title'] ) || $state['draft']['start_scene'] < 1 ) ) ||
 		( 0 === $state['revision'] && $state !== ps_pen_paper_adventure_default() ) ) { return false; }
 	foreach ( $state['draft']['edges'] as $edge ) { if ( ! ps_pen_paper_valid_adventure_edge( $edge ) ) { return false; } }
-	return true;
+	return ps_pen_paper_valid_adventure_world( $state['draft'] );
 }
 
 function ps_pen_paper_adventure_character( $campaign, $character_id, $owner_only = false ) {
@@ -308,7 +325,7 @@ function ps_pen_paper_adventure_validate_draft( $campaign, $draft, $rules ) {
 		}
 		if ( isset( $edge['conditions'] ) ) {
 			foreach ( $edge['conditions']['rows'] as $condition ) {
-				if ( is_wp_error( $error = ps_pen_paper_adventure_condition_field( $condition, $rules, $draft['edges'] ) ) ) { return $error; }
+				if ( is_wp_error( $error = ps_pen_paper_adventure_condition_field( $condition, $rules, $draft['edges'], $draft['states'] ?? array() ) ) ) { return $error; }
 			}
 		}
 		if ( '' !== $edge['expression'] ) {
@@ -463,12 +480,20 @@ function ps_pen_paper_save_adventure_edge( $campaign, $id, $input, $revision, $r
 				if ( is_wp_error( $edge['reward'] ) ) { return $edge['reward']; }
 			}
 			if ( array_key_exists( 'conditions', $input ) ) {
-				$edge['conditions'] = ps_pen_paper_prepare_adventure_conditions( $rules, $input['conditions'], $before['draft']['edges'] );
+				$edge['conditions'] = ps_pen_paper_prepare_adventure_conditions( $rules, $input['conditions'], $before['draft']['edges'], $before['draft']['states'] ?? array() );
 				if ( is_wp_error( $edge['conditions'] ) ) { return $edge['conditions']; }
 			}
 			if ( array_key_exists( 'gm_review', $input ) ) {
 				if ( '1' !== $input['gm_review'] ) { return ps_pen_paper_adventure_error(); }
 				$edge['gm_review'] = true;
+			}
+			if ( array_key_exists( 'items', $input ) ) {
+				$edge['items'] = ps_pen_paper_prepare_adventure_items( $campaign, $input['items'] );
+				if ( is_wp_error( $edge['items'] ) ) { return $edge['items']; }
+			}
+			if ( array_key_exists( 'effects', $input ) ) {
+				$edge['effects'] = ps_pen_paper_prepare_adventure_effects( $input['effects'], $before['draft']['states'] ?? array() );
+				if ( is_wp_error( $edge['effects'] ) ) { return $edge['effects']; }
 			}
 			if ( ! ps_pen_paper_valid_adventure_edge( $edge ) ) { return ps_pen_paper_adventure_error(); }
 			$after['draft']['edges'][] = $edge;
@@ -528,6 +553,9 @@ function ps_pen_paper_publish_adventure( $campaign, $id, $revision, $confirmatio
 				$after['published'] = array( 'publication' => $after['publication'], 'rules_revision' => $rules['revision'],
 					'title' => $current['draft']['title'], 'start_scene' => $current['draft']['start_scene'],
 					'edges' => $edges, 'scenes' => $scenes );
+				foreach ( array( 'states', 'encounters' ) as $key ) {
+					if ( array_key_exists( $key, $current['draft'] ) ) { $after['published'][ $key ] = $current['draft'][ $key ]; }
+				}
 				$after['status'] = 'published';
 				if ( ! ps_pen_paper_valid_adventure_publication( $after['published'] ) ) { return ps_pen_paper_adventure_error(); }
 			}
@@ -575,6 +603,8 @@ function ps_pen_paper_valid_adventure_run( $run, $prior_history = array() ) {
 		if ( is_array( $entry ) && array_key_exists( 'reward', $entry ) ) { $keys[] = 'reward'; }
 		if ( is_array( $entry ) && array_key_exists( 'conditions', $entry ) ) { $keys[] = 'conditions'; }
 		if ( is_array( $entry ) && array_key_exists( 'review', $entry ) ) { $keys[] = 'review'; }
+		if ( is_array( $entry ) && array_key_exists( 'items', $entry ) ) { $keys[] = 'items'; }
+		if ( is_array( $entry ) && array_key_exists( 'effects', $entry ) ) { $keys[] = 'effects'; }
 		if ( ! is_array( $entry ) || $keys !== array_keys( $entry ) ||
 			! is_string( $entry['edge_id'] ) || ! wp_is_uuid( $entry['edge_id'] ) || ! is_int( $entry['source_scene'] ) ||
 			! is_string( $entry['choice'] ) || ! ( null === $entry['roll'] || ( is_array( $entry['roll'] ) && isset( $entry['roll']['total'], $entry['roll']['threshold'], $entry['roll']['success'] ) &&
@@ -603,6 +633,10 @@ function ps_pen_paper_valid_adventure_run( $run, $prior_history = array() ) {
 			if ( ! isset( $entry['conditions'] ) || ! ps_pen_paper_valid_adventure_conditions_result( $edge['conditions'], $entry['conditions'] ) ) { return false; }
 			foreach ( $edge['conditions']['rows'] as $index => $condition ) {
 				if ( 'history' === $condition['part'] && $entry['conditions']['rows'][ $index ]['value'] !== ( isset( $seen[ $condition['field'] ] ) ? 1 : 0 ) ) { return false; }
+				if ( 'state' === $condition['part'] ) {
+					$values = ps_pen_paper_adventure_state_values( $run['snapshot'], $prior_history );
+					if ( is_wp_error( $values ) || ( $values[ $condition['field'] ] ?? null ) !== $entry['conditions']['rows'][ $index ]['value'] ) { return false; }
+				}
 			}
 		} elseif ( isset( $entry['conditions'] ) ) { return false; }
 		if ( '' === $edge['expression'] ) {
@@ -650,6 +684,14 @@ function ps_pen_paper_valid_adventure_run( $run, $prior_history = array() ) {
 				( $grant && ! ps_pen_paper_valid_adventure_reward_result( $edge['reward'], $entry['reward'], $run['character_id'] ) ) ||
 				( ! $grant && null !== $entry['reward'] ) ) { return false; }
 		} elseif ( isset( $entry['reward'] ) ) { return false; }
+		if ( isset( $edge['items'] ) ) {
+			if ( ! isset( $entry['items'] ) || ! ps_pen_paper_valid_adventure_items_result( $edge['items'], $entry['items'] ) ) { return false; }
+		} elseif ( array_key_exists( 'items', $entry ) ) { return false; }
+		if ( isset( $edge['effects'] ) ) {
+			$effects = ps_pen_paper_adventure_effects_result( $edge, $run['snapshot'], $prior_history, $entry['roll'] );
+			if ( is_wp_error( $effects ) || ! array_key_exists( 'effects', $entry ) || $entry['effects'] !== $effects ) { return false; }
+		} elseif ( array_key_exists( 'effects', $entry ) ) { return false; }
+		$prior_history[] = $entry;
 		$scene_id = $entry['target_scene'];
 		$seen[ $entry['edge_id'] ] = true;
 	}
@@ -737,8 +779,7 @@ function ps_pen_paper_advance_adventure_run( $campaign, $run_id, $edge_id, $revi
 		}
 	}
 	$locks = array_values( array_unique( $locks ) ); sort( $locks, SORT_NUMERIC );
-	return ps_pen_paper_adventure_locks( $locks, function () use ( $campaign, $run_id, $edge_id, $revision, $initial, $locks ) {
-		return ps_pen_paper_atomic_event( (int) $run_id, function () use ( $campaign, $run_id, $edge_id, $revision, $initial, $locks ) {
+	return ps_pen_paper_adventure_action_transaction( $campaign, $locks, (int) $run_id, function () use ( $campaign, $run_id, $edge_id, $revision, $initial, $locks ) {
 			global $wpdb;
 			foreach ( $locks as $id ) {
 				if ( $id !== (int) $run_id && (int) $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE ID = %d FOR UPDATE", $id ) ) !== $id ) { return ps_pen_paper_adventure_error(); }
@@ -772,6 +813,5 @@ function ps_pen_paper_advance_adventure_run( $campaign, $run_id, $edge_id, $revi
 			if ( array_key_exists( 'approval', $after ) ) { $after['approval'] = null; }
 			if ( ! ps_pen_paper_valid_adventure_run( $after ) ) { return ps_pen_paper_adventure_error(); }
 			return ps_pen_paper_write_adventure_event( $campaign, $run_id, $before, $after, 'adventure_run', 'owner', $before['owner_id'] );
-		} );
 	} );
 }

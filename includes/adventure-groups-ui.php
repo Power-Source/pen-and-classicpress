@@ -88,6 +88,8 @@ function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 			<?php if ( $group['scene_id'] ) : $scene = $group['snapshot']['scenes'][ $group['scene_id'] ]; ?>
 				<h5><?php echo esc_html( $scene['title'] ); ?></h5><p class="pspp-multiline"><?php echo esc_html( $scene['text'] ); ?></p>
 			<?php endif; ?>
+			<?php ps_pen_paper_render_adventure_world_progress( $group['snapshot'], $group['scene_id'], array_column( $group['history'], 'decision' ) ); ?>
+			<?php if ( $group['scene_id'] ) { ps_pen_paper_render_wiki_target_link( $campaign, 'scene:' . $group['scene_id'] ); } ?>
 			<?php if ( $gm && 'completed' !== $group['status'] ) :
 				ps_pen_paper_adventure_group_form( $campaign, $page_id, $id, $record['revision'], 'active' === $group['status'] ? 'pause' : 'resume' ); ?>
 				<button type="submit"><?php echo esc_html( 'active' === $group['status'] ? __( 'Gruppendurchlauf pausieren', 'ps-pen-paper' ) : __( 'Gruppendurchlauf fortsetzen', 'ps-pen-paper' ) ); ?></button></form>
@@ -129,7 +131,7 @@ function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 							$rules = ps_pen_paper_get_rules( $campaign->ID );
 							$requirement = ps_pen_paper_adventure_requirement_value( $edge, $rules, $character['state'] );
 							if ( $requirement ) { echo '<p>' . esc_html( is_wp_error( $requirement ) ? $requirement->get_error_message() : ps_pen_paper_adventure_requirement_label( $requirement ) ) . '</p>'; }
-							$conditions = ps_pen_paper_evaluate_adventure_conditions( $edge, $rules, $character['state'], array_column( $group['history'], 'decision' ), $group['snapshot']['edges'] );
+							$conditions = ps_pen_paper_evaluate_adventure_conditions( $edge, $rules, $character['state'], array_column( $group['history'], 'decision' ), $group['snapshot']['edges'], $group['snapshot']['states'] ?? array() );
 							if ( $conditions ) { echo '<p>' . esc_html( is_wp_error( $conditions ) ? $conditions->get_error_message() : ps_pen_paper_adventure_conditions_label( $conditions ) ) . '</p>'; }
 							$cost = isset( $edge['resource_cost'] ) ? ps_pen_paper_character_resource_cost( $campaign, $character['post'], $edge['resource_cost']['resource'], $edge['resource_cost']['amount'] ) : null;
 							if ( $cost ) { echo '<p>' . esc_html( is_wp_error( $cost ) ? $cost->get_error_message() : sprintf(
@@ -137,9 +139,12 @@ function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 								__( 'Kosten: %1$s %2$d; verfügbar %3$d. %4$s.', 'ps-pen-paper' ), $cost['label'], $cost['amount'], $cost['before'],
 								ps_pen_paper_adventure_cost_timings()[ $edge['resource_cost']['timing'] ] ) ) . '</p>'; }
 							$reward = isset( $edge['reward'] ) ? ps_pen_paper_adventure_reward_context( $campaign, $character['post'], $edge['reward'] ) : null;
+							$items = isset( $edge['items'] ) ? ps_pen_paper_adventure_items_result( $edge['items'], (int) $character['post']->ID ) : null;
+							if ( $items ) { echo '<p>' . esc_html( is_wp_error( $items ) ? $items->get_error_message() : ps_pen_paper_adventure_items_label( $items ) ) . '</p>'; }
 							if ( $reward ) { echo '<p>' . esc_html( is_wp_error( $reward ) ? $reward->get_error_message() : ps_pen_paper_adventure_reward_label( $edge['reward'] ) ) . '</p>'; }
 							$ready = $ready && ! is_wp_error( $requirement ) && ( ! $requirement || $requirement['value'] >= $requirement['minimum'] ) &&
-								! is_wp_error( $conditions ) && ( ! $conditions || $conditions['met'] ) && ! is_wp_error( $cost ) && ( ! $cost || $cost['after'] >= $cost['minimum'] ) && ! is_wp_error( $reward );
+								! is_wp_error( $conditions ) && ( ! $conditions || $conditions['met'] ) && ! is_wp_error( $cost ) && ( ! $cost || $cost['after'] >= $cost['minimum'] ) && ! is_wp_error( $reward ) &&
+								! is_wp_error( $items ) && ( ! $items || $items['met'] );
 							ps_pen_paper_adventure_group_form( $campaign, $page_id, $id, $record['revision'], 'execute' ); ?>
 							<button type="submit"<?php disabled( ! $ready ); ?>><?php esc_html_e( 'Vereinbarte Gruppenentscheidung ausführen', 'ps-pen-paper' ); ?></button></form>
 						<?php }

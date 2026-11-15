@@ -4,7 +4,7 @@ if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) { exit( "Run this test with WP-CLI.\n" 
 require_once dirname( __DIR__ ) . '/ps-pen-paper.php';
 require_once ABSPATH . 'wp-admin/includes/user.php';
 if ( is_multisite() ) { require_once ABSPATH . 'wp-admin/includes/ms.php'; }
-foreach ( array( 'universe', 'campaign', 'npc', 'event', 'wiki' ) as $type ) { call_user_func( 'ps_pen_paper_register_' . $type . '_type' ); }
+foreach ( array( 'universe', 'campaign', 'npc', 'event', 'wiki', 'scene' ) as $type ) { call_user_func( 'ps_pen_paper_register_' . $type . '_type' ); }
 $original_user = get_current_user_id(); $users = array(); $parents = array(); $native_ids = array(); $term_ids = array();
 $check = function ( $condition, $message ) { if ( ! $condition ) { throw new RuntimeException( $message ); } };
 try {
@@ -71,6 +71,27 @@ try {
 	$check( $entry === ps_pen_paper_save_wiki_entry( $universe, $entry, $input, '1', '1', 'confirmed', true ) &&
 		'publish' === get_post_status( $wiki_id ), 'Explicit publication failed.' );
 	$check( is_wp_error( ps_pen_paper_save_wiki_entry( $universe, $entry, $input, '1', '1', 'confirmed', true ) ), 'Publication replay accepted.' );
+	$c = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => 'Wiki link fixture' ), true );
+	$check( is_int( $c ), 'Campaign fixture failed.' ); $parents[] = $c; add_post_meta( $c, '_pspp_player', (string) $users['other'] );
+	$campaign = ps_pen_paper_get_campaign( $c );
+	$check( ! is_wp_error( ps_pen_paper_save_universe_link( $c, $u, '0', '1', 'confirmed' ) ), 'Universe link failed.' );
+	$rules = ps_pen_paper_save_rules( $c, array( 'name' => 'Wiki links', 'description' => '', 'dice' => array( '6' ),
+		'fields' => array( array( 'id' => '', 'label' => 'Lore', 'type' => 'text', 'description' => '' ) ) ), '0' );
+	$scene = ps_pen_paper_save_scene( $campaign, 0, array( 'title' => 'PRIVATE_LINK_SCENE', 'text' => '', 'secret' => '', 'grid' => '0' ), '0' );
+	$check( ! is_wp_error( $rules ) && is_int( $scene ), 'Wiki target fixtures failed.' );
+	$field = 'field:' . $rules['fields'][0]['id']; $scene_target = 'scene:' . $scene;
+	$check( true === ps_pen_paper_save_wiki_link( $campaign, $field, $entry, '0', '1' ) &&
+		true === ps_pen_paper_save_wiki_link( $campaign, $scene_target, $entry, '1', '1' ) &&
+		is_wp_error( ps_pen_paper_save_wiki_link( $campaign, $field, $entry, '1', '1' ) ), 'Wiki linking or revision conflict failed.' );
+	wp_set_current_user( $users['other'] );
+	$check( 'Public pilot' === ps_pen_paper_wiki_link_for_target( $campaign, $field )['title'] &&
+		null === ps_pen_paper_wiki_link_for_target( $campaign, $scene_target ) && is_wp_error( ps_pen_paper_wiki_links( $campaign ) ), 'Private scene link or management leaked.' );
+	wp_set_current_user( $users['gm'] );
+	$check( true === ps_pen_paper_publish_scene( $campaign, $scene, '1', 'confirmed' ) &&
+		true === ps_pen_paper_select_scene( $campaign, $scene, '0' ), 'Scene release failed.' );
+	wp_set_current_user( $users['other'] );
+	$check( 'Public pilot' === ps_pen_paper_wiki_link_for_target( $campaign, $scene_target )['title'], 'Released active scene link unavailable.' );
+	wp_set_current_user( $users['gm'] );
 	$public = get_post( $wiki_id )->post_content;
 	$input['content'] = 'Prepared second public description.';
 	$check( $entry === ps_pen_paper_save_wiki_entry( $universe, $entry, $input, '2', '1', 'confirmed' ) &&
@@ -109,7 +130,7 @@ try {
 	foreach ( $native_ids as $id ) { wp_delete_post( $id, true ); }
 	foreach ( array_reverse( $term_ids ) as $id ) { wp_delete_term( $id, 'psource_wiki_category' ); }
 	foreach ( $parents as $parent ) {
-		foreach ( get_posts( array( 'post_type' => array( 'pspp_npc', 'pspp_wiki_entry', 'pspp_event' ), 'post_status' => array( 'private', 'draft' ), 'post_parent' => $parent, 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $child ) { wp_delete_post( $child, true ); }
+		foreach ( get_posts( array( 'post_type' => array( 'pspp_npc', 'pspp_wiki_entry', 'pspp_scene', 'pspp_event' ), 'post_status' => array( 'private', 'draft' ), 'post_parent' => $parent, 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $child ) { wp_delete_post( $child, true ); }
 		wp_delete_post( $parent, true );
 	}
 	foreach ( $users as $user ) { is_multisite() ? wpmu_delete_user( $user ) : wp_delete_user( $user ); }

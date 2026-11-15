@@ -16,15 +16,19 @@ function ps_pen_paper_handle_folio_action( $operation ) {
 	if ( 'save_folio' === $operation ) {
 		if ( 'complete' !== ps_pen_paper_posted_text( 'folio_complete' ) ) { ps_pen_paper_fail( __( 'Das Mappenformular wurde nicht vollständig übertragen.', 'ps-pen-paper' ) ); }
 		$path = null;
+		$filename = null;
 		if ( isset( $_FILES['folio_image'] ) ) {
 			$file = $_FILES['folio_image'];
 			if ( ! is_array( $file ) || ! isset( $file['error'] ) ||
 				( UPLOAD_ERR_NO_FILE !== $file['error'] && ( UPLOAD_ERR_OK !== $file['error'] || ! isset( $file['tmp_name'] ) || ! is_string( $file['tmp_name'] ) || ! is_uploaded_file( $file['tmp_name'] ) ) ) ) {
 				ps_pen_paper_fail( __( 'Das Handoutbild wurde nicht vollständig hochgeladen.', 'ps-pen-paper' ) );
 			}
-			if ( UPLOAD_ERR_OK === $file['error'] ) { $path = $file['tmp_name']; }
+			if ( UPLOAD_ERR_OK === $file['error'] ) {
+				if ( ! isset( $file['name'] ) || ! is_string( $file['name'] ) || '' === $file['name'] ) { ps_pen_paper_fail( __( 'Der Dateiname ist ungültig.', 'ps-pen-paper' ) ); }
+				$path = $file['tmp_name']; $filename = $file['name'];
+			}
 		}
-		$result = ps_pen_paper_save_folio( $campaign, $id, isset( $_POST['folio'] ) ? wp_unslash( $_POST['folio'] ) : null, $revision, $path );
+		$result = ps_pen_paper_save_folio( $campaign, $id, isset( $_POST['folio'] ) ? wp_unslash( $_POST['folio'] ) : null, $revision, $path, $filename );
 		if ( ! is_wp_error( $result ) ) { $id = $result; }
 	} else {
 		$result = ps_pen_paper_publish_folio( $campaign, $id, $revision, ps_pen_paper_posted_text( 'folio_confirmation' ), 'withdraw_folio' === $operation );
@@ -36,15 +40,18 @@ function ps_pen_paper_handle_folio_action( $operation ) {
 	exit;
 }
 
-function ps_pen_paper_render_handout( $campaign, $snapshot ) {
+function ps_pen_paper_render_handout( $campaign, $snapshot, $folio_id = 0, $draft = false ) {
 	?>
 	<article class="pspp-handout">
 		<h3><?php echo esc_html( $snapshot['title'] ); ?></h3>
 		<div class="pspp-multiline"><?php echo esc_html( $snapshot['text'] ); ?></div>
 		<?php if ( $snapshot['asset_id'] ) :
-			$image = ps_pen_paper_private_image( $campaign, $snapshot['asset_id'] );
-			if ( is_wp_error( $image ) ) : ?><p role="alert"><?php echo esc_html( $image->get_error_message() ); ?></p>
-			<?php else : ?><img src="<?php echo esc_attr( $image ); ?>" alt="<?php echo esc_attr( $snapshot['title'] ); ?>" loading="lazy"><?php endif;
+			$asset = ps_pen_paper_handout_asset( $campaign, $folio_id, $draft );
+			if ( is_wp_error( $asset ) ) : ?><p role="alert"><?php echo esc_html( $asset->get_error_message() ); ?></p>
+			<?php else : $url = ps_pen_paper_handout_download_url( $campaign, $folio_id, $draft ); ?>
+				<?php if ( 0 === strpos( $asset->post_mime_type, 'image/' ) ) : ?><img src="<?php echo esc_url( $url ); ?>" alt="<?php echo esc_attr( $snapshot['title'] ); ?>" loading="lazy"><?php endif; ?>
+				<p><a href="<?php echo esc_url( $url ); ?>"><?php esc_html_e( 'Handoutdatei öffnen oder herunterladen', 'ps-pen-paper' ); ?></a></p>
+			<?php endif;
 		endif; ?>
 	</article>
 	<?php
@@ -59,7 +66,7 @@ function ps_pen_paper_render_handouts( $campaign, $page_id ) {
 	<?php
 	if ( is_wp_error( $handouts ) ) { echo '<p role="alert">' . esc_html( $handouts->get_error_message() ) . '</p>'; return; }
 	if ( ! $handouts ) { echo '<p>' . esc_html__( 'Noch keine Handouts freigegeben.', 'ps-pen-paper' ) . '</p>'; }
-	foreach ( $handouts as $snapshot ) { ps_pen_paper_render_handout( $campaign, $snapshot ); }
+	foreach ( $handouts as $id => $snapshot ) { ps_pen_paper_render_handout( $campaign, $snapshot, $id ); }
 }
 
 function ps_pen_paper_render_folio( $campaign, $page_id ) {
@@ -79,7 +86,7 @@ function ps_pen_paper_render_folio( $campaign, $page_id ) {
 	}
 	?>
 	<h2><?php esc_html_e( 'Spielleitermappe', 'ps-pen-paper' ); ?></h2>
-	<p><?php esc_html_e( 'Kapitel ordnen dein Abenteuer. Personen, Orte und Notizen bleiben privat. Nur Handouts können ausdrücklich für die gesamte Runde freigegeben werden; Verknüpfungen geben niemals Inhalte automatisch frei.', 'ps-pen-paper' ); ?></p>
+	<p><?php esc_html_e( 'Kapitel ordnen dein Abenteuer. Personen, Orte und Notizen bleiben privat. Handouts werden ausdrücklich für die Runde oder ausgewählte Mitglieder freigegeben; Verknüpfungen geben niemals Inhalte automatisch frei.', 'ps-pen-paper' ); ?></p>
 	<p><a href="<?php echo esc_url( ps_pen_paper_npc_url( $campaign, $page_id ) ); ?>"><?php esc_html_e( 'Gegner und NPCs verwalten', 'ps-pen-paper' ); ?></a></p>
 	<p><a href="<?php echo esc_url( ps_pen_paper_loot_url( $campaign, $page_id ) ); ?>"><?php esc_html_e( 'Beutetabellen verwalten', 'ps-pen-paper' ); ?></a></p>
 	<a class="button" href="<?php echo esc_url( $url . '#pspp-folio' ); ?>"><?php esc_html_e( 'Neuer Mappeneintrag', 'ps-pen-paper' ); ?></a>
@@ -126,19 +133,34 @@ function ps_pen_paper_render_folio( $campaign, $page_id ) {
 			</fieldset>
 		<?php endif; ?>
 		<?php if ( ! $id || 'handout' === $draft['type'] ) : ?>
-			<label><?php esc_html_e( 'Optionales Handoutbild (nur für Handouts)', 'ps-pen-paper' ); ?><input type="file" name="folio_image" accept="image/png,image/jpeg,image/webp"></label>
-			<p><?php esc_html_e( 'PNG, JPEG oder WebP bis 2 MiB und 3000 × 3000 Pixel. Keine öffentliche Mediathek-URL. PDFs und andere Dateien werden hier nicht angenommen.', 'ps-pen-paper' ); ?></p>
+			<label><?php esc_html_e( 'Optionale Handoutdatei (nur für Handouts)', 'ps-pen-paper' ); ?><input type="file" name="folio_image" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt"></label>
+			<p><?php esc_html_e( 'PNG, JPEG, WebP, PDF oder UTF-8-Text bis 2 MiB; Bilder höchstens 3000 × 3000 Pixel. Dateien werden geschützt gespeichert und nur berechtigten Empfängern ausgeliefert.', 'ps-pen-paper' ); ?></p>
 			<?php if ( $draft['asset_id'] ) : ?><label class="pspp-check"><input type="checkbox" name="folio[remove_image]" value="1"><?php esc_html_e( 'Bild aus dem Entwurf entfernen (nicht gleichzeitig ein neues hochladen)', 'ps-pen-paper' ); ?></label><?php endif; ?>
+		<?php endif; ?>
+		<?php if ( $id && 'handout' === $draft['type'] ) :
+			$audience = ps_pen_paper_handout_audience( $draft );
+			$member_ids = array_unique( array_merge( array( (int) $campaign->post_author ), array_map( 'intval', get_post_meta( $campaign->ID, '_pspp_gm', false ) ), array_map( 'intval', get_post_meta( $campaign->ID, '_pspp_player', false ) ), $audience['users'] ) ); ?>
+			<fieldset class="pspp-field"><legend><?php esc_html_e( 'Empfängerkreis für die nächste Freigabe', 'ps-pen-paper' ); ?></legend>
+				<label><?php esc_html_e( 'Kreis', 'ps-pen-paper' ); ?><select name="folio[audience_mode]">
+					<option value="all" <?php selected( $audience['mode'], 'all' ); ?>><?php esc_html_e( 'Gesamte Runde', 'ps-pen-paper' ); ?></option>
+					<option value="users" <?php selected( $audience['mode'], 'users' ); ?>><?php esc_html_e( 'Ausgewählte Mitglieder', 'ps-pen-paper' ); ?></option>
+				</select></label>
+				<p><?php esc_html_e( 'Bei ausgewählten Mitgliedern mindestens eine Person markieren. Für die gesamte Runde alle Markierungen entfernen. Die Spielleitung sieht alle Freigaben.', 'ps-pen-paper' ); ?></p>
+				<?php foreach ( $member_ids as $user_id ) : $user = get_userdata( $user_id ); ?>
+					<label class="pspp-check"><input type="checkbox" name="folio[audience_users][]" value="<?php echo esc_attr( $user_id ); ?>" <?php checked( in_array( $user_id, $audience['users'], true ) ); ?>>
+						<?php echo esc_html( $user ? $user->display_name . ' · #' . $user_id : sprintf( __( 'Nicht mehr verfügbares Mitglied #%d', 'ps-pen-paper' ), $user_id ) ); ?></label>
+				<?php endforeach; ?>
+			</fieldset>
 		<?php endif; ?>
 		<input type="hidden" name="folio_complete" value="complete">
 		<button type="submit"><?php esc_html_e( 'Mappeneintrag speichern', 'ps-pen-paper' ); ?></button>
 	</form>
 	<?php if ( $id && 'handout' === $draft['type'] ) : ?>
 		<details class="pspp-fold"><summary><?php esc_html_e( 'Private Vorschau des gespeicherten Handoutentwurfs', 'ps-pen-paper' ); ?></summary>
-			<?php ps_pen_paper_render_handout( $campaign, $draft ); ?>
+			<?php ps_pen_paper_render_handout( $campaign, $draft, $id, true ); ?>
 		</details>
-		<p><?php esc_html_e( 'Die Freigabe übernimmt nur Titel, Text und Bild. Entwurfsänderungen bleiben privat, bis du erneut freigibst. Bereits gelesene oder gespeicherte Inhalte können nicht zurückgeholt werden.', 'ps-pen-paper' ); ?></p>
-		<?php foreach ( array( 'publish_folio' => __( 'Handout für die Runde freigeben', 'ps-pen-paper' ), 'withdraw_folio' => __( 'Handout zurücknehmen', 'ps-pen-paper' ) ) as $operation => $label ) :
+		<p><?php esc_html_e( 'Die Freigabe übernimmt Titel, Text, Bild und Empfängerkreis. Entwurfsänderungen bleiben privat, bis du erneut freigibst. Bereits gelesene oder gespeicherte Inhalte können nicht zurückgeholt werden.', 'ps-pen-paper' ); ?></p>
+		<?php foreach ( array( 'publish_folio' => __( 'Handout für den Empfängerkreis freigeben', 'ps-pen-paper' ), 'withdraw_folio' => __( 'Handout zurücknehmen', 'ps-pen-paper' ) ) as $operation => $label ) :
 			if ( 'withdraw_folio' === $operation && null === $state['published'] ) { continue; }
 			ps_pen_paper_form_start( $operation, 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 			<input type="hidden" name="folio_id" value="<?php echo esc_attr( $id ); ?>"><input type="hidden" name="folio_revision" value="<?php echo esc_attr( $state['revision'] ); ?>">
@@ -149,4 +171,5 @@ function ps_pen_paper_render_folio( $campaign, $page_id ) {
 	<?php endif;
 	ps_pen_paper_render_npcs( $campaign, $page_id );
 	ps_pen_paper_render_loot( $campaign, $page_id );
+	ps_pen_paper_render_campaign_wiki_links( $campaign, $page_id );
 }

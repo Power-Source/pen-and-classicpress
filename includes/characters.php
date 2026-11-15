@@ -45,10 +45,10 @@ function ps_pen_paper_has_characters( $campaign_id ) {
 function ps_pen_paper_character_schema( $rules ) {
 	$schema = array();
 	foreach ( $rules['fields'] as $field ) {
-		$schema[ $field['id'] ] = array_intersect_key( $field, array_flip( array( 'type', 'required', 'min', 'max' ) ) );
+		$schema[ $field['id'] ] = array_intersect_key( $field, array_flip( array( 'type', 'required', 'min', 'max', 'choices' ) ) );
 	}
 	ksort( $schema );
-	return $schema;
+	return array( 'fields' => $schema, 'allocation' => isset( $rules['allocation'] ) ? $rules['allocation'] : null );
 }
 
 function ps_pen_paper_get_character_scope( $id ) {
@@ -154,9 +154,15 @@ function ps_pen_paper_character_values( $rules ) {
 	foreach ( $rules['fields'] as $field ) {
 		if ( 'resource' === $field['type'] ) {
 			$values[ $field['id'] ] = array( 'current' => $field['start'], 'maximum' => $field['max'] );
+		} elseif ( 'choice' === $field['type'] ) {
+			$values[ $field['id'] ] = $field['start'];
 		} else {
 			$values[ $field['id'] ] = isset( $field['start'] ) ? $field['start'] : '';
 		}
+	}
+	if ( ! empty( $rules['allocation'] ) ) {
+		$defaults = ps_pen_paper_character_allocation_defaults( $rules );
+		if ( ! is_wp_error( $defaults ) ) { $values = array_merge( $values, $defaults ); }
 	}
 	return $values;
 }
@@ -174,6 +180,11 @@ function ps_pen_paper_validate_character( $input, $rules ) {
 	$clean = array( 'name' => $name, 'values' => array() );
 	foreach ( $rules['fields'] as $field ) {
 		$value = isset( $values[ $field['id'] ] ) ? $values[ $field['id'] ] : '';
+		if ( 'choice' === $field['type'] ) {
+			if ( ! is_string( $value ) || ( '' !== $value && ! in_array( $value, $field['choices'], true ) ) || ( $field['required'] && '' === $value ) ) { return $error; }
+			$clean['values'][ $field['id'] ] = $value;
+			continue;
+		}
 		if ( in_array( $field['type'], array( 'text', 'textarea' ), true ) ) {
 			if ( ! is_string( $value ) || strlen( $value ) > ( 'text' === $field['type'] ? 200 : 20000 ) ) {
 				return $error;
@@ -200,6 +211,9 @@ function ps_pen_paper_validate_character( $input, $rules ) {
 			return $error;
 		}
 		$clean['values'][ $field['id'] ] = 'resource' === $field['type'] ? $numbers : $numbers['value'];
+	}
+	if ( ! ps_pen_paper_character_allocation_valid( $clean, $rules ) ) {
+		return new WP_Error( 'invalid_allocation', __( 'Die ausgewählten Attribute müssen zusammen genau die festgelegte Punktzahl ergeben.', 'ps-pen-paper' ) );
 	}
 	return $clean;
 }
@@ -281,6 +295,19 @@ function ps_pen_paper_save_character_locked( $campaign_id, $character_id, $owner
 }
 
 function ps_pen_paper_review_character( $campaign_id, $character_id, $decision, $revision ) {
+	$stored = get_post_meta( $character_id, '_pspp_character', true );
+	$is_base_request = is_array( $stored ) && null === ( $stored['active'] ?? null ) && null !== ( $stored['pending'] ?? null ) &&
+		isset( $stored['context']['mode'], $stored['context']['source_id'] ) && 'shared' === $stored['context']['mode'];
+	if ( $is_base_request ) {
+		if ( 'reject' === $decision && ! ps_pen_paper_record_post( $stored['context']['source_id'] ) ) {
+			return ps_pen_paper_with_character_lock( $character_id, function () use ( $campaign_id, $character_id, $decision, $revision ) {
+				return ps_pen_paper_review_character_locked( $campaign_id, $character_id, $decision, $revision );
+			} );
+		}
+		return ps_pen_paper_with_character_context_locks( $campaign_id, $character_id, $stored['context']['source_id'], function () use ( $campaign_id, $character_id, $decision, $revision ) {
+			return ps_pen_paper_review_character_locked( $campaign_id, $character_id, $decision, $revision );
+		} );
+	}
 	return ps_pen_paper_with_character_lock( $character_id, function () use ( $campaign_id, $character_id, $decision, $revision ) {
 		return ps_pen_paper_review_character_locked( $campaign_id, $character_id, $decision, $revision );
 	} );
@@ -298,11 +325,33 @@ function ps_pen_paper_character_resource_cost( $campaign, $character, $resource_
 		return new WP_Error( 'resource_cost_pending', __( 'Vor einem kostenpflichtigen Versuch muss der offene Werteantrag freigegeben oder abgelehnt werden.', 'ps-pen-paper' ) );
 	}
 	$rules = ps_pen_paper_get_rules( $campaign->ID );
+	$shared_base = null;
 	if ( isset( $state['context'] ) ) {
 		$context = ps_pen_paper_validate_context( $state['context'], $rules );
 		if ( is_wp_error( $context ) ) { return $context; }
-		if ( 'copy' !== $context['mode'] ) {
-			return new WP_Error( 'resource_cost_shared', __( 'Ressourcenverbrauch ist für gemeinsame Universums-Basisbögen noch nicht freigegeben. Kostenfreie Entscheidungen bleiben möglich.', 'ps-pen-paper' ) );
+		if ( 'shared' === $context['mode'] ) {
+			$link = ps_pen_paper_get_universe_link( $campaign->ID );
+			$base_post = ps_pen_paper_record_post( $context['source_id'] );
+			$base = $base_post ? ps_pen_paper_raw_character_state( $base_post->ID ) : null;
+			if ( is_wp_error( $link ) || $link['universe_id'] !== $context['universe_id'] || ! $base_post ||
+				'pspp_character' !== $base_post->post_type || 'private' !== $base_post->post_status ||
+				(int) $base_post->post_parent !== $context['universe_id'] || is_wp_error( $base ) || ! $base ||
+				! $base['active'] || null !== $base['pending'] || array_key_exists( 'context', $base ) ||
+				! ps_pen_paper_get_universe( $context['universe_id'] ) ||
+				ps_pen_paper_character_schema( $rules ) !== ps_pen_paper_character_schema( ps_pen_paper_get_rules( $context['universe_id'] ) ) ||
+				(int) $base_post->post_author !== (int) $character->post_author ) {
+				return new WP_Error( 'resource_cost_shared_conflict', __( 'Der gemeinsame Basisbogen hat einen offenen Antrag oder wurde geändert. Bitte lade den Charakterbogen neu.', 'ps-pen-paper' ) );
+			}
+			$state['active'] = $base['active'];
+			$state['revision'] = $base['revision'];
+			$shared_base = array(
+				'universe_id' => (int) $context['universe_id'],
+				'character_id' => (int) $base_post->ID,
+				'alias_revision' => (int) ps_pen_paper_raw_character_state( $character->ID )['revision'],
+				'source_revision' => (int) $base['revision'],
+			);
+		} elseif ( 'copy' !== $context['mode'] ) {
+			return new WP_Error( 'resource_cost_shared', __( 'Für diesen Kampagnenbogen ist kein Ressourcenverbrauch freigegeben.', 'ps-pen-paper' ) );
 		}
 	}
 	$snapshot = ps_pen_paper_context_snapshot( $state['active'], $rules );
@@ -310,24 +359,58 @@ function ps_pen_paper_character_resource_cost( $campaign, $character, $resource_
 	foreach ( $rules['fields'] as $field ) {
 		if ( $field['id'] === $resource_id && 'resource' === $field['type'] ) {
 			$value = $snapshot['values'][ $resource_id ];
-			return array( 'id' => $resource_id, 'label' => $field['label'], 'amount' => $amount,
+			$cost = array( 'id' => $resource_id, 'label' => $field['label'], 'amount' => $amount,
 				'before' => $value['current'], 'after' => $value['current'] - $amount,
 				'minimum' => max( 0, $field['min'] ), 'maximum' => $value['maximum'], 'character_revision' => $state['revision'] );
+			if ( $shared_base ) { $cost['shared_base'] = $shared_base; }
+			return $cost;
 		}
 	}
 	return $error;
 }
 
 function ps_pen_paper_valid_character_resource_cost( $cost ) {
-	if ( ! is_array( $cost ) || array( 'id', 'label', 'amount', 'before', 'after', 'minimum', 'maximum', 'character_revision' ) !== array_keys( $cost ) ||
+	$keys = is_array( $cost ) && array_key_exists( 'shared_base', $cost )
+		? array( 'id', 'label', 'amount', 'before', 'after', 'minimum', 'maximum', 'character_revision', 'shared_base' )
+		: array( 'id', 'label', 'amount', 'before', 'after', 'minimum', 'maximum', 'character_revision' );
+	if ( ! is_array( $cost ) || $keys !== array_keys( $cost ) ||
 		! is_string( $cost['id'] ) || ! wp_is_uuid( $cost['id'] ) || ! is_string( $cost['label'] ) || '' === $cost['label'] ) { return false; }
 	foreach ( array( 'amount', 'before', 'after', 'minimum', 'maximum', 'character_revision' ) as $key ) { if ( ! is_int( $cost[ $key ] ) ) { return false; } }
-	return $cost['amount'] > 0 && $cost['amount'] <= 1000000 && $cost['minimum'] >= 0 && $cost['maximum'] <= 1000000 &&
+	$shared_valid = ! array_key_exists( 'shared_base', $cost ) || ( is_array( $cost['shared_base'] ) &&
+		array( 'universe_id', 'character_id', 'alias_revision', 'source_revision' ) === array_keys( $cost['shared_base'] ) &&
+		is_int( $cost['shared_base']['universe_id'] ) && $cost['shared_base']['universe_id'] > 0 &&
+		is_int( $cost['shared_base']['character_id'] ) && $cost['shared_base']['character_id'] > 0 &&
+		is_int( $cost['shared_base']['alias_revision'] ) && $cost['shared_base']['alias_revision'] > 0 &&
+		is_int( $cost['shared_base']['source_revision'] ) && $cost['shared_base']['source_revision'] === $cost['character_revision'] );
+	return $shared_valid && $cost['amount'] > 0 && $cost['amount'] <= 1000000 && $cost['minimum'] >= 0 && $cost['maximum'] <= 1000000 &&
 		$cost['after'] >= $cost['minimum'] && $cost['before'] <= $cost['maximum'] &&
 		$cost['after'] === $cost['before'] - $cost['amount'] && $cost['character_revision'] > 0;
 }
 
-// The caller authorizes the cost and holds the character lock and enclosing transaction.
+function ps_pen_paper_character_resource_lock_ids( $campaign, $character, $cost = null ) {
+	$character_ids = array( (int) $character->ID );
+	$scope_ids = array( (int) $campaign->ID );
+	if ( is_array( $cost ) && isset( $cost['shared_base']['character_id'], $cost['shared_base']['universe_id'] ) ) {
+		$character_ids[] = (int) $cost['shared_base']['character_id'];
+		$scope_ids[] = (int) $cost['shared_base']['universe_id'];
+	}
+	$character_ids = array_values( array_unique( $character_ids ) );
+	$scope_ids = array_values( array_unique( $scope_ids ) );
+	sort( $character_ids, SORT_NUMERIC );
+	sort( $scope_ids, SORT_NUMERIC );
+	return array( 'character_ids' => $character_ids, 'scope_ids' => $scope_ids );
+}
+
+function ps_pen_paper_with_character_resource_locks( $campaign, $character, $cost, $callback ) {
+	$locks = ps_pen_paper_character_resource_lock_ids( $campaign, $character, $cost );
+	$lock_scopes = function ( $index ) use ( &$lock_scopes, $locks, $callback ) {
+		if ( ! isset( $locks['scope_ids'][ $index ] ) ) { return $callback(); }
+		return ps_pen_paper_scope_lock( $locks['scope_ids'][ $index ], function () use ( &$lock_scopes, $index ) { return $lock_scopes( $index + 1 ); } );
+	};
+	return ps_pen_paper_with_character_locks( $locks['character_ids'], function () use ( $lock_scopes ) { return $lock_scopes( 0 ); } );
+}
+
+// The caller authorizes the cost and holds all returned locks and one enclosing transaction.
 function ps_pen_paper_write_character_resource_cost( $campaign, $character, $cost ) {
 	if ( ! $character || (int) $character->post_author !== get_current_user_id() || ! ps_pen_paper_valid_character_resource_cost( $cost ) ) {
 		return new WP_Error( 'invalid_resource_cost', __( 'Dieser Ressourcenverbrauch ist nicht zulässig. Es wurde nichts gespeichert.', 'ps-pen-paper' ) );
@@ -336,6 +419,31 @@ function ps_pen_paper_write_character_resource_cost( $campaign, $character, $cos
 	if ( is_wp_error( $current ) ) { return $current; }
 	if ( $current !== $cost ) {
 		return new WP_Error( 'conflict', __( 'Die Ressource wurde inzwischen geändert. Lade den Charakterbogen neu.', 'ps-pen-paper' ) );
+	}
+	if ( isset( $cost['shared_base'] ) ) {
+		$shared = $cost['shared_base'];
+		$base = ps_pen_paper_record_post( $shared['character_id'] );
+		$before = $base ? ps_pen_paper_raw_character_state( $base->ID ) : null;
+		$alias_state = ps_pen_paper_raw_character_state( $character->ID );
+		if ( ! $base || is_wp_error( $before ) || is_wp_error( $alias_state ) ||
+			(int) $base->post_parent !== $shared['universe_id'] || (int) $base->post_author !== (int) $character->post_author ||
+			$before['revision'] !== $shared['source_revision'] || $alias_state['revision'] !== $shared['alias_revision'] ||
+			! isset( $alias_state['context']['source_id'] ) || $alias_state['context']['source_id'] !== $base->ID ) {
+			return new WP_Error( 'conflict', __( 'Der gemeinsame Basisbogen wurde inzwischen geändert. Lade die Seite neu.', 'ps-pen-paper' ) );
+		}
+		$after = $before;
+		$after['revision']++;
+		$after['active']['values'][ $cost['id'] ]['current'] = $cost['after'];
+		$effective = ps_pen_paper_character_state( $campaign, $character, false );
+		if ( is_wp_error( $effective ) ) { return $effective; }
+		$effective['active']['values'][ $cost['id'] ]['current'] = $cost['after'];
+		$check = ps_pen_paper_check_character_gear( $campaign, $character, $effective['active'] );
+		if ( is_wp_error( $check ) ) { return $check; }
+		$universe_rules = ps_pen_paper_get_rules( $shared['universe_id'] );
+		return ps_pen_paper_write_document_event( $shared['universe_id'], $base->ID, '_pspp_character', $before, $after, array(
+			'kind' => 'character_resource_spent', 'visibility' => 'owner', 'recipient_id' => (int) $base->post_author,
+			'rules_revision' => $universe_rules['revision'], 'fields' => $universe_rules['fields'], 'resource_cost' => $cost,
+		), false );
 	}
 	$before = ps_pen_paper_raw_character_state( $character->ID );
 	if ( is_wp_error( $before ) ) { return $before; }
@@ -354,10 +462,12 @@ function ps_pen_paper_write_character_resource_cost( $campaign, $character, $cos
 function ps_pen_paper_review_character_locked( $campaign_id, $character_id, $decision, $revision ) {
 	$campaign = ps_pen_paper_get_character_scope( $campaign_id );
 	$character = $campaign ? ps_pen_paper_get_character( $campaign, $character_id ) : null;
-	if ( ! $character || ! ps_pen_paper_can_manage_character_scope( $campaign ) || ! ps_pen_paper_can_edit_character( $campaign, $character ) ) {
+	$previous = $character ? get_post_meta( $character_id, '_pspp_character', true ) : array();
+	$is_base_request = is_array( $previous ) && null === ( $previous['active'] ?? null ) && null !== ( $previous['pending'] ?? null ) &&
+		isset( $previous['context']['mode'], $previous['context']['source_id'] ) && 'shared' === $previous['context']['mode'];
+	if ( ! $character || ! ps_pen_paper_can_manage_character_scope( $campaign ) || ( ! $is_base_request && ! ps_pen_paper_can_edit_character( $campaign, $character ) ) ) {
 		return new WP_Error( 'forbidden', __( 'Nur Spielleiter dürfen Charakteränderungen freigeben.', 'ps-pen-paper' ) );
 	}
-	$previous = get_post_meta( $character_id, '_pspp_character', true );
 	if ( ! is_string( $revision ) || (string) $previous['revision'] !== $revision || null === $previous['pending'] ) {
 		return new WP_Error( 'conflict', __( 'Der Antrag wurde inzwischen geändert oder bereits bearbeitet. Lade die Seite neu.', 'ps-pen-paper' ) );
 	}
@@ -367,6 +477,16 @@ function ps_pen_paper_review_character_locked( $campaign_id, $character_id, $dec
 	$state = $previous;
 	$state['revision']++;
 	if ( 'approve' === $decision ) {
+		if ( ! ps_pen_paper_valid_character_snapshot( $state['pending'], ps_pen_paper_get_rules( $campaign_id ) ) ) {
+			return new WP_Error( 'invalid_character', __( 'Der offene Antrag passt nicht zum aktuellen Regelwerk. Bitte prüfe den Bogen vor der Freigabe.', 'ps-pen-paper' ) );
+		}
+		if ( $is_base_request ) {
+			$source = ps_pen_paper_raw_character_state( $previous['context']['source_id'] );
+			if ( is_wp_error( $source ) || $source['revision'] !== $previous['context']['source_revision'] ||
+				! $source['active'] || $source['active'] !== $previous['pending'] ) {
+				return new WP_Error( 'base_request_conflict', __( 'Der Basisbogen wurde seit der Anfrage geändert. Bitte lehne die Anfrage ab und bitte das Mitglied, sie erneut einzureichen.', 'ps-pen-paper' ) );
+			}
+		}
 		$gear_check = ps_pen_paper_check_character_gear( $campaign, $character, $state['pending'] );
 		if ( is_wp_error( $gear_check ) ) { return $gear_check; }
 		$state['active'] = $state['pending'];

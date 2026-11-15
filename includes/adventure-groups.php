@@ -157,8 +157,7 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 		}
 		$locks = array_values( array_unique( $locks ) ); sort( $locks, SORT_NUMERIC );
 		$created_id = 0;
-		$result = ps_pen_paper_adventure_locks( $locks, function () use ( $campaign, $id, $revision, $operation, $input, $initial, $locks, &$created_id ) {
-			return ps_pen_paper_atomic_event( (int) $campaign->ID, function () use ( $campaign, $id, $revision, $operation, $input, $initial, $locks, &$created_id ) {
+		$result = ps_pen_paper_adventure_action_transaction( $campaign, $locks, (int) $campaign->ID, function () use ( $campaign, $id, $revision, $operation, $input, $initial, $locks, &$created_id ) {
 				global $wpdb;
 				foreach ( $locks as $lock_id ) {
 					if ( (int) $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE ID=%d FOR UPDATE", $lock_id ) ) !== $lock_id ) { return ps_pen_paper_adventure_group_error(); }
@@ -264,7 +263,6 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 				$result = ps_pen_paper_write_document_event( $campaign->ID, $id, '_pspp_adventure_group', $before, $after,
 					array( 'kind' => 'adventure_group', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => $after['snapshot']['rules_revision'] ), $new );
 				return $result;
-			} );
 		} );
 		return is_wp_error( $result ) ? $result : ( $created_id ? $created_id : true );
 	} );

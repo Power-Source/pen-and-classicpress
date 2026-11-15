@@ -153,6 +153,47 @@ try {
 	$membership_record['meta'][0]['value'] = serialize( $membership_event );
 	$membership_record['meta'][3]['value'] = (string) $users['historian'];
 	$export['payload']['records'][] = $membership_record;
+	$migration_before_rules = $rules;
+	$migration_before_rules['allocation'] = array( 'fields' => array( $rules['fields'][0]['id'] ), 'points' => 2 );
+	$migration_after_rules = $migration_before_rules;
+	$migration_after_rules['revision']++;
+	$migration_after_rules['allocation']['points'] = 3;
+	$migration_before = get_post_meta( $base, '_pspp_character', true );
+	$migration_after = $migration_before;
+	$migration_after['revision']++;
+	$migration_after['active']['values'][ $rules['fields'][0]['id'] ] = 3;
+	$migration_event = array( 'version' => 1, 'kind' => 'character_saved', 'visibility' => 'owner',
+		'recipient_id' => $users['player'], 'actor_name' => 'Rules Migration', 'object_id' => $base,
+		'before' => $migration_before, 'after' => $migration_after,
+		'fields' => $migration_after_rules['fields'], 'rules_revision' => $migration_after_rules['revision'],
+		'migration_rules_before' => $migration_before_rules, 'migration_rules_after' => $migration_after_rules );
+	$migration_record = $event_record;
+	$migration_record['id'] = $membership_record['id'] + 1;
+	$migration_record['parent_id'] = $universe;
+	$migration_record['meta'][0]['value'] = serialize( $migration_event );
+	$migration_record['meta'][1]['value'] = 'owner';
+	$migration_record['meta'][2]['value'] = (string) $users['player'];
+	$export['payload']['records'][] = $migration_record;
+	$resource_field = $rules['fields'][0];
+	$resource_field['id'] = wp_generate_uuid4();
+	$resource_field['label'] = 'Mana'; $resource_field['type'] = 'resource'; $resource_field['start'] = 5;
+	$resource_before = array( 'revision' => 7, 'active' => array( 'name' => 'Historical Base',
+		'values' => array( $resource_field['id'] => array( 'current' => 5, 'maximum' => 10 ) ) ), 'pending' => null );
+	$resource_after = $resource_before;
+	$resource_after['revision']++;
+	$resource_after['active']['values'][ $resource_field['id'] ]['current'] = 3;
+	$resource_event = array( 'version' => 1, 'kind' => 'character_resource_spent', 'visibility' => 'owner',
+		'recipient_id' => $users['player'], 'actor_name' => 'Shared Base Cost', 'object_id' => $base,
+		'before' => $resource_before, 'after' => $resource_after,
+		'fields' => array( $resource_field ), 'rules_revision' => $rules['revision'],
+		'resource_cost' => array( 'id' => $resource_field['id'], 'label' => 'Mana', 'amount' => 2,
+			'before' => 5, 'after' => 3, 'minimum' => 0, 'maximum' => 10, 'character_revision' => 7,
+			'shared_base' => array( 'universe_id' => $universe, 'character_id' => $base,
+				'alias_revision' => 4, 'source_revision' => 7 ) ) );
+	$resource_record = $migration_record;
+	$resource_record['id']++;
+	$resource_record['meta'][0]['value'] = serialize( $resource_event );
+	$export['payload']['records'][] = $resource_record;
 	$parsed = ps_pen_paper_parse_import( $archive_json( $export ) );
 	$check( is_array( $parsed ), 'Campaign fixture archive did not parse.' );
 	$document_report = ps_pen_paper_import_documents( $parsed );
@@ -182,6 +223,30 @@ try {
 	$character = ps_pen_paper_import_meta( array( 'meta' => array( $alias => array( '_pspp_character' => array( $character ) ) ) ), $alias, '_pspp_character' );
 	$check( $character['context']['universe_id'] === $map[ $universe ] &&
 		$character['context']['source_id'] === $map[ $base ], 'Shared character context was not remapped.' );
+	$migration_meta = array_column( $prepared[ $migration_record['id'] ]['meta'], 'value', 'key' );
+	$check( $migration_meta['_pspp_event']['migration_rules_before'] === $migration_before_rules &&
+		$migration_meta['_pspp_event']['migration_rules_after'] === $migration_after_rules,
+		'Migration rule snapshots or allocation/field UUIDs were altered during preparation.' );
+	$bad_migration = $parsed;
+	$bad_migration['meta'][ $migration_record['id'] ]['_pspp_event'][0]['before']['active']['values'][ $rules['fields'][0]['id'] ] = 3;
+	$check( is_wp_error( ps_pen_paper_prepare_import( $bad_migration, $options, $map, true ) ),
+		'Migration before state was validated with after/latest allocation instead of its embedded rules.' );
+	$bad_migration = $parsed;
+	unset( $bad_migration['meta'][ $migration_record['id'] ]['_pspp_event'][0]['migration_rules_before'] );
+	$check( is_wp_error( ps_pen_paper_prepare_import( $bad_migration, $options, $map, true ) ),
+		'An incomplete embedded migration-rule pair was accepted.' );
+	$resource_meta = array_column( $prepared[ $resource_record['id'] ]['meta'], 'value', 'key' );
+	$prepared_cost = $resource_meta['_pspp_event']['resource_cost'];
+	$check( $resource_meta['_pspp_event']['object_id'] === $map[ $base ] &&
+		$prepared_cost['shared_base']['character_id'] === $map[ $base ] &&
+		$prepared_cost['shared_base']['universe_id'] === $map[ $universe ] &&
+		$prepared_cost['character_revision'] === 7 && $prepared_cost['shared_base']['source_revision'] === 7 &&
+		$prepared_cost['shared_base']['alias_revision'] === 4,
+		'Shared resource cost confused alias/base identities or changed historical revisions.' );
+	$bad_resource = $parsed;
+	$bad_resource['meta'][ $resource_record['id'] ]['_pspp_event'][0]['resource_cost']['shared_base']['character_id'] = $alias;
+	$check( is_wp_error( ps_pen_paper_prepare_import( $bad_resource, $options, $map, true ) ),
+		'A shared base resource event accepted a foreign campaign alias as its base character.' );
 	$meta = array();
 	foreach ( $prepared[ $campaign ]['meta'] as $entry ) { $meta[ $entry['key'] ][] = $entry['value']; }
 	$check( $meta['_pspp_backdrop'][0]['asset_id'] === $map[ $asset ] &&

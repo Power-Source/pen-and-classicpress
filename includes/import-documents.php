@@ -3,29 +3,9 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 function ps_pen_paper_import_rules_valid( $rules ) {
-	if ( is_wp_error( ps_pen_paper_import_rule_schema( $rules ) ) ||
-		! isset( $rules['revision'], $rules['name'], $rules['description'], $rules['dice'] ) ||
-		! is_int( $rules['revision'] ) || $rules['revision'] < 1 ||
-		! is_array( $rules['dice'] ) || array_values( $rules['fields'] ) !== $rules['fields'] ) { return false; }
-	$input = $rules;
-	foreach ( $input['fields'] as &$field ) {
-		if ( ! isset( $field['required'] ) || ! is_bool( $field['required'] ) ) { return false; }
-		if ( $field['required'] ) { $field['required'] = '1'; } else { unset( $field['required'] ); }
-		if ( in_array( $field['type'], array( 'number', 'attribute', 'resource' ), true ) ) {
-			foreach ( array( 'min', 'max', 'start' ) as $key ) {
-				if ( ! isset( $field[ $key ] ) || ! is_int( $field[ $key ] ) ) { return false; }
-				$field[ $key ] = (string) $field[ $key ];
-			}
-		}
-	}
-	unset( $field );
-	$previous = $rules; $previous['revision']--;
-	$validated = ps_pen_paper_validate_rules( $input, $previous );
-	if ( is_wp_error( $validated ) ) { return false; }
-	foreach ( $rules as $key => $value ) {
-		if ( ! array_key_exists( $key, $validated ) || $validated[ $key ] !== $value ) { return false; }
-	}
-	return true;
+	return ps_pen_paper_valid_rules_document( $rules ) &&
+		array_values( $rules['fields'] ) === $rules['fields'] &&
+		! is_wp_error( ps_pen_paper_import_rule_schema( $rules ) );
 }
 
 function ps_pen_paper_import_character_valid( $state, $rules ) {
@@ -33,8 +13,7 @@ function ps_pen_paper_import_character_valid( $state, $rules ) {
 		! array_key_exists( 'active', $state ) || ! array_key_exists( 'pending', $state ) ) { return false; }
 	foreach ( array( 'active', 'pending' ) as $key ) {
 		if ( null === $state[ $key ] ) { continue; }
-		$validated = ps_pen_paper_context_snapshot( $state[ $key ], $rules );
-		if ( is_wp_error( $validated ) || $validated !== $state[ $key ] ) { return false; }
+		if ( ! ps_pen_paper_valid_character_snapshot( $state[ $key ], $rules ) ) { return false; }
 	}
 	return ! array_key_exists( 'context', $state ) || ! is_wp_error( ps_pen_paper_validate_context( $state['context'], $rules ) );
 }

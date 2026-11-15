@@ -243,9 +243,9 @@ function ps_pen_paper_parse_import( $json ) {
 function ps_pen_paper_import_user_references( $value, &$users, $required = true ) {
 	if ( ! is_array( $value ) ) { return; }
 	foreach ( $value as $key => $part ) {
-		if ( in_array( $key, array( 'owner_id', 'authorizer_id', 'recipient_id', 'actor_id', 'user_id' ), true ) && is_int( $part ) && $part > 0 ) {
+		if ( in_array( $key, array( 'owner_id', 'authorizer_id', 'recipient_id', 'actor_id', 'user_id', 'requester_id', 'reviewer_id' ), true ) && is_int( $part ) && $part > 0 ) {
 			if ( ! isset( $users[ $part ] ) ) { $users[ $part ] = array( 'required' => false ); }
-			if ( $required && in_array( $key, array( 'owner_id', 'authorizer_id' ), true ) ) { $users[ $part ]['required'] = true; }
+			if ( $required && in_array( $key, array( 'owner_id', 'authorizer_id', 'requester_id', 'reviewer_id' ), true ) ) { $users[ $part ]['required'] = true; }
 		}
 		if ( is_array( $part ) ) { ps_pen_paper_import_user_references( $part, $users, $required ); }
 	}
@@ -340,7 +340,7 @@ function ps_pen_paper_import_configuration( $parsed, $options ) {
 			$universe_hash = hash( 'sha256', serialize( $documents ) );
 			foreach ( $parsed['bases'] as $id => $base ) {
 				$mapped = isset( $options['bases'][ $id ] ) ? $options['bases'][ $id ] : 0;
-				$post = $mapped ? get_post( $mapped ) : null;
+				$post = $mapped ? ps_pen_paper_record_post( $mapped ) : null;
 				$owner = isset( $options['users'][ $base['owner_id'] ] ) ? $options['users'][ $base['owner_id'] ] : 0;
 				if ( ! $post || 'pspp_character' !== $post->post_type || 'private' !== $post->post_status ||
 					(int) $post->post_parent !== $universe->ID || $owner < 1 || (int) $post->post_author !== $owner ) {
@@ -354,11 +354,14 @@ function ps_pen_paper_import_configuration( $parsed, $options ) {
 					}
 				}
 			}
+			$wallet_currency = isset( $link['economy_mode'] ) && 'local' === $link['economy_mode']
+				? ps_pen_paper_import_meta( $parsed, $source_id, '_pspp_currency' ) : $documents['currency'];
+			if ( is_wp_error( $wallet_currency ) ) { return $wallet_currency; }
 			foreach ( $parsed['records'] as $id => $record ) {
 				$wallet = ps_pen_paper_import_meta( $parsed, $id, '_pspp_wallet' );
 				if ( $record['parent_id'] !== $source_id || null === $wallet ) { continue; }
-				if ( ! ps_pen_paper_valid_wallet( $wallet ) || $wallet['currency_id'] !== $documents['currency']['currency_id'] ) {
-					$conflicts[] = __( 'Ein lokales Guthaben passt nicht zur Währung des gewählten Universums. Es wird keine automatische Währungsumrechnung vorgenommen.', 'ps-pen-paper' );
+				if ( ! ps_pen_paper_valid_wallet( $wallet ) || ! ps_pen_paper_valid_currency( $wallet_currency ) || $wallet['currency_id'] !== $wallet_currency['currency_id'] ) {
+					$conflicts[] = __( 'Ein lokales Guthaben passt nicht zur ausdrücklich gewählten Währung. Es wird keine automatische Währungsumrechnung vorgenommen.', 'ps-pen-paper' );
 				}
 			}
 			$warnings[] = __( 'Beim Zuordnen bleiben vorhandene Universumsdaten, Basiswerte und gemeinsame Guthaben unverändert. Archivierte gemeinsame Stände werden nicht über sie geschrieben.', 'ps-pen-paper' );
@@ -369,6 +372,20 @@ function ps_pen_paper_import_configuration( $parsed, $options ) {
 		else { $warnings[] = __( 'Ein bereits fehlendes historisches Bild kann nicht wiederhergestellt werden.', 'ps-pen-paper' ); }
 	}
 	$warnings[] = __( 'Konten werden nicht erstellt und globale Rollen nicht vergeben. Externe Wiki-Artikel, Chatnachrichten und Community-Profile benötigen eigene Sicherungen beziehungsweise spätere Verknüpfungen.', 'ps-pen-paper' );
+	if ( 'bind' === $options['universe_mode'] && ! $conflicts ) {
+		global $wpdb;
+		$ids = array_values( array_unique( array_merge( array( $options['universe_id'] ), array_values( $options['bases'] ) ) ) );
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT p.ID,p.post_type,p.post_parent,p.post_author,p.post_status,p.post_title,p.post_content,p.post_excerpt,p.post_mime_type,p.menu_order,m.meta_key,m.meta_value
+			FROM $wpdb->posts p LEFT JOIN $wpdb->postmeta m ON m.post_id=p.ID AND m.meta_key LIKE %s
+			WHERE p.ID IN (" . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ")
+			OR (p.post_parent=%d AND p.post_type IN ('pspp_item','pspp_npc','pspp_loot_table','pspp_asset','pspp_wiki_entry'))
+			ORDER BY p.ID,m.meta_id",
+			array_merge( array( $wpdb->esc_like( '_pspp_' ) . '%' ), $ids, array( $options['universe_id'] ) )
+		), ARRAY_A );
+		if ( $wpdb->last_error || ! is_array( $rows ) || ! $rows ) { return ps_pen_paper_import_error(); }
+		$universe_hash = hash( 'sha256', serialize( $rows ) );
+	}
 	return array( 'options' => $options, 'documents' => $document_check, 'conflicts' => array_values( array_unique( $conflicts ) ),
 		'warnings' => array_values( array_unique( $warnings ) ), 'target_hash' => $target_hash, 'universe_hash' => $universe_hash );
 }

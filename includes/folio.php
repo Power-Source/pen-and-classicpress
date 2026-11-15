@@ -50,7 +50,7 @@ function ps_pen_paper_validate_folio_snapshot( $value, $published = false ) {
 }
 
 function ps_pen_paper_get_folio( $campaign, $id ) {
-	$post = get_post( $id );
+	$post = ps_pen_paper_record_post( $id );
 	$value = get_post_meta( $id, '_pspp_folio', true );
 	if ( ! $post || 'pspp_folio' !== $post->post_type || 'private' !== $post->post_status ||
 		(int) $post->post_parent !== (int) $campaign->ID ) { return ps_pen_paper_folio_error(); }
@@ -96,6 +96,12 @@ function ps_pen_paper_adventure_plan( $campaign ) {
 }
 
 function ps_pen_paper_save_folio( $campaign, $id, $input, $revision, $image_path = null ) {
+	return ps_pen_paper_scope_write( $campaign, function () use ( $campaign, $id, $input, $revision, $image_path ) {
+		return ps_pen_paper_save_folio_locked( $campaign, $id, $input, $revision, $image_path );
+	} );
+}
+
+function ps_pen_paper_save_folio_locked( $campaign, $id, $input, $revision, $image_path = null ) {
 	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
 		return new WP_Error( 'forbidden', __( 'Nur die Spielleitung darf die Mappe bearbeiten.', 'ps-pen-paper' ) );
 	}

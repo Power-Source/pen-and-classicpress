@@ -21,24 +21,31 @@ function ps_pen_paper_register_campaign_type() {
 }
 
 function ps_pen_paper_get_campaign( $campaign_id ) {
-	$campaign = get_post( $campaign_id );
+	$campaign = ps_pen_paper_record_post( $campaign_id );
 	if ( ! $campaign || 'pspp_campaign' !== $campaign->post_type || 'private' !== $campaign->post_status ) {
 		return null;
 	}
+	if ( ! ps_pen_paper_scope_observe( $campaign->ID ) ) { return null; }
 	return $campaign;
 }
 
 function ps_pen_paper_campaign_role( $campaign, $user_id ) {
-	if ( (int) $campaign->post_author === (int) $user_id || in_array( (string) $user_id, get_post_meta( $campaign->ID, '_pspp_gm', false ), true ) ) {
+	global $wpdb;
+	$campaign = $campaign ? ps_pen_paper_get_campaign( (int) $campaign->ID ) : null;
+	if ( ! $campaign ) { return ''; }
+	$roles = $wpdb->get_col( $wpdb->prepare( "SELECT meta_key FROM $wpdb->postmeta WHERE post_id=%d AND meta_value=%s AND meta_key IN ('_pspp_gm','_pspp_player')", $campaign->ID, (string) $user_id ) );
+	if ( $wpdb->last_error ) { error_log( 'PS Pen & Paper: membership lookup failed.' ); return ''; }
+	if ( (int) $campaign->post_author === (int) $user_id || in_array( '_pspp_gm', $roles, true ) ) {
 		return 'gm';
 	}
-	if ( in_array( (string) $user_id, get_post_meta( $campaign->ID, '_pspp_player', false ), true ) ) {
+	if ( in_array( '_pspp_player', $roles, true ) ) {
 		return 'player';
 	}
 	return '';
 }
 
 function ps_pen_paper_can_view_campaign( $campaign ) {
+	if ( ! $campaign || ! ps_pen_paper_scope_observe( $campaign->ID ) ) { return false; }
 	return current_user_can( 'manage_options' ) || '' !== ps_pen_paper_campaign_role( $campaign, get_current_user_id() );
 }
 
@@ -47,6 +54,7 @@ function ps_pen_paper_can_access_site() {
 }
 
 function ps_pen_paper_can_manage_campaign( $campaign ) {
+	if ( ! $campaign || ! ps_pen_paper_scope_observe( $campaign->ID ) ) { return false; }
 	return current_user_can( 'manage_options' ) || 'gm' === ps_pen_paper_campaign_role( $campaign, get_current_user_id() );
 }
 

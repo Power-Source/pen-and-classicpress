@@ -23,7 +23,8 @@ function ps_pen_paper_handle_universe_action( $operation ) {
 		check_admin_referer( 'pspp_universe_link_' . $campaign_id );
 		$result = ps_pen_paper_save_universe_link(
 			$campaign_id, $id, isset( $_POST['link_revision'] ) ? $_POST['link_revision'] : null,
-			$revision, ps_pen_paper_posted_text( 'link_confirmation' )
+			$revision, ps_pen_paper_posted_text( 'link_confirmation' ),
+			isset( $_POST['economy_mode'] ) ? ps_pen_paper_posted_text( 'economy_mode' ) : 'universe'
 		);
 		$notice = 'universe_linked';
 	}
@@ -148,6 +149,12 @@ function ps_pen_paper_render_universes( $page_id = 0 ) {
 					<option value="<?php echo esc_attr( $universe->ID ); ?>"><?php echo esc_html( $document['name'] ); ?></option>
 				<?php endforeach; ?>
 			</select></label></p>
+		<p><label><?php esc_html_e( 'Währung und Handelsregeln', 'ps-pen-paper' ); ?>
+			<select name="pspp_link_economy">
+				<option value="universe"><?php esc_html_e( 'Einstellungen des Zieluniversums verwenden', 'ps-pen-paper' ); ?></option>
+				<option value="local"><?php esc_html_e( 'Lokale Währung und Handelsregeln behalten', 'ps-pen-paper' ); ?></option>
+			</select></label></p>
+		<p class="description"><?php esc_html_e( 'Mit lokalen Einstellungen bleiben bestehende Kampagnenkonten und Guthaben unverändert. Es werden keine Konten zusammengeführt oder Beträge umgerechnet. Gemeinsame Basisbögen müssen zuerst ausdrücklich unabhängig weitergeführt werden; gemeinsame Universumskonten benötigen weiterhin eine gesonderte Kontenmigration.', 'ps-pen-paper' ); ?></p>
 		<?php submit_button( __( 'Zuordnung prüfen', 'ps-pen-paper' ), 'secondary' ); ?>
 	</form>
 	<?php
@@ -159,9 +166,10 @@ function ps_pen_paper_render_universe_link_preview( $page_id ) {
 	}
 	$campaign_id = ps_pen_paper_frontend_id( 'pspp_link_campaign' );
 	$universe_id = isset( $_GET['pspp_link_universe'] ) && '0' === $_GET['pspp_link_universe'] ? 0 : ps_pen_paper_frontend_id( 'pspp_link_universe' );
+	$economy_mode = isset( $_GET['pspp_link_economy'] ) ? $_GET['pspp_link_economy'] : 'universe';
 	$preview = is_wp_error( $campaign_id ) || is_wp_error( $universe_id ) || ! $campaign_id || ! isset( $_GET['pspp_link_universe'] )
 		? new WP_Error( 'invalid_id', __( 'Die gewählte Zuordnung ist ungültig.', 'ps-pen-paper' ) )
-		: ps_pen_paper_preview_universe_link( $campaign_id, $universe_id );
+		: ps_pen_paper_preview_universe_link( $campaign_id, $universe_id, $economy_mode );
 	if ( is_wp_error( $preview ) ) {
 		echo '<p role="alert">' . esc_html( $preview->get_error_message() ) . '</p>';
 		return;
@@ -173,10 +181,14 @@ function ps_pen_paper_render_universe_link_preview( $page_id ) {
 		<p><strong><?php echo esc_html( $preview['campaign']->post_title ); ?></strong></p>
 		<p><?php echo esc_html( ( $preview['source_universe']['name'] ? $preview['source_universe']['name'] : $none ) . ' → ' . ( $preview['universe']['name'] ? $preview['universe']['name'] : $none ) ); ?></p>
 		<p><?php esc_html_e( 'Geändert wird ausschließlich die organisatorische Zuordnung. Regeln, Charakterkennungen, Werte, offene Freigaben, Würfe, Mitgliedschaften und Chat bleiben unverändert. Es werden keine Charaktere kopiert oder zusammengeführt.', 'ps-pen-paper' ); ?></p>
+		<p><?php echo esc_html( 'local' === $economy_mode || ! $universe_id
+			? __( 'Währung und Handelsregeln bleiben lokal bei der Kampagne. Vorhandene Konten und Guthaben werden nicht verändert.', 'ps-pen-paper' )
+			: __( 'Die Kampagne verwendet die Währung und Handelsregeln des Zieluniversums. Lokale Einstellungen werden nicht gelöscht; bestehende Konten werden nicht automatisch übertragen.', 'ps-pen-paper' ) ); ?></p>
 		<?php ps_pen_paper_form_start( 'link_universe', 'pspp_universe_link_' . $campaign_id, $campaign_id, $page_id ); ?>
 			<input type="hidden" name="universe_id" value="<?php echo esc_attr( $universe_id ); ?>">
 			<input type="hidden" name="universe_revision" value="<?php echo esc_attr( $preview['universe']['revision'] ); ?>">
 			<input type="hidden" name="link_revision" value="<?php echo esc_attr( $preview['before']['revision'] ); ?>">
+			<input type="hidden" name="economy_mode" value="<?php echo esc_attr( $economy_mode ); ?>">
 			<p><label class="pspp-check"><input type="checkbox" name="link_confirmation" value="confirmed" required>
 				<?php esc_html_e( 'Ich bestätige diese Zuordnung ohne Datenübernahme oder Rechteänderung.', 'ps-pen-paper' ); ?></label></p>
 			<?php submit_button( __( 'Zuordnung bestätigen', 'ps-pen-paper' ) ); ?>

@@ -26,6 +26,8 @@ function pspp_test_assert( $condition, $message ) {
 $original_user = get_current_user_id();
 $original_query = $GLOBALS['wp_query'];
 $original_get = $_GET;
+$original_post = $_POST;
+$original_request = $_REQUEST;
 $user_ids = array();
 $post_ids = array();
 $suffix = strtolower( wp_generate_password( 12, false, false ) );
@@ -312,7 +314,29 @@ try {
 	wp_set_current_user( $user_ids['gm'] );
 	$html = ps_pen_paper_frontend_shortcode();
 	pspp_test_assert( false !== strpos( $html, 'Testcharakter' ), 'Character library hides GM-managed characters.' );
+	$_GET = array( 'pspp_campaign' => (string) $campaign_id );
+	$html = ps_pen_paper_frontend_shortcode();
+	foreach ( array( 'save_rules', 'update', 'add_member', 'remove_member' ) as $operation ) {
+		pspp_test_assert( false !== strpos( $html, 'name="pspp_operation" value="' . $operation . '"' ), 'Frontend GM preparation is missing operation ' . $operation );
+	}
+	pspp_test_assert( false === strpos( $html, 'admin-post.php' ) && false === strpos( $html, 'Weitere Vorbereitung: Regeln und Mitgliederverwaltung' ), 'Frontend campaign preparation still requires backend access.' );
+	pspp_test_assert( false !== strpos( $html, 'name="rules_revision"' ) && false !== strpos( $html, 'name="membership_revision"' ) && false !== strpos( $html, 'name="pspp_scope_epoch"' ), 'Frontend preparation lost stale-input protection.' );
+	wp_set_current_user( $user_ids['owner'] );
+	$_GET = array( 'pspp_view' => 'campaigns' );
+	pspp_test_assert( false === strpos( ps_pen_paper_frontend_shortcode(), 'name="pspp_operation" value="create"' ), 'Frontend offers campaign creation without permission.' );
+	$owner->add_cap( 'ps_pen_paper_create_campaigns' );
+	wp_set_current_user( 0 );
+	wp_set_current_user( $user_ids['owner'] );
+	$html = ps_pen_paper_frontend_shortcode();
+	pspp_test_assert( false !== strpos( $html, 'name="pspp_operation" value="create"' ) && false !== strpos( $html, 'name="pspp_frontend_page" value="' . $page_id . '"' ) && false === strpos( $html, 'admin-post.php' ), 'Permitted frontend campaign creation is absent or posts into the backend.' );
+	$owner->remove_cap( 'ps_pen_paper_create_campaigns' );
 	wp_set_current_user( $user_ids['player'] );
+	$_GET = array( 'pspp_campaign' => (string) $campaign_id );
+	$html = ps_pen_paper_frontend_shortcode();
+	foreach ( array( 'save_rules', 'update', 'add_member', 'remove_member' ) as $operation ) {
+		pspp_test_assert( false === strpos( $html, 'name="pspp_operation" value="' . $operation . '"' ), 'Frontend exposes campaign management to a player: ' . $operation );
+	}
+	pspp_test_assert( false !== strpos( $html, 'pspp-rules-heading' ), 'Players lost read-only access to campaign rules.' );
 	$_GET = array( 'pspp_view' => array( 'characters' ) );
 	pspp_test_assert( false === strpos( ps_pen_paper_frontend_shortcode(), 'Testcharakter' ), 'Malformed dashboard view exposes content.' );
 	foreach ( array( '-1', '1oops', array( '1' ), '999999999999999999999999999999' ) as $bad_id ) {
@@ -329,6 +353,26 @@ try {
 	pspp_test_assert( is_wp_error( ps_pen_paper_save_rules( $campaign_id, $rename_input, '3' ) ), 'Anonymous visitor can save rules.' );
 	wp_update_post( array( 'ID' => $page_id, 'post_status' => 'draft' ) );
 	pspp_test_assert( null === ps_pen_paper_frontend_page( $page_id ), 'Draft page is accepted as frontend return context.' );
+	wp_set_current_user( $user_ids['gm'] );
+	$die_handler = static function () {
+		return static function ( $message ) { throw new RuntimeException( $message ); };
+	};
+	add_filter( 'wp_die_handler', $die_handler, 1000 );
+	try {
+		foreach ( array( 'create', 'update', 'save_rules', 'add_member', 'remove_member' ) as $operation ) {
+			$_POST = array( 'pspp_operation' => $operation, 'pspp_frontend_page' => (string) $page_id, '_wpnonce' => 'invalid' );
+			$_REQUEST = $_POST;
+			$rejected = false;
+			try {
+				ps_pen_paper_handle_admin_action();
+			} catch ( RuntimeException $error ) {
+				$rejected = __( 'Die Spielbereich-Seite ist nicht mehr verfügbar. Bitte öffne das Formular erneut.', 'ps-pen-paper' ) === $error->getMessage();
+			}
+			pspp_test_assert( $rejected, 'Invalid frontend context reached campaign operation ' . $operation );
+		}
+	} finally {
+		remove_filter( 'wp_die_handler', $die_handler, 1000 );
+	}
 
 	$type = get_post_type_object( 'pspp_campaign' );
 	pspp_test_assert( ! $type->publicly_queryable && ! $type->show_in_rest && ! $type->show_ui, 'Campaign post type is exposed.' );
@@ -338,6 +382,8 @@ try {
 	wp_set_current_user( $original_user );
 	$GLOBALS['wp_query'] = $original_query;
 	$_GET = $original_get;
+	$_POST = $original_post;
+	$_REQUEST = $original_request;
 	$cleanup_errors = array();
 	$events = $post_ids ? get_posts( array( 'post_type' => 'pspp_event', 'post_status' => array( 'private', 'draft' ), 'post_parent__in' => $post_ids, 'posts_per_page' => -1, 'fields' => 'ids' ) ) : array();
 	foreach ( $events as $id ) {

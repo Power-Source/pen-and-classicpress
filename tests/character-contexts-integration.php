@@ -4,6 +4,7 @@
  */
 if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) { exit( "Run this test with WP-CLI.\n" ); }
 require_once dirname( __DIR__ ) . '/ps-pen-paper.php';
+require_once dirname( __DIR__ ) . '/includes/import-prepare.php';
 require_once ABSPATH . 'wp-admin/includes/user.php';
 if ( is_multisite() ) { require_once ABSPATH . 'wp-admin/includes/ms.php'; }
 ps_pen_paper_register_campaign_type();
@@ -11,6 +12,7 @@ ps_pen_paper_register_universe_type();
 ps_pen_paper_register_character_type();
 ps_pen_paper_register_event_type();
 ps_pen_paper_register_roll_type();
+ps_pen_paper_register_item_type();
 $original_user = get_current_user_id();
 $users = array();
 $parents = array();
@@ -172,18 +174,107 @@ try {
 		remove_filter( 'wp_insert_post_data', $fail_publish );
 	}
 	$check( $baseline === ps_pen_paper_raw_character_state( $ids[0] ) && $journal === ps_pen_paper_get_events( $campaigns[0] ), 'Failure rollback damaged existing state/history.' );
+	$copy_campaign = $campaigns[2];
+	$copy_id = $ids[2];
+	$check( true === ps_pen_paper_save_character_context( $copy_campaign->ID, $copy_id, '1', '3', '1', array( $attribute => '2' ), 'COPY_NOTE' ), 'Copy transition overrides failed.' );
+	$copy_before = ps_pen_paper_raw_character_state( $copy_id );
+	$copy_journal = ps_pen_paper_get_events( $copy_campaign );
+	wp_set_current_user( $users['player'] );
+	$check( is_wp_error( ps_pen_paper_copy_shared_character( $copy_campaign->ID, $copy_id, '2', '3', '1', 'confirmed' ) ), 'Owner detached a shared character without GM authority.' );
+	ob_start(); ps_pen_paper_render_characters( $copy_campaign, $copy_id ); $copy_html = ob_get_clean();
+	$check( false === strpos( $copy_html, 'value="copy_shared_character"' ), 'Owner received the GM copy form.' );
+	wp_set_current_user( $users['assistant'] );
+	$check( is_wp_error( ps_pen_paper_copy_shared_character( $copy_campaign->ID, $copy_id, '2', '3', '1', 'confirmed' ) ), 'GM of another campaign detached the character.' );
+	wp_set_current_user( $users['gm'] );
+	foreach ( array( array( '1', '3', '1', 'confirmed' ), array( '2', '2', '1', 'confirmed' ), array( '2', '3', '0', 'confirmed' ), array( '2', '3', '1', '' ) ) as $tokens ) {
+		$check( is_wp_error( ps_pen_paper_copy_shared_character( $copy_campaign->ID, $copy_id, ...$tokens ) ), 'Stale or unconfirmed copy transition succeeded.' );
+	}
+	add_filter( 'wp_insert_post_data', $fail_publish );
+	try {
+		$check( is_wp_error( ps_pen_paper_copy_shared_character( $copy_campaign->ID, $copy_id, '2', '3', '1', 'confirmed' ) ), 'Failed transition publication reported success.' );
+	} finally { remove_filter( 'wp_insert_post_data', $fail_publish ); }
+	$check( $copy_before === ps_pen_paper_raw_character_state( $copy_id ) && $copy_journal === ps_pen_paper_get_events( $copy_campaign ), 'Rejected transition changed the character or its history.' );
+
+	define( 'CPC_CORE_PLUGINS', 'core-profile,core-activity' );
+	require_once dirname( __DIR__, 2 ) . '/ps-community/activity/cpc_profile_tabs.php';
+	$check( true === ps_pen_paper_save_equipment_schema( $copy_campaign, array( 'slots' => 'kopf | Kopf | hut', 'rarities' => 'normal | Normal | #718096' ), '0' ), 'Transition gear schema failed.' );
+	$copy_item = ps_pen_paper_save_item( $copy_campaign, 0, array( 'name' => 'Copy hat', 'description' => '', 'kind' => 'hut', 'rarity' => 'normal', 'binding' => 'tradeable', 'properties' => '', 'bonuses' => array( $attribute => '2' ) ), '0' );
+	$check( is_int( $copy_item ) && true === ps_pen_paper_save_gear( $copy_campaign, $copy_id, 'grant_item', array( 'item_id' => (string) $copy_item, 'item_revision' => '1' ), '0' ), 'Transition item issuance failed.' );
+	$copy_instance = array_key_first( ps_pen_paper_gear_state( $copy_id )['active']['items'] );
+	$check( true === ps_pen_paper_save_gear( $copy_campaign, $copy_id, 'equip_items', array( 'slots' => array( 'kopf' => $copy_instance ) ), '1' ), 'Transition equipment failed.' );
+	$copy_gear = ps_pen_paper_gear_state( $copy_id );
+	$check( true === ps_pen_paper_save_currency( $universe, array( 'name' => 'Credits', 'symbol' => 'CR', 'wallet_mode' => 'campaign' ), '0' ) &&
+		true === ps_pen_paper_change_wallet( $copy_campaign, $copy_id, 'grant', '7', 'Transition balance', '0', '1' ), 'Transition wallet fixture failed.' );
+	$copy_wallet = ps_pen_paper_wallet_context( $copy_campaign, $copy_id )['wallet'];
+	$copy_currency = ps_pen_paper_currency_document( $universe_id );
+	$shared_currency = $copy_currency; $shared_currency['wallet_mode'] = 'universe';
+	$shared_wallet = $copy_wallet; $shared_wallet['balance'] = 19;
+	update_post_meta( $universe_id, '_pspp_currency', $shared_currency );
+	update_post_meta( $base_id, '_pspp_wallet', $shared_wallet );
+	$shared_copy_result = ps_pen_paper_copy_shared_character( $copy_campaign->ID, $copy_id, '2', '3', '1', 'confirmed' );
+	$check( is_wp_error( $shared_copy_result ) && 'shared_wallet' === $shared_copy_result->get_error_code() &&
+		$shared_wallet === get_post_meta( $base_id, '_pspp_wallet', true ) && $copy_before === ps_pen_paper_raw_character_state( $copy_id ), 'Transition disconnected or copied a shared universe account.' );
+	update_post_meta( $universe_id, '_pspp_currency', $copy_currency );
+	delete_post_meta( $base_id, '_pspp_wallet' );
+	$copy_base_before = ps_pen_paper_raw_character_state( $base_id );
+	$copy_base_before['revision']++;
+	$copy_base_before['pending'] = $copy_base_before['active'];
+	$copy_base_before['pending']['name'] = 'TRANSITION_PENDING_SECRET';
+	update_post_meta( $base_id, '_pspp_character', wp_slash( $copy_base_before ) );
+	$check( 4 === ps_pen_paper_character_state( $copy_campaign, get_post( $copy_id ) )['active']['values'][ $attribute ], 'Transition fixture did not apply the override and equipment bonus.' );
+	ob_start(); ps_pen_paper_render_characters( $copy_campaign, $copy_id ); $copy_html = ob_get_clean();
+	$check( false !== strpos( $copy_html, 'value="copy_shared_character"' ) && false === strpos( $copy_html, 'TRANSITION_PENDING_SECRET' ), 'Transition form missing or exposed an unapproved base request.' );
+	add_post_meta( $copy_campaign->ID, '_pspp_gm', (string) $users['assistant'] );
+	wp_set_current_user( $users['assistant'] );
+	$check( true === ps_pen_paper_copy_shared_character( $copy_campaign->ID, $copy_id, '2', '4', '1', 'confirmed' ), 'Campaign-only GM could not independently continue an approved shared character.' );
+	$copied = ps_pen_paper_character_state( $copy_campaign, get_post( $copy_id ) );
+	$copy_raw = ps_pen_paper_raw_character_state( $copy_id );
+	$check( 2 === $copy_raw['active']['values'][ $attribute ] && 4 === $copied['active']['values'][ $attribute ] &&
+		'copy' === $copy_raw['context']['mode'] && 'COPY_NOTE' === $copy_raw['context']['note'] && null === $copy_raw['pending'] &&
+		$copy_base_before === ps_pen_paper_raw_character_state( $base_id ) && $copy_gear === ps_pen_paper_gear_state( $copy_id ) &&
+		$copy_wallet === ps_pen_paper_wallet_context( $copy_campaign, $copy_id )['wallet'], 'Transition lost overrides, copied pending data, doubled bonuses, changed the base, gear or balance.' );
+	$cost = ps_pen_paper_character_resource_cost( $copy_campaign, get_post( $copy_id ), $resource, 2 );
+	$check( ! is_wp_error( $cost ) && 10 === $cost['before'] && 8 === $cost['after'], 'Independent continuation did not enable personal adventure resource costs.' );
+	$copy_event = ps_pen_paper_get_events( $copy_campaign )['events'][0];
+	$check( 'shared' === $copy_event['before']['context']['mode'] && 'copy' === $copy_event['after']['context']['mode'] &&
+		2 === $copy_event['effective_after']['values'][ $attribute ], 'Transition history lost mode change or recorded an equipment bonus as a base value.' );
+	$check( is_wp_error( ps_pen_paper_copy_shared_character( $copy_campaign->ID, $copy_id, '2', '4', '1', 'confirmed' ) ), 'Transition replay changed an independent copy.' );
+	wp_set_current_user( $users['gm'] );
+	$base_input['values'][ $attribute ] = '9';
+	$check( $base_id === ps_pen_paper_save_character( $universe_id, $base_id, $users['player'], $base_input, '4', '1' ) &&
+		4 === ps_pen_paper_character_state( $copy_campaign, get_post( $copy_id ) )['active']['values'][ $attribute ] &&
+		9 === ps_pen_paper_character_state( $campaigns[0], $shared_character )['active']['values'][ $attribute ], 'Later base changes altered the detached copy or stopped another shared campaign.' );
 	$broken = $baseline;
 	$broken['context']['overrides']['unknown'] = 1;
 	update_post_meta( $ids[0], '_pspp_character', wp_slash( $broken ) );
 	$check( is_wp_error( ps_pen_paper_character_state( $campaigns[0], $shared_character ) ), 'Corrupt context silently ignored.' );
 	update_post_meta( $ids[0], '_pspp_character', wp_slash( $baseline ) );
+	$check( true === ps_pen_paper_copy_shared_character( $campaigns[0]->ID, $ids[0], '3', '5', '1', 'confirmed' ) &&
+		! is_wp_error( ps_pen_paper_save_universe_link( $campaigns[0]->ID, 0, '1', '0', 'confirmed' ) ) &&
+		9 === ps_pen_paper_character_state( $campaigns[0], $shared_character )['active']['values'][ $attribute ], 'Detaching the last shared character did not permit a safe universe unlink.' );
+	$standalone = ps_pen_paper_export_campaign( $campaigns[0]->ID, 'local' );
+	$check( ! is_wp_error( $standalone ), 'Detached campaign could not be exported.' );
+	$standalone_parsed = ps_pen_paper_parse_import( json_encode( $standalone, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+	$check( ! is_wp_error( $standalone_parsed ), 'Detached campaign export did not parse.' );
+	$standalone_options = array( 'operation' => 'copy', 'target_id' => 0, 'universe_mode' => 'none', 'universe_id' => 0, 'users' => array(), 'bases' => array() );
+	foreach ( $standalone_parsed['users'] as $source_user => $requirement ) { $standalone_options['users'][ $source_user ] = $source_user; }
+	$standalone_map = array(); $standalone_next = 100000;
+	foreach ( array_keys( $standalone_parsed['records'] ) as $source_id ) { $standalone_map[ $source_id ] = $standalone_next++; }
+	$standalone_prepared = ps_pen_paper_prepare_import( $standalone_parsed, $standalone_options, $standalone_map, true );
+	$check( ! is_wp_error( $standalone_prepared ), 'Standalone import required the detached universe or base instead of preserving historical provenance.' );
+	$historical_roll = null;
+	foreach ( $standalone_prepared[ $old_roll_id ]['meta'] as $entry ) {
+		if ( '_pspp_roll' === $entry['key'] ) { $historical_roll = $entry['value']; }
+	}
+	$check( is_array( $historical_roll ) && $standalone_map[ $ids[0] ] === $historical_roll['character']['id'] &&
+		$base_id === $historical_roll['character']['context']['source_id'] && 5 === $historical_roll['attribute']['value'], 'Standalone import changed the old roll, lost its historical base or retained its old active character ID.' );
 	delete_post_meta( $campaigns[0]->ID, '_pspp_player', (string) $users['player'] );
 	wp_set_current_user( $users['player'] );
 	$check( null === ps_pen_paper_get_character( $campaigns[0], $ids[0] ) && is_wp_error( ps_pen_paper_roll_dice( $campaigns[0]->ID, $roll_input, '1' ) ), 'Removed member retained contextual access.' );
 } finally {
 	wp_set_current_user( $original_user );
 	$errors = array();
-	$children = $parents ? get_posts( array( 'post_type' => array( 'pspp_character', 'pspp_roll', 'pspp_event' ), 'post_status' => array( 'private', 'draft' ), 'post_parent__in' => $parents, 'posts_per_page' => -1, 'fields' => 'ids' ) ) : array();
+	$children = $parents ? get_posts( array( 'post_type' => array( 'pspp_character', 'pspp_roll', 'pspp_event', 'pspp_item' ), 'post_status' => array( 'private', 'draft' ), 'post_parent__in' => $parents, 'posts_per_page' => -1, 'fields' => 'ids' ) ) : array();
 	foreach ( array_merge( $children, $parents ) as $id ) {
 		if ( ! wp_delete_post( $id, true ) ) { $errors[] = 'Cannot remove context fixture ' . $id; }
 	}
@@ -192,4 +283,4 @@ try {
 	}
 	if ( $errors ) { WP_CLI::error( implode( '; ', $errors ) ); }
 }
-WP_CLI::success( 'Base templates, shared progress, independent copies, context overrides, effective dice snapshots, privacy, conflicts and publication rollback passed.' );
+WP_CLI::success( 'Base templates, shared progress, independent continuation, retained equipment and wallets, context overrides, effective dice snapshots, privacy, conflicts and publication rollback passed.' );

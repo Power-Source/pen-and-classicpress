@@ -102,7 +102,7 @@ function ps_pen_paper_validate_item( $item ) {
 }
 
 function ps_pen_paper_get_item( $scope, $id ) {
-	$post = get_post( $id );
+	$post = ps_pen_paper_record_post( $id );
 	$state = get_post_meta( $id, '_pspp_item', true );
 	if ( ! $post || 'pspp_item' !== $post->post_type || 'private' !== $post->post_status || (int) $post->post_parent !== (int) $scope->ID ||
 		! is_array( $state ) || ! isset( $state['revision'], $state['item'] ) || ! is_int( $state['revision'] ) || $state['revision'] < 1 ||
@@ -136,6 +136,12 @@ function ps_pen_paper_item_catalogue( $scope ) {
 }
 
 function ps_pen_paper_save_item( $scope, $id, $input, $revision, $image_path = null ) {
+	return ps_pen_paper_scope_write( $scope, function () use ( $scope, $id, $input, $revision, $image_path ) {
+		return ps_pen_paper_save_item_locked( $scope, $id, $input, $revision, $image_path );
+	} );
+}
+
+function ps_pen_paper_save_item_locked( $scope, $id, $input, $revision, $image_path = null ) {
 	if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
 	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_character_scope( $scope ) ) { return ps_pen_paper_equipment_error( 'forbidden' ); }
 	$before = $id ? ps_pen_paper_get_item( $scope, $id ) : array( 'revision' => 0, 'item' => null );

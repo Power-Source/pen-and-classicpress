@@ -131,12 +131,16 @@ einen endgültigen Funktionsumfang.
 - Version 0.27.0 ergänzt die private Importvorschau: Dateiprüfung,
   neue oder bestehende Zielkampagne, getrennte oder bestehende Universumsdaten,
   ausdrückliche Konten-/Basiszuordnung und Konfliktanzeige. Sie verändert
-  keine Spielstände; schreibender Import und geprüfte Wiederherstellung
-  sind weiterhin offen.
+  keine Spielstände. Die schreibende Wiederherstellung folgt in 0.29.0.
 - Version 0.28.0 ergänzt fachliche Dokumentprüfungen mit vorhandenen Regel-,
   Charakter-, Story- und Wirtschaftsvalidatoren. Ungültige Stände werden
   abgewiesen, noch ungeprüfte Metadaten ausdrücklich angezeigt. Protokolle,
-  vollständige Referenzauflösung und schreibende Wiederherstellung bleiben offen.
+  vollständige Referenzauflösung und schreibende Wiederherstellung folgen in 0.29.0.
+- Version 0.29.0 ergänzt tatsächliche neue Kampagnen und bestätigte Ersetzungen
+  mit typisierten Referenzen, atomarer Speicherung, privater Zielsicherung,
+  Wiederholungsnachweisen und Schutz vor veralteten Zielständen/Formularen.
+  Bekannte ungültige Daten werden nicht still repariert; unbekannte Metadaten
+  bleiben nur bei ausdrücklicher Zustimmung privat archiviert.
 
 ### Universum vor Kampagne: Grundmodell seit Version 0.11.0
 
@@ -152,6 +156,10 @@ einen endgültigen Funktionsumfang.
 - Basisfortschritt und lokale Auflagen besitzen Revisionen und geschützte
   Historien. Würfe speichern tatsächlich verwendete Werte sowie Basis- und
   Kontextrevisionen; alte Würfe werden nicht nachträglich berechnet.
+- Gemeinsame Basisbögen können nach Vorschau und Bestätigung als unabhängige
+  Kampagnenbögen weitergeführt werden. Freigegebene Werte und Auflagen werden
+  übernommen, Ausrüstung und persönliche Konten bleiben erhalten.
+  Gemeinsame Universumskonten benötigen vor dem Ablösen eine Kontenmigration.
 - Geschichten, Teilnehmer, Chat und Protokolle bleiben kampagnengetrennt.
   Universumsbesitz oder Bogenbesitz gewährt keine zusätzliche Teilnahme.
 
@@ -159,9 +167,10 @@ einen endgültigen Funktionsumfang.
 
 - Kontrollierte Migration bestehender Kampagnen mit Vorschau, eindeutiger
   Zuordnung und Konfliktauflösung; keine stillschweigende Zusammenführung.
-- Kontrollierter Wechsel zwischen gemeinsamem Stand und Kopie sowie Ablösen
-  gemeinsamer Bögen. Solange das fehlt, sperren gemeinsame Bögen einen
-  Universumswechsel beziehungsweise das Lösen der Zuordnung.
+- Kontrollierte Rückverbindung unabhängiger Kopien mit Vorschau und
+  Konfliktauflösung. Noch gemeinsame Bögen sperren einen Universumswechsel;
+  das ausdrückliche Ablösen ist bereits möglich, sofern keine gemeinsamen
+  Universumskonten daran gebunden sind.
 - Konfigurierbare universumsweite Teilnahme und zusätzliche kampagnenbezogene
   Freigaben. Aktuell entscheidet weiterhin jede Kampagne über ihre Mitglieder;
   eine spätere Universumsmitgliedschaft darf keine Geschichten ungefragt öffnen.
@@ -187,7 +196,7 @@ einen endgültigen Funktionsumfang.
 - **Einfach bedienen:** Theme-unabhängige Frontend-Ausgabe, zugängliche
   Oberflächen und möglichst wenige zusätzliche Abhängigkeiten.
 
-## Prioritäten für die nächsten Entwicklungsschritte
+## Fachliche Anforderungen des weiteren Ausbaus
 
 ### 1. Regeländerungen ohne Datenverlust
 
@@ -358,7 +367,7 @@ Das Handbuch beschreibt bereits die erste Spieltisch-Oberfläche.
 Die Module beschreiben fachliche Bereiche und müssen nicht als separate Plugins
 oder als komplizierte technische Architektur umgesetzt werden.
 
-## Aktuelle Priorität: Vorhandenes Grundgerüst stabilisieren
+## Aktuelle Priorität: Das Grundgerüst funktional vervollständigen und spielbar machen
 
 Der erste kleine Schritt aus Phase 7 ist seit **0.21.0** umgesetzt. Der
 Story-Builder bleibt Grundlage. Seit **0.16.0** stehen
@@ -373,21 +382,28 @@ Seit 0.24.0 sind konfigurierbare Soloentscheidungsbelohnungen vorhanden.
 Seit 0.25.0 sind mehrere Wertebedingungen mit UND/ODER vorhanden.
 Seit 0.26.0 steht der erste versionierte Kampagnenexport bereit.
 Seit 0.27.0 steht die private Importvorschau mit frei wählbaren,
-berechtigungsgeprüften Zuordnungen bereit; sie schreibt noch keine Spielstände.
+berechtigungsgeprüften Zuordnungen bereit. Seit 0.29.0 können die geprüften
+Zuordnungen atomar als neue Kampagne oder bestätigter Ersatz gespeichert werden.
 
-Die funktionale Grundlage ist damit umfangreich genug, um zunächst ihre
-Sicherung, Wiederherstellung und verlässliche Nutzung zu priorisieren.
-Begegnungen, Gruppen- und hybride Abläufe sowie weitere neue Funktionsbereiche
-bleiben geplant, werden aber vorerst zurückgestellt. Korrekturen und gezielte
-Verbesserungen vorhandener Funktionen bleiben möglich. Das Plugin unterstützt
-die Spielleitung; eine vollständige Game-Engine ist weiterhin kein Ziel.
+Import/Export ist abgeschlossen, nicht der gesamte geplante Funktionsumfang.
+Vorhandene Funktionen müssen auch über ihre tatsächlichen Bedienelemente
+nutzbar sein. Gemeldete Fehler in grundlegenden Abläufen, etwa der
+Universumszuordnung, werden vor darauf aufbauenden Erweiterungen behoben.
+Kampagnenanlage, Regelbearbeitung und persönliche Mitgliederverwaltung sind
+jetzt auch direkt im Frontend-Spielbereich verfügbar. Die vorhandenen
+Erstell- und Spielleiterrechte, Formularschutz und Revisionsprüfungen bleiben
+verbindlich; Spieler erhalten dadurch keine Verwaltungsrechte.
+Danach folgen Abenteuer-, Regel-/Universums- und Spielwelterweiterungen.
+Qualitätsprüfungen begleiten diese Arbeit, ersetzen sie aber nicht.
+Das Plugin unterstützt die Spielleitung; eine vollständige Game-Engine
+ist weiterhin kein Ziel.
 
 ### Reihenfolge der nächsten Schritte
 
-1. **Kampagnenexport und Wiederherstellung:** Der versionierte Export steht
+1. **Kampagnenexport und Wiederherstellung — abgeschlossen:** Der versionierte Export steht
    seit 0.26.0 in lokaler und vollständiger Variante bereit; seit 0.27.0
-   ergänzt ihn eine private Importvorschau. Als Nächstes folgen vollständige
-   Fachdokumentprüfung und atomare Wiederherstellung einer einzelnen Kampagne.
+   ergänzt ihn eine private Importvorschau. Seit 0.29.0 stehen Fachdokumentprüfung
+   und atomare Wiederherstellung einer einzelnen Kampagne bereit.
    Regeln, Charaktere, Inventare,
    Währung und Guthaben, Kapitel, Szenen, Handouts, NPCs, Beutetabellen,
    Ereignishistorien, Soloabenteuer und Durchläufe sowie geschützte Assets
@@ -396,19 +412,45 @@ die Spielleitung; eine vollständige Game-Engine ist weiterhin kein Ziel.
    an anderen Kampagnen. Den Umgang mit gemeinsam genutzten Universumsdaten
    und optionalen Integrationen vor der Wiederherstellung festlegen; keine
    fremden oder nicht zum Export freigegebenen Daten übernehmen.
-2. **Plattform- und Wiederherstellungstests:** Unterstützte Mindestversionen
-   von WordPress, ClassicPress und PHP festlegen und anhand einer reproduzierbaren
-   Testmatrix prüfen. Betrieb mit und ohne optionale Integrationen,
-   Mehrprozess-/Zwei-Subsite-Szenarien und erfolgreiche sowie fehlgeschlagene
-   Wiederherstellungen abdecken. Bestehende Integrationsprüfungen weiterführen;
-   sie ersetzen weder die Plattformmatrix noch den Nachweis einer Wiederherstellung.
-3. **Vorhandene Modulschnittstellen dokumentieren:** Zuständigkeiten und
+2. **Vorhandene Kernabläufe tatsächlich bedienbar machen — unmittelbar:**
+   Gemeldete Zuordnungs-, Formular- und Navigationsfehler auf der Testseite
+   nachvollziehen und beheben. Anlegen, Zuordnen, Bearbeiten, Freigeben und
+   Spielen über echte Backend-/Frontend-Bedienelemente prüfen. Direkte
+   PHP-Aufrufe und erfolgreiche HTTP-Anfragen allein belegen keine
+   durchgängige Bedienbarkeit.
+3. **Abenteuer weiter ausbauen — laufender Funktionsblock:** Textvergleiche,
+   Voraussetzungen anhand vorheriger Entscheidungen und ausdrückliche
+   Spielleiterfreigaben für Einzeldurchläufe sind implementiert und live geprüft.
+   Gruppendurchläufe mit wählbaren Entscheidungsregeln, persönlichen Kosten und
+   Belohnungen, Teilnahme, Pausen und Wiedereinstieg sind ergänzt; Import/Export
+   erhält den gemeinsamen Fortschritt samt Stimmen und Freigaben.
+   Noch offen sind Gegenstandsvoraussetzungen, weitere Ereignisarten,
+   Begegnungsabläufe.
+   Wiederverwendbare Abenteuerpakete von Kampagnensicherungen,
+   Teilnehmerkonten und persönlichen Spielständen trennen.
+4. **Regeln und Universen flexibilisieren:** Verwendete Feldstrukturen
+   kontrolliert ändern, Kampagnenmigration mit Vorschau und Konfliktauflösung,
+   Gemeinsame Basisbögen können bereits ausdrücklich unabhängig weitergeführt
+   werden. Rückverbindungen und Spielerbearbeitung von Basisbögen mit Freigaben
+   ermöglichen. Auswahlfelder, optionale Punkteverteilung
+   und konfigurierbare XP-/Level-/Rangregeln ergänzen.
+5. **Spielwelt und Integrationen vervollständigen:** Beute auf mehrere
+   Empfänger aufteilen, Gegenstandsgruppen und verschachtelte Tabellen,
+   weitere Würfelarten, Wiki-Verknüpfungen, geschützte Handoutformate und
+   Empfängerkreise sowie Einladungen ergänzen.
+6. **Qualität und Plattformprüfung begleitend:** Geänderte Abläufe live auf
+   der Testseite und mit gezielten Regressionen prüfen. Unterstützte Versionen
+   von WordPress, ClassicPress und PHP mit einer reproduzierbaren Testmatrix
+   nachweisen; Betrieb mit/ohne Integrationen sowie Mehrprozess- und
+   Zwei-Subsite-Szenarien abdecken. Fehlende Funktionen nicht als erledigt
+   markieren, nur weil vorhandene Tests bestanden sind.
+7. **Vorhandene Modulschnittstellen direkt mitdokumentieren:** Zuständigkeiten und
    interne PHP-Lese-/Schreibwege für Kampagnen, Universen, Charaktere,
    Ereignisse, Inventar und Story festhalten. Fachliche Änderungen über die
    zuständigen Writer und deren Sperr-/Transaktionsregeln führen. Bestehende
    Schnittstellen gezielt verbessern, statt eine neue API-Schicht auf Verdacht
    oder eine öffentliche REST-API einzuführen.
-4. **Barrierefreiheit begleitend prüfen:** Zustände nicht nur über Farben
+8. **Barrierefreiheit begleitend prüfen:** Zustände nicht nur über Farben
    vermitteln; Aktionen ohne Drag-and-drop ermöglichen. Fokussteuerung,
    dynamische Statusmeldungen, SVG-Beschriftungen und Bedienung ohne
    Animationen bei jeder betroffenen Oberflächenänderung mitprüfen.
@@ -438,9 +480,9 @@ Seit **0.15.0** verbindet ein privater Abenteuerplan die bestehenden Werkzeuge:
 
 ### Abgesicherte Grundlagen und spätere Absicherung
 
-Die erledigten Konsistenzkorrekturen bleiben Grundlage. Export/Wiederherstellung,
-Plattformtests und Schnittstellendokumentation haben jetzt Vorrang vor dem
-Ausbau weiterer Spielmechanismen:
+Die erledigten Konsistenzkorrekturen bleiben Grundlage. Weitere Absicherung,
+Plattformtests und Schnittstellendokumentation begleiten den Funktionsausbau;
+sie stellen die noch fehlenden Kernfunktionen nicht pauschal zurück:
 
 - [x] Lokale Änderungen an vorhandenen Charakterbögen, Freigaben,
   Kampagnenauflagen und Inventaren verwenden dieselbe Datenbanksperre je
@@ -480,13 +522,15 @@ Ausbau weiterer Spielmechanismen:
   Ziel- und Universumswahl, ausdrücklichen Konten-/Basiszuordnungen,
   Konfliktanzeige, Zielsicherung und Verwerfen bereitstellen. Konten,
   Websitegrenzen, Ablauf, reale Uploads und unveränderte Spielstände prüfen.
-- [ ] Schreibenden Import und die Wiederherstellung einzelner Kampagnen
-  ergänzen. Vollständige Fachdokumentprüfung, atomare Speicherung,
+- [x] Seit 0.29.0 schreibenden Import und die Wiederherstellung einzelner Kampagnen
+  bereitstellen. Fachdokumentprüfung, atomare Speicherung,
   Änderungen zwischen Vorschau und Speicherung sowie Wiederholungsabwehr
   absichern. Benutzer-/Objektzuordnungen, gemeinsame Universumsdaten und
   externe Integrationen kontrolliert behandeln; keine stillen Überschreibungen
   oder erneuten wirtschaftlichen Vergaben. Eine erfolgreiche Wiederherstellung
-  und sichere Ablehnung fehlerhafter Dateien nachweisen.
+  und sichere Ablehnung fehlerhafter Dateien nachweisen. Vor einem Ersatz
+  private Zielsicherung und alte Datensätze erhalten; wiederholte Bestätigungen
+  auch nach späteren Ersetzungen nicht erneut ausführen.
 - [x] Seit 0.28.0 vorhandene Fachvalidatoren in die private Importvorschau
   einbinden, Dokumentfehler und verbleibenden Prüfbedarf ausdrücklich zeigen.
   Keine Werte still korrigieren und keine wirtschaftlichen Vorgänge ausführen.
@@ -666,7 +710,8 @@ beziehungsweise charaktergebunden gekennzeichnete Exemplare sind seit
 stimmen ausdrücklich zu; eine zusätzliche Spielleiterfreigabe ist einstellbar
 und standardmäßig erforderlich. Handelsgrundregeln gehören zum Universum;
 Kampagnen ohne Universum besitzen eine eigene Einstellung. Universumsregeln
-werden verbindlich ohne lokale Abweichung übernommen. Zunächst ist nur
+werden standardmäßig übernommen; eine ausdrücklich lokale Wirtschaftszuordnung
+erhält stattdessen die Kampagnenregeln. Zunächst ist nur
 Handel derselben Kampagne zwischen unterschiedlichen Besitzern möglich.
 Freundschaften dürfen höchstens die Auswahl unterstützen, nicht Kampagnen-
 oder Handelsrechte ersetzen. Außerdem fehlen Entzug/Entfernen von Exemplaren,
@@ -768,8 +813,10 @@ Kampagnen ohne Universum konfigurieren ihre Währung lokal.
   Kampagnenleitung, gemeinsame Konten nur die Universumsleitung beziehungsweise
   Administration. Wiederholte veraltete Formulare buchen nicht erneut.
 - [x] Das Kontomodell bleibt nach der ersten Buchung fest. Konten werden bei
-  einer anderen Universumszuordnung nicht umgedeutet; ein solcher Wechsel
-  benötigt eine gesonderte, noch nicht implementierte Guthabenmigration.
+  einer anderen Universumszuordnung nicht umgedeutet. Bestehende lokale Konten
+  können bei einer ausdrücklich lokalen Wirtschaftszuordnung unverändert
+  weitergeführt werden. Währungsumrechnungen und Übertragungen bestehender
+  Universumskonten benötigen weiterhin eine gesonderte Migration.
 - [x] Vorlagen als **handelbar** oder **charaktergebunden** kennzeichnen und
   die Eigenschaft im ausgegebenen Exemplar einfrieren. Vorlagenänderungen
   verändern keine bereits ausgegebenen Bindungen.
@@ -778,7 +825,8 @@ Kampagnen ohne Universum konfigurieren ihre Währung lokal.
 
 - [x] Geschenk, Verkauf und Tausch unabhängig aktivieren; standardmäßig keine
   Art erlauben und zusätzliche Spielleiterfreigabe verlangen. Universumsregeln
-  verbindlich übernehmen, eigenständige Kampagnen lokal konfigurieren.
+  standardmäßig übernehmen oder bei ausdrücklich lokaler Wirtschaftszuordnung
+  die Kampagnenregeln behalten.
 - [x] Verschenken, Tauschen sowie Kaufen und Verkaufen mit vereinbartem Betrag
   ermöglichen. Beide Besitzer müssen den konkreten Bedingungen zustimmen;
   unbekannte Gegenleistungen dürfen nicht automatisch als angenommen gelten.
@@ -868,10 +916,11 @@ Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
 4. **Seit 0.20.0 umgesetzt:** Kontrollierter Handel mit konfigurierbaren Arten,
    verbindlicher Besitzerzustimmung und optionaler Spielleiterfreigabe.
 5. **Soloausbau bis 0.25.0 vorhanden:** Mindestwerte, Ressourcenkosten,
-   Belohnungen und UND-/ODER-Wertebedingungen. Jetzt Export/Wiederherstellung,
-   Plattformtests und dokumentierte Schnittstellen vorziehen.
-6. Begegnungen sowie weitere Solo-, Gruppen- und hybride Abläufe danach
-   gezielt ausbauen; einen gemeinsamen Gruppenmodus gesondert konzipieren.
+   Belohnungen und UND-/ODER-Wertebedingungen. Kampagnenimport/-export ist
+   seit 0.29.0 vorhanden, die funktionale Abenteuerplanung aber noch nicht fertig.
+6. Als nächsten Funktionsblock Begegnungen sowie weitere Solo-, Gruppen- und
+   hybride Abläufe ausbauen; Entscheidungsverfahren und Teilnahmeverhalten
+   je Abenteuer konfigurierbar machen.
 
 ## Phase 7: Geleitete, hybride und automatisierte Abenteuer
 
@@ -879,9 +928,10 @@ Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
 behält die Kontrolle über Vorbereitung und Freigabe. Mindestwerte und
 optionale Ressourcenkosten ergänzen den Ablauf seit 0.22.0 beziehungsweise
 0.23.0; seit 0.24.0 folgen konfigurierbare einmalige Belohnungen.
-Gruppenabläufe und hybride Freigabeschritte sind noch nicht implementiert.
-Weitere neue Abenteuermechanismen bleiben hinter der aktuellen
-Stabilisierungspriorität zurückgestellt.
+Hybride Freigabeschritte und gemeinsame Gruppendurchläufe mit konfigurierbaren
+Entscheidungen, Teilnahme und Wiedereinstieg sind ergänzt. Weitere Voraussetzungen,
+Begegnungen und Abenteuerpakete bleiben Funktionsausbau;
+sie werden nicht pauschal hinter eine abschließende Stabilisierungsphase zurückgestellt.
 
 - [x] Pro Charakter einen eigenen Durchlauf aus einem ausdrücklich
   freigegebenen Szenenstand speichern; der Durchlauf friert Szenen und
@@ -904,8 +954,12 @@ Stabilisierungspriorität zurückgestellt.
   Fortschritt sowie private Pflichtereignisse gemeinsam speichern.
   Kostenpflichtige Versuche vorläufig auf lokale Bögen und unabhängige Kopien
   ohne offenen Werteantrag begrenzen; kostenfreie Alternativen bleiben möglich.
-- [ ] Teamdurchläufe, gemeinsame Entscheidungen, Wiedereinstieg und
-  Teilnahmeverhalten ausdrücklich entwerfen.
+- [x] Teamdurchläufe mit eigenem gemeinsamen Fortschritt, frei wählbarer
+  Einzelentscheidung, Mehrheit, Einstimmigkeit oder Spielleiterfreigabe anbieten.
+  Echte Besitzer führen persönliche Aktionen aus; Teilnahmewechsel, Pausen und
+  Wiedereinstieg erhalten den Verlauf und verwerfen offene Vorschläge.
+  Import/Export bewahrt Teilnehmer, Stimmen und aktuelle/historische Freigaben,
+  ohne Kosten oder Belohnungen erneut auszuführen.
 - [x] Seit 0.24.0 feste Gegenstände/Währung und vorhandene Beutetabellen als
   optionale Alternativen je Soloentscheidung anbieten. Auch Misserfolg belohnen
   oder nur Erfolg; ohne Probe immer. Vorlagen und Tabellen einfrieren,
@@ -917,8 +971,14 @@ Stabilisierungspriorität zurückgestellt.
   kleiner, gleich und ungleich unterstützen; Ressourcenwert und Maximum
   unterscheiden. Aktuelle freigegebene Werte prüfen, offene Anträge nicht
   verwenden und alle Vergleichsergebnisse im privaten Verlauf einfrieren.
-- [ ] Text- und Gegenstandsbedingungen als gesonderten Ausbau vorsehen.
-- [ ] Hybride Abläufe mit ausdrücklich notwendigen Spielleiterfreigaben ergänzen.
+- [x] Textbedingungen mit gleich/ungleich und enthält/enthält nicht ergänzen.
+- [x] Vorherige Entscheidungen im eigenen Solo- oder Gruppendurchlauf als
+  Bedingungen prüfen; persönliche Nachweise nicht an fremde Teilnehmer ausliefern.
+- [x] Hybride Abläufe mit ausdrücklich notwendigen Spielleiterfreigaben ergänzen.
+  Anfrage/Vorschlag und Zustimmung verbrauchen nichts; der echte Besitzer führt
+  nach erneuter Rechteprüfung aus. Entzogene Freigaben lassen sich zurücknehmen
+  und durch eine aktuelle Entscheidung der Spielleitung ersetzen.
+- [ ] Gegenstandsbedingungen, weitere Ereignisse und gesetzte Abenteuerzustände ergänzen.
 
 Abenteuerautor und ausführende Spielleitung sind getrennte Zuständigkeiten.
 Vorbereitete Abenteuer können von anderen Personen übernommen und ohne
@@ -935,7 +995,8 @@ Administration beziehungsweise Spielleitung wählt den Modus innerhalb ihrer Rec
   Spielleitung definiert Auswahlmöglichkeiten, optionale Proben,
   Erfolgs-/Misserfolgsfolgen und erlaubte Übergänge zwischen freigegebenen
   Szenen. Mindestwerte stehen seit 0.22.0 bereit; mehrere Wertebedingungen mit
-  UND/ODER seit 0.25.0. Text- und Gegenstandsbedingungen folgen später.
+  UND/ODER seit 0.25.0. Text- und Fortschrittsbedingungen sind ergänzt;
+  Gegenstandsbedingungen folgen später.
 - Vorbereitete Komplikationen statt automatisch erfundener Ergebnisse
   verwenden. Beispiel: Ein Schloss untersuchen, eine Verstandprobe ausführen
   und je Ergebnis eine freigegebene Folgeszene öffnen.
@@ -946,7 +1007,7 @@ Administration beziehungsweise Spielleitung wählt den Modus innerhalb ihrer Rec
   Figuren würfeln und wie Teilnahme, Wiedereinstieg sowie gemeinsame
   Belohnungen behandelt werden. Keine stillschweigende Mehrheits- oder
   Gruppenführerregel voraussetzen.
-- Persönliche Charakterressourcen und gemeinsame Gruppenbestände getrennt
+- Persönliche Charakterressourcen vom gemeinsamen Abenteuerfortschritt getrennt
   führen. Teilnehmerwechsel, Pausen und Wiedereinstieg dürfen den gemeinsamen
   Fortschritt nicht löschen; Entscheidungsverfahren und Umgang mit abwesenden
   Teilnehmern werden je Abenteuer konfiguriert.
@@ -987,12 +1048,14 @@ Administration beziehungsweise Spielleitung wählt den Modus innerhalb ihrer Rec
   derselben Regel-, Charakter-, Rechte- und Speicherbasis ausbauen, nicht
   als zwei konkurrierende Engines. Keine Flowchart-, Echtzeit- oder KI-Pflicht.
 
-Diese Erweiterung folgt nach der aktuellen Sicherungs- und Stabilisierungsarbeit.
+Diese Erweiterung gehört zum Abenteuerausbau. Kampagnenimport/-export ist
+die Speichergrundlage, ersetzt aber kein eigenständiges Abenteuerpaket.
 
 ## Phase 8: Mögliche spätere Erweiterungen
 
-Diese Ideen sind bewusst noch nicht Teil der ersten spielbaren Version und
-folgen erst nach der aktuellen Stabilisierungspriorität:
+Diese weiterführenden Ideen sind nicht alle Voraussetzung für das geplante
+Grundgerüst. Die ausdrücklich priorisierten Abenteuer-, Regel- und
+Spielwelterweiterungen werden dadurch nicht wieder zurückgestellt:
 
 - Einen universellen Katalog für Regelwerke, Charakterbögen, NPCs,
   Gegenstände, Szenen, Abenteuer und Beutetabellen schrittweise ausbauen.
@@ -1007,8 +1070,6 @@ folgen erst nach der aktuellen Stabilisierungspriorität:
 - Optionales Level- oder Rangsystem, Erfahrungspunkte und weitere
   Freigabeabläufe entsprechend dem gewählten Kampagnenregelwerk.
 - Sitzungsnotizen, Terminübersicht und Zusammenfassungen vergangener Sitzungen.
-- Gruppeninventar mit eigenen Zugriffs- und Vergaberechten; der geplante
-  Handel zwischen Charakteren wird bereits in Phase 6 behandelt.
 - Import und Export eigener Kampagnen- oder Regelvorlagen mit klaren Optionen
   für private Inhalte und personenbezogene Daten.
 - Druckansicht oder PDF-Export für Charakterbögen und Spielleiternotizen.
@@ -1031,22 +1092,28 @@ folgen erst nach der aktuellen Stabilisierungspriorität:
 - Funktionen auf den festgelegten WordPress- und ClassicPress-Versionen testen,
   einschließlich Betrieb mit und ohne optionale Integrationen.
 
-## Offene Entscheidungen
+## Konfiguration und verbleibende Umsetzungsaufgaben
+
+Fachliche Entscheidungen treffen Administration, Spielleitung und Abenteuerautoren
+innerhalb ihrer Rechte im Plugin. Die Entwicklung stellt die entsprechenden
+Optionen bereit, statt eine einzige globale Spielweise festzulegen.
 
 1. Welche Versionen von WordPress, ClassicPress und PHP sollen mindestens
    unterstützt werden?
 2. Administratoren und ausdrücklich berechtigte Benutzer dürfen Kampagnen
-   erstellen. Wie sollen Einladungen und die Aufnahme neuer Spieler ablaufen?
-3. Welche konkreten Änderungen an Charakteren benötigen eine Freigabe, und
-   wer darf private Würfe sehen?
+   erstellen. Aufnahme und Beitrittsanfragen sind vorhanden; konfigurierbare
+   Einladungen fehlen noch.
+3. Charakterfreigaben und Würfelsichtbarkeit sind bereits pro Kampagne
+   konfigurierbar. Weitere Bearbeitungs-/Freigaberechte für Basisbögen ergänzen.
 4. Wie sollen Änderungen an bereits verwendeten Feldern und Regeln bestehende
    Charaktere und offene Freigaben beeinflussen?
 5. Welche Wiki- und Chat-Zugriffsrechte sind bereits vorhanden, und wo werden
    gegebenenfalls Erweiterungen der anderen Plugins benötigt?
 6. Welche weiteren Handoutformate und Empfängerkreise werden neben den
    geschützten Text-/Bild-Handouts für die gesamte Runde benötigt?
-7. **Seit 0.20.0 entschieden:** Universums-Handelsregeln gelten verbindlich
-   ohne lokale Abweichung. Weitere Abweichungsmodelle bleiben späterer Ausbau.
+7. Handelsarten und zusätzliche Freigaben sind konfigurierbar. Bei der
+   Universumszuordnung wählt die zuständige Person Universumseinstellungen
+   oder ausdrücklich beibehaltene lokale Währungs-/Handelsregeln.
 8. **Seit 0.16.0 entschieden:** Die Universumsleitung wählt getrennte
    Kampagnenkonten oder gemeinsame Universumscharakterkonten. Erstere
    verwaltet die Kampagnenleitung, letztere die Universumsleitung;

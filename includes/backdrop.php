@@ -44,7 +44,7 @@ function ps_pen_paper_private_image( $campaign, $asset_id ) {
 }
 
 function ps_pen_paper_private_image_data( $campaign, $asset_id ) {
-	$asset = get_post( $asset_id );
+	$asset = ps_pen_paper_record_post( $asset_id );
 	if ( ! $asset || 'pspp_asset' !== $asset->post_type || 'private' !== $asset->post_status ||
 		(int) $asset->post_parent !== (int) $campaign->ID ||
 		! in_array( $asset->post_mime_type, array( 'image/png', 'image/jpeg', 'image/webp' ), true ) ||
@@ -104,7 +104,7 @@ function ps_pen_paper_save_backdrop( $campaign_id, $path, $revision ) {
 		return new WP_Error( 'conflict', __( 'Der Hintergrund konnte nicht zugeordnet werden. Bitte lade die Seite neu.', 'ps-pen-paper' ) );
 	}
 	if ( $previous['asset_id'] ) {
-		$old = get_post( $previous['asset_id'] );
+		$old = ps_pen_paper_record_post( $previous['asset_id'] );
 		if ( $old && ( 'pspp_asset' !== $old->post_type || (int) $old->post_parent !== (int) $campaign_id || ! wp_delete_post( $old->ID, true ) ) ) {
 			return new WP_Error( 'cleanup_failed', __( 'Der neue Hintergrund ist gespeichert, aber der alte konnte nicht entfernt werden. Bitte informiere den Administrator.', 'ps-pen-paper' ) );
 		}

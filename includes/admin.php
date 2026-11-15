@@ -50,8 +50,9 @@ function ps_pen_paper_fail( $message ) {
 	wp_die( esc_html( $message ) );
 }
 
-function ps_pen_paper_redirect( $notice, $campaign_id = 0 ) {
-	wp_safe_redirect( add_query_arg( 'pspp_notice', $notice, ps_pen_paper_admin_url( $campaign_id ) ) );
+function ps_pen_paper_redirect( $notice, $campaign_id = 0, $page_id = 0, $section = '' ) {
+	$url = $page_id ? ps_pen_paper_game_url( $page_id, $campaign_id ) : ps_pen_paper_admin_url( $campaign_id );
+	wp_safe_redirect( add_query_arg( 'pspp_notice', $notice, $url ) . ( $page_id && $campaign_id && $section ? '#' . $section : '' ) );
 	exit;
 }
 
@@ -78,9 +79,27 @@ function ps_pen_paper_handle_admin_action() {
 	}
 
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
+	$page_id = ps_pen_paper_posted_id( 'pspp_frontend_page' );
+	if ( in_array( $operation, array( 'create', 'update', 'save_rules', 'add_member', 'remove_member' ), true ) ) {
+		if ( ! ps_pen_paper_can_access_site() ) {
+			ps_pen_paper_fail( __( 'Du hast keinen Zugriff auf den Spielbereich dieser Website.', 'ps-pen-paper' ) );
+		}
+		if ( isset( $_POST['pspp_frontend_page'] ) && ( ! $page_id || ! ps_pen_paper_frontend_page( $page_id ) ) ) {
+			ps_pen_paper_fail( __( 'Die Spielbereich-Seite ist nicht mehr verfügbar. Bitte öffne das Formular erneut.', 'ps-pen-paper' ) );
+		}
+	}
+	if ( 'restore_import' === $operation || 'download_import_backup' === $operation ) { ps_pen_paper_handle_restore_action( $operation ); }
 	if ( in_array( $operation, array( 'preview_import', 'configure_import_preview', 'discard_import_preview' ), true ) ) { ps_pen_paper_handle_import_preview_action( $operation ); }
 	if ( 'export_campaign' === $operation ) { ps_pen_paper_handle_export_action(); }
-	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure' ), true ) ) { ps_pen_paper_handle_adventure_action( $operation ); }
+	$scope_id = ps_pen_paper_posted_id( 'campaign_id' );
+	if ( $scope_id ) {
+		$epoch = ps_pen_paper_scope_epoch( $scope_id );
+		if ( is_wp_error( $epoch ) || $epoch !== ps_pen_paper_posted_text( 'pspp_scope_epoch' ) ) {
+			ps_pen_paper_fail( __( 'Die Runde wurde inzwischen wiederhergestellt. Alte Eingaben wurden nicht übernommen. Bitte lade die Seite neu.', 'ps-pen-paper' ) );
+		}
+	}
+	if ( 'group_adventure' === $operation ) { ps_pen_paper_handle_adventure_group_action(); }
+	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure', 'request_adventure_review', 'review_adventure_run', 'cancel_adventure_review' ), true ) ) { ps_pen_paper_handle_adventure_action( $operation ); }
 	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) ) { ps_pen_paper_handle_trade_action( $operation ); }
 	if ( in_array( $operation, array( 'configure_wiki', 'prepare_wiki', 'publish_wiki' ), true ) ) { ps_pen_paper_handle_wiki_action( $operation ); }
 	if ( in_array( $operation, array( 'save_loot_table', 'roll_loot', 'award_loot' ), true ) ) { ps_pen_paper_handle_loot_action( $operation ); }
@@ -99,7 +118,7 @@ function ps_pen_paper_handle_admin_action() {
 	if ( in_array( $operation, array( 'save_scene', 'publish_scene', 'withdraw_scene', 'select_scene' ), true ) ) {
 		ps_pen_paper_handle_scene_action( $operation );
 	}
-	if ( in_array( $operation, array( 'save_universe_rules', 'save_base_character', 'adopt_universe_rules', 'attach_base_character', 'save_character_context' ), true ) ) {
+	if ( in_array( $operation, array( 'save_universe_rules', 'save_base_character', 'adopt_universe_rules', 'attach_base_character', 'save_character_context', 'copy_shared_character' ), true ) ) {
 		ps_pen_paper_handle_character_context_action( $operation );
 	}
 	if ( in_array( $operation, array( 'save_universe', 'link_universe' ), true ) ) {
@@ -140,7 +159,7 @@ function ps_pen_paper_handle_admin_action() {
 			}
 			ps_pen_paper_fail( __( 'Die Kampagne konnte nicht vollständig gespeichert werden.', 'ps-pen-paper' ) );
 		}
-		ps_pen_paper_redirect( 'created', $campaign_id );
+		ps_pen_paper_redirect( 'created', $campaign_id, $page_id, 'pspp-rulebook' );
 	}
 
 	if ( 'creator_permission' === $operation ) {
@@ -262,7 +281,7 @@ function ps_pen_paper_handle_admin_action() {
 		if ( is_wp_error( $result ) ) {
 			ps_pen_paper_fail( $result->get_error_message() );
 		}
-		ps_pen_paper_redirect( 'rules_saved', $campaign_id );
+		ps_pen_paper_redirect( 'rules_saved', $campaign_id, $page_id, 'pspp-rulebook' );
 	}
 
 	if ( 'update' === $operation ) {
@@ -289,20 +308,20 @@ function ps_pen_paper_handle_admin_action() {
 		if ( get_post_meta( $campaign_id, '_pspp_archived', true ) !== $archived ) {
 			ps_pen_paper_fail( __( 'Name und Beschreibung wurden gespeichert, aber der Archivstatus konnte nicht gespeichert werden.', 'ps-pen-paper' ) );
 		}
-		ps_pen_paper_redirect( 'updated', $campaign_id );
+		ps_pen_paper_redirect( 'updated', $campaign_id, $page_id, 'pspp-settings' );
 	}
 
 	if ( 'add_member' === $operation ) {
 		$result = ps_pen_paper_change_membership( $campaign_id, ps_pen_paper_posted_id( 'user_id' ), 'add', ps_pen_paper_posted_text( 'member_role' ), ps_pen_paper_posted_text( 'membership_revision' ) );
 		if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
-		ps_pen_paper_redirect( 'member_added', $campaign_id );
+		ps_pen_paper_redirect( 'member_added', $campaign_id, $page_id, 'pspp-settings' );
 	}
 
 	if ( 'remove_member' === $operation ) {
 		$user_id = ps_pen_paper_posted_id( 'user_id' );
 		$result = ps_pen_paper_change_membership( $campaign_id, $user_id, 'remove', ps_pen_paper_posted_text( 'member_role' ), ps_pen_paper_posted_text( 'membership_revision' ) );
 		if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
-		ps_pen_paper_redirect( 'member_removed', $user_id === get_current_user_id() && ! current_user_can( 'manage_options' ) ? 0 : $campaign_id );
+		ps_pen_paper_redirect( 'member_removed', $user_id === get_current_user_id() && ! current_user_can( 'manage_options' ) ? 0 : $campaign_id, $page_id, 'pspp-settings' );
 	}
 
 	ps_pen_paper_fail( __( 'Unbekannte Aktion.', 'ps-pen-paper' ) );
@@ -319,6 +338,9 @@ function ps_pen_paper_form_start( $operation, $nonce, $campaign_id = 0, $page_id
 		<?php endif; ?>
 		<?php if ( $campaign_id ) : ?>
 			<input type="hidden" name="campaign_id" value="<?php echo esc_attr( $campaign_id ); ?>">
+			<?php $epoch = ps_pen_paper_scope_epoch( $campaign_id ); ?>
+			<?php if ( is_wp_error( $epoch ) ) { ps_pen_paper_fail( $epoch->get_error_message() ); } ?>
+			<input type="hidden" name="pspp_scope_epoch" value="<?php echo esc_attr( $epoch ); ?>">
 		<?php endif; ?>
 		<?php wp_nonce_field( $nonce ); ?>
 		<?php do_action( 'pspp_form_context' ); ?>
@@ -421,16 +443,21 @@ function ps_pen_paper_render_campaign_list() {
 			<?php endforeach; ?>
 		</ul>
 	<?php endif; ?>
-	<?php if ( ps_pen_paper_can_create_campaign() ) : ?>
+	<?php ps_pen_paper_render_campaign_create_form(); ?>
+	<?php
+}
+
+function ps_pen_paper_render_campaign_create_form( $page_id = 0 ) {
+	if ( ! ps_pen_paper_can_create_campaign() ) { return; }
+	?>
 		<h2><?php esc_html_e( 'Neue Kampagne', 'ps-pen-paper' ); ?></h2>
-		<?php ps_pen_paper_form_start( 'create', 'pspp_create' ); ?>
+		<?php ps_pen_paper_form_start( 'create', 'pspp_create', 0, $page_id ); ?>
 			<p><label for="pspp-new-title"><?php esc_html_e( 'Name', 'ps-pen-paper' ); ?></label><br>
 			<input id="pspp-new-title" name="title" type="text" class="regular-text" required></p>
 			<p><label for="pspp-new-description"><?php esc_html_e( 'Beschreibung', 'ps-pen-paper' ); ?></label><br>
 			<textarea id="pspp-new-description" name="description" rows="4" class="large-text"></textarea></p>
 			<?php submit_button( __( 'Kampagne erstellen', 'ps-pen-paper' ) ); ?>
 		</form>
-	<?php endif; ?>
 	<?php
 }
 
@@ -483,14 +510,7 @@ function ps_pen_paper_render_campaign( $campaign ) {
 		<?php endif; ?>
 	</nav>
 	<?php if ( $can_manage ) : ?>
-		<?php ps_pen_paper_form_start( 'update', 'pspp_campaign_' . $campaign->ID, $campaign->ID ); ?>
-			<p><label for="pspp-title"><?php esc_html_e( 'Name', 'ps-pen-paper' ); ?></label><br>
-			<input id="pspp-title" name="title" type="text" class="regular-text" value="<?php echo esc_attr( $campaign->post_title ); ?>" required></p>
-			<p><label for="pspp-description"><?php esc_html_e( 'Beschreibung', 'ps-pen-paper' ); ?></label><br>
-			<textarea id="pspp-description" name="description" rows="4" class="large-text"><?php echo esc_textarea( $campaign->post_content ); ?></textarea></p>
-			<p><label class="pspp-check"><input type="checkbox" name="archived" value="1" <?php checked( '1', get_post_meta( $campaign->ID, '_pspp_archived', true ) ); ?>> <?php esc_html_e( 'Kampagne archivieren', 'ps-pen-paper' ); ?></label></p>
-			<?php submit_button( __( 'Kampagne speichern', 'ps-pen-paper' ) ); ?>
-		</form>
+		<?php ps_pen_paper_render_campaign_settings( $campaign ); ?>
 	<?php else : ?>
 		<p><?php echo nl2br( esc_html( $campaign->post_content ) ); ?></p>
 	<?php endif; ?>
@@ -507,6 +527,27 @@ function ps_pen_paper_render_campaign( $campaign ) {
 	<?php if ( $can_manage ) : ?><section id="pspp-folio" class="pspp-game"><?php ps_pen_paper_render_folio( $campaign, 0 ); ?></section><?php endif; ?>
 	<?php if ( $can_manage ) : ?><section id="pspp-equipment" class="pspp-game"><?php ps_pen_paper_render_equipment_catalogue( $campaign, 0 ); ?></section><?php endif; ?>
 	<?php if ( $can_manage ) : ?><section id="pspp-settings"><?php ps_pen_paper_render_access_settings( $campaign ); ?></section><?php endif; ?>
+	<?php ps_pen_paper_render_campaign_members( $campaign ); ?>
+	<?php
+}
+
+function ps_pen_paper_render_campaign_settings( $campaign, $page_id = 0 ) {
+	if ( ! ps_pen_paper_can_manage_campaign( $campaign ) ) { return; }
+	?>
+		<?php ps_pen_paper_form_start( 'update', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
+			<p><label for="pspp-title"><?php esc_html_e( 'Name', 'ps-pen-paper' ); ?></label><br>
+			<input id="pspp-title" name="title" type="text" class="regular-text" value="<?php echo esc_attr( $campaign->post_title ); ?>" required></p>
+			<p><label for="pspp-description"><?php esc_html_e( 'Beschreibung', 'ps-pen-paper' ); ?></label><br>
+			<textarea id="pspp-description" name="description" rows="4" class="large-text"><?php echo esc_textarea( $campaign->post_content ); ?></textarea></p>
+			<p><label class="pspp-check"><input type="checkbox" name="archived" value="1" <?php checked( '1', get_post_meta( $campaign->ID, '_pspp_archived', true ) ); ?>> <?php esc_html_e( 'Kampagne archivieren', 'ps-pen-paper' ); ?></label></p>
+			<?php submit_button( __( 'Kampagne speichern', 'ps-pen-paper' ) ); ?>
+		</form>
+	<?php
+}
+
+function ps_pen_paper_render_campaign_members( $campaign, $page_id = 0 ) {
+	$can_manage = ps_pen_paper_can_manage_campaign( $campaign );
+	?>
 	<h3><?php esc_html_e( 'Mitglieder', 'ps-pen-paper' ); ?></h3>
 	<?php $membership = ps_pen_paper_membership_revision( $campaign->ID ); ?>
 	<?php if ( is_wp_error( $membership ) ) { ps_pen_paper_fail( $membership->get_error_message() ); } ?>
@@ -528,7 +569,7 @@ function ps_pen_paper_render_campaign( $campaign ) {
 				echo ' – ' . esc_html( 'gm' === $role ? __( 'Spielleiter', 'ps-pen-paper' ) : __( 'Spieler', 'ps-pen-paper' ) );
 				?>
 				<?php if ( $can_manage && (int) $campaign->post_author !== (int) $user_id ) : ?>
-					<?php ps_pen_paper_form_start( 'remove_member', 'pspp_campaign_' . $campaign->ID, $campaign->ID ); ?>
+					<?php ps_pen_paper_form_start( 'remove_member', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 						<input type="hidden" name="membership_revision" value="<?php echo esc_attr( $membership['revision'] ); ?>">
 						<input type="hidden" name="user_id" value="<?php echo esc_attr( $user_id ); ?>">
 						<input type="hidden" name="member_role" value="<?php echo esc_attr( $role ); ?>">
@@ -540,7 +581,7 @@ function ps_pen_paper_render_campaign( $campaign ) {
 	<?php endforeach; ?>
 	<?php if ( $can_manage ) : ?>
 		<h3><?php esc_html_e( 'Mitglied hinzufügen', 'ps-pen-paper' ); ?></h3>
-		<?php ps_pen_paper_form_start( 'add_member', 'pspp_campaign_' . $campaign->ID, $campaign->ID ); ?>
+		<?php ps_pen_paper_form_start( 'add_member', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 			<input type="hidden" name="membership_revision" value="<?php echo esc_attr( $membership['revision'] ); ?>">
 			<p><label><?php esc_html_e( 'Benutzer', 'ps-pen-paper' ); ?> <?php ps_pen_paper_user_select(); ?></label></p>
 			<p><label for="pspp-member-role"><?php esc_html_e( 'Rolle in dieser Kampagne', 'ps-pen-paper' ); ?></label>

@@ -113,6 +113,57 @@ try {
 	finally { remove_filter( 'update_post_metadata', $race, 10 ); }
 	$check( is_wp_error( $nested ) && 'conflict' === $nested->get_error_code() && 6 === ps_pen_paper_wallet_context( $shared, $alias )['wallet']['balance'], 'Two aliases bypassed the base account lock.' );
 	$check( $raw === get_post_meta( $character_id, '_pspp_character', true ), 'Money altered character values or approvals.' );
+	$local_campaign_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private',
+		'post_title' => 'Local economy association fixture', 'post_author' => $users['world_gm'] ), true );
+	$check( is_int( $local_campaign_id ), 'Local association fixture failed.' );
+	$parents[] = $local_campaign_id;
+	add_post_meta( $local_campaign_id, '_pspp_player', (string) $users['player'] );
+	$local_campaign = ps_pen_paper_get_campaign( $local_campaign_id );
+	$local_rules = ps_pen_paper_save_rules( $local_campaign_id, array( 'name' => 'Local rules', 'description' => '',
+		'dice' => array( '6' ), 'fields' => array() ), '0' );
+	$check( ! is_wp_error( $local_rules ), 'Local rules fixture failed.' );
+	$local_character = ps_pen_paper_save_character( $local_campaign_id, 0, $users['player'],
+		array( 'name' => 'Local account hero', 'values' => array() ), '0', '1' );
+	$check( is_int( $local_character ), 'Local character fixture failed.' );
+	$check( true === ps_pen_paper_save_currency( $local_campaign,
+		array( 'name' => 'Local tokens', 'symbol' => 'LT', 'wallet_mode' => 'campaign' ), '0' ) &&
+		true === ps_pen_paper_save_trade_policy( $local_campaign, array( 'kinds' => array( 'gift', 'sale' ), 'approval' => '1' ), '0' ) &&
+		true === ps_pen_paper_change_wallet( $local_campaign, $local_character, 'grant', '17', 'Local fixture', '0', '1' ),
+		'Local economic fixture failed.' );
+	$local_wallet_before = get_post_meta( $local_character, '_pspp_wallet', true );
+	$local_currency_before = ps_pen_paper_currency_document( $local_campaign_id );
+	$local_policy_before = ps_pen_paper_trade_policy( $local_campaign )['policy'];
+	$target_universe_id = $universes['campaign']->ID;
+	$target_currency_before = ps_pen_paper_currency_document( $target_universe_id );
+	$target_revision = (string) ps_pen_paper_universe_document( $target_universe_id )['revision'];
+	$check( is_wp_error( ps_pen_paper_save_universe_link( $local_campaign_id, $target_universe_id, '0', $target_revision, 'confirmed' ) ),
+		'Existing local money was silently reassigned to a universe currency.' );
+	$local_link = ps_pen_paper_save_universe_link( $local_campaign_id, $target_universe_id, '0', $target_revision, 'confirmed', 'local' );
+	$check( ! is_wp_error( $local_link ) && 'local' === $local_link['economy_mode'] &&
+		$local_wallet_before === ps_pen_paper_wallet_context( $local_campaign, $local_character )['wallet'] &&
+		$local_currency_before === ps_pen_paper_currency_document( $local_campaign_id ) &&
+		$local_policy_before === ps_pen_paper_trade_policy( $local_campaign )['policy'] &&
+		$target_currency_before === ps_pen_paper_currency_document( $target_universe_id ),
+		'Explicit local association changed money, rules or the target universe.' );
+	$check( is_wp_error( ps_pen_paper_save_universe_link( $local_campaign_id, $target_universe_id, '1', $target_revision, 'confirmed', 'universe' ) ) &&
+		is_wp_error( ps_pen_paper_save_universe_link( $local_campaign_id, $target_universe_id, '1', $target_revision, 'confirmed', array( 'local' ) ) ) &&
+		$local_link === ps_pen_paper_get_universe_link( $local_campaign_id ),
+		'An unsafe or malformed economy-mode change was accepted.' );
+	$check( true === ps_pen_paper_change_wallet( $local_campaign, $local_character, 'grant', '5', 'After association', '1', '2' ) &&
+		22 === ps_pen_paper_wallet_context( $local_campaign, $local_character )['wallet']['balance'],
+		'Associated local wallets were no longer usable.' );
+	$fail_local_link = function ( $data ) {
+		if ( 'pspp_event' === $data['post_type'] && 'private' === $data['post_status'] ) { $data['post_status'] = 'draft'; }
+		return $data;
+	};
+	add_filter( 'wp_insert_post_data', $fail_local_link );
+	try {
+		$check( is_wp_error( ps_pen_paper_save_universe_link( $local_campaign_id, 0, '1', '0', 'confirmed', 'local' ) ) &&
+			$local_link === ps_pen_paper_get_universe_link( $local_campaign_id ), 'Failed local unlink left a partial association.' );
+	} finally { remove_filter( 'wp_insert_post_data', $fail_local_link ); }
+	$check( ! is_wp_error( ps_pen_paper_save_universe_link( $local_campaign_id, 0, '1', '0', 'confirmed', 'local' ) ) &&
+		22 === ps_pen_paper_wallet_context( $local_campaign, $local_character )['wallet']['balance'],
+		'Unlinking a locally funded campaign lost its account.' );
 	delete_post_meta( $campaign->ID, '_pspp_player', (string) $users['player'] );
 	wp_set_current_user( $users['player'] );
 	$check( is_wp_error( ps_pen_paper_wallet_context( $campaign, $character_id ) ), 'Removed member retained wallet access.' );

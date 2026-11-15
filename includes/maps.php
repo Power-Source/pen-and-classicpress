@@ -48,7 +48,7 @@ function ps_pen_paper_validate_scene_snapshot( $value, $draft = false ) {
 }
 
 function ps_pen_paper_get_scene( $campaign, $id ) {
-	$post = get_post( $id );
+	$post = ps_pen_paper_record_post( $id );
 	if ( ! $post || 'pspp_scene' !== $post->post_type || 'private' !== $post->post_status || (int) $post->post_parent !== (int) $campaign->ID ) {
 		return ps_pen_paper_scene_error();
 	}
@@ -84,6 +84,12 @@ function ps_pen_paper_scene_event( $campaign, $id, $before, $after, $kind, $new 
 }
 
 function ps_pen_paper_save_scene( $campaign, $id, $input, $revision, $image_path = null ) {
+	return ps_pen_paper_scope_write( $campaign, function () use ( $campaign, $id, $input, $revision, $image_path ) {
+		return ps_pen_paper_save_scene_locked( $campaign, $id, $input, $revision, $image_path );
+	} );
+}
+
+function ps_pen_paper_save_scene_locked( $campaign, $id, $input, $revision, $image_path = null ) {
 	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
 		return new WP_Error( 'forbidden', __( 'Nur die Spielleitung darf Szenen vorbereiten.', 'ps-pen-paper' ) );
 	}

@@ -13,7 +13,7 @@ function ps_pen_paper_currency_scope( $scope ) {
 	if ( 'pspp_universe' === $scope->post_type ) { return $scope; }
 	$link = ps_pen_paper_get_universe_link( $scope->ID );
 	if ( is_wp_error( $link ) ) { return $link; }
-	if ( ! $link['universe_id'] ) { return $scope; }
+	if ( ! $link['universe_id'] || ( isset( $link['economy_mode'] ) && 'local' === $link['economy_mode'] ) ) { return $scope; }
 	$universe = ps_pen_paper_get_universe( $link['universe_id'] );
 	return $universe ?: new WP_Error( 'invalid_currency', __( 'Das Universum der Währung fehlt. Es wird keine Ersatzwährung verwendet.', 'ps-pen-paper' ) );
 }
@@ -98,7 +98,7 @@ function ps_pen_paper_resolve_wallet_context( $scope, $character ) {
 		if ( ! isset( $state['context'] ) || 'shared' !== $state['context']['mode'] ) {
 			return new WP_Error( 'shared_wallet_required', __( 'Dieses Universum führt gemeinsame Guthaben. Dafür muss der Charakter als gemeinsamer Basisstand aufgenommen sein; lokale Bögen und unabhängige Kopien erhalten kein Ersatzkonto.', 'ps-pen-paper' ) );
 		}
-		$target = get_post( $state['context']['source_id'] );
+		$target = ps_pen_paper_record_post( $state['context']['source_id'] );
 		$wallet_scope = $currency_scope;
 	} elseif ( 'campaign' === $currency['wallet_mode'] && 'pspp_universe' === $scope->post_type ) {
 		return new WP_Error( 'campaign_wallet', __( 'Guthaben werden nach diesen Einstellungen getrennt an den Kampagnenbögen geführt.', 'ps-pen-paper' ) );

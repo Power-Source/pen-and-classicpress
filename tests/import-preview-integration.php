@@ -142,6 +142,14 @@ try {
 	$invalid_wallet = ps_pen_paper_parse_import( $encode( $bad ) );
 	$check( is_array( $invalid_wallet ) && ps_pen_paper_import_documents( $invalid_wallet )['conflicts'],
 		'Wallet above the supported balance limit passed document validation.' );
+	$bad = $archive; $wiki = ps_pen_paper_wiki_default(); $wiki['enabled'] = 'yes';
+	foreach ( $bad['payload']['records'] as &$entry ) {
+		if ( $entry['id'] === $world ) { $entry['meta'][] = array( 'key' => '_pspp_wiki', 'value' => serialize( $wiki ) ); }
+	}
+	unset( $entry );
+	$invalid_wiki = ps_pen_paper_parse_import( $encode( $bad ) );
+	$check( is_array( $invalid_wiki ) && ps_pen_paper_import_documents( $invalid_wiki )['conflicts'],
+		'Native wiki configuration bypassed document validation.' );
 	$replace_options = $options;
 	$replace_options['operation'] = 'replace'; $replace_options['target_id'] = $target;
 	$replace_options['universe_mode'] = 'bind'; $replace_options['universe_id'] = $world; $replace_options['bases'][ $base ] = $base;

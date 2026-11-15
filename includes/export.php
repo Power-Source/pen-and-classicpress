@@ -8,7 +8,7 @@ function ps_pen_paper_export_error() {
 
 function ps_pen_paper_campaign_record_types() {
 	return array( 'pspp_character', 'pspp_roll', 'pspp_event', 'pspp_asset', 'pspp_scene', 'pspp_folio',
-		'pspp_npc', 'pspp_wiki_entry', 'pspp_item', 'pspp_loot_table', 'pspp_loot_run', 'pspp_trade', 'pspp_adventure', 'pspp_adventure_run' );
+		'pspp_npc', 'pspp_wiki_entry', 'pspp_item', 'pspp_loot_table', 'pspp_loot_run', 'pspp_trade', 'pspp_adventure', 'pspp_adventure_run', 'pspp_adventure_group' );
 }
 
 function ps_pen_paper_export_meta( $record, $key ) {
@@ -167,12 +167,16 @@ function ps_pen_paper_export_campaign( $campaign_id, $mode ) {
 				'historical' => $historical, 'included' => $available );
 		}
 	}
+	$epoch = ps_pen_paper_export_meta( $root, '_pspp_import_epoch' );
+	if ( is_wp_error( $epoch ) ) { return $epoch; }
+	$chat_id = ps_pen_paper_chat_id( $campaign_id, null === $epoch ? '' : $epoch );
+	if ( is_wp_error( $chat_id ) ) { return $chat_id; }
 	$payload = array(
 		'source' => array( 'site_url' => home_url( '/' ), 'blog_id' => get_current_blog_id(), 'campaign_id' => $campaign_id ),
 		'mode' => $mode, 'meta_encoding' => 'wordpress-raw',
 		'records' => array_values( array_intersect_key( $records, $selected ) ), 'dependencies' => $dependencies,
 		'external_data' => array( 'user_accounts' => 'not_included', 'user_assignment' => 'required_on_restore',
-			'ps_community' => 'not_included', 'ps_chat' => array( 'included' => false, 'session_id' => ps_pen_paper_chat_id( $campaign_id ) ),
+			'ps_community' => 'not_included', 'ps_chat' => array( 'included' => false, 'session_id' => $chat_id ),
 			'ps_wiki' => 'references_and_pspp_snapshots_only' ),
 	);
 	$encoded = json_encode( $payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
@@ -210,7 +214,7 @@ function ps_pen_paper_render_export_settings( $campaign, $page_id = 0 ) {
 	?>
 	<section class="pspp-settings-section">
 		<h3><?php esc_html_e( 'Kampagne sichern', 'ps-pen-paper' ); ?></h3>
-		<p id="pspp-export-help"><?php esc_html_e( 'Die versionierte JSON-Datei sichert Kampagnendaten einschließlich Entwürfen, Geheimnissen, Inventaren, Guthaben, Protokollen, Abenteuerdurchläufen und geschützten Bildern. Import und Wiederherstellung sind noch nicht verfügbar; die Datei ersetzt derzeit kein vollständiges Website-Backup.', 'ps-pen-paper' ); ?></p>
+		<p id="pspp-export-help"><?php esc_html_e( 'Die versionierte JSON-Datei sichert Kampagnendaten einschließlich Entwürfen, Geheimnissen, Inventaren, Guthaben, Protokollen, Abenteuerdurchläufen und geschützten Bildern. Import und Wiederherstellung stehen nach privater Vorschau auf der Übersicht des Spielbereichs zur Verfügung. Die Datei ersetzt kein vollständiges Website-Backup.', 'ps-pen-paper' ); ?></p>
 		<p id="pspp-export-dependencies"><?php esc_html_e( 'Lokal: Gemeinsame Universumsdaten werden nur als Abhängigkeiten ausgewiesen. Vollständig: Zusätzlich werden Universumsdefinitionen, gemeinsame Gegenstands-/NPC-/Wiki-Kataloge, zugeordnete Basisbögen und deren benötigte Bilder und Protokolle gesichert. Andere Kampagnen und unbeteiligte Basisbögen bleiben ausgeschlossen.', 'ps-pen-paper' ); ?></p>
 		<p><?php esc_html_e( 'Fehlende benötigte Bilder verhindern den vollständigen Export. Bereits gelöschte Bilder aus alten Protokollen bleiben ausdrücklich als nicht enthaltene historische Abhängigkeiten ausgewiesen.', 'ps-pen-paper' ); ?></p>
 		<p><?php esc_html_e( 'Benutzerkonten, Community-Profile, Chatnachrichten und externe Wiki-Artikel werden nicht übernommen. Ihre Verknüpfungen beziehungsweise die plugininternen Wiki-Stände bleiben erhalten und benötigen bei einer späteren Wiederherstellung eine kontrollierte Zuordnung.', 'ps-pen-paper' ); ?></p>

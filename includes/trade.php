@@ -67,7 +67,7 @@ function ps_pen_paper_save_trade_policy( $scope, $input, $revision ) {
 // Exposes only the identity needed to address an offer, never a foreign sheet.
 function ps_pen_paper_trade_party( $campaign, $id ) {
 	if ( ! ps_pen_paper_can_access_site() || ! $campaign || 'pspp_campaign' !== $campaign->post_type || ! ps_pen_paper_can_view_campaign( $campaign ) ) { return ps_pen_paper_trade_error(); }
-	$post = get_post( $id );
+	$post = ps_pen_paper_record_post( $id );
 	if ( ! $post || 'pspp_character' !== $post->post_type || 'private' !== $post->post_status || (int) $post->post_parent !== (int) $campaign->ID ||
 		! is_user_member_of_blog( (int) $post->post_author ) || ! ps_pen_paper_campaign_role( $campaign, (int) $post->post_author ) ) { return ps_pen_paper_trade_error(); }
 	$state = ps_pen_paper_resolve_character_state( $campaign, $post, false );

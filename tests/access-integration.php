@@ -120,7 +120,12 @@ try {
 	$check( 2 === count( ps_pen_paper_pending_memberships( $campaign ) ), 'GM cannot see pending requests.' );
 	$membership_before = ps_pen_paper_membership_revision( $campaign_id );
 	ob_start(); ps_pen_paper_render_access_settings( $campaign, $page_id ); $pending_html = ob_get_clean();
-	$check( 2 === substr_count( $pending_html, 'name="membership_revision"' ) && false !== strpos( $pending_html, 'name="membership_revision" value="' . $membership_before['revision'] . '"' ), 'Admission forms do not carry the membership revision.' );
+	preg_match_all( '/<form\b[^>]*>.*?<\/form>/s', $pending_html, $pending_forms );
+	$admission_forms = array_filter( $pending_forms[0], static function ( $form ) { return false !== strpos( $form, 'name="pspp_operation" value="review_membership"' ); } );
+	$check( 2 === count( $admission_forms ), 'Pending admission forms are missing.' );
+	foreach ( $admission_forms as $form ) {
+		$check( false !== strpos( $form, 'name="membership_revision" value="' . $membership_before['revision'] . '"' ), 'Admission form does not carry the current membership revision.' );
+	}
 	$journal_before = ps_pen_paper_get_events( $campaign );
 	$fail_publish = static function ( $data ) { if ( 'pspp_event' === $data['post_type'] && 'private' === $data['post_status'] ) { $data['post_status'] = 'draft'; } return $data; };
 	add_filter( 'wp_insert_post_data', $fail_publish );

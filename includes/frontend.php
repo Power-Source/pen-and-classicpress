@@ -42,15 +42,15 @@ function ps_pen_paper_handle_frontend_action() {
 		return;
 	}
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
-	if ( in_array( $operation, array( 'preview_import', 'configure_import_preview', 'discard_import_preview' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
-	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
+	if ( in_array( $operation, array( 'preview_import', 'configure_import_preview', 'discard_import_preview', 'restore_import', 'download_import_backup' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
+	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure', 'request_adventure_review', 'review_adventure_run', 'cancel_adventure_review', 'group_adventure' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'configure_wiki', 'prepare_wiki', 'publish_wiki' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'save_loot_table', 'roll_loot', 'award_loot' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'save_npc', 'offer_npc', 'copy_npc', 'approve_npc', 'save_currency', 'change_wallet', 'save_equipment_schema', 'save_item', 'grant_item', 'equip_items', 'review_gear', 'save_portrait', 'save_sheet_style' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) {
 		ps_pen_paper_handle_admin_action();
 	}
-	if ( ! in_array( $operation, array( 'export_campaign', 'save_character', 'review_character', 'roll_dice', 'request_membership', 'review_membership', 'save_access', 'save_backdrop', 'save_style', 'save_universe', 'link_universe', 'save_universe_rules', 'save_base_character', 'adopt_universe_rules', 'attach_base_character', 'save_character_context', 'save_scene', 'publish_scene', 'withdraw_scene', 'select_scene', 'save_folio', 'publish_folio', 'withdraw_folio' ), true ) || ps_pen_paper_posted_id( 'pspp_frontend_page' ) !== get_queried_object_id() ) {
+	if ( ! in_array( $operation, array( 'create', 'update', 'save_rules', 'add_member', 'remove_member', 'export_campaign', 'save_character', 'review_character', 'roll_dice', 'request_membership', 'review_membership', 'save_access', 'save_backdrop', 'save_style', 'save_universe', 'link_universe', 'save_universe_rules', 'save_base_character', 'adopt_universe_rules', 'attach_base_character', 'save_character_context', 'copy_shared_character', 'save_scene', 'publish_scene', 'withdraw_scene', 'select_scene', 'save_folio', 'publish_folio', 'withdraw_folio' ), true ) || ps_pen_paper_posted_id( 'pspp_frontend_page' ) !== get_queried_object_id() ) {
 		ps_pen_paper_fail( __( 'Ungültige Spielbereich-Aktion. Bitte öffne das Formular erneut.', 'ps-pen-paper' ) );
 	}
 	ps_pen_paper_handle_admin_action();
@@ -141,9 +141,9 @@ function ps_pen_paper_frontend_shortcode() {
 	?>
 	<div class="pspp-game<?php echo $campaign ? ' pspp-workspace' : ''; ?>" style="<?php echo esc_attr( ps_pen_paper_style_variables( $style['colors'] ) ); ?>">
 		<?php if ( ! $campaign ) : ?>
+			<?php ps_pen_paper_render_notice(); ?>
 			<?php ps_pen_paper_render_dashboard_navigation( $page_id ); ?>
 			<?php if ( 'universes' === $view ) : ?>
-				<?php ps_pen_paper_render_notice(); ?>
 				<?php ps_pen_paper_render_universes( $page_id ); ?>
 			<?php elseif ( 'characters' === $view ) : ?>
 				<?php ps_pen_paper_render_character_library( $page_id ); ?>
@@ -174,6 +174,7 @@ function ps_pen_paper_frontend_shortcode() {
 					<?php endforeach; ?>
 				</div>
 			<?php endif; ?>
+			<?php ps_pen_paper_render_campaign_create_form( $page_id ); ?>
 			<?php endif; ?>
 		<?php else : ?>
 			<?php ps_pen_paper_render_table( $campaign, $page_id, $character_id ); ?>

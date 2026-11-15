@@ -61,7 +61,7 @@ function ps_pen_paper_valid_loot_table( $state ) {
 
 function ps_pen_paper_get_loot_table( $campaign, $id ) {
 	if ( ! ps_pen_paper_can_manage_loot( $campaign ) ) { return ps_pen_paper_loot_error(); }
-	$post = get_post( $id ); $state = get_post_meta( $id, '_pspp_loot_table', true );
+	$post = ps_pen_paper_record_post( $id ); $state = get_post_meta( $id, '_pspp_loot_table', true );
 	return $post && 'pspp_loot_table' === $post->post_type && 'private' === $post->post_status && (int) $post->post_parent === (int) $campaign->ID &&
 		ps_pen_paper_valid_loot_table( $state ) && $state['revision'] > 0 ? $state : ps_pen_paper_loot_error();
 }
@@ -88,6 +88,12 @@ function ps_pen_paper_write_loot( $campaign, &$id, $type, $before, $after, $kind
 }
 
 function ps_pen_paper_save_loot_table( $campaign, $id, $input, $revision ) {
+	return ps_pen_paper_scope_write( $campaign, function () use ( $campaign, $id, $input, $revision ) {
+		return ps_pen_paper_save_loot_table_locked( $campaign, $id, $input, $revision );
+	} );
+}
+
+function ps_pen_paper_save_loot_table_locked( $campaign, $id, $input, $revision ) {
 	if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
 	if ( ! ps_pen_paper_can_manage_loot( $campaign ) || ! is_array( $input ) || ! isset( $input['name'], $input['die'], $input['rows'] ) ||
 		! is_string( $input['name'] ) || ! is_string( $input['die'] ) || ! is_array( $input['rows'] ) || count( $input['rows'] ) > 30 ) { return ps_pen_paper_loot_error(); }
@@ -170,7 +176,7 @@ function ps_pen_paper_valid_loot_run( $state ) {
 
 function ps_pen_paper_get_loot_run( $campaign, $id ) {
 	if ( ! ps_pen_paper_can_manage_loot( $campaign ) ) { return ps_pen_paper_loot_error(); }
-	$post = get_post( $id ); $state = get_post_meta( $id, '_pspp_loot_run', true );
+	$post = ps_pen_paper_record_post( $id ); $state = get_post_meta( $id, '_pspp_loot_run', true );
 	return $post && 'pspp_loot_run' === $post->post_type && 'private' === $post->post_status && (int) $post->post_parent === (int) $campaign->ID &&
 		ps_pen_paper_valid_loot_run( $state ) && $state['revision'] > 0 ? $state : ps_pen_paper_loot_error();
 }

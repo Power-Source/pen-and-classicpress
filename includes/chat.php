@@ -4,18 +4,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-function ps_pen_paper_chat_id( $campaign_id ) {
-	return 'pspp-' . get_current_blog_id() . '-' . $campaign_id;
+function ps_pen_paper_chat_id( $campaign_id, $epoch = null ) {
+	if ( null === $epoch ) { $epoch = ps_pen_paper_scope_epoch( $campaign_id ); }
+	if ( is_wp_error( $epoch ) ) { return $epoch; }
+	if ( ! is_string( $epoch ) || ( '' !== $epoch && ! wp_is_uuid( $epoch ) ) ) {
+		return new WP_Error( 'scope_state_failed', __( 'Der Wiederherstellungsstand der Runde konnte nicht sicher geprüft werden. Bitte informiere die Administration.', 'ps-pen-paper' ) );
+	}
+	return 'pspp-' . get_current_blog_id() . '-' . $campaign_id . ( $epoch ? '-' . str_replace( '-', '', $epoch ) : '' );
 }
 
 function ps_pen_paper_chat_campaign( $session ) {
-	if ( empty( $session['id'] ) || ! is_string( $session['id'] ) || ! preg_match( '/^pspp-([1-9]\d*)-([1-9]\d*)$/D', $session['id'], $match ) ) {
+	if ( empty( $session['id'] ) || ! is_string( $session['id'] ) || ! preg_match( '/^pspp-([1-9]\d*)-([1-9]\d*)(?:-[a-fA-F0-9]{32})?$/D', $session['id'], $match ) ) {
 		return null;
 	}
 	if ( (int) $match[1] !== get_current_blog_id() || ! isset( $session['blog_id'], $session['session_type'] ) || (int) $session['blog_id'] !== get_current_blog_id() || 'page' !== $session['session_type'] ) {
 		return null;
 	}
-	return ps_pen_paper_get_campaign( (int) $match[2] );
+	$campaign = ps_pen_paper_get_campaign( (int) $match[2] );
+	$id = $campaign ? ps_pen_paper_chat_id( $campaign->ID ) : null;
+	return is_string( $id ) && $id === $session['id'] ? $campaign : null;
 }
 
 function ps_pen_paper_chat_access( $allowed, $session ) {
@@ -47,12 +54,15 @@ function ps_pen_paper_render_chat( $campaign ) {
 			<?php else : ?>
 				<?php
 				$style = ps_pen_paper_get_style( $campaign->ID );
+				$chat_id = ps_pen_paper_chat_id( $campaign->ID );
 				if ( is_wp_error( $style ) ) {
 					echo '<p role="alert">' . esc_html( $style->get_error_message() ) . '</p>';
+				} elseif ( is_wp_error( $chat_id ) ) {
+					echo '<p role="alert">' . esc_html( $chat_id->get_error_message() ) . '</p>';
 				} else {
 				$colors = $style['colors'];
 				echo $psource_chat->process_chat_shortcode( array(
-					'id' => ps_pen_paper_chat_id( $campaign->ID ),
+					'id' => $chat_id,
 					'access_provider' => 'ps-pen-paper',
 					'session_type' => 'page',
 					'login_options' => array_keys( wp_roles()->roles ),

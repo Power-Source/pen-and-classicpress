@@ -171,7 +171,7 @@ function ps_pen_paper_get_roll( $campaign, $roll_id ) {
 	if ( ! current_user_can( 'read' ) || ! ps_pen_paper_can_view_campaign( $campaign ) ) {
 		return $error;
 	}
-	$post = get_post( $roll_id );
+	$post = ps_pen_paper_record_post( $roll_id );
 	if ( ! $post || 'pspp_roll' !== $post->post_type || 'private' !== $post->post_status || (int) $post->post_parent !== (int) $campaign->ID ) {
 		return $error;
 	}

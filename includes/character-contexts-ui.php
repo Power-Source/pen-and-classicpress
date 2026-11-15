@@ -32,6 +32,14 @@ function ps_pen_paper_handle_character_context_action( $operation ) {
 			isset( $_POST['character_revision'] ) ? $_POST['character_revision'] : null,
 			isset( $_POST['character_rules_revision'] ) ? $_POST['character_rules_revision'] : null );
 		if ( ! is_wp_error( $result ) ) { $url = ps_pen_paper_universe_url( $id, $page_id, $result ); }
+	} elseif ( 'copy_shared_character' === $operation ) {
+		$character_id = ps_pen_paper_posted_id( 'character_id' );
+		$result = ps_pen_paper_copy_shared_character( $id, $character_id,
+			isset( $_POST['character_revision'] ) ? $_POST['character_revision'] : null,
+			isset( $_POST['base_revision'] ) ? $_POST['base_revision'] : null,
+			isset( $_POST['character_rules_revision'] ) ? $_POST['character_rules_revision'] : null,
+			ps_pen_paper_posted_text( 'context_confirmation' ) );
+		$url = ps_pen_paper_character_url( $id, $character_id, $page_id );
 	} elseif ( 'save_character_context' === $operation ) {
 		if ( 'complete' !== ps_pen_paper_posted_text( 'context_complete' ) ) {
 			ps_pen_paper_fail( __( 'Die Kampagnenauflagen wurden nicht vollständig übertragen.', 'ps-pen-paper' ) );
@@ -137,7 +145,7 @@ function ps_pen_paper_render_universe_characters( $universe, $page_id ) {
 							</select></label></p>
 						<p><label><?php esc_html_e( 'Fortschritt in dieser Kampagne', 'ps-pen-paper' ); ?>
 							<select name="context_mode"><?php foreach ( ps_pen_paper_character_context_modes() as $mode => $label ) : ?><option value="<?php echo esc_attr( $mode ); ?>"><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></label></p>
-						<p><?php esc_html_e( 'Gemeinsam: Freigegebene Basisänderungen erscheinen auch hier; Bearbeitung nur durch die Universumsleitung. Kopie: Der aktuelle freigegebene Stand wird unabhängig weitergeführt. Offene Basisanträge werden nie übernommen. Ein späterer Moduswechsel ist noch nicht verfügbar.', 'ps-pen-paper' ); ?></p>
+						<p><?php esc_html_e( 'Gemeinsam: Freigegebene Basisänderungen erscheinen auch hier; Bearbeitung nur durch die Universumsleitung. Kopie: Der aktuelle freigegebene Stand wird unabhängig weitergeführt. Offene Basisanträge werden nie übernommen. Die Kampagnenleitung kann einen gemeinsamen Bogen später ausdrücklich als unabhängige Kopie weiterführen, sofern kein gemeinsames Universumskonto daran gebunden ist.', 'ps-pen-paper' ); ?></p>
 						<p><label class="pspp-check"><input type="checkbox" name="context_confirmation" value="confirmed" required>
 							<?php esc_html_e( 'Diesen Bogen im gewählten Modus aufnehmen, ohne Mitgliedschaften zu verändern.', 'ps-pen-paper' ); ?></label></p>
 						<?php submit_button( __( 'Basisbogen übernehmen', 'ps-pen-paper' ) ); ?>
@@ -160,6 +168,28 @@ function ps_pen_paper_render_character_context( $campaign, $character, $state, $
 		<p><?php esc_html_e( 'Die angezeigten gültigen Werte enthalten die freigegebenen Kampagnenauflagen. Diese überschreiben weder den Basisbogen noch andere Runden. Leere Auflagenfelder übernehmen den Grundwert. Ressourcen bleiben unverändert; eine optionale Stufe kann als frei benanntes Zahlenfeld angepasst werden.', 'ps-pen-paper' ); ?></p>
 		<p class="pspp-multiline"><?php echo esc_html( $context['note'] ); ?></p>
 		<?php if ( ps_pen_paper_can_manage_campaign( $campaign ) ) : ?>
+			<?php if ( 'shared' === $context['mode'] ) :
+				$preview = ps_pen_paper_preview_character_copy( $campaign->ID, $character->ID );
+				?>
+				<details class="pspp-fold">
+					<summary><?php esc_html_e( 'Als unabhängigen Kampagnenbogen weiterführen', 'ps-pen-paper' ); ?></summary>
+					<?php if ( is_wp_error( $preview ) ) : ?>
+						<p role="alert"><?php echo esc_html( $preview->get_error_message() ); ?></p>
+					<?php else : ?>
+						<p><?php esc_html_e( 'Dieser freigegebene Stand einschließlich Kampagnenauflagen wird zum eigenen Grundstand. Ausrüstung, Inventar und bestehende Kampagnenkonten bleiben erhalten; Ausrüstungsboni werden nicht als Grundwerte übernommen. Spätere Basisänderungen gelten hier nicht mehr. Der Basisbogen und andere Kampagnen bleiben unverändert. Eine Rückverbindung ist nicht automatisch möglich.', 'ps-pen-paper' ); ?></p>
+						<?php ps_pen_paper_render_character_snapshot( $preview['effective']['active'], $preview['rules'] ); ?>
+						<?php ps_pen_paper_form_start( 'copy_shared_character', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
+							<input type="hidden" name="character_id" value="<?php echo esc_attr( $character->ID ); ?>">
+							<input type="hidden" name="character_revision" value="<?php echo esc_attr( $preview['before']['revision'] ); ?>">
+							<input type="hidden" name="base_revision" value="<?php echo esc_attr( $preview['effective']['base_revision'] ); ?>">
+							<input type="hidden" name="character_rules_revision" value="<?php echo esc_attr( $preview['rules']['revision'] ); ?>">
+							<p><label class="pspp-check"><input type="checkbox" name="context_confirmation" value="confirmed" required>
+								<?php esc_html_e( 'Den angezeigten Stand unabhängig in dieser Kampagne weiterführen.', 'ps-pen-paper' ); ?></label></p>
+							<?php submit_button( __( 'Basisverbindung lösen', 'ps-pen-paper' ) ); ?>
+						</form>
+					<?php endif; ?>
+				</details>
+			<?php endif; ?>
 			<details class="pspp-fold">
 				<summary><?php esc_html_e( 'Kampagnenauflagen bearbeiten', 'ps-pen-paper' ); ?></summary>
 				<?php ps_pen_paper_form_start( 'save_character_context', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>

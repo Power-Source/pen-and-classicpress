@@ -68,7 +68,7 @@ function ps_pen_paper_can_read_npcs( $scope, $campaign = null ) {
 
 function ps_pen_paper_get_npc( $scope, $id, $campaign = null ) {
 	if ( ! ps_pen_paper_can_read_npcs( $scope, $campaign ) ) { return ps_pen_paper_npc_error(); }
-	$post = get_post( $id );
+	$post = ps_pen_paper_record_post( $id );
 	$state = get_post_meta( $id, '_pspp_npc', true );
 	if ( ! $post || 'pspp_npc' !== $post->post_type || 'private' !== $post->post_status || (int) $post->post_parent !== (int) $scope->ID ||
 		! ps_pen_paper_valid_npc_state( $state ) || $state['revision'] < 1 ||
@@ -128,6 +128,12 @@ function ps_pen_paper_write_npc( $scope, &$id, $before, $after, $kind ) {
 }
 
 function ps_pen_paper_save_npc( $scope, $id, $input, $revision, $image_path = null ) {
+	return ps_pen_paper_scope_write( $scope, function () use ( $scope, $id, $input, $revision, $image_path ) {
+		return ps_pen_paper_save_npc_locked( $scope, $id, $input, $revision, $image_path );
+	} );
+}
+
+function ps_pen_paper_save_npc_locked( $scope, $id, $input, $revision, $image_path = null ) {
 	if ( ! ps_pen_paper_can_read_npcs( $scope ) || ! ps_pen_paper_can_manage_character_scope( $scope ) || ! is_array( $input ) ) { return ps_pen_paper_npc_error(); }
 	foreach ( array( 'kind', 'name', 'description', 'secret', 'scene_id', 'properties', 'values' ) as $key ) {
 		if ( ! isset( $input[ $key ] ) || ! is_string( $input[ $key ] ) ) { return ps_pen_paper_npc_error(); }
@@ -201,7 +207,7 @@ function ps_pen_paper_transfer_npc( $campaign, $source_id, $revision, $confirmat
 		$after['npc']['loot_table_id'] = 0;
 		if ( $state['npc']['asset_id'] ) {
 			if ( is_wp_error( ps_pen_paper_private_image_data( $source, $state['npc']['asset_id'] ) ) ) { return ps_pen_paper_npc_error(); }
-			$asset = get_post( $state['npc']['asset_id'] );
+			$asset = ps_pen_paper_record_post( $state['npc']['asset_id'] );
 			$asset_id = wp_insert_post( wp_slash( array(
 				'post_type' => 'pspp_asset', 'post_status' => 'private', 'post_parent' => $target->ID,
 				'post_title' => 'PS Pen & Paper NPC Image', 'post_author' => get_current_user_id(),

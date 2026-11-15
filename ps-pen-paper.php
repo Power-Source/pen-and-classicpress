@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PS Pen & Paper
  * Description: Ein universeller Baukasten für Pen-and-Paper-Kampagnen.
- * Version: 0.28.0
+ * Version: 0.29.0
  * Author: PSOURCE
  * Text Domain: ps-pen-paper
  * Domain Path: /languages
@@ -12,6 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/includes/scope-state.php';
 require_once __DIR__ . '/includes/campaigns.php';
 require_once __DIR__ . '/includes/rules.php';
 require_once __DIR__ . '/includes/rules-admin.php';
@@ -42,6 +43,11 @@ require_once __DIR__ . '/includes/loot-ui.php';
 require_once __DIR__ . '/includes/trade.php';
 require_once __DIR__ . '/includes/trade-ui.php';
 require_once __DIR__ . '/includes/adventure.php';
+require_once __DIR__ . '/includes/adventure-actions.php';
+require_once __DIR__ . '/includes/adventure-review.php';
+require_once __DIR__ . '/includes/adventure-review-ui.php';
+require_once __DIR__ . '/includes/adventure-groups.php';
+require_once __DIR__ . '/includes/adventure-groups-ui.php';
 require_once __DIR__ . '/includes/adventure-rewards.php';
 require_once __DIR__ . '/includes/adventure-ui.php';
 require_once __DIR__ . '/includes/appearance.php';
@@ -54,6 +60,8 @@ require_once __DIR__ . '/includes/dashboard.php';
 require_once __DIR__ . '/includes/export.php';
 require_once __DIR__ . '/includes/import.php';
 require_once __DIR__ . '/includes/import-documents.php';
+require_once __DIR__ . '/includes/import-prepare.php';
+require_once __DIR__ . '/includes/import-write.php';
 require_once __DIR__ . '/includes/import-ui.php';
 require_once __DIR__ . '/includes/chat.php';
 require_once __DIR__ . '/includes/table.php';
@@ -62,6 +70,7 @@ require_once __DIR__ . '/includes/frontend.php';
 require_once __DIR__ . '/includes/admin.php';
 
 add_action( 'plugins_loaded', 'ps_pen_paper_load_textdomain' );
+add_action( 'pre_get_posts', 'ps_pen_paper_scope_queries', PHP_INT_MAX );
 add_action( 'init', 'ps_pen_paper_register_campaign_type' );
 add_action( 'init', 'ps_pen_paper_register_character_type' );
 add_action( 'init', 'ps_pen_paper_register_roll_type' );

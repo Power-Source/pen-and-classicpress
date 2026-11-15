@@ -761,13 +761,241 @@ try {
 		$check( $cost_base_before === ps_pen_paper_raw_character_state( $cost_base_id ), 'Reward changed base resources.' );
 	}
 
+	wp_set_current_user( $users['gm'] );
+	$hybrid_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => 'Hybrid foundation fixture' ), true );
+	$check( is_int( $hybrid_id ) && $hybrid_id > 0, 'Hybrid campaign failed.' ); $parents[] = $hybrid_id;
+	add_post_meta( $hybrid_id, '_pspp_gm', (string) $users['gm'] );
+	add_post_meta( $hybrid_id, '_pspp_gm', (string) $users['other'] );
+	add_post_meta( $hybrid_id, '_pspp_player', (string) $users['player'] );
+	$hybrid = ps_pen_paper_get_campaign( $hybrid_id );
+	$hybrid_rules = ps_pen_paper_save_rules( $hybrid_id, array( 'name' => 'Hybrid rules', 'description' => '', 'dice' => array( '4' ), 'fields' => array(
+		array( 'id' => '', 'label' => 'Access note', 'type' => 'text', 'description' => '' ),
+		array( 'id' => '', 'label' => 'Energy', 'type' => 'resource', 'description' => '', 'min' => '0', 'max' => '10', 'start' => '7' ),
+	) ), '0' );
+	$check( ! is_wp_error( $hybrid_rules ), 'Hybrid rules failed.' );
+	$text_id = $hybrid_rules['fields'][0]['id']; $energy_id = $hybrid_rules['fields'][1]['id'];
+	$hybrid_char = ps_pen_paper_save_character( $hybrid_id, 0, $users['player'], array( 'name' => 'Hybrid player',
+		'values' => array( $text_id => 'Access granted', $energy_id => array( 'current' => '7', 'maximum' => '10' ) ) ), '0', '1' );
+	$check( is_int( $hybrid_char ), 'Hybrid character failed.' );
+	$hybrid_scenes = array();
+	foreach ( array( 'Hybrid opening', 'Hybrid continuation' ) as $title ) {
+		$scene = ps_pen_paper_save_scene( $hybrid, 0, array( 'title' => $title, 'text' => $title, 'secret' => '', 'grid' => '0' ), '0' );
+		$check( is_int( $scene ) && true === ps_pen_paper_publish_scene( $hybrid, $scene, '1', 'confirmed' ), 'Hybrid scene failed.' );
+		$hybrid_scenes[] = $scene;
+	}
+	$hybrid_adventure = ps_pen_paper_save_adventure( $hybrid, 0, 'Hybrid route', (string) $hybrid_scenes[0], '0' );
+	$hybrid_edge = array( 'from_scene' => (string) $hybrid_scenes[0], 'choice' => 'Ask for access', 'expression' => 'W4',
+		'attribute' => '', 'threshold' => '0', 'success_scene' => (string) $hybrid_scenes[1], 'failure_scene' => '0',
+		'cost_resource' => $energy_id, 'cost_amount' => '2', 'cost_timing' => 'attempt',
+		'conditions' => array( 'mode' => 'all', 'rows' => array( array( 'target' => $text_id . ':text', 'operator' => 'contains', 'value' => 'granted' ) ) ),
+		'gm_review' => '1' );
+	$bad_text_edge = $hybrid_edge; $bad_text_edge['conditions']['rows'][0]['operator'] = 'gte';
+	$check( is_wp_error( ps_pen_paper_save_adventure_edge( $hybrid, $hybrid_adventure, $bad_text_edge, '1' ) ), 'Numeric text comparison accepted.' );
+	$check( true === ps_pen_paper_save_adventure_edge( $hybrid, $hybrid_adventure, $hybrid_edge, '1' ), 'Hybrid choice failed.' );
+	$hybrid_edge_id = ps_pen_paper_get_adventure( $hybrid, $hybrid_adventure )['draft']['edges'][0]['id'];
+	$follow_edge = array( 'from_scene' => (string) $hybrid_scenes[1], 'choice' => 'Use prior access', 'expression' => '',
+		'attribute' => '', 'threshold' => '0', 'success_scene' => '0', 'failure_scene' => '0',
+		'conditions' => array( 'mode' => 'all', 'rows' => array( array( 'target' => $hybrid_edge_id . ':history', 'operator' => 'eq', 'value' => '1' ) ) ) );
+	$check( true === ps_pen_paper_save_adventure_edge( $hybrid, $hybrid_adventure, $follow_edge, '2' ) &&
+		true === ps_pen_paper_publish_adventure( $hybrid, $hybrid_adventure, '3', 'confirmed' ), 'Historical choice publication failed.' );
+	$hybrid_snapshot = ps_pen_paper_get_adventure( $hybrid, $hybrid_adventure )['published'];
+	ob_start(); ps_pen_paper_render_adventure_condition_fields( $hybrid_rules, $hybrid_snapshot['edges'] ); $condition_editor = ob_get_clean();
+	$check( 3 === substr_count( $condition_editor, $hybrid_edge_id . ':history' ), 'History options duplicated per character field.' );
+	$forged_snapshot = $hybrid_snapshot; $forged_snapshot['edges'][1]['conditions']['rows'][0]['field'] = wp_generate_uuid4();
+	$check( ! ps_pen_paper_valid_adventure_publication( $forged_snapshot ), 'Unknown historical decision accepted.' );
+	wp_set_current_user( $users['player'] );
+	$hybrid_run = ps_pen_paper_start_adventure_run( $hybrid, $hybrid_adventure, $hybrid_char, '4', '1' );
+	$check( is_int( $hybrid_run ), 'Hybrid run failed.' );
+	$read_hybrid = static function () use ( $hybrid_run ) { return get_post_meta( $hybrid_run, '_pspp_adventure_run', true ); };
+	$hybrid_before = $read_hybrid(); $hybrid_character_before = ps_pen_paper_raw_character_state( $hybrid_char );
+	$check( is_wp_error( ps_pen_paper_advance_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '1' ) ) &&
+		$hybrid_before === $read_hybrid(), 'Unapproved decision advanced.' );
+	$fail_review_event = static function ( $check, $id, $key, $value ) {
+		return '_pspp_event' === $key && isset( $value['kind'] ) && 'adventure_run' === $value['kind'] ? false : $check;
+	};
+	add_filter( 'update_post_metadata', $fail_review_event, 10, 4 );
+	try { $check( is_wp_error( ps_pen_paper_review_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '1' ) ), 'Unlogged review request succeeded.' ); }
+	finally { remove_filter( 'update_post_metadata', $fail_review_event, 10 ); }
+	$check( $hybrid_before === $read_hybrid(), 'Request rollback changed run.' );
+	wp_set_current_user( $users['other'] );
+	$check( is_wp_error( ps_pen_paper_review_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '1' ) ), 'Nonowner requested a decision.' );
+	wp_set_current_user( $users['player'] );
+	$check( true === ps_pen_paper_review_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '1' ), 'Owner request failed.' );
+	$pending = $read_hybrid();
+	$check( ps_pen_paper_valid_adventure_run( $pending ) && 'pending' === $pending['approval']['status'] && ! $pending['history'] &&
+		$hybrid_character_before === ps_pen_paper_raw_character_state( $hybrid_char ) &&
+		is_wp_error( ps_pen_paper_review_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '2', 'approved' ) ) &&
+		is_wp_error( ps_pen_paper_advance_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '2' ) ), 'Pending request changed values or let a player approve.' );
+	wp_set_current_user( $users['gm'] );
+	ob_start(); ps_pen_paper_render_adventure_reviews( $hybrid, 0 ); $queue = ob_get_clean();
+	$check( false !== strpos( $queue, 'Entscheidung freigeben' ) && false !== strpos( $queue, 'Hybrid player' ), 'GM queue missing.' );
+	$check( true === ps_pen_paper_review_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '2', 'rejected' ), 'Review rejection failed.' );
+	wp_set_current_user( $users['player'] );
+	$check( true === ps_pen_paper_review_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '3' ), 'Rejected decision could not be requested again.' );
+	wp_set_current_user( $users['other'] );
+	$check( is_wp_error( ps_pen_paper_review_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '2', 'approved' ) ) &&
+		true === ps_pen_paper_review_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '4', 'approved' ), 'Review revision checks failed.' );
+	delete_post_meta( $hybrid_id, '_pspp_gm', (string) $users['other'] );
+	wp_set_current_user( $users['player'] );
+	$check( is_wp_error( ps_pen_paper_advance_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '5' ) ) &&
+		true === ps_pen_paper_review_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '5', 'cancel' ) &&
+		true === ps_pen_paper_review_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '6' ), 'Revoked reviewer authority or re-request failed.' );
+	wp_set_current_user( $users['gm'] );
+	$check( true === ps_pen_paper_review_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '7', 'approved' ), 'Replacement approval failed.' );
+	wp_set_current_user( $users['player'] );
+	$approved = $read_hybrid();
+	add_filter( 'update_post_metadata', $fail_review_event, 10, 4 );
+	try { $check( is_wp_error( ps_pen_paper_advance_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '8' ) ), 'Unlogged approved advancement succeeded.' ); }
+	finally { remove_filter( 'update_post_metadata', $fail_review_event, 10 ); }
+	$check( $approved === $read_hybrid() && $hybrid_character_before === ps_pen_paper_raw_character_state( $hybrid_char ), 'Advancement rollback consumed approval/resources.' );
+	$check( true === ps_pen_paper_advance_adventure_run( $hybrid, $hybrid_run, $hybrid_edge_id, '8' ), 'Approved decision failed.' );
+	$advanced = $read_hybrid();
+	$check( null === $advanced['approval'] && count( $advanced['history'] ) === 1 &&
+		$advanced['history'][0]['review']['reviewer_id'] === $users['gm'], 'Approval was not consumed and recorded.' );
+	$check( $advanced['history'][0]['conditions']['rows'][0]['value'] === 'Access granted', 'Incorrect text proof: ' . wp_json_encode( $advanced['history'][0]['conditions'] ) );
+	$check( ps_pen_paper_raw_character_state( $hybrid_char )['active']['values'][ $energy_id ]['current'] === 5,
+		'Incorrect resource charge: ' . wp_json_encode( ps_pen_paper_raw_character_state( $hybrid_char )['active']['values'][ $energy_id ] ) );
+	$last_edge = $advanced['snapshot']['edges'][1];
+	$without_history = ps_pen_paper_evaluate_adventure_conditions( $last_edge, $hybrid_rules, ps_pen_paper_raw_character_state( $hybrid_char ), array(), $advanced['snapshot']['edges'] );
+	$check( ! is_wp_error( $without_history ) && ! $without_history['met'] &&
+		true === ps_pen_paper_advance_adventure_run( $hybrid, $hybrid_run, $last_edge['id'], '9' ), 'Prior-decision condition failed.' );
+	$finished_hybrid = $read_hybrid();
+	$check( ps_pen_paper_valid_adventure_run( $finished_hybrid ) && 'completed' === $finished_hybrid['status'] &&
+		1 === $finished_hybrid['history'][1]['conditions']['rows'][0]['value'] &&
+		is_wp_error( ps_pen_paper_advance_adventure_run( $hybrid, $hybrid_run, $last_edge['id'], '9' ) ), 'Completed history or replay validation failed.' );
+	$forged_hybrid = $finished_hybrid; $forged_hybrid['reviews'] = 1; $forged_hybrid['revision'] = 4;
+	$check( ! ps_pen_paper_valid_adventure_run( $forged_hybrid ), 'History approval accepted without request and approval revisions.' );
+
+	wp_set_current_user( $users['gm'] );
+	add_post_meta( $hybrid_id, '_pspp_player', (string) $users['other'] );
+	add_post_meta( $hybrid_id, '_pspp_player', (string) $users['outsider'] );
+	foreach ( array( 'any', 'majority', 'unanimous', 'gm' ) as $group_rule ) {
+		$group_chars = array();
+		foreach ( array( 'player', 'other', 'outsider' ) as $owner ) {
+			$group_chars[ $owner ] = ps_pen_paper_save_character( $hybrid_id, 0, $users[ $owner ], array( 'name' => 'Group ' . $owner . ' ' . $group_rule,
+				'values' => array( $text_id => 'Access granted', $energy_id => array( 'current' => '7', 'maximum' => '10' ) ) ), '0', '1' );
+			$check( is_int( $group_chars[ $owner ] ), 'Group character failed.' );
+		}
+		$group_id = ps_pen_paper_write_adventure_group( $hybrid, 0, '0', 'create', array( 'title' => 'Group ' . $group_rule,
+			'rule' => $group_rule, 'adventure_id' => $hybrid_adventure, 'adventure_revision' => '4' ) );
+		$check( is_int( $group_id ), 'Group creation failed: ' . $group_rule . ( is_wp_error( $group_id ) ? ' / ' . $group_id->get_error_message() : ' / ' . wp_json_encode( $group_id ) ) );
+		$read_group = static function () use ( $group_id ) { return get_post_meta( $group_id, '_pspp_adventure_group', true ); };
+		$group_action = static function ( $operation, $input = array() ) use ( $hybrid, $group_id, $read_group ) {
+			return ps_pen_paper_write_adventure_group( $hybrid, $group_id, (string) $read_group()['revision'], $operation, $input );
+		};
+		wp_set_current_user( $users['player'] );
+		$check( is_wp_error( $group_action( 'join', array( 'character_id' => $group_chars['other'] ) ) ), 'Player joined using another character.' );
+		$check( true === $group_action( 'join', array( 'character_id' => $group_chars['player'] ) ), 'First group join failed.' );
+		wp_set_current_user( $users['other'] );
+		$check( true === $group_action( 'join', array( 'character_id' => $group_chars['other'] ) ), 'Second group join failed.' );
+		wp_set_current_user( $users['outsider'] );
+		$check( null === ps_pen_paper_adventure_group_records( $hybrid )[ $group_id ]['state'] &&
+			is_wp_error( $group_action( 'vote' ) ), 'Unjoined campaign member accessed private group history or voted.' );
+		$check( true === $group_action( 'join', array( 'character_id' => $group_chars['outsider'] ) ), 'Third participant join failed.' );
+		wp_set_current_user( $users['player'] );
+		$check( true === $group_action( 'propose', array( 'character_id' => $group_chars['player'], 'edge_id' => $hybrid_edge_id ) ), 'Group proposal failed.' );
+		$proposal_before = $read_group(); $personal_before = ps_pen_paper_raw_character_state( $group_chars['player'] );
+		$check( is_wp_error( $group_action( 'execute' ) ) && $proposal_before === $read_group() &&
+			$personal_before === ps_pen_paper_raw_character_state( $group_chars['player'] ), 'Unapproved or unagreed group proposal executed.' );
+		wp_set_current_user( $users['gm'] );
+		$check( is_wp_error( $group_action( 'execute' ) ) && true === $group_action( 'approve' ), 'GM impersonated the executor or could not approve.' );
+		if ( 'any' === $group_rule ) {
+			$check( true === $group_action( 'cancel' ), 'GM could not reset a proposal.' );
+			add_post_meta( $hybrid_id, '_pspp_gm', (string) $users['other'] );
+			wp_set_current_user( $users['player'] );
+			$check( true === $group_action( 'propose', array( 'character_id' => $group_chars['player'], 'edge_id' => $hybrid_edge_id ) ), 'Replacement proposal failed.' );
+			wp_set_current_user( $users['other'] );
+			$check( true === $group_action( 'approve' ), 'Additional GM approval failed.' );
+			delete_post_meta( $hybrid_id, '_pspp_gm', (string) $users['other'] );
+			wp_set_current_user( $users['player'] );
+			$check( is_wp_error( $group_action( 'execute' ) ) && true === $group_action( 'cancel' ) &&
+				true === $group_action( 'propose', array( 'character_id' => $group_chars['player'], 'edge_id' => $hybrid_edge_id ) ), 'Revoked approval did not block or could not be replaced.' );
+			wp_set_current_user( $users['gm'] ); $check( true === $group_action( 'approve' ), 'Current GM could not replace a revoked approval.' );
+		}
+		if ( in_array( $group_rule, array( 'majority', 'unanimous' ), true ) ) {
+			wp_set_current_user( $users['player'] );
+			$check( is_wp_error( $group_action( 'execute' ) ), 'Insufficient group votes advanced.' );
+			wp_set_current_user( $users['other'] );
+			$check( true === $group_action( 'vote' ) && is_wp_error( $group_action( 'vote' ) ) &&
+				true === $group_action( 'unvote' ) && true === $group_action( 'vote' ) &&
+				is_wp_error( $group_action( 'execute' ) ), 'Voting, duplicate protection or executor ownership failed.' );
+			if ( 'unanimous' === $group_rule ) {
+				wp_set_current_user( $users['player'] ); $check( is_wp_error( $group_action( 'execute' ) ), 'Two out of three votes satisfied unanimity.' );
+				wp_set_current_user( $users['outsider'] ); $check( true === $group_action( 'vote' ), 'Third unanimity vote failed.' );
+			}
+		}
+		wp_set_current_user( $users['player'] );
+		$approved_group = $read_group();
+		$fail_group_event = static function ( $check, $id, $key, $value ) {
+			return '_pspp_event' === $key && isset( $value['kind'] ) && 'adventure_group' === $value['kind'] ? false : $check;
+		};
+		add_filter( 'update_post_metadata', $fail_group_event, 10, 4 );
+		try { $check( is_wp_error( $group_action( 'execute' ) ), 'Unlogged group progression succeeded.' ); }
+		finally { remove_filter( 'update_post_metadata', $fail_group_event, 10 ); }
+		$check( $approved_group === $read_group() && $personal_before === ps_pen_paper_raw_character_state( $group_chars['player'] ),
+			'Group rollback consumed approval, resources or progress.' );
+		$stale_revision = (string) $approved_group['revision'];
+		$check( true === $group_action( 'execute' ), 'Agreed group execution failed: ' . $group_rule );
+		$shared = $read_group();
+		$check( ps_pen_paper_valid_adventure_group( $shared ) && 1 === count( $shared['history'] ) &&
+			$shared['scene_id'] === $hybrid_scenes[1] && $shared['history'][0]['owner_id'] === $users['player'] &&
+			5 === ps_pen_paper_raw_character_state( $group_chars['player'] )['active']['values'][ $energy_id ]['current'] &&
+			7 === ps_pen_paper_raw_character_state( $group_chars['other'] )['active']['values'][ $energy_id ]['current'] &&
+			is_wp_error( ps_pen_paper_write_adventure_group( $hybrid, $group_id, $stale_revision, 'execute' ) ),
+			'Shared progress, personal resources or replay protection failed.' );
+		$shared_history = $shared['history'];
+		wp_set_current_user( $users['other'] );
+		ob_start(); ps_pen_paper_render_adventure_groups( $hybrid, 0 ); $other_group_html = ob_get_clean();
+		$check( false === strpos( $other_group_html, 'freigegeben Access granted' ), 'Another actor saw private text values through group history.' );
+		wp_set_current_user( $users['player'] );
+		$check( true === $group_action( 'leave', array( 'character_id' => $group_chars['player'] ) ), 'Participant departure failed.' );
+		$check( $shared_history === $read_group()['history'] && $hybrid_scenes[1] === $read_group()['scene_id'], 'Departure lost group progress.' );
+		wp_set_current_user( $users['gm'] );
+		$check( true === $group_action( 'pause' ), 'Group pause failed.' );
+		wp_set_current_user( $users['player'] );
+		$check( true === $group_action( 'join', array( 'character_id' => $group_chars['player'] ) ) &&
+			is_wp_error( $group_action( 'propose', array( 'character_id' => $group_chars['player'], 'edge_id' => $last_edge['id'] ) ) ),
+			'Reentry or paused group guard failed.' );
+		wp_set_current_user( $users['gm'] );
+		$check( true === $group_action( 'resume' ) && $shared_history === $read_group()['history'], 'Resumption lost progress.' );
+		wp_set_current_user( $users['other'] );
+		$check( true === $group_action( 'propose', array( 'character_id' => $group_chars['other'], 'edge_id' => $last_edge['id'] ) ), 'Another participant could not propose the next step.' );
+		if ( 'gm' === $group_rule ) {
+			wp_set_current_user( $users['gm'] ); $check( true === $group_action( 'approve' ), 'GM decision mode failed.' );
+		} elseif ( in_array( $group_rule, array( 'majority', 'unanimous' ), true ) ) {
+			wp_set_current_user( $users['player'] ); $check( true === $group_action( 'vote' ), 'Continuation vote failed.' );
+			if ( 'unanimous' === $group_rule ) { wp_set_current_user( $users['outsider'] ); $check( true === $group_action( 'vote' ), 'Third continuation vote failed.' ); }
+		}
+		wp_set_current_user( $users['other'] );
+		$check( true === $group_action( 'execute' ), 'Shared prior-decision requirement failed.' );
+		$completed_group = $read_group();
+		$check( ps_pen_paper_valid_adventure_group( $completed_group ) && 'completed' === $completed_group['status'] &&
+			2 === count( $completed_group['history'] ) && $completed_group['history'][1]['owner_id'] === $users['other'] &&
+			1 === $completed_group['history'][1]['decision']['conditions']['rows'][0]['value'] &&
+			is_wp_error( $group_action( 'execute' ) ), 'Shared completion, different actor or history proof failed.' );
+		$forged_group = $completed_group;
+		$forged_group['history'][0]['votes'][] = $users['gm'];
+		$check( ! ps_pen_paper_valid_adventure_group( $forged_group ), 'Forged nonparticipant vote accepted.' );
+		wp_set_current_user( $users['gm'] );
+		$group_event = ps_pen_paper_get_events( $hybrid )['events'][0];
+		$check( 'adventure_group' === $group_event['kind'] && $completed_group === $group_event['after'], 'Group event omitted the shared receipt.' );
+		wp_set_current_user( $users['player'] );
+		$check( is_wp_error( ps_pen_paper_get_event( $hybrid, $group_event['id'] ) ), 'Participant accessed GM-private personal group proofs.' );
+		wp_set_current_user( $users['gm'] );
+		$raw_event = get_post_meta( $group_event['id'], '_pspp_event', true );
+		$bad_event = $raw_event; $bad_event['after']['history'] = array();
+		update_post_meta( $group_event['id'], '_pspp_event', $bad_event );
+		try { $check( is_wp_error( ps_pen_paper_get_event( $hybrid, $group_event['id'] ) ), 'Corrupted group event bypassed native validation.' ); }
+		finally { update_post_meta( $group_event['id'], '_pspp_event', $raw_event ); }
+	}
+
 	wp_set_current_user( $users['outsider'] );
 	$check( is_wp_error( ps_pen_paper_start_adventure_run( $campaign, $adventure_id, $characters['player'], (string) $published['revision'], '1' ) ), 'Nonmember started an adventure run.' );
 	echo "Adventure integration checks passed.\n";
 } finally {
 	wp_set_current_user( $original_user );
 	$errors = array();
-	$children = $parents ? get_posts( array( 'post_type' => array( 'pspp_character', 'pspp_scene', 'pspp_adventure', 'pspp_adventure_run', 'pspp_item', 'pspp_loot_table', 'pspp_event' ),
+	$children = $parents ? get_posts( array( 'post_type' => array( 'pspp_character', 'pspp_scene', 'pspp_adventure', 'pspp_adventure_run', 'pspp_adventure_group', 'pspp_item', 'pspp_loot_table', 'pspp_event' ),
 		'post_status' => array( 'private', 'draft' ), 'post_parent__in' => $parents, 'posts_per_page' => -1, 'fields' => 'ids' ) ) : array();
 	foreach ( array_merge( $children, $parents ) as $id ) { if ( ! wp_delete_post( $id, true ) ) { $errors[] = 'Cannot remove adventure fixture ' . $id; } }
 	foreach ( $users as $id ) { if ( ! ( is_multisite() ? wpmu_delete_user( $id ) : wp_delete_user( $id ) ) ) { $errors[] = 'Cannot remove fixture account ' . $id; } }

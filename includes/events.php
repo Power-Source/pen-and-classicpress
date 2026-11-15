@@ -7,6 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 function ps_pen_paper_event_labels() {
 	return array(
 		'rules_saved'         => __( 'Regelwerk gespeichert', 'ps-pen-paper' ),
+		'campaign_restored'   => __( 'Kampagne wiederhergestellt', 'ps-pen-paper' ),
 		'turn_changed'        => __( 'Zug gewechselt', 'ps-pen-paper' ),
 		'access_saved'        => __( 'Zugangseinstellungen geändert', 'ps-pen-paper' ),
 		'membership_saved'    => __( 'Mitgliedschaft oder Beitrittsanfrage geändert', 'ps-pen-paper' ),
@@ -18,7 +19,7 @@ function ps_pen_paper_event_labels() {
 		'character_requested' => __( 'Charakteränderung beantragt', 'ps-pen-paper' ),
 		'character_approved'  => __( 'Charakteränderung freigegeben', 'ps-pen-paper' ),
 		'character_rejected'  => __( 'Charakteränderung abgelehnt', 'ps-pen-paper' ),
-		'character_context'   => __( 'Kampagnenauflagen freigegeben', 'ps-pen-paper' ),
+		'character_context'   => __( 'Kampagnenkontext geändert', 'ps-pen-paper' ),
 		'scene_saved'         => __( 'Szenenentwurf gespeichert', 'ps-pen-paper' ),
 		'scene_published'     => __( 'Szene freigegeben', 'ps-pen-paper' ),
 		'scene_withdrawn'     => __( 'Szenenfreigabe zurückgenommen', 'ps-pen-paper' ),
@@ -40,6 +41,7 @@ function ps_pen_paper_event_labels() {
 		'adventure_saved'     => __( 'Soloabenteuer vorbereitet', 'ps-pen-paper' ),
 		'adventure_published' => __( 'Soloabenteuer freigegeben oder pausiert', 'ps-pen-paper' ),
 		'adventure_run'       => __( 'Soloabenteuer fortgesetzt', 'ps-pen-paper' ),
+		'adventure_group'     => __( 'Gruppenabenteuer geändert', 'ps-pen-paper' ),
 		'folio_published'     => __( 'Handout freigegeben', 'ps-pen-paper' ),
 		'folio_withdrawn'     => __( 'Handout zurückgenommen', 'ps-pen-paper' ),
 		'portrait_saved'      => __( 'Charakterporträt geändert oder geprüft', 'ps-pen-paper' ),
@@ -116,6 +118,20 @@ function ps_pen_paper_save_document_event( $campaign_id, $object_id, $key, $befo
 }
 
 function ps_pen_paper_atomic_event( $object_id, $write, $extra_tables = array() ) {
+	global $wpdb;
+	if ( 'wpdb' !== get_class( $wpdb ) || ! ( $wpdb->dbh instanceof mysqli ) ) { return ps_pen_paper_atomic_event_unlocked( $object_id, $write, $extra_tables ); }
+	$post = ps_pen_paper_record_post( $object_id );
+	$scope_id = $post ? ( in_array( $post->post_type, array( 'pspp_campaign', 'pspp_universe' ), true ) ? (int) $post->ID : (int) $post->post_parent ) : 0;
+	if ( ! $scope_id ) { return ps_pen_paper_atomic_event_unlocked( $object_id, $write, $extra_tables ); }
+	return ps_pen_paper_scope_lock( $scope_id, function () use ( $scope_id, $object_id, $write, $extra_tables ) {
+		if ( ! ps_pen_paper_scope_observe( $scope_id ) ) {
+			return new WP_Error( 'scope_changed', __( 'Die Runde wurde inzwischen wiederhergestellt. Alte Eingaben wurden nicht übernommen. Bitte lade die Seite neu.', 'ps-pen-paper' ) );
+		}
+		return ps_pen_paper_atomic_event_unlocked( $object_id, $write, $extra_tables );
+	} );
+}
+
+function ps_pen_paper_atomic_event_unlocked( $object_id, $write, $extra_tables = array() ) {
 	global $wpdb;
 	$unsupported = new WP_Error( 'transaction_unavailable', __( 'Diese Änderung benötigt eine sichere Datenbanktransaktion. Sie wurde nicht übernommen. Bitte informiere den Administrator über die erforderliche InnoDB-Unterstützung und die Standard-Datenbankverbindung.', 'ps-pen-paper' ) );
 	if ( 'wpdb' !== get_class( $wpdb ) || ! ( $wpdb->dbh instanceof mysqli ) || ! is_int( $wpdb->reconnect_retries ) ) {
@@ -219,7 +235,7 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 	if ( ! current_user_can( 'read' ) || ! ( $universe ? ps_pen_paper_can_manage_universe( $campaign ) : ps_pen_paper_can_view_campaign( $campaign ) ) ) {
 		return $error;
 	}
-	$post = get_post( $id );
+	$post = ps_pen_paper_record_post( $id );
 	if ( ! $post || 'pspp_event' !== $post->post_type || 'private' !== $post->post_status || (int) $post->post_parent !== (int) $campaign->ID ) {
 		return $error;
 	}
@@ -257,6 +273,10 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 			( 'adventure_run' !== $event['kind'] && 'gm' !== $event['visibility'] ) ) {
 			return new WP_Error( 'invalid_event', __( 'Die Abenteuerstände im Protokoll sind beschädigt.', 'ps-pen-paper' ) );
 		}
+	}
+	if ( 'adventure_group' === $event['kind'] && ( 'gm' !== $event['visibility'] || 0 !== $event['recipient_id'] ||
+		! ps_pen_paper_valid_adventure_group( $event['before'] ) || ! ps_pen_paper_valid_adventure_group( $event['after'] ) ) ) {
+		return new WP_Error( 'invalid_event', __( 'Der Gruppenabenteuerstand im Protokoll ist beschädigt.', 'ps-pen-paper' ) );
 	}
 	if ( in_array( $event['kind'], array( 'wiki_configured', 'wiki_prepared', 'wiki_published' ), true ) ) {
 		$validate = 'wiki_configured' === $event['kind'] ? 'ps_pen_paper_valid_wiki_config' : 'ps_pen_paper_valid_wiki_entry';

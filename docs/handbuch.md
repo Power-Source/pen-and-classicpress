@@ -52,8 +52,8 @@ sind seit 0.13.0 enthalten.
 | Änderungs- und Wurfprotokoll | Automatisch geprüfter Punktepool |
 | Spielleitermappe, geschützte Text-/Bild-Handouts und responsive Bedienung | Strukturierte NPC-Werte und private PDF-Dateien |
 | Private Porträts sowie Community-gebundene Inventare, Ausrüstung und kontrollierter Handel | Stapelmengen und automatische Gegenstandssynchronisierung |
-| Soloabenteuer mit freigegebenen Szenen, UND-/ODER-Wertebedingungen, Proben, optionalen Kosten und Belohnungen sowie privaten Einzeldurchläufen | Gruppenabenteuer, hybride Freigabeschritte und Verbrauch gemeinsamer Basisressourcen |
-| Privater, versionierter Kampagnenexport mit lokalen oder berechtigten Universumsdaten | Import mit Vorschau und geprüfte Wiederherstellung |
+| Solo-, hybride und gemeinsame Gruppendurchläufe mit freigegebenen Szenen, Zahlen-/Text-/Fortschrittsbedingungen, Proben, persönlichen Kosten und Belohnungen sowie konfigurierbaren Entscheidungen und Spielleiterfreigaben | Gegenstandsbedingungen und Verbrauch gemeinsamer Basisressourcen |
+| Privater, versionierter Kampagnenexport und bestätigte Wiederherstellung neuer/bestehender Kampagnen | Erweiterte Plattform- und Wiederherstellungstestmatrix |
 
 Die Spielleitung kann Szenentexte und Karten vorbereiten und gezielt anzeigen.
 Die Kampagnenbeschreibung eignet sich weiter für eine gemeinsame Einleitung,
@@ -131,7 +131,8 @@ werden nicht automatisch als Nachrichten übertragen.
 
 ## 3. Kampagnen und Mitglieder
 
-Unter **Pen & Paper** im Backend:
+Unter **Pen & Paper → Kampagnen** im Backend oder unter **Kampagnen**
+im Frontend-Spielbereich:
 
 1. Als Website-Administrator eine Kampagne erstellen oder einem Benutzer die
    Berechtigung **„Kampagnen erstellen“** geben.
@@ -139,6 +140,14 @@ Unter **Pen & Paper** im Backend:
 3. Bereits vorhandene Mitglieder dieser Website als **Spieler** oder
    **Spielleiter** aufnehmen.
 4. Regelwerk einrichten, bevor die ersten Charaktere entstehen.
+
+Im Frontend führt die Anlage direkt zum **Regelwerk** der neuen Runde.
+Unter **Rundeneinstellungen** kann die Spielleitung Name, Beschreibung
+und Archivstatus speichern sowie vorhandene Website-Benutzer als Spieler
+oder Spielleiter hinzufügen und entfernen. Das **Regelwerk** am Spieltisch
+ist für die Spielleitung bearbeitbar, für Spieler weiterhin nur lesbar.
+Speichern führt zurück in den jeweiligen Frontend-Bereich; ein Backend-Zugang
+ist für diese Vorbereitung nicht erforderlich.
 
 Die Kampagnenrolle ist nicht dieselbe wie die WordPress-Benutzerrolle.
 Ein Benutzer kann in einer Kampagne Spielleiter und in einer anderen Spieler
@@ -160,7 +169,7 @@ Im Backend unter **Pen & Paper** und auf der Startseite des Frontend-Spielbereic
 
 - **Übersicht:** Orientierung und Erklärung des Einstiegs.
 - **Universen:** Welten, Regelvorlagen und Basisbögen verwalten; Kampagnen zuordnen.
-- **Kampagnen:** Runde wählen; die Backend-Ansicht erlaubt Berechtigten die Anlage.
+- **Kampagnen:** Runde wählen oder mit Erstellberechtigung im Backend und Frontend anlegen.
 - **Charakterverwaltung:** eigene und als Spielleitung verwaltbare Bögen finden.
 - **Einstellungen:** verwaltbare Runde wählen; Zugang, Anfragen, Bilder und Farben
   direkt im Frontend ändern. Globale Erstellberechtigungen bleiben im Backend.
@@ -171,6 +180,9 @@ Im Backend unter **Pen & Paper** und auf der Startseite des Frontend-Spielbereic
    einen Namen und eine interne Weltbeschreibung speichern.
 2. Unter **Kampagne zuordnen oder lösen** die eigene Kampagne und das
    Zieluniversum wählen. **Ohne Universum** löst eine vorhandene Zuordnung.
+   Unter **Währung und Handelsregeln** wählen, ob die Zieluniversumseinstellungen
+   gelten oder **Lokale Währung und Handelsregeln behalten** werden.
+   Die lokale Variante erhält vorhandene Kampagnenkonten und Guthaben unverändert.
 3. **Zuordnung prüfen** öffnet die Vorschau. Die bisherige Zuordnung bleibt
    dabei unverändert.
 4. Die Vorschau lesen, das Bestätigungsfeld markieren und **Zuordnung bestätigen**
@@ -188,8 +200,10 @@ die Spielleitung im jeweiligen Kampagnenprotokoll. Die Universumsansicht zeigt
 die letzten 20 Änderungen; ältere Datensätze bleiben gespeichert.
 
 Die Zuordnung allein verändert weiterhin keine Regeln, Bögen oder Freigaben.
-Nutzt eine Kampagne gemeinsame Basisbögen, ist das Lösen oder Wechseln derzeit
-gesperrt. Unabhängige Kopien dürfen ihre Universumszuordnung dagegen verlieren.
+Nutzt eine Kampagne gemeinsame Basisbögen, ist das Lösen oder Wechseln gesperrt,
+bis diese ausdrücklich unabhängig weitergeführt werden. Unabhängige Kopien
+dürfen ihre Universumszuordnung dagegen verlieren, sofern bestehende Konten
+weiter zu ihrer Währung passen.
 
 ### Regelvorlage und Basisbögen verwenden
 
@@ -250,7 +264,28 @@ aktuelle Spielleitung und Administration. Nur die Kampagnenleitung erteilt
 Auflagen; dafür sind keine Verwaltungsrechte am Universum erforderlich.
 Basisänderungen stehen dagegen in der geschützten Universumshistorie.
 
-Ressourcenauflagen, ein späterer Wechsel zwischen gemeinsamem Stand und Kopie,
+### Gemeinsamen Bogen unabhängig weiterführen
+
+Die Kampagnenleitung öffnet am Bogen unter **Kampagnenkontext** den Bereich
+**Als unabhängigen Kampagnenbogen weiterführen**. Die Vorschau zeigt den
+freigegebenen Grundstand einschließlich Kampagnenauflagen, aber ohne
+Ausrüstungsboni. Nach Bestätigung **Basisverbindung lösen** wählen.
+
+Die vorhandene Figur bleibt bestehen: Werte, Ressourcen, Notiz, Ausrüstung,
+Inventar und persönliche Kampagnenkonten werden erhalten. Die bisherigen
+Auflagen werden eigene Grundwerte, nicht erneut angewendet. Offene Basisanträge
+werden nicht übernommen. Spätere Basisänderungen gelten hier nicht mehr;
+Basisbogen und andere Kampagnen bleiben unverändert. Der Moduswechsel wird
+mit Vorher/Nachher nur für Besitzer und Spielleitung protokolliert.
+Eine automatische Rückverbindung ist nicht möglich.
+
+Ein gemeinsames Universumskonto sperrt die Umstellung bis zu einer gesonderten
+Kontenmigration. Es wird kein Ersatzkonto erstellt und kein Guthaben kopiert.
+Nach dem Ablösen aller gemeinsamen Bögen kann die Universumszuordnung geändert
+oder gelöst werden; die bestehenden Währungs- und Kontenschutzregeln gelten
+weiterhin.
+
+Ressourcenauflagen, Rückverbindungen von Kopien,
 Spieleranträge für Basisbögen sowie universumsweite Mitgliedschaften fehlen noch.
 Eine frei benannte numerische Stufe ist möglich, aber noch kein XP-System oder
 automatischer Stufenaufstieg. Eine fehlende gemeinsame Basis erzeugt einen
@@ -563,8 +598,11 @@ Szenenpfade, Entscheidungen und optionale Zahlenproben. Seit 0.22.0 ergänzen
 Mindestwerte und seit 0.23.0 optionale Ressourcenkosten diesen Ablauf.
 Seit 0.24.0 sind feste und tabellenbasierte Belohnungen konfigurierbar.
 Seit 0.25.0 lassen sich mehrere Wertebedingungen mit UND oder ODER verknüpfen.
-Gruppenabenteuer, gemeinsame Entscheidungen und hybride Freigabeschritte
-fehlen weiterhin; Details stehen in Abschnitt 21.
+Text- und Fortschrittsbedingungen sowie hybride Spielleiterfreigaben für
+Einzeldurchläufe sind ergänzt. Gemeinsame Gruppendurchläufe mit konfigurierbaren
+Entscheidungen, Teilnahme und Wiedereinstieg sind ebenfalls vorhanden.
+Gegenstandsbedingungen und eigenständige Abenteuerpakete fehlen noch;
+Details stehen in Abschnitt 21.
 Der **Story-Builder** mit Szenen, getrennten Geheimnissen, Inhaltsvorschau,
 Freigabe, Rücknahme und Protokollierung ist vorhanden.
 Kapitel mit geordneter Szenenfolge, private Personen-/Orts-/Notizkarten und
@@ -951,8 +989,10 @@ Spielsystem vor: Name und Kürzel sind frei, Beträge bleiben **ganze Einheiten*
   Name, Kürzel und Kontomodell.
 - **Ohne Universum:** Unter **Rundeneinstellungen → Währung & Guthaben**
   richtet die Kampagnenleitung eine eigene Währung ein.
-- Zugeordnete Kampagnen übernehmen die Währung und das gewählte Modell aus
-  dem Universum. Es gibt keine automatische Umrechnung oder lokale Zweitwährung.
+- Zugeordnete Kampagnen übernehmen standardmäßig die Währung und das gewählte
+  Modell aus dem Universum. Bei bewusst lokaler Zuordnung bleiben stattdessen
+  die Kampagnenwährung, bestehenden Konten und Handelsregeln erhalten.
+  Es gibt keine automatische Umrechnung oder Verdoppelung von Guthaben.
 
 | Kontomodell im Universum | Wirkung und Buchungsrechte |
 |---|---|
@@ -962,8 +1002,10 @@ Spielsystem vor: Name und Kürzel sind frei, Beträge bleiben **ganze Einheiten*
 Vor der ersten Buchung kann die Universumsleitung das Modell wechseln.
 Danach bleibt es fest, damit Guthaben weder verschwinden noch doppelt
 verwendet werden. Name und Kürzel bleiben änderbar. Ein Wechsel der
-Universumszuordnung von Kampagnen mit Konten wird gesperrt, bis es eine
-ausdrückliche Guthabenmigration gibt.
+Universumszuordnung ist mit bewusst beibehaltenen lokalen Konten möglich.
+Bestehende Universumskonten lassen sich damit nicht lokal übernehmen; für
+solche Übertragungen und Währungsumrechnungen gemeinsamer Universumskonten fehlt
+weiterhin die gesonderte Migration.
 
 ![Lokale Währungseinstellungen der Nebelhafen-Demo mit Dockmark und ganzen Einheiten](images/25-waehrungseinstellungen.png)
 
@@ -1451,6 +1493,77 @@ gemeinsam mit dem Fortschritt und Pflichtereignis. Spätere Werteänderungen
 schreiben diesen privaten Nachweis nicht um. Ältere Abenteuer, Durchläufe
 und Ereignisse ohne Voraussetzungen bleiben lesbar und unverändert.
 
+### Hybride Entscheidungen mit Spielleiterfreigabe
+
+Unter **Entscheidung oder Probe ergänzen** kann die Spielleitung
+**Diese Entscheidung benötigt ausdrücklich eine Spielleiterfreigabe**
+aktivieren. Nach dem Speichern den Abenteuerentwurf wie gewohnt freigeben.
+
+Der Besitzer wählt die Entscheidung zunächst als Anfrage. Sie erscheint unter
+**Abenteuer & Szenen → Ausstehende Abenteuerentscheidungen** bei der Spielleitung,
+die ausdrücklich freigibt oder ablehnt. Bis dahin bleiben Fortschritt,
+Ressourcen und Belohnungen unverändert; auch die Probe wird noch nicht gewürfelt.
+Nach Freigabe lädt der Besitzer seinen Bogen neu und führt die Entscheidung aus.
+Voraussetzungen und aktuelle Berechtigungen werden dabei erneut geprüft.
+
+Der Besitzer kann eine Anfrage oder ungenutzte Freigabe zurückziehen und erneut
+anfragen. Das ermöglicht auch eine neue Prüfung nach entzogenen
+Spielleiterrechten. Erfolgreiche Ausführung verbraucht die Freigabe genau einmal
+und dokumentiert sie privat im Verlauf. Schlägt die Ausführung fehl, bleiben
+Freigabe und Ressourcen erhalten. Import und Wiederherstellung übernehmen diese
+Zustände samt ausdrücklicher Benutzerzuordnung; sie führen keine Entscheidung aus.
+Gruppendurchläufe beachten dieselbe ausdrücklich konfigurierte Freigabepflicht.
+
+### Gemeinsame und hybride Gruppenabenteuer
+
+1. Bereite das Abenteuer wie oben unter **Abenteuer & Szenen → Soloabenteuer**
+   vor und gib es frei. Diese Szenen- und Entscheidungsdefinition wird auch
+   für Gruppen verwendet; ein bestehender Solodurchlauf wird nicht umgewandelt.
+2. Öffne **Gemeinsame Abenteuer → Gruppendurchlauf anlegen**, vergib einen Namen
+   und wähle die Entscheidungsregel: ein Teilnehmer, Mehrheit der aktiven
+   Teilnehmer, alle aktiven Teilnehmer oder ausdrückliche Spielleiterfreigabe.
+3. Jeder Besitzer wählt eine eigene freigegebene Figur und betätigt
+   **Teilnehmen / wieder einsteigen**. Pro Benutzer kann eine Figur zugleich
+   aktiv teilnehmen; bis zu 100 Figuren einschließlich früherer Teilnehmer
+   bleiben zugeordnet. Vor eigener Teilnahme sieht ein normales Kampagnenmitglied
+   keine Gruppenszenen oder Historie.
+4. Ein Teilnehmer schlägt eine Entscheidung mit seiner Figur vor. Der Vorschlag
+   zählt als eigene Zustimmung; andere stimmen zu oder ziehen ihre Zustimmung
+   zurück. Bei Mehrheit müssen mehr als die Hälfte der aktiven Teilnehmer
+   zustimmen, bei Einstimmigkeit alle. Eine für die Entscheidung zusätzlich
+   konfigurierte Spielleiterfreigabe bleibt in jedem Modus verpflichtend.
+5. Sobald Zustimmung und gegebenenfalls Freigabe vorliegen, führt ausschließlich
+   der vorgeschlagene Besitzer **Vereinbarte Gruppenentscheidung ausführen** aus.
+   Erst jetzt prüft der Server alle Bedingungen und Berechtigungen erneut,
+   würfelt, verbraucht persönliche Ressourcen und vergibt persönliche Belohnungen.
+   Fehler lassen weder Teilfortschritt noch Teilverbrauch zurück.
+6. Alle Teilnehmer sehen dieselbe Folgeszene und den gemeinsamen Verlauf. Die
+   nächste Entscheidung darf eine andere Figur ausführen und voraussetzen,
+   dass eine frühere Gruppenentscheidung tatsächlich ausgeführt wurde.
+
+Der gemeinsame Fortschritt gehört diesem Durchlauf, nicht der allgemeinen
+Kampagnenszene oder anderen Gruppen. Fremde Zahlen-, Text- und Ressourcenwerte
+werden nicht an andere Teilnehmer ausgeliefert; die Spielleitung behält ihre
+bestehenden Einsichtsrechte. Gruppenereignisse mit persönlichen Nachweisen
+bleiben spielleiterprivat.
+
+**Teilnahme beenden**, **Gruppendurchlauf pausieren**, Wiedereinstieg und Änderungen
+der Entscheidungsregel erhalten Szene und Historie, verwerfen aber offene
+Vorschläge, Stimmen und Freigaben. Die Spielleitung kann auch ungültig gewordene
+Teilnahmen beenden. Pausierte Durchläufe erlauben Wiedereinstieg, aber keine
+Entscheidungen. Nach **Gruppendurchlauf fortsetzen** kann die Gruppe weitergehen.
+Auch das Verlassen aller Teilnehmer löscht den bisherigen Fortschritt nicht.
+
+Import und Wiederherstellung übernehmen laufende Gruppen, Teilnehmer,
+historische Wählerschaft, Stimmen und Freigaben mit ausdrücklichen Benutzer-
+und Objektzuordnungen. Sie würfeln nicht und zahlen keine Belohnung erneut aus.
+Benutzerzusammenlegungen mit Doppelstimmen oder kollidierenden aktiven
+Teilnahmen werden abgewiesen. Nach der Übernahme zählen die aktuellen Rechte
+der örtlichen Spielleitung und tatsächlichen Besitzer.
+
+Kosten und Belohnungen betreffen ausschließlich die jeweils ausführende Figur.
+Gegenstandsbedingungen und eigenständige Abenteuerpakete bleiben weitere Ausbauschritte.
+
 ### Mehrere Wertebedingungen mit UND oder ODER
 
 Seit **0.25.0** kann jede Entscheidung bis zu 20 Wertebedingungen erhalten.
@@ -1460,7 +1573,13 @@ Mit **Weitere Bedingung** lassen sich zusätzliche Zeilen ergänzen und wieder
 entfernen. Ohne JavaScript stehen zwei Eingabezeilen zur Verfügung.
 
 Jede Zeile wählt ein Feld, den Wertbestandteil, einen Vergleich und einen
-ganzzahligen Vergleichswert von −1000000 bis 1000000:
+Vergleichswert. Zahlenvergleiche verwenden ganze Zahlen von −1000000 bis 1000000.
+Textfelder unterstützen **gleich**, **ungleich**, **enthält Text** und
+**enthält Text nicht** mit bis zu 2000 Zeichen; Groß-/Kleinschreibung wird
+beachtet. **Vorherige Entscheidung** prüft ausschließlich den eigenen Durchlauf:
+1 bedeutet ausgeführt, 0 bedeutet nicht ausgeführt. Die Entscheidung muss bereits
+im Entwurf existieren; der gespeicherte Nachweis wird später nicht umgeschrieben.
+Für Zahlen und Ressourcen stehen die bisherigen Vergleiche zur Verfügung:
 
 - Zahlen und Attribute: den aktuellen freigegebenen wirksamen Wert verwenden.
 - Ressourcen: **aktuellen Wert** oder persönliches **Maximum** wählen.
@@ -1604,7 +1723,7 @@ ausschließlich nach ausdrücklich konfigurierten und freigegebenen Regeln.
 Es benötigt keine Gruppenentscheidung und
 funktioniert unabhängig von PS Community. Teamdurchläufe, Rücksetzen,
 Voraussetzungen jenseits der beschriebenen Wertebedingungen, automatische
-Ressourcenregeneration sowie hybride Freigabeschritte bleiben spätere, getrennt zu planende
+Ressourcenregeneration bleiben spätere, getrennt zu planende
 Erweiterungen.
 
 In der Nebelhafen-Demo ist **Die Wetterkapsel vor dem Ablegen** als
@@ -1667,10 +1786,10 @@ Beschädigungen, ersetzt aber keine Zugriffsprüfung und ist keine Signatur.
 Die ursprünglichen Objekt- und Benutzer-IDs sind keine Erlaubnis zum
 Überschreiben vorhandener Zieldaten.
 
-**Schreibender Import und Wiederherstellung sind noch nicht verfügbar.**
-Die JSON-Datei ersetzt deshalb derzeit kein vollständiges Website-Backup.
+Seit **0.29.0** können die Dateien kontrolliert wiederhergestellt werden.
+Die JSON-Datei ersetzt weiterhin kein vollständiges Website-Backup.
 
-## 23. Private Importvorschau
+## 23. Private Importvorschau und Wiederherstellung
 
 Seit **0.27.0** kann berechtigte Administration oder Spielleitung eine
 Sicherung prüfen und Zuordnungen vorbereiten:
@@ -1695,15 +1814,26 @@ Sicherung prüfen und Zuordnungen vorbereiten:
 7. Konflikte und Hinweise lesen. Bei Ersatz kann die aktuelle Zielkampagne
    über **Aktuelle Zielkampagne vor dem Ersatz sichern** heruntergeladen werden.
    **Private Vorschau verwerfen** entfernt die eigene Vorschau.
+8. Zugang auswählen: standardmäßig **privat und geschlossen**, oder die
+   ursprünglichen Zugangseinstellungen ausdrücklich übernehmen. Unbekannte
+   Plugin-Metadaten dürfen nur mit Zustimmung privat archiviert werden,
+   niemals als aktive Einstellungen. Bekannte ungültige Daten sperren weiterhin
+   den Vorgang.
+9. Ziel, Konten und Übernahme privater Spielstände bestätigen, anschließend
+   **Als neue Kampagne wiederherstellen** oder **Zielkampagne gesichert ersetzen**
+   wählen. Neue Inhalte bekommen neue IDs; beim Ersatz bleiben Kampagnen-ID
+   und bisheriger Ersteller erhalten. Das ausführende Konto bleibt Spielleitung.
+10. Nach Erfolg die Kampagne öffnen. Bei Ersatz kann die automatisch gesicherte
+    ursprüngliche Kampagne privat heruntergeladen und mit demselben Ablauf
+    erneut als neue Kampagne oder bestätigter Ersatz wiederhergestellt werden.
 
 Die Vorschau zeigt Quelle, Exportversion, Prüfsumme und enthaltene Datentypen.
 Seit **0.28.0** zeigt sie zusätzlich die **Fachdokumentprüfung**: Unterstützte
 Regel-, Charakter-, Story- und Wirtschaftsdokumente werden mit denselben
 Fachvalidatoren wie im Plugin geprüft. Ungültige Werte erscheinen als Konflikte;
 die Originalwerte werden nicht korrigiert oder überschrieben.
-Noch ungeprüfte Metadaten werden ausdrücklich aufgelistet. Protokollinhalte,
-fachliche Beziehungen und sämtliche ID-Zuordnungen sind damit noch nicht
-vollständig geprüft.
+Seit **0.29.0** prüft die vollständige Aufbereitung zusätzlich Protokolle,
+Metadaten und typisierte ID-Zuordnungen, bevor die Speicherbestätigung erscheint.
 Dateiformat, Struktur, Bilddaten und Kampagnenabgrenzung werden geprüft;
 fehlende Bilder, nicht passende Feldstrukturen oder lokale Guthabenwährungen
 werden nicht still ersetzt beziehungsweise umgerechnet. Zugeordnete bestehende
@@ -1713,8 +1843,25 @@ Die Originaldatei und Optionen bleiben privat an Konto und Website gebunden.
 Die Vorschau ist höchstens eine Stunde verfügbar; erneutes Prüfen verlängert
 die Frist nicht. Es wird keine öffentliche Datei oder Mediathekanlage erstellt.
 
-**Auch eine konfliktfreie Vorschau ist noch keine Wiederherstellung.**
-Vollständige Fachdokumentprüfung, kontrollierte ID-Zuordnung, atomare Speicherung,
-Absicherung zwischen Prüfung und Speicherung sowie Wiederholungsabwehr folgen.
-Spielstände, Inventare, Guthaben und historische Vergaben werden in dieser
-Etappe weder überschrieben noch erneut ausgeführt.
+**Eine Vorschau allein ändert noch keine Spielstände.** Erst die ausdrückliche
+Bestätigung speichert die aufbereiteten Inhalte gemeinsam in einer sicheren
+Datenbanktransaktion. Geänderte Ziel-/Universumsstände verlangen eine erneute
+Prüfung; ältere Formulare müssen nach einem Ersatz neu geladen werden.
+Wiederholte identische Bestätigungen erzeugen keine zweite Kampagne und vergeben
+keine Belohnungen erneut. Auch ein späterer Ersatz macht alte Bestätigungen
+nicht wieder verwendbar. Bei einem nicht eindeutig bestätigten Abschluss
+informiere die Administration, statt blind einen zweiten Import zu starten.
+
+Die Zielsicherung und alten lokalen Datensätze liegen privat, nicht als spielbare
+Kampagne oder öffentliche Mediathekdatei. Herunterladen dürfen nur der bisherige
+Ersteller, die ausführende Person und die Administration; neu importierte
+Spielleitungen bekommen nicht automatisch Zugriff auf alte Zielgeheimnisse.
+Inventare, Guthaben und laufende Abenteuer werden übernommen, wirtschaftliche
+Aktionen und historische Würfe nicht erneut ausgeführt. Externe Wiki-Verknüpfungen
+bleiben deaktiviert; Konten, globale Rollen, Chat- und Community-Daten benötigen
+eigene Verwaltung beziehungsweise Backups.
+
+Nach einem Ersatz beginnt die Runde eine getrennte Chatsitzung und Anwesenheit.
+Alte Formulare und offene Spieltische müssen neu geladen werden; sie dürfen den
+neuen Stand nicht mit alten Eingaben ändern. Bereits gespeicherte externe
+Chatgespräche werden nicht gelöscht oder neuen Mitgliedern zugeordnet.

@@ -99,6 +99,25 @@ try {
 	wp_set_current_user( $users['gm'] );
 	$standalone = ps_pen_paper_export_campaign( $other_campaign, 'complete' );
 	$check( is_array( $standalone ) && $ids( $standalone ) === array( $other_campaign, $foreign_scene ), 'Standalone campaign required universe permissions or leaked another scope.' );
+	$old_epoch = wp_generate_uuid4(); $new_epoch = wp_generate_uuid4();
+	update_post_meta( $other_campaign, '_pspp_import_epoch', $old_epoch );
+	ps_pen_paper_scope_observe( $other_campaign, true );
+	$replace_after_snapshot = function ( $url ) use ( $other_campaign, $new_epoch ) {
+		update_post_meta( $other_campaign, '_pspp_import_epoch', $new_epoch );
+		return $url;
+	};
+	add_filter( 'home_url', $replace_after_snapshot );
+	try {
+		$concurrent = ps_pen_paper_export_campaign( $other_campaign, 'local' );
+		$check( is_array( $concurrent ) && $old_epoch === ps_pen_paper_export_meta( $record( $concurrent, $other_campaign ), '_pspp_import_epoch' ) &&
+			ps_pen_paper_chat_id( $other_campaign, $old_epoch ) === $concurrent['payload']['external_data']['ps_chat']['session_id'] &&
+			ps_pen_paper_chat_id( $other_campaign ) !== $concurrent['payload']['external_data']['ps_chat']['session_id'],
+			'Concurrent replacement mixed the exported snapshot with a different chat session.' );
+	} finally {
+		remove_filter( 'home_url', $replace_after_snapshot );
+		delete_post_meta( $other_campaign, '_pspp_import_epoch' );
+		ps_pen_paper_scope_observe( $other_campaign, true );
+	}
 	$local = ps_pen_paper_export_campaign( $campaign, 'local' );
 	$check( is_array( $local ), 'Local export failed.' );
 	$check( array() === array_diff( $local_records, $ids( $local ) ) && ! in_array( $universe, $ids( $local ), true ) &&

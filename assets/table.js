@@ -12,6 +12,7 @@
 	const join = table.querySelector('[data-presence="join"]');
 	const turnForm = table.querySelector('[data-turn-form]');
 	const endpoint = table.dataset.tableEndpoint;
+	const epoch = table.dataset.tableEpoch || '';
 	const userId = Number(table.dataset.tableUser);
 	let sharing = false;
 	let busy = false;
@@ -39,7 +40,7 @@
 		});
 	}
 
-	const hashes = { '#pspp-play': 'play', '#pspp-sheet': 'sheet', '#pspp-group': 'group', '#pspp-dice': 'dice', '#pspp-log': 'log', '#pspp-rulebook': 'rules', '#pspp-settings': 'settings', '#pspp-story': 'story', '#pspp-folio': 'folio', '#pspp-handouts': 'handouts', '#pspp-equipment': 'equipment' };
+	const hashes = { '#pspp-play': 'play', '#pspp-sheet': 'sheet', '#pspp-group': 'group', '#pspp-group-adventures': 'adventures', '#pspp-dice': 'dice', '#pspp-log': 'log', '#pspp-rulebook': 'rules', '#pspp-settings': 'settings', '#pspp-story': 'story', '#pspp-folio': 'folio', '#pspp-handouts': 'handouts', '#pspp-equipment': 'equipment' };
 	function followHash() {
 		showView(hashes[window.location.hash] || 'play');
 	}
@@ -103,7 +104,9 @@
 	}
 
 	async function request(input) {
-		const response = await fetch(endpoint, {
+		const url = new URL(endpoint, window.location.href);
+		url.searchParams.set('scope_epoch', epoch);
+		const response = await fetch(url, {
 			method: input ? 'POST' : 'GET',
 			credentials: 'same-origin',
 			cache: 'no-store',
@@ -117,7 +120,7 @@
 				if (activeControls) activeControls.hidden = true;
 				if (join) join.hidden = false;
 			}
-			if (response.status === 401 || response.status === 403) {
+			if (response.status === 401 || response.status === 403 || data.code === 'scope_changed') {
 				stopped = true;
 				window.clearInterval(timer);
 				table.querySelectorAll('[data-presence], [data-turn-form] button').forEach(function (button) { button.disabled = true; });

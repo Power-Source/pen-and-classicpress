@@ -74,7 +74,7 @@ function ps_pen_paper_valid_wiki_entry( $state ) {
 
 function ps_pen_paper_get_wiki_entry( $universe, $id ) {
 	if ( ! ps_pen_paper_can_manage_wiki( $universe ) ) { return ps_pen_paper_wiki_error(); }
-	$post = get_post( $id ); $state = get_post_meta( $id, '_pspp_wiki_entry', true );
+	$post = ps_pen_paper_record_post( $id ); $state = get_post_meta( $id, '_pspp_wiki_entry', true );
 	return $post && 'pspp_wiki_entry' === $post->post_type && 'private' === $post->post_status && (int) $post->post_parent === (int) $universe->ID &&
 		ps_pen_paper_valid_wiki_entry( $state ) && $state['revision'] > 0 ? $state : ps_pen_paper_wiki_error();
 }

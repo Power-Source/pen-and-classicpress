@@ -80,6 +80,8 @@ function ps_pen_paper_render_table_sheet( $campaign, $page_id ) {
 
 function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 	$state = ps_pen_paper_table_state( $campaign );
+	$epoch = ps_pen_paper_scope_epoch( $campaign->ID );
+	if ( is_wp_error( $state ) || is_wp_error( $epoch ) ) { echo '<p role="alert">' . esc_html( is_wp_error( $state ) ? $state->get_error_message() : $epoch->get_error_message() ) . '</p>'; return; }
 	$is_gm = ps_pen_paper_can_manage_campaign( $campaign );
 	$backdrop = ps_pen_paper_backdrop_image( $campaign );
 	$labels = array(
@@ -94,7 +96,7 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 		'gm' => __( 'Spielleitung', 'ps-pen-paper' ), 'player' => __( 'Spieler', 'ps-pen-paper' ),
 	);
 	?>
-	<div class="pspp-table" data-table-endpoint="<?php echo esc_url( rest_url( 'ps-pen-paper/v1/campaigns/' . $campaign->ID . '/table' ) ); ?>" data-table-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>" data-table-user="<?php echo esc_attr( get_current_user_id() ); ?>" data-table-labels="<?php echo esc_attr( wp_json_encode( $labels ) ); ?>">
+	<div class="pspp-table" data-table-endpoint="<?php echo esc_url( rest_url( 'ps-pen-paper/v1/campaigns/' . $campaign->ID . '/table' ) ); ?>" data-table-epoch="<?php echo esc_attr( $epoch ); ?>" data-table-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>" data-table-user="<?php echo esc_attr( get_current_user_id() ); ?>" data-table-labels="<?php echo esc_attr( wp_json_encode( $labels ) ); ?>">
 		<header class="pspp-table-header">
 			<div><span class="pspp-eyebrow"><?php echo esc_html( $is_gm ? __( 'PS Pen & Paper / Spielleitung', 'ps-pen-paper' ) : __( 'PS Pen & Paper / Spieltisch', 'ps-pen-paper' ) ); ?></span>
 				<h2><?php echo esc_html( $campaign->post_title ); ?></h2>
@@ -124,6 +126,7 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 				<a href="#pspp-sheet" data-table-view="sheet"><?php echo esc_html( $is_gm ? __( 'Bögen', 'ps-pen-paper' ) : __( 'Mein Bogen', 'ps-pen-paper' ) ); ?></a>
 				<a href="#pspp-dice" data-table-view="dice"><?php esc_html_e( 'Würfel', 'ps-pen-paper' ); ?></a>
 				<a href="#pspp-group" data-table-view="group"><?php esc_html_e( 'Gruppe', 'ps-pen-paper' ); ?></a>
+				<a href="#pspp-group-adventures" data-table-view="adventures"><?php esc_html_e( 'Gemeinsame Abenteuer', 'ps-pen-paper' ); ?></a>
 			</nav>
 			<div class="pspp-table-layout">
 				<aside id="pspp-group" class="pspp-table-panel pspp-table-group" data-table-panel="group">
@@ -186,9 +189,10 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 					</div>
 				</section>
 				<section id="pspp-sheet" class="pspp-table-panel pspp-table-character" data-table-panel="sheet"><?php ps_pen_paper_render_table_sheet( $campaign, $page_id ); ?></section>
+				<section id="pspp-group-adventures" class="pspp-table-panel pspp-table-stage" data-table-panel="adventures"><?php ps_pen_paper_render_adventure_groups( $campaign, $page_id ); ?></section>
 				<div class="pspp-table-panel pspp-table-stage" data-table-panel="dice"><?php ps_pen_paper_render_dice( $campaign, $page_id, false ); ?></div>
 				<section class="pspp-table-panel pspp-table-stage" data-table-panel="log"><?php ps_pen_paper_render_journal( $campaign, $page_id ); ?></section>
-				<section id="pspp-rulebook" class="pspp-table-panel pspp-table-stage" data-table-panel="rules"><?php ps_pen_paper_render_rules( $campaign, false ); ?></section>
+				<section id="pspp-rulebook" class="pspp-table-panel pspp-table-stage" data-table-panel="rules"><?php ps_pen_paper_render_rules( $campaign, $is_gm, $page_id ); ?></section>
 				<section id="pspp-handouts" class="pspp-table-panel pspp-table-stage" data-table-panel="handouts"><?php ps_pen_paper_render_handouts( $campaign, $page_id ); ?></section>
 				<?php if ( $is_gm ) : ?>
 					<section id="pspp-folio" class="pspp-table-panel pspp-table-stage" data-table-panel="folio"><?php ps_pen_paper_render_folio( $campaign, $page_id ); ?></section>

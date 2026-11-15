@@ -82,7 +82,7 @@ function ps_pen_paper_get_characters( $campaign ) {
 }
 
 function ps_pen_paper_get_character( $campaign, $character_id ) {
-	$character = get_post( $character_id );
+	$character = ps_pen_paper_record_post( $character_id );
 	if ( ! current_user_can( 'read' ) || ! ps_pen_paper_can_view_character_scope( $campaign ) || ! $character || 'pspp_character' !== $character->post_type || 'private' !== $character->post_status || (int) $character->post_parent !== (int) $campaign->ID ) {
 		return null;
 	}
@@ -138,6 +138,15 @@ function ps_pen_paper_with_character_lock( $character_id, $callback ) {
 		return new WP_Error( 'character_lock_recovery_required', __( 'Die Datenbanksperre konnte nicht freigegeben werden. Änderungen können bereits gespeichert sein. Bitte lade den aktuellen Stand neu und informiere den Administrator.', 'ps-pen-paper' ) );
 	}
 	return $result;
+}
+
+function ps_pen_paper_with_character_locks( $ids, $write ) {
+	// Callers supply unique IDs in numeric order to avoid opposite lock orders.
+	if ( ! $ids ) { return $write(); }
+	$id = array_shift( $ids );
+	return ps_pen_paper_with_character_lock( $id, function () use ( $ids, $write ) {
+		return ps_pen_paper_with_character_locks( $ids, $write );
+	} );
 }
 
 function ps_pen_paper_character_values( $rules ) {
@@ -197,7 +206,9 @@ function ps_pen_paper_validate_character( $input, $rules ) {
 
 function ps_pen_paper_save_character( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision ) {
 	return ps_pen_paper_with_character_lock( $character_id, function () use ( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision ) {
-		return ps_pen_paper_save_character_locked( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision );
+		return ps_pen_paper_scope_write( $campaign_id, function () use ( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision ) {
+			return ps_pen_paper_save_character_locked( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision );
+		} );
 	} );
 }
 

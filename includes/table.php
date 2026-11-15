@@ -16,8 +16,10 @@ function ps_pen_paper_table_members( $campaign ) {
 	return $members;
 }
 
-function ps_pen_paper_table_key( $campaign_id, $user_id, $kind ) {
-	return 'pspp_' . $kind . '_' . get_current_blog_id() . '_' . $campaign_id . '_' . $user_id;
+function ps_pen_paper_table_key( $campaign_id, $user_id, $kind, $epoch = null ) {
+	if ( null === $epoch ) { $epoch = ps_pen_paper_scope_epoch( $campaign_id ); }
+	if ( is_wp_error( $epoch ) ) { return $epoch; }
+	return 'pspp_' . $kind . '_' . get_current_blog_id() . '_' . $campaign_id . '_' . $user_id . ( $epoch ? '_' . md5( $epoch ) : '' );
 }
 
 function ps_pen_paper_table_turn( $campaign_id ) {
@@ -26,10 +28,13 @@ function ps_pen_paper_table_turn( $campaign_id ) {
 }
 
 function ps_pen_paper_table_state( $campaign ) {
+	$epoch = ps_pen_paper_scope_epoch( $campaign->ID );
+	if ( is_wp_error( $epoch ) ) { return $epoch; }
+	if ( ! ps_pen_paper_scope_observe( $campaign->ID ) ) { return new WP_Error( 'scope_changed', __( 'Die Runde wurde wiederhergestellt. Bitte lade den Spieltisch neu.', 'ps-pen-paper' ), array( 'status' => 409 ) ); }
 	$members = ps_pen_paper_table_members( $campaign );
 	foreach ( $members as &$member ) {
-		$seen = get_transient( ps_pen_paper_table_key( $campaign->ID, $member['id'], 'seen' ) );
-		$away = get_transient( ps_pen_paper_table_key( $campaign->ID, $member['id'], 'away' ) );
+		$seen = get_transient( ps_pen_paper_table_key( $campaign->ID, $member['id'], 'seen', $epoch ) );
+		$away = get_transient( ps_pen_paper_table_key( $campaign->ID, $member['id'], 'away', $epoch ) );
 		$member['status'] = ! $seen ? 'unreported' : ( time() - (int) $seen > 120 ? 'offline' : ( false !== $away ? 'afk' : 'online' ) );
 		$member['note'] = 'afk' === $member['status'] && is_string( $away ) ? $away : '';
 	}
@@ -46,7 +51,16 @@ function ps_pen_paper_table_permission( $request ) {
 }
 
 function ps_pen_paper_table_request( $request ) {
+	return ps_pen_paper_scope_write( (int) $request['id'], function () use ( $request ) { return ps_pen_paper_table_request_locked( $request ); } );
+}
+
+function ps_pen_paper_table_request_locked( $request ) {
 	$campaign = ps_pen_paper_get_campaign( (int) $request['id'] );
+	if ( ! $campaign || ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_campaign( $campaign ) ) { return new WP_Error( 'forbidden', __( 'Diese Runde ist für dich nicht verfügbar.', 'ps-pen-paper' ), array( 'status' => 403 ) ); }
+	$epoch = ps_pen_paper_scope_epoch( $campaign->ID );
+	if ( is_wp_error( $epoch ) ) { return $epoch; }
+	$expected = $request->get_param( 'scope_epoch' );
+	if ( $epoch !== ( null === $expected ? '' : $expected ) ) { return new WP_Error( 'scope_changed', __( 'Die Runde wurde wiederhergestellt. Bitte lade den Spieltisch neu.', 'ps-pen-paper' ), array( 'status' => 409 ) ); }
 	if ( 'POST' === $request->get_method() ) {
 		$input = $request->get_json_params();
 		$operation = is_array( $input ) && isset( $input['operation'] ) && is_string( $input['operation'] ) ? $input['operation'] : '';
@@ -77,8 +91,8 @@ function ps_pen_paper_table_request( $request ) {
 			if ( ! isset( $members[ get_current_user_id() ] ) ) {
 				return new WP_Error( 'not_member', __( 'Nur eingetragene Rundenteilnehmer können ihre Anwesenheit teilen.', 'ps-pen-paper' ), array( 'status' => 403 ) );
 			}
-			$seen_key = ps_pen_paper_table_key( $campaign->ID, get_current_user_id(), 'seen' );
-			$away_key = ps_pen_paper_table_key( $campaign->ID, get_current_user_id(), 'away' );
+			$seen_key = ps_pen_paper_table_key( $campaign->ID, get_current_user_id(), 'seen', $epoch );
+			$away_key = ps_pen_paper_table_key( $campaign->ID, get_current_user_id(), 'away', $epoch );
 			if ( ! in_array( $operation, array( 'join', 'leave' ), true ) && ! get_transient( $seen_key ) ) {
 				return new WP_Error( 'presence_inactive', __( 'Die Anwesenheitsanzeige ist beendet. Bitte teile deinen Status bei Bedarf erneut.', 'ps-pen-paper' ), array( 'status' => 409 ) );
 			}
@@ -114,7 +128,9 @@ function ps_pen_paper_table_request( $request ) {
 			return new WP_Error( 'invalid_operation', __( 'Ungültige Spieltisch-Aktion.', 'ps-pen-paper' ), array( 'status' => 400 ) );
 		}
 	}
-	$response = rest_ensure_response( ps_pen_paper_table_state( $campaign ) );
+	$state = ps_pen_paper_table_state( $campaign );
+	if ( is_wp_error( $state ) ) { return $state; }
+	$response = rest_ensure_response( $state );
 	$response->header( 'Cache-Control', 'no-store, private' );
 	return $response;
 }

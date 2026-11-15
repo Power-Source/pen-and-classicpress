@@ -87,8 +87,9 @@ lokale Daten mit ausgewiesenen Abhängigkeiten oder zusätzlich benötigte
 Universumsdaten bei entsprechender Verwaltungsberechtigung. Eine SHA-256-Prüfsumme
 begleitet den unveränderten Datenstand. Version 0.27.0 ergänzt eine private
 Importvorschau mit ausdrücklichen Ziel-, Universums-, Benutzer- und
-Basisbogenzuordnungen. Ein schreibender Import und eine geprüfte Wiederherstellung
-fehlen noch; externe Konten und Integrationsdaten benötigen eigene Backups.
+Basisbogenzuordnungen. Seit 0.29.0 lassen sich diese Sicherungen als neue Kampagne
+oder als ausdrücklich bestätigter Ersatz wiederherstellen; externe Konten und
+Integrationsdaten benötigen weiterhin eigene Backups.
 Seit 0.28.0 prüft die Vorschau zusätzlich unterstützte Regel-, Charakter-,
 Story- und Wirtschaftsdokumente mit den vorhandenen Fachvalidatoren.
 Ungültige Werte werden als Konflikte angezeigt, nicht still korrigiert.
@@ -126,8 +127,7 @@ des aktuellen Stands nicht.
 Benutzerkonten, Zugangsdaten, Community-Profile, PS-Chat-Nachrichten und externe
 Wiki-Artikel/-Kategorien werden nicht exportiert. Benutzer- und
 Integrationsverweise beziehungsweise vorhandene plugininterne Wiki-Stände
-bleiben erhalten. **Es gibt noch keinen schreibenden Import und keinen geprüften
-Wiederherstellungsablauf. Die Datei ersetzt kein vollständiges Website-Backup.**
+bleiben als Herkunft erhalten. **Die Datei ersetzt kein vollständiges Website-Backup.**
 
 ## Private Importvorschau seit Version 0.27.0
 
@@ -154,10 +154,35 @@ Vorhandene Universumsdaten, Basiswerte und gemeinsame Guthaben bleiben
 bei einer Zuordnung unverändert. Die Zielkampagne kann aus der Vorschau
 privat gesichert und die Vorschau ausdrücklich verworfen werden.
 
-**Diese Etappe schreibt keine Spielstände zurück.** Vollständige
-Fachdokumentprüfung, atomare Wiederherstellung, abgesicherte ID-Zuordnung,
-Konflikte zwischen Vorschau und Speicherung sowie Wiederholungsabwehr
-stehen noch aus. Keine historischen Geld-/Gegenstandsaktionen werden ausgeführt.
+Seit **0.29.0** folgt nach der Dokument- und Referenzprüfung die ausdrückliche
+Wiederherstellung:
+
+- Neue Inhalte erhalten neue IDs; ein Ersatz behält Kampagnen-ID und bisherigen
+  Ersteller. Die importierten Zuordnungen und das ausführende Konto erhalten
+  die vorgesehenen kampagneninternen Rechte, keine globalen Rollen.
+- Beim Ersatz werden alte lokale Datensätze unter einer privaten,
+  nicht spielbaren Sicherung aufbewahrt. Die unveränderte JSON-Zielsicherung
+  dürfen nur bisheriger Ersteller, ausführende Person und Administration
+  herunterladen, nicht automatisch jede neu importierte Spielleitung.
+- Neue Inhalte, Rechte, Protokoll und Wiederholungsnachweis werden gemeinsam
+  in einer InnoDB-Transaktion gespeichert. Fehler übernehmen keinen Teilstand.
+  Bereits bestätigte Vorgänge werden auch nach einer späteren Wiederherstellung
+  nicht erneut ausgeführt; geänderte Ziel-/Universumsstände benötigen eine
+  aktuelle Prüfung und Bestätigung.
+- Der Zugang bleibt standardmäßig privat und geschlossen. Die verantwortliche
+  Person kann die ursprünglichen Zugangseinstellungen ausdrücklich übernehmen.
+  Der ursprüngliche Zugang bleibt als Herkunft privat archiviert.
+- Unbekannte Plugin-Metadaten sperren den Import, bis ihre rein private
+  Archivierung ausdrücklich gewählt wird. Bekannte ungültige Dokumente werden
+  dadurch nicht akzeptiert. Externe Wiki-Verknüpfungen bleiben deaktiviert.
+- Ein Ersatz beginnt eine getrennte Chatsitzung und Anwesenheit. Alte Formulare
+  und Spieltischverbindungen müssen neu geladen werden. Alte externe Chatdaten
+  werden nicht gelöscht und brauchen weiterhin eine eigene Sicherung.
+
+Inventare, Guthaben, UUIDs und Abenteuerdurchläufe werden als Spielstände
+übernommen. Historische Würfe, Verbräuche und Belohnungen werden nicht erneut
+ausgeführt. Die Vorschau bleibt für die Wiederherstellung höchstens eine Stunde
+verfügbar; der gespeicherte Abschlussnachweis bleibt unabhängig davon erhalten.
 
 ## Geschützter Spielbereich im Frontend
 
@@ -167,8 +192,15 @@ Regeln und eigenen Charaktere. Spielleiter können Charaktere für Mitglieder
 erstellen, bearbeiten und Anträge freigeben oder verwerfen. Es gelten dieselben
 Bearbeitungsrechte und Revisionsprüfungen wie im Backend. Nach dem Speichern
 bleibt man im Frontend. Zugang, Beitrittsanfragen, Hintergrundbild und Farben
-sind über **Rundeneinstellungen** direkt im Frontend erreichbar. Regeln und
-persönliche Mitgliederzuordnung werden weiterhin im Backend eingerichtet.
+sind über **Rundeneinstellungen** direkt im Frontend erreichbar. Dort können
+Spielleiter auch Name, Beschreibung und Archivstatus ändern sowie bestehende
+Website-Benutzer als Spieler oder Spielleiter aufnehmen und entfernen.
+Das **Regelwerk** lässt sich durch die Spielleitung direkt am Spieltisch
+einrichten und bearbeiten; Spieler behalten die lesende Ansicht.
+Berechtigte können unter **Kampagnen** oder auf der Übersicht eine neue Runde
+anlegen und anschließend direkt deren Regelwerk einrichten. Dafür ist kein
+Wechsel ins Backend erforderlich; die Erstellberechtigung vergibt weiterhin
+die Website-Administration.
 Frontend-Formulare werden direkt auf der veröffentlichten Spielseite verarbeitet,
 damit Backend-Weiterleitungen anderer Plugins Spieleraktionen nicht abfangen.
 Nonce-, Mitgliedschafts- und Bearbeitungsprüfungen bleiben dabei unverändert.
@@ -232,8 +264,8 @@ freigegebene Fassung bleibt für jeden begonnenen Durchlauf unverändert.
 Soloentscheidungen verändern die gemeinsame Kampagnenszene nicht.
 Ressourcen und Bestände ändern sich ausschließlich durch ausdrücklich
 konfigurierte Kosten beziehungsweise Belohnungen. Ein Durchlauf gehört genau
-einem Charakter und kann derzeit nicht zurückgesetzt oder gemeinsam gespielt
-werden. Die Spielleitung kann neue Starts pausieren, ohne bestehende Durchläufe
+einem Charakter und kann derzeit nicht zurückgesetzt werden. Gemeinsames Spielen
+verwendet einen getrennten Gruppendurchlauf. Die Spielleitung kann neue Starts pausieren, ohne bestehende Durchläufe
 zu löschen. Details und Grenzen stehen im
 [Pluginhandbuch](docs/handbuch.md#21-soloabenteuer).
 
@@ -250,7 +282,21 @@ Seit **0.25.0** stehen unter **Optionale Wertebedingungen** mehrere Zahlen-,
 Attribut- und Ressourcenvergleiche mit UND/ODER zur Verfügung. Auch einzelne
 Mindestwerte werden für neue Entscheidungen dort konfiguriert. Nicht erfüllte
 Entscheidungen bleiben sichtbar und gesperrt; bei ODER genügt eine erfüllte
-Bedingung. Text- und Gegenstandsbedingungen sind nicht Teil dieses Ausbaus.
+Bedingung. Zusätzlich unterstützen Textfelder gleich/ungleich und
+enthält/enthält nicht; vorherige Entscheidungen lassen sich für denselben
+Durchlauf mit 0 (nicht ausgeführt) oder 1 (ausgeführt) prüfen.
+Gegenstandsbedingungen sind noch offen.
+
+Für hybride Einzeldurchläufe kann die Spielleitung je Entscheidung eine
+**ausdrückliche Spielleiterfreigabe** verlangen. Der Besitzer fragt an;
+unter **Abenteuer & Szenen → Ausstehende Abenteuerentscheidungen** wird
+freigegeben oder abgelehnt. Erst danach führt der Besitzer die Entscheidung
+aus. Anfrage und Freigabe verbrauchen nichts und würfeln nicht.
+Eine Freigabe wird einmalig verwendet und im Verlauf dokumentiert.
+Zurückziehen und erneut anfragen ist möglich, auch nach entzogenen
+Spielleiterrechten. Import/Export erhält die Zustände und ordnet die beteiligten
+Benutzer ausdrücklich zu. Gruppendurchläufe verwenden dieselbe optionale
+Freigabepflicht.
 
 Seit **0.24.0** kann jede Entscheidung eine feste Gegenstands-/Geldbelohnung
 oder eine vorhandene Beutetabelle verwenden: nach jeder ausgeführten
@@ -261,6 +307,26 @@ wird dieser Stand Teil des lesbaren Soloabenteuers; andere Tabellen bleiben
 privat. Inventar und Guthaben müssen vor dem Würfeln jedes mögliche Ergebnis
 aufnehmen können. Fehlende Integration, geänderte Währung oder entzogene
 Vergaberechte blockieren die Entscheidung ausdrücklich, ohne Teilvergaben.
+
+## Gemeinsame und hybride Gruppenabenteuer
+
+Unter **Gemeinsame Abenteuer** legt die Spielleitung einen Gruppendurchlauf
+aus einem freigegebenen Abenteuer an. Je Gruppe wählt sie Einzelentscheidung,
+Mehrheit, Einstimmigkeit oder Spielleiterfreigabe. Jeder Besitzer tritt mit
+einer eigenen freigegebenen Figur bei; pro Benutzer ist eine Figur gleichzeitig
+aktiv. Vorschläge und Stimmen verbrauchen nichts. Nur der im Vorschlag benannte
+Besitzer führt die vereinbarte Entscheidung aus. Voraussetzungen, Kosten,
+Belohnungen und aktuelle Rechte werden dabei erneut geprüft.
+
+Alle Teilnehmer teilen Szene und Fortschritt. Persönliche Kosten und Belohnungen
+betreffen ausschließlich die ausführende Figur; fremde Charakterwerte bleiben
+privat. Austritt, Pausieren, Wiedereinstieg und Regelwechsel erhalten den Verlauf
+und verwerfen offene Vorschläge und Freigaben. Neue Fassungen ändern laufende
+Gruppen nicht. Import/Export erhält Teilnehmer, Stimmen, Freigaben und historische
+Nachweise, ohne Kosten oder Belohnungen erneut auszuführen; zusammengelegte
+Benutzer dürfen keine Doppelstimmen erzeugen.
+
+Gegenstandsbedingungen und eigenständige Abenteuerpakete bleiben offen.
 
 ## Öffentliches Weltlexikon seit Version 0.19.0
 
@@ -383,10 +449,15 @@ ein. Die Administration darf diese Einstellungen ebenfalls verwalten:
 
 Kampagnen ohne Universum konfigurieren ihre eigene Währung unter
 **Rundeneinstellungen** und führen getrennte Konten. Zugeordnete Kampagnen
-übernehmen die Währungseinstellungen des Universums ohne lokale Abweichung.
+übernehmen standardmäßig die Währungseinstellungen des Universums. Bei der
+Zuordnung kann die verantwortliche Person ausdrücklich **Lokale Währung und
+Handelsregeln behalten** wählen. Bestehende lokale Konten, Guthaben und
+Handelsregeln bleiben dann unverändert und nutzbar; das Universum wird nicht geändert.
 Nach der ersten Buchung ist das Kontomodell fest; Name und Kürzel bleiben
 änderbar. Eine andere Universumszuordnung bestehender Kampagnenkonten
-benötigt eine noch nicht implementierte Migration und wird ausdrücklich gesperrt.
+ist mit bewusst beibehaltenen lokalen Einstellungen möglich. Die Übertragung
+bestehender Universumskonten, die Währungsumrechnung und der Wechsel gemeinsamer
+Basisbögen benötigen weiterhin eine gesonderte Migration.
 
 Im privaten Charakterbogen beziehungsweise Community-Profil steht das
 **Guthaben**. Die zuständige Spielleitung kann Beträge vergeben oder abziehen,
@@ -626,6 +697,9 @@ sehen die Universumsverwaltung und deren Änderungsverlauf.
 Unter **Universen → Kampagne zuordnen oder lösen** zeigt eine Vorschau die alte
 und neue Zuordnung. Erst die ausdrückliche Bestätigung speichert sie. Dafür sind
 Verwaltungsrechte an der Kampagne und beiden beteiligten Universen erforderlich.
+Die Vorschau zeigt zusätzlich, ob Währung und Handelsregeln vom Zieluniversum
+verwendet oder lokal beibehalten werden. Lokale Guthaben allein verhindern
+eine ausdrücklich lokale organisatorische Zuordnung nicht mehr.
 Die Zuordnung steht im geschützten Kampagnenprotokoll. Universumsbesitz gewährt
 keinen automatischen Zugriff auf zugeordnete Kampagnen oder deren Chat.
 Bestehende Kampagnen werden nicht automatisch zugeordnet. Ihre Regeln, Bögen,
@@ -661,10 +735,20 @@ vorbehalten. Spieler können sich keine eigenen Auflagen erteilen.
 Würfe verwenden die effektiven Werte und speichern Basis- und Kontextrevisionen,
 aber keine privaten Auflagennotizen. Bereits gespeicherte Würfe bleiben unverändert.
 
-Gemeinsame Bögen sperren derzeit einen Universumswechsel oder das Lösen der
-Kampagnenzuordnung, statt verwaiste Verbindungen zu erzeugen. Bei einer fehlenden
-Basis erscheint ein Fehler; es werden keine veralteten Ersatzwerte verwendet.
-Noch offen sind automatische Migrationen bestehender Kampagnen, Moduswechsel,
+Unter **Kampagnenkontext → Als unabhängigen Kampagnenbogen weiterführen** kann die
+Kampagnenleitung den aktuellen freigegebenen Basisstand nach Vorschau und
+Bestätigung unabhängig weiterführen. Kampagnenauflagen werden dabei zu eigenen
+Grundwerten; Ausrüstung, Inventar, Notizen und persönliche Konten bleiben erhalten.
+Ausrüstungsboni und offene Basisanträge werden nicht in den Grundstand kopiert.
+Gemeinsame Universumskonten sperren diesen Schritt bis zu einer gesonderten
+Kontenmigration. Nach dem Ablösen aller gemeinsamen Bögen kann die
+Universumszuordnung geändert oder gelöst werden, sofern vorhandene Konten weiter
+zu ihrer Währung passen. Eine automatische Rückverbindung ist nicht verfügbar.
+Bei einer fehlenden Basis erscheint ein Fehler; es werden keine veralteten
+Ersatzwerte verwendet.
+Unabhängige Kopien können ohne das ursprüngliche Universum und dessen Basisbogen
+importiert werden; deren Kennungen bleiben reine historische Herkunftsnachweise.
+Noch offen sind automatische Migrationen bestehender Kampagnen, Rückverbindungen,
 universumsweite Mitgliedschaften, Spielerbearbeitung der Basis, Ressourcenauflagen
 und ein XP-/Levelautomatismus. Ein numerisches Stufenfeld ist kein solches System.
 
@@ -994,13 +1078,13 @@ Exportsammlung ergänzt werden.
 `historical`; historische Fehlbestände sind ausdrücklich sichtbar.
 `external_data` beschreibt die nicht enthaltenen Konten, Profile, Chatdaten
 und externen Wiki-Daten. Alte IDs sind Herkunftsverweise, keine Erlaubnis,
-vorhandene Zieldaten bei einem künftigen Import zu überschreiben.
+vorhandene Zieldaten bei einem Import zu überschreiben.
 
 Die Prüfsumme erkennt Beschädigungen, ist aber keine Signatur und kein
-Vertrauens- oder Berechtigungsnachweis. Ein künftiger Import muss Format,
-Dokumente, Benutzer-/Objektzuordnungen und Zugriffsrechte unabhängig prüfen;
-keine fremden Metadaten ungeprüft deserialisieren oder direkt zurückschreiben
-und keine historischen Geld-/Gegenstandsaktionen erneut ausführen.
+Vertrauens- oder Berechtigungsnachweis. Der Import prüft Format,
+Dokumente, Benutzer-/Objektzuordnungen und Zugriffsrechte unabhängig.
+Fremde Metadaten werden nicht ungeprüft deserialisiert oder aktiviert;
+historische Geld-/Gegenstandsaktionen werden nicht erneut ausgeführt.
 
 `tests/export-integration.php` prüft lokale und vollständige Varianten,
 Gemeinschaftsbögen gegenüber unabhängigen Kopien, unveränderte Metadaten und
@@ -1046,14 +1130,36 @@ für Regeln, Charakterstände, Szenen, Mappeneinträge, Figuren, Gegenstände,
 Inventare, Währung/Guthaben, Handel, Beute, Abenteuer und Wiki-Stände.
 Die reinen Szenen-, Mappen- und Inventarvalidatoren werden auch von den
 bisherigen Datenbank-Lesern verwendet. Originalwerte bleiben unverändert.
-Protokollinhalte, weitere Metadaten und die vollständige Auflösung fachlicher
-Beziehungen und IDs bleiben offen; ein konfliktfreier Bericht ist keine
-vollständige Archiv- oder Wiederherstellungsfreigabe.
+Der Bericht ist die erste Dokumentprüfung, keine alleinige Schreibfreigabe.
+Seit 0.29.0 prüft `ps_pen_paper_prepare_import($parsed, $options, $id_map,
+$archive_unknown)` zusätzlich Metadaten, Protokolle und typisierte Beziehungen.
+Es liefert schreibfertige Datensätze, nach Quell-ID indiziert, mit dekodierten
+Metadatenwerten oder `WP_Error`. Live-Verweise werden von eingefrorenen
+Herkunftsverweisen unterschieden; ausgeschlossene Universumsdaten werden
+bei einer Bindung nicht überschrieben.
 
 `ps_pen_paper_create_import_preview($json)` und
 `ps_pen_paper_get_import_preview($token)` verwalten private Transients mit
 Besitzer, Blog, Ablaufzeit, Originaldatei und gewählten Optionen. Änderungen
-verlängern die einstündige Verfügbarkeit nicht. Es gibt keinen Restore-Writer.
+verlängern die einstündige Verfügbarkeit nicht.
+
+`ps_pen_paper_restore_campaign($token, $fingerprint, $archive_unknown,
+$access_policy)` erwartet den Fingerprint der aktuellen privaten Vorschau,
+eine boolesche Archiventscheidung und `private` oder `preserve`.
+Es liefert `campaign_id`, `backup_id` und den gespeicherten Bestätigungsnachweis
+oder `WP_Error`. Berechtigungen und Fingerprint werden unter Rundensperren erneut
+geprüft. `ps_pen_paper_get_import_backup($id)` liefert ausschließlich berechtigten
+Personen die geprüfte private Zielsicherung. HTTP-Aktionen benötigen zusätzlich
+Nonce und ausdrückliche Bestätigung.
+Nach einem Kampagnenersatz schützt ein neuer Epochenmarker ältere Formulare
+und bereits laufende Anfragen. Interne PHP-Aufrufer dürfen alte Parameter nicht
+ohne erneute Prüfung als aktuellen Spielstand behandeln.
+
+`tests/import-write-integration.php` prüft tatsächliche Kopien und Ersetzungen,
+lesbare Historien, neue IDs, private Sicherung und Rücksicherung, geschützte
+Ersteller, unveränderte Quelldaten, wiederholte Anfragen, veraltete Bestätigungen,
+atomaren Rollback und ausdrücklich archivierte unbekannte Metadaten.
+Die Datenbank-Integrationssuiten werden seriell ausgeführt.
 
 `tests/import-preview-integration.php` prüft reale lokale/vollständige Exporte,
 gemeinsame und unabhängige Bögen, Laufzeitoptionen, Konten-/Besitzerprüfung,

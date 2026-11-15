@@ -74,7 +74,7 @@ function ps_pen_paper_resolve_character_state( $scope, $character, $with_equipme
 	}
 	if ( 'shared' === $context['mode'] ) {
 		$link = ps_pen_paper_get_universe_link( $scope->ID );
-		$source = get_post( $context['source_id'] );
+		$source = ps_pen_paper_record_post( $context['source_id'] );
 		if ( is_wp_error( $link ) || $link['universe_id'] !== $context['universe_id'] || ! ps_pen_paper_get_universe( $context['universe_id'] ) ||
 			! $source || 'pspp_character' !== $source->post_type || 'private' !== $source->post_status ||
 			(int) $source->post_parent !== $context['universe_id'] || (int) $source->post_author !== (int) $character->post_author ||
@@ -142,6 +142,12 @@ function ps_pen_paper_adopt_universe_rules( $campaign_id, $source_revision, $con
 }
 
 function ps_pen_paper_attach_base_character( $campaign_id, $source_id, $source_revision, $rules_revision, $mode, $confirmed ) {
+	return ps_pen_paper_scope_write( $campaign_id, function () use ( $campaign_id, $source_id, $source_revision, $rules_revision, $mode, $confirmed ) {
+		return ps_pen_paper_attach_base_character_locked( $campaign_id, $source_id, $source_revision, $rules_revision, $mode, $confirmed );
+	} );
+}
+
+function ps_pen_paper_attach_base_character_locked( $campaign_id, $source_id, $source_revision, $rules_revision, $mode, $confirmed ) {
 	$universe = ps_pen_paper_context_campaign( $campaign_id );
 	if ( is_wp_error( $universe ) ) {
 		return $universe;
@@ -258,6 +264,71 @@ function ps_pen_paper_save_character_context_locked( $campaign_id, $id, $revisio
 		'rules_revision' => $rules['revision'], 'fields' => $rules['fields'],
 		'effective_before' => $effective['active'], 'effective_after' => $source,
 	) );
+}
+
+function ps_pen_paper_preview_character_copy( $campaign_id, $id ) {
+	$campaign = ps_pen_paper_get_campaign( $campaign_id );
+	$character = $campaign ? ps_pen_paper_get_character( $campaign, $id ) : null;
+	if ( ! ps_pen_paper_can_access_site() || ! $character || ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
+		return new WP_Error( 'forbidden', __( 'Nur die Kampagnenleitung darf einen gemeinsamen Basisbogen unabhängig weiterführen.', 'ps-pen-paper' ) );
+	}
+	$before = ps_pen_paper_raw_character_state( $id );
+	if ( is_wp_error( $before ) ) { return $before; }
+	if ( ! isset( $before['context']['mode'] ) || 'shared' !== $before['context']['mode'] || null !== $before['pending'] ) {
+		return new WP_Error( 'invalid_context', __( 'Nur ein gemeinsamer Basisbogen ohne offenen Kampagnenantrag kann unabhängig weitergeführt werden.', 'ps-pen-paper' ) );
+	}
+	// Equipment bonuses remain derived values, not the new independent base.
+	$effective = ps_pen_paper_character_state( $campaign, $character, false );
+	if ( is_wp_error( $effective ) ) { return $effective; }
+	$scope = ps_pen_paper_currency_scope( $campaign );
+	if ( is_wp_error( $scope ) ) { return $scope; }
+	$currency = ps_pen_paper_currency_document( $scope->ID );
+	if ( is_wp_error( $currency ) ) { return $currency; }
+	if ( $scope->ID !== $campaign->ID && 'universe' === $currency['wallet_mode'] ) {
+		return new WP_Error( 'shared_wallet', __( 'Dieser Bogen nutzt ein gemeinsames Universumskonto. Ohne gesonderte Kontenmigration darf die Basisverbindung nicht gelöst werden; Guthaben wird weder kopiert noch übertragen.', 'ps-pen-paper' ) );
+	}
+	return array( 'before' => $before, 'effective' => $effective, 'rules' => ps_pen_paper_get_rules( $campaign_id ), 'owner_id' => (int) $character->post_author, 'currency' => $currency );
+}
+
+function ps_pen_paper_copy_shared_character( $campaign_id, $id, $revision, $base_revision, $rules_revision, $confirmation ) {
+	if ( 'confirmed' !== $confirmation ) {
+		return new WP_Error( 'confirmation_required', __( 'Bitte prüfe und bestätige die unabhängige Weiterführung des aktuellen Basisstands.', 'ps-pen-paper' ) );
+	}
+	return ps_pen_paper_scope_write( $campaign_id, function () use ( $campaign_id, $id, $revision, $base_revision, $rules_revision ) {
+		$initial = ps_pen_paper_preview_character_copy( $campaign_id, $id );
+		if ( is_wp_error( $initial ) ) { return $initial; }
+		$locks = array_values( array_unique( array( (int) $campaign_id, (int) $id, $initial['before']['context']['source_id'], $initial['before']['context']['universe_id'] ) ) );
+		sort( $locks, SORT_NUMERIC );
+		return ps_pen_paper_with_character_locks( $locks, function () use ( $campaign_id, $id, $revision, $base_revision, $rules_revision, $initial, $locks ) {
+			return ps_pen_paper_atomic_event( $id, function () use ( $campaign_id, $id, $revision, $base_revision, $rules_revision, $initial, $locks ) {
+				global $wpdb;
+				foreach ( $locks as $lock_id ) {
+					if ( $lock_id !== (int) $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE ID = %d FOR UPDATE", $lock_id ) ) ) {
+						return new WP_Error( 'conflict', __( 'Der Basis- oder Kampagnenstand ist nicht mehr verfügbar. Bitte lade neu.', 'ps-pen-paper' ) );
+					}
+					clean_post_cache( $lock_id );
+				}
+				$preview = ps_pen_paper_preview_character_copy( $campaign_id, $id );
+				if ( is_wp_error( $preview ) ) { return $preview; }
+				if ( $preview !== $initial || ! is_string( $revision ) || (string) $preview['before']['revision'] !== $revision ||
+					! is_string( $base_revision ) || (string) $preview['effective']['base_revision'] !== $base_revision ||
+					! is_string( $rules_revision ) || (string) $preview['rules']['revision'] !== $rules_revision ) {
+					return new WP_Error( 'conflict', __( 'Bogen, Basisstand oder Regeln wurden inzwischen geändert. Bitte prüfe die Vorschau erneut.', 'ps-pen-paper' ) );
+				}
+				$after = $preview['before'];
+				$after['revision']++;
+				$after['active'] = $preview['effective']['active'];
+				$after['context']['mode'] = 'copy';
+				$after['context']['source_revision'] = $preview['effective']['base_revision'];
+				$after['context']['overrides'] = array();
+				return ps_pen_paper_write_document_event( $campaign_id, $id, '_pspp_character', $preview['before'], $after, array(
+					'kind' => 'character_context', 'visibility' => 'owner', 'recipient_id' => $preview['owner_id'],
+					'rules_revision' => $preview['rules']['revision'], 'fields' => $preview['rules']['fields'],
+					'effective_before' => $preview['effective']['active'], 'effective_after' => $after['active'],
+				), false );
+			} );
+		} );
+	} );
 }
 
 function ps_pen_paper_has_shared_characters( $campaign_id ) {

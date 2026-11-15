@@ -93,6 +93,15 @@ function ps_pen_paper_render_access_settings( $campaign, $page_id = 0 ) {
 	?>
 	<h2><?php esc_html_e( 'Deine Runde einrichten', 'ps-pen-paper' ); ?></h2>
 	<p><?php esc_html_e( 'Die Spielleitung entscheidet, wer mitspielt. Eine freigegebene Vorschau öffnet niemals den Spieltisch.', 'ps-pen-paper' ); ?></p>
+	<?php if ( $page_id ) : ?>
+		<section class="pspp-settings-section">
+			<h3><?php esc_html_e( 'Kampagne', 'ps-pen-paper' ); ?></h3>
+			<?php ps_pen_paper_render_campaign_settings( $campaign, $page_id ); ?>
+		</section>
+		<section class="pspp-settings-section">
+			<?php ps_pen_paper_render_campaign_members( $campaign, $page_id ); ?>
+		</section>
+	<?php endif; ?>
 	<?php ps_pen_paper_render_currency_settings( $campaign, $page_id ); ?>
 	<?php ps_pen_paper_render_trade_policy( $campaign, $page_id ); ?>
 	<?php ps_pen_paper_render_export_settings( $campaign, $page_id ); ?>
@@ -157,6 +166,10 @@ function ps_pen_paper_render_access_settings( $campaign, $page_id = 0 ) {
 		<?php ps_pen_paper_render_style_settings( $campaign, $page_id ); ?>
 	</details>
 	<?php ps_pen_paper_render_sheet_style_form( $campaign, $page_id ); ?>
-	<p><a href="<?php echo esc_url( ps_pen_paper_admin_url( $campaign->ID ) ); ?>"><?php esc_html_e( 'Weitere Vorbereitung: Regeln und Mitgliederverwaltung', 'ps-pen-paper' ); ?></a></p>
+	<?php if ( $page_id ) : ?>
+		<p><a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-rulebook' ); ?>"><?php esc_html_e( 'Regelwerk einrichten oder bearbeiten', 'ps-pen-paper' ); ?></a></p>
+	<?php else : ?>
+		<p><a href="<?php echo esc_url( ps_pen_paper_admin_url( $campaign->ID ) ); ?>"><?php esc_html_e( 'Weitere Vorbereitung: Regeln und Mitgliederverwaltung', 'ps-pen-paper' ); ?></a></p>
+	<?php endif; ?>
 	<?php
 }

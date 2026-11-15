@@ -76,7 +76,7 @@ function ps_pen_paper_render_import_settings( $page_id = 0 ) {
 	?>
 	<section id="pspp-import" class="pspp-settings-section">
 		<h2><?php esc_html_e( 'Sicherung prüfen und Wiederherstellung vorbereiten', 'ps-pen-paper' ); ?></h2>
-		<p><?php esc_html_e( 'Du wählst pro Vorgang eine neue Kampagne oder den Ersatz einer bestehenden sowie ein getrenntes Universum oder die Zuordnung zu bestehenden Daten. Die Vorschau prüft Datei und Zuordnungen, verändert aber noch keine Spielstände. Ein schreibender Import ist noch nicht verfügbar.', 'ps-pen-paper' ); ?></p>
+		<p><?php esc_html_e( 'Du wählst pro Vorgang eine neue Kampagne oder den Ersatz einer bestehenden sowie ein getrenntes Universum oder die Zuordnung zu bestehenden Daten. Die Vorschau prüft Datei und Zuordnungen, verändert aber noch keine Spielstände. Erst deine ausdrückliche Bestätigung startet die Wiederherstellung; bei einem Ersatz wird der bisherige Stand privat gesichert.', 'ps-pen-paper' ); ?></p>
 		<?php ps_pen_paper_form_start( 'preview_import', 'pspp_import_upload', 0, $page_id, true ); ?>
 			<p><label for="pspp-import-file"><?php esc_html_e( 'Private JSON-Kampagnensicherung', 'ps-pen-paper' ); ?></label>
 				<input id="pspp-import-file" type="file" name="import_file" accept=".json,application/json" required aria-describedby="pspp-import-limit">
@@ -98,6 +98,20 @@ function ps_pen_paper_render_import_settings( $page_id = 0 ) {
 }
 
 function ps_pen_paper_render_import_preview( $token, $page_id = 0 ) {
+	$receipt = ps_pen_paper_restore_receipt( $token );
+	if ( is_wp_error( $receipt ) ) { echo '<p role="alert">' . esc_html( $receipt->get_error_message() ) . '</p>'; return; }
+	if ( $receipt ) {
+		?><h3><?php esc_html_e( 'Wiederherstellung abgeschlossen', 'ps-pen-paper' ); ?></h3>
+		<p><?php esc_html_e( 'Dieser Vorgang wurde vollständig gespeichert und wird nicht erneut ausgeführt. Die Kampagne kann danach regulär geändert worden sein.', 'ps-pen-paper' ); ?></p>
+		<p><a href="<?php echo esc_url( add_query_arg( $page_id ? 'pspp_campaign' : 'campaign_id', $receipt['campaign_id'], ps_pen_paper_dashboard_url( 'campaigns', $page_id ) ) ); ?>"><?php esc_html_e( 'Wiederhergestellte Kampagne öffnen', 'ps-pen-paper' ); ?></a></p>
+		<?php if ( $receipt['backup_id'] ) : ?>
+			<?php ps_pen_paper_form_start( 'download_import_backup', 'pspp_restore_backup_' . $receipt['backup_id'], 0, $page_id, false, true ); ?>
+				<input type="hidden" name="backup_id" value="<?php echo esc_attr( $receipt['backup_id'] ); ?>">
+				<?php submit_button( __( 'Private Sicherung vor dem Ersatz herunterladen', 'ps-pen-paper' ), 'secondary' ); ?>
+			</form>
+		<?php endif; ?>
+		<?php return;
+	}
 	$preview = ps_pen_paper_get_import_preview( $token );
 	if ( is_wp_error( $preview ) ) { echo '<p role="alert">' . esc_html( $preview->get_error_message() ) . '</p>'; return; }
 	$parsed = ps_pen_paper_parse_import( $preview['json'] );
@@ -122,7 +136,7 @@ function ps_pen_paper_render_import_preview( $token, $page_id = 0 ) {
 	$site_users = get_users( array( 'blog_id' => get_current_blog_id(), 'orderby' => 'display_name', 'order' => 'ASC' ) );
 	?>
 	<h3><?php echo esc_html( $campaign['title'] ); ?></h3>
-	<p><?php esc_html_e( 'Format, Prüfsumme, Datentypen, Bilddaten und Kampagnenabgrenzung wurden geprüft. Das ist noch keine Freigabe zum Zurückschreiben sämtlicher Fachdokumente.', 'ps-pen-paper' ); ?></p>
+	<p><?php esc_html_e( 'Format, Prüfsumme, Datentypen, Bilddaten und Kampagnenabgrenzung wurden geprüft. Prüfe die Kontenzuordnungen und bestätige anschließend die Wiederherstellung.', 'ps-pen-paper' ); ?></p>
 	<dl>
 		<dt><?php esc_html_e( 'Quellwebsite', 'ps-pen-paper' ); ?></dt><dd><?php echo esc_html( $parsed['archive']['payload']['source']['site_url'] ); ?></dd>
 		<dt><?php esc_html_e( 'Exportversion', 'ps-pen-paper' ); ?></dt><dd><?php echo esc_html( $parsed['archive']['plugin_version'] ); ?></dd>
@@ -210,15 +224,9 @@ function ps_pen_paper_render_import_preview( $token, $page_id = 0 ) {
 		/* translators: %d: number of checked metadata documents. */
 		echo esc_html( sprintf( __( '%d Fachdokumente wurden mit den vorhandenen Regel-, Charakter-, Story- oder Wirtschaftsvalidatoren geprüft. Es wurden keine Werte verändert und keine Vergaben ausgeführt.', 'ps-pen-paper' ), $plan['documents']['checked'] ) );
 	?></p>
-	<?php if ( $plan['documents']['deferred'] ) : ?>
-		<p><?php esc_html_e( 'Noch gesondert fachlich zu prüfen: weitere Metadaten, Protokollinhalte, Beziehungen und Referenzzuordnungen. Eine Schreibfreigabe liegt nicht vor.', 'ps-pen-paper' ); ?></p>
-		<ul><?php foreach ( $plan['documents']['deferred'] as $key ) : ?><li><code><?php echo esc_html( $key ); ?></code></li><?php endforeach; ?></ul>
-	<?php endif; ?>
 	<?php if ( $plan['conflicts'] ) : ?>
 		<h4><?php esc_html_e( 'Offene Konflikte', 'ps-pen-paper' ); ?></h4>
 		<ul role="alert"><?php foreach ( $plan['conflicts'] as $message ) : ?><li><?php echo esc_html( $message ); ?></li><?php endforeach; ?></ul>
-	<?php else : ?>
-		<p><?php esc_html_e( 'Die ausgewählten Zuordnungen haben diese Vorschauprüfung bestanden. Das ist noch keine Wiederherstellung: Atomare Speicherung, vollständige Fachdokumentprüfung und Wiederholungsabwehr folgen im nächsten Schritt.', 'ps-pen-paper' ); ?></p>
 	<?php endif; ?>
 	<ul><?php foreach ( $plan['warnings'] as $message ) : ?><li><?php echo esc_html( $message ); ?></li><?php endforeach; ?></ul>
 	<?php if ( $plan['target_hash'] ) : ?>
@@ -229,6 +237,35 @@ function ps_pen_paper_render_import_preview( $token, $page_id = 0 ) {
 			<?php submit_button( __( 'Aktuelle Zielkampagne vor dem Ersatz sichern', 'ps-pen-paper' ) ); ?>
 		</form>
 	<?php endif; ?>
+	<?php if ( ! $plan['conflicts'] && function_exists( 'ps_pen_paper_prepare_import' ) ) :
+		$map = ps_pen_paper_import_identity_map( $parsed, $options );
+		$check = ps_pen_paper_prepare_import( $parsed, $options, $map, false );
+		$archive_required = is_wp_error( $check );
+		$archived = $archive_required ? ps_pen_paper_prepare_import( $parsed, $options, $map, true ) : $check;
+		if ( is_wp_error( $check ) ) : ?><p role="alert"><?php echo esc_html( $check->get_error_message() ); ?></p><?php endif;
+		if ( ! is_wp_error( $archived ) ) :
+			foreach ( $archived[ $parsed['archive']['payload']['source']['campaign_id'] ]['meta'] as $entry ) {
+				if ( '_pspp_import_archive' === $entry['key'] && isset( $entry['value']['warnings'] ) ) {
+					foreach ( $entry['value']['warnings'] as $warning ) { echo '<p>' . esc_html( $warning ) . '</p>'; }
+				}
+			}
+			$fingerprint = ps_pen_paper_restore_fingerprint( $parsed, $options, $plan );
+			ps_pen_paper_form_start( 'restore_import', 'pspp_restore_' . $token . '_' . $fingerprint, 0, $page_id );
+			?>
+			<input type="hidden" name="import_token" value="<?php echo esc_attr( $token ); ?>">
+			<input type="hidden" name="restore_fingerprint" value="<?php echo esc_attr( $fingerprint ); ?>">
+			<p><?php esc_html_e( 'Dokumente, Protokolle und typisierte Referenzen wurden vollständig aufbereitet. Spielstände und Vergaben werden übernommen, nicht noch einmal ausgeführt. Konten, globale Rollen und bestehende Universumsdaten werden nicht überschrieben; externe Wiki-Verknüpfungen bleiben deaktiviert.', 'ps-pen-paper' ); ?></p>
+			<p><label><?php esc_html_e( 'Zugang nach der Wiederherstellung', 'ps-pen-paper' ); ?>
+				<select name="restore_access"><option value="private"><?php esc_html_e( 'Privat und für neue Aufnahmeanfragen geschlossen', 'ps-pen-paper' ); ?></option>
+				<option value="preserve"><?php esc_html_e( 'Zugangseinstellungen aus der Datei ausdrücklich übernehmen', 'ps-pen-paper' ); ?></option></select></label></p>
+			<p><label><input type="checkbox" name="archive_unknown" value="1" <?php echo $archive_required ? 'required' : ''; ?>> <?php esc_html_e( 'Unbekannte Plugin-Metadaten nur privat archivieren, nicht als aktive Einstellungen übernehmen.', 'ps-pen-paper' ); ?></label></p>
+			<p><label><input type="checkbox" name="restore_confirmation" value="confirmed" required> <?php esc_html_e( 'Ich habe Ziel und Kontenzuordnungen geprüft und bestätige die Übernahme privater Inhalte und Spielstände. Beim Ersatz werden sämtliche kampagneneigenen Spielstände ersetzt und vorher privat gesichert. Der bisherige Ersteller und mein Konto behalten die Spielleitung.', 'ps-pen-paper' ); ?></label></p>
+			<?php submit_button( 'replace' === $options['operation'] ? __( 'Zielkampagne gesichert ersetzen', 'ps-pen-paper' ) : __( 'Als neue Kampagne wiederherstellen', 'ps-pen-paper' ) ); ?>
+			</form>
+		<?php elseif ( is_wp_error( $archived ) && $archived->get_error_message() !== $check->get_error_message() ) : ?>
+			<p role="alert"><?php echo esc_html( $archived->get_error_message() ); ?></p>
+		<?php endif;
+	endif; ?>
 	<?php ps_pen_paper_form_start( 'discard_import_preview', 'pspp_import_preview_' . $token, 0, $page_id ); ?>
 		<input type="hidden" name="import_token" value="<?php echo esc_attr( $token ); ?>">
 		<?php submit_button( __( 'Private Vorschau verwerfen', 'ps-pen-paper' ), 'secondary' ); ?>

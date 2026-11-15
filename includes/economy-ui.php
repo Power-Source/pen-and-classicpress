@@ -53,7 +53,7 @@ function ps_pen_paper_render_currency_settings( $scope, $page_id ) {
 			<?php endif; ?>
 			<p><?php echo esc_html( 'pspp_universe' === $scope->post_type
 				? __( 'Gemeinsame Konten benötigen gemeinsame Basisbögen und werden nur von der Universumsleitung bebucht. Bei getrennten Konten bucht die jeweilige Kampagnenleitung.', 'ps-pen-paper' )
-				: __( 'Diese Kampagne führt ihre Währung und Guthaben unabhängig. Eine spätere Universumszuordnung benötigt nach der ersten Buchung eine Guthabenmigration.', 'ps-pen-paper' ) ); ?></p>
+				: __( 'Diese Kampagne führt ihre Währung und Guthaben unabhängig. Bei einer späteren Universumszuordnung können die lokalen Währungs- und Handelsregeln ausdrücklich beibehalten werden. Eine Kontenübertragung oder Währungsumrechnung benötigt eine gesonderte Migration.', 'ps-pen-paper' ) ); ?></p>
 			<p><?php esc_html_e( 'Nach der ersten Buchung bleibt das Guthabenmodell zum Schutz der Konten fest; Name und Kürzel bleiben änderbar.', 'ps-pen-paper' ); ?></p>
 			<button type="submit"><?php esc_html_e( 'Währungseinstellungen speichern', 'ps-pen-paper' ); ?></button>
 		</form>

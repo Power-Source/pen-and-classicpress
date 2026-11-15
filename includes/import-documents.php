@@ -46,14 +46,16 @@ function ps_pen_paper_import_documents( $parsed ) {
 		'_pspp_loot_run' => 'ps_pen_paper_valid_loot_run', '_pspp_trade' => 'ps_pen_paper_valid_trade',
 		'_pspp_trade_policy' => 'ps_pen_paper_valid_trade_policy', '_pspp_adventure' => 'ps_pen_paper_valid_adventure_state',
 		'_pspp_adventure_run' => 'ps_pen_paper_valid_adventure_run', '_pspp_currency' => 'ps_pen_paper_valid_currency',
+		'_pspp_adventure_group' => 'ps_pen_paper_valid_adventure_group',
 		'_pspp_wallet' => 'ps_pen_paper_valid_wallet', '_pspp_gear' => 'ps_pen_paper_validate_gear_state',
-		'_pspp_wiki_entry' => 'ps_pen_paper_valid_wiki_entry', '_pspp_wiki_config' => 'ps_pen_paper_valid_wiki_config',
+		'_pspp_wiki_entry' => 'ps_pen_paper_valid_wiki_entry', '_pspp_wiki' => 'ps_pen_paper_valid_wiki_config',
 		'_pspp_rules' => 'ps_pen_paper_import_rules_valid',
 	);
 	$primary = array(
 		'pspp_scene' => '_pspp_scene', 'pspp_folio' => '_pspp_folio', 'pspp_npc' => '_pspp_npc',
 		'pspp_loot_table' => '_pspp_loot_table', 'pspp_loot_run' => '_pspp_loot_run', 'pspp_trade' => '_pspp_trade',
 		'pspp_adventure' => '_pspp_adventure', 'pspp_adventure_run' => '_pspp_adventure_run',
+		'pspp_adventure_group' => '_pspp_adventure_group',
 		'pspp_wiki_entry' => '_pspp_wiki_entry', 'pspp_item' => '_pspp_item', 'pspp_character' => '_pspp_character',
 	);
 	$conflicts = array(); $checked = 0; $deferred = array();

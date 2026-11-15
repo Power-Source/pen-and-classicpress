@@ -1,5 +1,0 @@
-# Prisma
-# NOTE: Migrations MUST be committed to version control
-# migrations/  <-- REMOVED: Migrations should be tracked in git
-*.db
-*.db-journal

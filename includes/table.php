@@ -41,7 +41,9 @@ function ps_pen_paper_table_state( $campaign ) {
 	unset( $member );
 	$turn = ps_pen_paper_table_turn( $campaign->ID );
 	$turn['available'] = ! $turn['user_id'] || isset( $members[ $turn['user_id'] ] );
-	return array( 'members' => array_values( $members ), 'turn' => $turn );
+	$round = ps_pen_paper_game_round( $campaign->ID );
+	if ( is_wp_error( $round ) ) { return $round; }
+	return array( 'members' => array_values( $members ), 'turn' => $turn, 'game_round' => $round );
 }
 
 function ps_pen_paper_table_permission( $request ) {
@@ -141,4 +143,100 @@ function ps_pen_paper_register_table_routes() {
 		'callback' => 'ps_pen_paper_table_request',
 		'permission_callback' => 'ps_pen_paper_table_permission',
 	) );
+}
+
+function ps_pen_paper_table_map_request( $request ) {
+	$campaign = ps_pen_paper_get_campaign( (int) $request['id'] );
+	if ( ! $campaign || ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_campaign( $campaign ) ) { return ps_pen_paper_equipment_error( 'forbidden' ); }
+	$characters = get_posts( array( 'post_type' => 'pspp_character', 'post_status' => 'private', 'post_parent' => $campaign->ID,
+		'author' => get_current_user_id(), 'posts_per_page' => -1 ) );
+	return ps_pen_paper_with_item_character_locks( $campaign, $characters, function () use ( $request, $campaign, $characters ) {
+		if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_campaign( $campaign ) ) { return ps_pen_paper_equipment_error( 'forbidden' ); }
+		// Native markers belong to users, not characters: suspend that user's movement.
+		foreach ( $characters as $character ) {
+			$allowed = ps_pen_paper_require_character_game_action( $campaign, (int) $character->ID );
+			if ( is_wp_error( $allowed ) ) { return $allowed; }
+		}
+		return ps_pen_paper_map_request( $request );
+	} );
+}
+
+function ps_pen_paper_table_guard_map_callback( $response, $request, $route, $handler ) {
+	if ( null !== $response || 'ps_pen_paper_map_request' !== ( $handler['callback'] ?? null ) || 'POST' !== $request->get_method() ) { return $response; }
+	$input = $request->get_json_params();
+	return is_array( $input ) && 'move' === ( $input['operation'] ?? null ) ? ps_pen_paper_table_map_request( $request ) : $response;
+}
+
+add_filter( 'rest_dispatch_request', 'ps_pen_paper_table_guard_map_callback', 10, 4 );
+
+function ps_pen_paper_validate_game_round( $value ) {
+	return is_array( $value ) && array_keys( $value ) === array( 'revision', 'round', 'active' ) &&
+		is_int( $value['revision'] ) && $value['revision'] >= 0 &&
+		is_int( $value['round'] ) && $value['round'] >= 0 && $value['round'] <= 1000000000 && is_bool( $value['active'] );
+}
+
+function ps_pen_paper_game_round( $campaign_id ) {
+	$value = get_post_meta( $campaign_id, '_pspp_game_round', true );
+	if ( '' === $value ) { return array( 'revision' => 0, 'round' => 0, 'active' => false ); }
+	return ps_pen_paper_validate_game_round( $value ) ? $value : ps_pen_paper_equipment_error( 'invalid_game_round' );
+}
+
+function ps_pen_paper_control_game_round( $campaign, $operation, $revision ) {
+	if ( 'pspp_campaign' !== $campaign->post_type || ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ) { return ps_pen_paper_equipment_error( 'forbidden' ); }
+	$characters = ps_pen_paper_get_characters( $campaign );
+	return ps_pen_paper_with_item_character_locks( $campaign, $characters, function () use ( $campaign, $operation, $revision, $characters ) {
+		try {
+			return ps_pen_paper_atomic_event( $campaign->ID, function () use ( $campaign, $operation, $revision, $characters ) {
+			if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ) { return ps_pen_paper_equipment_error( 'forbidden' ); }
+			$before = ps_pen_paper_game_round( $campaign->ID );
+			if ( is_wp_error( $before ) ) { return $before; }
+			if ( ! is_string( $revision ) || (string) $before['revision'] !== $revision ) { return ps_pen_paper_equipment_error( 'conflict' ); }
+			$after = $before;
+			if ( 'advance_game_round' === $operation ) {
+				if ( ! $before['active'] || $before['round'] >= 1000000000 ) { return ps_pen_paper_equipment_error( 'game_session_inactive' ); }
+				$after['round']++;
+			} elseif ( 'start_game_session' === $operation ) {
+				if ( $before['active'] ) { return 0; }
+				$after['active'] = true;
+			} elseif ( 'end_game_session' === $operation ) {
+				if ( ! $before['active'] ) { return 0; }
+				$after['active'] = false;
+			} else { return ps_pen_paper_equipment_error(); }
+			$after['revision']++;
+			foreach ( $characters as $character ) {
+				$gear = ps_pen_paper_gear_state( $character->ID );
+				if ( is_wp_error( $gear ) ) { return $gear; }
+				if ( ! isset( $gear['uses'] ) ) { continue; }
+				$next = $gear;
+				foreach ( $next['uses']['effects'] as &$effect ) {
+					if ( $effect['temporary'] && ! $effect['ended'] && $effect['expires'] && $effect['expires'] <= $after['round'] ) {
+						$ended = ps_pen_paper_write_item_effect_ending( $campaign, $character, $effect );
+						if ( is_wp_error( $ended ) ) { return $ended; }
+						$effect['ended'] = true;
+					}
+				}
+				unset( $effect );
+				if ( $next === $gear ) { continue; }
+				$next['revision']++;
+				$state = ps_pen_paper_character_state( $campaign, $character, false );
+				if ( is_wp_error( $state ) ) { return $state; }
+				$bonus = ps_pen_paper_gear_bonus( $campaign, $next['active'], $state['active'] );
+				if ( is_wp_error( $bonus ) ) { return $bonus; }
+				foreach ( $bonus as $id => $delta ) { $state['active']['values'][ $id ] += $delta; }
+				$valid = ps_pen_paper_apply_item_effects( $campaign, $character, $state, $next );
+				if ( is_wp_error( $valid ) ) { return $valid; }
+				$result = ps_pen_paper_write_item_use_event( $campaign, $character, $gear, $next );
+				if ( is_wp_error( $result ) ) { return $result; }
+			}
+			return ps_pen_paper_write_document_event( $campaign->ID, $campaign->ID, '_pspp_game_round', $before, $after,
+				array( 'kind' => 'game_round', 'visibility' => 'group', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => ps_pen_paper_get_rules( $campaign->ID )['revision'] ), false );
+			} );
+		} finally {
+			foreach ( $characters as $character ) {
+				$raw = ps_pen_paper_raw_character_state( $character->ID );
+				clean_post_cache( $character->ID );
+				if ( ! is_wp_error( $raw ) && isset( $raw['context']['source_id'] ) ) { clean_post_cache( $raw['context']['source_id'] ); }
+			}
+		}
+	} );
 }

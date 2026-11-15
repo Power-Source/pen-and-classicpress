@@ -27,7 +27,30 @@ function ps_pen_paper_field_edit_modes() {
 
 function ps_pen_paper_field_edit_mode( $field, $rules ) {
 	if ( ! empty( $rules['progression'] ) && $field['id'] === $rules['progression']['level_field'] ) { return 'gm_only'; }
+	if ( isset( $rules['allocation']['per_level'] ) && ! ps_pen_paper_character_creation_field_editable( $field, $rules ) ) { return 'gm_only'; }
 	return $field['edit_mode'] ?? ps_pen_paper_character_mode( $rules );
+}
+
+function ps_pen_paper_character_creation_field_editable( $field, $rules ) {
+	if ( 'gm_only' === ( $field['edit_mode'] ?? 'inherit' ) ) { return false; }
+	if ( ! empty( $rules['progression'] ) && in_array( $field['id'], array( $rules['progression']['experience_field'], $rules['progression']['level_field'] ), true ) ) { return false; }
+	return in_array( $field['type'], array( 'text', 'textarea', 'choice' ), true ) ||
+		( 'attribute' === $field['type'] && in_array( $field['id'], $rules['allocation']['fields'] ?? array(), true ) );
+}
+
+function ps_pen_paper_validate_character_creation( $input, $rules ) {
+	$snapshot = ps_pen_paper_validate_character( $input, $rules );
+	if ( is_wp_error( $snapshot ) ) { return $snapshot; }
+	$defaults = ps_pen_paper_character_values( $rules );
+	foreach ( $rules['fields'] as $field ) {
+		if ( ps_pen_paper_character_creation_field_editable( $field, $rules ) ) { continue; }
+		$value = $snapshot['values'][ $field['id'] ];
+		if ( ! empty( $rules['progression'] ) && $field['id'] === $rules['progression']['level_field'] ) { $value = (int) $input['values'][ $field['id'] ]; }
+		if ( $value !== $defaults[ $field['id'] ] ) {
+			return new WP_Error( 'creation_values_forbidden', __( 'Startwerte, Ressourcen, Erfahrung und Level werden von der Spielleitung vorgegeben. Du kannst nur die freigegebenen Attributpunkte verteilen.', 'ps-pen-paper' ) );
+		}
+	}
+	return $snapshot;
 }
 
 function ps_pen_paper_register_character_type() {
@@ -80,7 +103,7 @@ function ps_pen_paper_can_view_character_scope( $scope ) {
 }
 
 function ps_pen_paper_get_characters( $campaign ) {
-	if ( ! current_user_can( 'read' ) || ! ps_pen_paper_can_view_character_scope( $campaign ) ) {
+	if ( ! current_user_can( 'read' ) || ! ( 'pspp_universe' === $campaign->post_type ? ps_pen_paper_can_use_universe_characters( $campaign ) : ps_pen_paper_can_view_character_scope( $campaign ) ) ) {
 		return array();
 	}
 	$args = array(
@@ -99,7 +122,7 @@ function ps_pen_paper_get_characters( $campaign ) {
 
 function ps_pen_paper_get_character( $campaign, $character_id ) {
 	$character = ps_pen_paper_record_post( $character_id );
-	if ( ! current_user_can( 'read' ) || ! ps_pen_paper_can_view_character_scope( $campaign ) || ! $character || 'pspp_character' !== $character->post_type || 'private' !== $character->post_status || (int) $character->post_parent !== (int) $campaign->ID ) {
+	if ( ! current_user_can( 'read' ) || ! ( 'pspp_universe' === $campaign->post_type ? ps_pen_paper_can_use_universe_characters( $campaign ) : ps_pen_paper_can_view_character_scope( $campaign ) ) || ! $character || 'pspp_character' !== $character->post_type || 'private' !== $character->post_status || (int) $character->post_parent !== (int) $campaign->ID ) {
 		return null;
 	}
 	if ( ! ps_pen_paper_can_manage_character_scope( $campaign ) && (int) $character->post_author !== get_current_user_id() ) {
@@ -109,7 +132,7 @@ function ps_pen_paper_get_character( $campaign, $character_id ) {
 }
 
 function ps_pen_paper_can_edit_character( $campaign, $character = null ) {
-	if ( ! current_user_can( 'read' ) || ! ps_pen_paper_can_view_character_scope( $campaign ) ) {
+	if ( ! current_user_can( 'read' ) || ! ( 'pspp_universe' === $campaign->post_type ? ps_pen_paper_can_use_universe_characters( $campaign ) : ps_pen_paper_can_view_character_scope( $campaign ) ) ) {
 		return false;
 	}
 	if ( $character && ! ps_pen_paper_get_character( $campaign, $character->ID ) ) {
@@ -215,6 +238,7 @@ function ps_pen_paper_validate_character( $input, $rules ) {
 			if ( $field['required'] && '' === $value ) {
 				return $error;
 			}
+			if ( ! empty( $field['choices'] ) && '' !== $value && ! in_array( $value, $field['choices'], true ) ) { return $error; }
 			$clean['values'][ $field['id'] ] = $value;
 			continue;
 		}
@@ -286,15 +310,24 @@ function ps_pen_paper_player_character_state( $snapshot, $previous, $rules ) {
 	return $state;
 }
 
-function ps_pen_paper_save_character( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision ) {
-	return ps_pen_paper_with_character_lock( $character_id, function () use ( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision ) {
-		return ps_pen_paper_scope_write( $campaign_id, function () use ( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision ) {
-			return ps_pen_paper_save_character_locked( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision );
-		} );
+function ps_pen_paper_save_character( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision, $player_context = false ) {
+	return ps_pen_paper_with_character_lock( $character_id, function () use ( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision, $player_context ) {
+		$write = function () use ( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision, $player_context ) {
+			return ps_pen_paper_save_character_locked( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision, $player_context );
+		};
+		if ( ! $character_id && ps_pen_paper_get_campaign( $campaign_id ) ) {
+			$link = ps_pen_paper_get_universe_link( $campaign_id );
+			if ( is_wp_error( $link ) ) { return $link; }
+			if ( $link['universe_id'] ) {
+				$scopes = array( (int) $campaign_id, $link['universe_id'] ); sort( $scopes, SORT_NUMERIC );
+				return ps_pen_paper_scope_lock( $scopes[0], function () use ( $scopes, $write ) { return ps_pen_paper_scope_lock( $scopes[1], $write ); } );
+			}
+		}
+		return ps_pen_paper_scope_write( $campaign_id, $write );
 	} );
 }
 
-function ps_pen_paper_save_character_locked( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision ) {
+function ps_pen_paper_save_character_locked( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision, $player_context = false ) {
 	$campaign = ps_pen_paper_get_character_scope( $campaign_id );
 	$character = $campaign && $character_id ? ps_pen_paper_get_character( $campaign, $character_id ) : null;
 	if ( ! $campaign || ( $character_id && ! $character ) || ! ps_pen_paper_can_edit_character( $campaign, $character ) ) {
@@ -313,12 +346,26 @@ function ps_pen_paper_save_character_locked( $campaign_id, $character_id, $owner
 		return new WP_Error( 'conflict', __( 'Der Charakter wurde inzwischen geändert. Lade die Seite neu.', 'ps-pen-paper' ) );
 	}
 	$owner_id = $character ? (int) $character->post_author : (int) $owner_id;
-	$is_gm = ps_pen_paper_can_manage_character_scope( $campaign );
+	$is_gm = ! $player_context && ps_pen_paper_can_manage_character_scope( $campaign );
 	$universe = 'pspp_universe' === $campaign->post_type;
 	if ( ! get_userdata( $owner_id ) || ! is_user_member_of_blog( $owner_id ) || ( $universe ? ! user_can( $owner_id, 'read' ) : ! ps_pen_paper_campaign_role( $campaign, $owner_id ) ) || ( ! $is_gm && $owner_id !== get_current_user_id() ) ) {
 		return new WP_Error( 'invalid_owner', $universe ? __( 'Der Basisbogen muss einem leseberechtigten Mitglied dieser Website gehören.', 'ps-pen-paper' ) : __( 'Der Charakter muss einem Mitglied dieser Kampagne gehören.', 'ps-pen-paper' ) );
 	}
-	$snapshot = ps_pen_paper_validate_character( $input, $rules );
+	if ( ! $character ) {
+		if ( $universe && ! $is_gm ) {
+			$policy = ps_pen_paper_character_policy( $campaign_id );
+			if ( is_wp_error( $policy ) ) { return $policy; }
+			if ( ! ps_pen_paper_is_universe_member( $campaign ) && 'site' !== $policy['creation_access'] ) { return new WP_Error( 'forbidden', __( 'Neue Charaktere benötigen eine Universumsmitgliedschaft.', 'ps-pen-paper' ) ); }
+		}
+		$link = $universe ? array( 'universe_id' => (int) $campaign_id ) : ps_pen_paper_get_universe_link( $campaign_id );
+		if ( is_wp_error( $link ) ) { return $link; }
+		if ( $link['universe_id'] ) {
+			if ( ! ps_pen_paper_get_universe( $link['universe_id'] ) ) { return new WP_Error( 'invalid_universe', __( 'Bitte repariere zuerst die Universumszuordnung.', 'ps-pen-paper' ) ); }
+			$limit = ps_pen_paper_check_character_creation_limit( $link['universe_id'], $owner_id );
+			if ( is_wp_error( $limit ) ) { return $limit; }
+		}
+	}
+	$snapshot = ! $character && ! $is_gm ? ps_pen_paper_validate_character_creation( $input, $rules ) : ps_pen_paper_validate_character( $input, $rules );
 	if ( is_wp_error( $snapshot ) ) {
 		return $snapshot;
 	}

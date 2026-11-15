@@ -28,10 +28,18 @@ und **Einstellungen** getrennt. Dieselben Bereiche sind im Frontend erreichbar;
 der Spieltisch ist davon getrennt. Die Charakterverwaltung zeigt nur eigene
 beziehungsweise als Spielleitung verwaltbare Bögen.
 
-Mitglieder müssen bereits Benutzer dieser Website sein; Einladungen und die
-Aufnahme in eine Netzwerk-Website sind noch nicht implementiert. Der Ersteller
+Mitglieder müssen bereits Benutzer dieser Website sein. Spielleitungen und
+berechtigte Spieler können sie einladen; Annahme und gegebenenfalls Freigabe
+erfolgen im eigenen Profil. Die Aufnahme in eine Netzwerk-Website ist nicht
+implementiert. Der Ersteller
 bleibt Spielleiter seiner Kampagne. Ein Archivkennzeichen markiert Kampagnen
 derzeit nur in der Übersicht; es sperrt keine Aktionen.
+
+Neue Kampagnen benötigen ein vorhandenes Universum. Im eigenen PS-Community-Profil
+stehen die Universumsauswahl zur Charaktererstellung, die Auswahl eigener Bögen
+und Einladungen bereit. Profil und Spieltisch nutzen denselben Charakterbogen
+mit Tabs für Übersicht, Werte, Inventar und Abenteuer. Optionale UI-Farben
+werden am Universum eingestellt und von dessen Kampagnen übernommen.
 
 Das Plugin kann über die Plugin-Verwaltung aktiviert werden. Angemeldete
 Website-Mitglieder finden ihre Kampagnen unter „Pen & Paper“ im Backend. Es
@@ -102,6 +110,14 @@ Optionale **Erfahrungs-/Stufenregeln** verbinden zwei frei benannte Zahlenfelder
 mit aufsteigenden Schwellen. Stufen folgen dem jeweiligen Erfahrungsstand,
 ohne vorgegebene Klassen oder automatische Attributboni. Vorhandene Bögen
 werden nur über die bestätigte Änderungsvorschau angepasst.
+Mit **Startpunkte und Punkte je Level** legt die Leitung das verteilbare
+Attributbudget fest: Startpunkte + (Level - 1) × Punkte je Aufstieg.
+Nicht verteilte Punkte bleiben verfügbar; der Bogen zeigt sie direkt an.
+Erfahrung vergibt dabei die Leitung. Spieler können Ressourcen, Maxima und
+Level nicht selbst hochsetzen. Im Profil gilt dies auch für Leitungskonten;
+bewusste Korrekturen gehören in die Spielleitungsverwaltung.
+Bei jeder eigenen Charaktererstellung sind Zahlen außerhalb des freigegebenen
+Attributpools feste Startvorgaben, keine freien Eingaben.
 Die Würfelbühne bietet nach ausdrücklicher Freigabe **Erfolgspools** sowie
 **höchsten oder niedrigsten Einzelwürfel**. Würfelsummen bleiben Standard;
 Abenteuerproben und Beutetabellen ändern ihre bisherige Berechnung nicht.
@@ -572,8 +588,18 @@ erhalten; kleine Dateien und Datenbanksicherungen sind wichtig.
 Mit aktivem **PS Community** und geladenen Profil-Tab-Schnittstellen erscheint
 im **eigenen** Profil der Tab **Pen & Paper**. In der lokalen Community-Version
 benötigt das die Module Profil und Aktivität sowie eine veröffentlichte,
-in Community zugeordnete Profilseite. Dort wählt der Besitzer seinen
-Kampagnencharakter, bearbeitet den Bogen und verwaltet Porträt und Ausrüstung.
+in Community zugeordnete Profilseite. Dort wählt der Besitzer sein Universum,
+erstellt seinen Charakter und öffnet eigene Universums- oder Kampagnenbögen
+über die Charakterauswahl. Einladungen einschließlich Leitungsfreigaben stehen
+direkt im Profil mit Spielrunde beziehungsweise Universum und Absender.
+Dort werden erhaltene Einladungen angenommen oder abgelehnt, nicht verwaltet.
+Mitspieler werden in der jeweiligen Spielrunde eingeladen; Spieleauswahl
+und Spielnavigation bleiben im Spielbereich.
+Porträt, Werte und Inventar verwenden dieselben Charaktertabs wie im Spiel.
+Ein vorhandener eigener Charakter wird beim Öffnen des Profils direkt angezeigt.
+Ein eingerichtetes Universum erlaubt standardmäßig die eigene Charaktererstellung
+für Website-Mitglieder, ohne zusätzliche Universumsmitgliedschaft.
+Eine ausdrücklich von der Leitung gespeicherte Zugangsbeschränkung bleibt gültig.
 Formulare werden direkt auf der Profilseite verarbeitet; eine Backend-Freigabe
 ist dafür nicht nötig. Fremde Profilaufrufe und native Community-AJAX-Aufrufe
 erhalten keine fremden Bögen. Freundschaften vergeben keine Kampagnenrechte.
@@ -601,6 +627,23 @@ Vorlagenänderungen verändern ausgegebene Gegenstände nicht.
 Ein Charakter besitzt zunächst höchstens 100 einzelne Exemplare.
 Ein Exemplar darf genau einen passenden Slot belegen. Slotauswahl, Besitz
 und Freigabepolitik werden auf dem Server geprüft.
+
+Verbrauchsgüter erhalten statt einer Slotbelegung eine ausdrückliche
+Nutzungsregel: sofort, Leitungsfreigabe, bestandene Probe oder eine echte
+Spielrunde aussetzen. Die Leitung definiert dauerhafte oder temporäre
+Änderungen auf Zahlen, Attribute und aktuelle Ressourcenwerte.
+Ein erfolgreich benutztes Exemplar wird genau einmal verbraucht; Grenzen,
+Nachweise und Änderungen werden gemeinsam gespeichert. Währungen bleiben
+in den Geldkonten, nicht in erfundenen Goldgegenständen.
+
+Unter **Ausrüstung und Verbrauch außerhalb des Spiels** erlaubt oder verbietet
+die Leitung Profilaktionen ausdrücklich, getrennt für Ausrüsten und Verbrauch.
+Zusätzliche Slot- und Gegenstandsregeln können einschränken oder eine Freigabe
+verlangen; ein Verbot hat Vorrang. Im Profil gibt es keine Probe und kein
+Rundenaussetzen. Während einer gestarteten Sitzung bleiben Profilaktionen
+standardmäßig gesperrt. Gemeinsame Basisressourcen wirken in verbundenen
+Kampagnen, deren Ausrüstung bleibt getrennt. Temporäre Basiseffekte beendet
+die Universumsleitung ausdrücklich; Kampagnenrunden ersetzen das nicht.
 
 Angelegte, freigegebene Boni werden auf Zahlen-/Attributfelder addiert, ohne
 Grundwerte zu überschreiben. Bogen und Würfe verwenden dieselben effektiven
@@ -829,8 +872,9 @@ Werte; Zahlen und Attribute können als lokale Auflagen erhalten bleiben.
 Spieler können in einer zugeordneten Kampagne einen eigenen Universumsbasisbogen
 beantragen. Die Universumsleitung prüft diesen Antrag; die Aufnahme des
 freigegebenen Bogens in eine Kampagne bleibt ein eigener Vorgang.
-Universumsweite Mitgliedschaften, Ressourcenauflagen und ein
-XP-/Levelautomatismus bleiben offen. Ein numerisches Stufenfeld ist kein solches System.
+Universumsmitgliedschaften, Erfahrungs-/Stufenschwellen und ein verteilbarer
+Level-Punktepool sind inzwischen ergänzt. Ein bloßes Zahlenfeld namens
+„Stufe“ aktiviert diese Regeln nicht. Ressourcenauflagen bleiben offen.
 
 Die Spielleitung kann einen Teilnehmer als **am Zug** markieren oder
 **Freies Spiel** wählen. Änderungen sind revisionsgeschützt und werden mit
@@ -1044,8 +1088,10 @@ Konfigurierbar sind:
 - Reihenfolge der Felder; Kennungen bleiben beim Umbenennen und Umsortieren
   erhalten.
 
-Die optionale Attribut-Punkteverteilung prüft die genaue Summe der ausgewählten
-Attribute. Auswahlfelder erlauben nur die konfigurierten Optionen.
+Die feste Attribut-Punkteverteilung prüft die genaue Summe der ausgewählten
+Attribute. Der Level-Punktepool begrenzt stattdessen das Budget anhand von
+Startpunkten und erreichten Leveln; Restpunkte bleiben verfügbar.
+Auswahlfelder erlauben nur die konfigurierten Optionen.
 Verwendete Feldlisten, Typen, Pflichtstatus und Wertebereiche lassen sich nach
 Änderungsvorschau und ausdrücklicher Konfliktauflösung migrieren. Gültige Stände
 und offene Anträge werden nicht stillschweigend angepasst. Vorher-/Nachher-

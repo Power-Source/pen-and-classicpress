@@ -194,7 +194,7 @@ try {
 		'name'   => 'Testcharakter',
 		'values' => array(
 			$renamed['fields'][0]['id'] => 'Hintergrund mit einem Pfad C:\Welt',
-			$resource_id => array( 'current' => '10', 'maximum' => '50' ),
+			$resource_id => array( 'current' => '10', 'maximum' => '100' ),
 		),
 	);
 	$character_id = ps_pen_paper_save_character( $campaign_id, 0, $user_ids['player'], $character_input, '0', '3' );
@@ -223,6 +223,7 @@ try {
 	pspp_test_assert( is_wp_error( $schema_result ) && 'schema_preview_required' === $schema_result->get_error_code(), 'Used field structure bypassed the migration preview.' );
 
 	wp_set_current_user( $user_ids['player'] );
+	$character_input['values'][ $resource_id ]['maximum'] = '50';
 	$character_input['values'][ $resource_id ]['current'] = '20';
 	pspp_test_assert( $character_id === ps_pen_paper_save_character( $campaign_id, $character_id, $user_ids['player'], $character_input, '2', '3' ), 'Player could not request changed values.' );
 	$state = get_post_meta( $character_id, '_pspp_character', true );
@@ -323,7 +324,9 @@ try {
 	$approval_input['character_mode'] = 'approval';
 	pspp_test_assert( ! is_wp_error( ps_pen_paper_save_rules( $campaign_id, $approval_input, '5' ) ), 'Could not configure frontend approval test.' );
 	wp_set_current_user( $user_ids['player'] );
-	pspp_test_assert( false !== strpos( ps_pen_paper_frontend_shortcode(), 'Zur Freigabe einreichen' ), 'Frontend does not honor campaign approval policy.' );
+	$approval_html = ps_pen_paper_frontend_shortcode();
+	pspp_test_assert( false !== strpos( $approval_html, ps_pen_paper_character_modes()['approval'] ) &&
+		false !== strpos( $approval_html, 'name="character[name]"' ), 'Frontend does not honor campaign approval policy.' );
 	wp_set_current_user( $user_ids['outsider'] );
 	$html = ps_pen_paper_frontend_shortcode();
 	pspp_test_assert( false === strpos( $html, 'Testcharakter' ) && false === strpos( $html, $campaign->post_title ), 'Another player’s private character was disclosed.' );
@@ -360,6 +363,12 @@ try {
 	$owner->add_cap( 'ps_pen_paper_create_campaigns' );
 	wp_set_current_user( 0 );
 	wp_set_current_user( $user_ids['owner'] );
+	$html = ps_pen_paper_frontend_shortcode();
+	pspp_test_assert( false !== strpos( $html, 'Zuerst ein Universum erstellen' ) &&
+		false === strpos( $html, 'name="pspp_operation" value="create"' ), 'Campaign creation bypassed the required universe.' );
+	ps_pen_paper_register_universe_type();
+	$creation_universe = ps_pen_paper_save_universe( 0, array( 'name' => 'Creation universe ' . $suffix, 'description' => '' ), '0' );
+	pspp_test_assert( is_int( $creation_universe ) && $creation_universe > 0, 'Required campaign universe fixture failed.' ); $post_ids[] = $creation_universe;
 	$html = ps_pen_paper_frontend_shortcode();
 	pspp_test_assert( false !== strpos( $html, 'name="pspp_operation" value="create"' ) && false !== strpos( $html, 'name="pspp_frontend_page" value="' . $page_id . '"' ) && false === strpos( $html, 'admin-post.php' ), 'Permitted frontend campaign creation is absent or posts into the backend.' );
 	$owner->remove_cap( 'ps_pen_paper_create_campaigns' );

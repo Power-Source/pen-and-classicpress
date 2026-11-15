@@ -51,6 +51,10 @@ function ps_pen_paper_handle_frontend_action() {
 		return;
 	}
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
+	if ( in_array( $operation, array( 'save_slot_icon', 'save_item_action_policy', 'set_item_outside', 'use_item', 'review_item_use', 'end_item_effect', 'advance_game_round', 'start_game_session', 'end_game_session' ), true ) &&
+		ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
+	if ( in_array( $operation, array( 'save_universe_style', 'profile_create_character', 'save_character_policy', 'member_invitation', 'upload_portrait_preset', 'select_portrait_preset', 'profile_portrait' ), true ) &&
+		ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'preview_import', 'configure_import_preview', 'discard_import_preview', 'restore_import', 'download_import_backup' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'save_adventure_world', 'save_adventure_scenario', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure', 'request_adventure_review', 'review_adventure_run', 'cancel_adventure_review', 'group_adventure' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
@@ -72,12 +76,12 @@ function ps_pen_paper_enqueue_frontend() {
 		return;
 	}
 	$url = plugin_dir_url( dirname( __DIR__ ) . '/ps-pen-paper.php' );
-	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.2' );
+	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.3' );
 	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.26.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
-	wp_enqueue_script( 'ps-pen-paper-table', $url . 'assets/table.js', array(), '0.14.1', true );
+	wp_enqueue_script( 'ps-pen-paper-table', $url . 'assets/table.js', array(), '0.14.2', true );
 	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.17.0' );
-	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.1' );
+	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.2' );
 	wp_enqueue_script( 'ps-pen-paper-character', $url . 'assets/character.js', array(), '0.1.0', true );
 	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.15.0' );
 	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array( 'ps-pen-paper-table' ), '0.13.0', true );

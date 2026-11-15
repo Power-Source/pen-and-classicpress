@@ -188,6 +188,10 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 				} else {
 					$after = $before; $after['revision']++;
 					$member = ps_pen_paper_adventure_group_member( $campaign, $before, $user_id );
+					if ( $member && in_array( $operation, array( 'propose', 'vote', 'execute' ), true ) ) {
+						$allowed = ps_pen_paper_require_character_game_action( $campaign, $member['character_id'] );
+						if ( is_wp_error( $allowed ) ) { return $allowed; }
+					}
 					if ( in_array( $operation, array( 'pause', 'resume', 'configure' ), true ) ) {
 						if ( ! $gm || 'completed' === $before['status'] ||
 							( 'pause' === $operation && 'active' !== $before['status'] ) ||

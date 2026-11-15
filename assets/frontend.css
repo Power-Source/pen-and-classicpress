@@ -158,8 +158,7 @@
 	list-style: none;
 }
 
-.pspp-party li,
-.pspp-sheet-heading {
+.pspp-party li {
 	display: flex;
 	gap: 12px;
 	align-items: center;
@@ -306,33 +305,7 @@
 	font: 700 clamp(26px, 4vw, 40px)/1.3 Georgia, serif;
 }
 
-.pspp-sheet-heading { padding-bottom: 24px; }
-.pspp-game .pspp-sheet-heading .pspp-portrait { flex-basis: 72px; width: 72px; height: 80px; border-radius: 36px 36px 4px 4px; font-size: 40px; }
-.pspp-game .pspp-sheet-section h4 { border-block: 3px double var(--pspp-border); padding: 10px; text-align: center; font: 700 19px Georgia, serif; }
-.pspp-sheet-section { margin-bottom: 28px; }
-
-.pspp-sheet-fields {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
-	gap: 12px 24px;
-}
-
-.pspp-game .pspp-sheet-fields > div {
-	min-width: 0;
-	border-bottom: 1px solid var(--pspp-border);
-	padding-block: 8px;
-}
-
-.pspp-sheet-wide { grid-column: 1 / -1; }
-.pspp-sheet-stat { text-align: center; }
-.pspp-game .pspp-sheet-fields dt { font-size: 13px; }
-.pspp-game .pspp-sheet-fields dd { margin: 6px 0 0; }
-.pspp-game .pspp-sheet-stat dd { font: 700 30px/1.2 Georgia, serif; }
-.pspp-rating { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
-.pspp-rating i { width: 10px; height: 10px; border: 1px solid currentColor; border-radius: 50%; }
-.pspp-rating .is-filled { background: currentColor; }
 .pspp-sheet meter { display: block; width: 100%; height: 18px; accent-color: var(--pspp-accent); }
-.pspp-game .pspp-pending { border-inline-start: 3px solid var(--pspp-accent); padding-inline-start: 12px; }
 .pspp-game .pspp-fold { margin-top: 16px; }
 .pspp-game .pspp-fold > summary { min-height: 44px; padding-block: 10px; cursor: pointer; font-weight: 700; }
 .pspp-game .pspp-table-feedback:empty { display: none; }
@@ -428,8 +401,6 @@
 	.pspp-game .pspp-party li { flex-basis: 185px; }
 	.pspp-game .pspp-scene { min-height: 54svh; padding: 24px 16px; }
 	.pspp-scene-caption { padding: 20px 16px; }
-	.pspp-sheet-heading { align-items: start; gap: 12px; }
-	.pspp-game .pspp-sheet-heading .pspp-portrait { flex-basis: 48px; width: 48px; height: 60px; font-size: 30px; }
 }
 
 .pspp-page > h1 {

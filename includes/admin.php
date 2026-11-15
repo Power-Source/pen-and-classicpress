@@ -28,14 +28,14 @@ function ps_pen_paper_enqueue_admin_assets( $hook ) {
 	}
 	$url = plugin_dir_url( dirname( __DIR__ ) . '/ps-pen-paper.php' );
 	wp_enqueue_style( 'ps-pen-paper-admin', $url . 'assets/admin.css', array(), '0.7.0' );
-	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.2' );
+	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.3' );
 	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.26.0', true );
 	wp_enqueue_script( 'ps-pen-paper-style', $url . 'assets/styles.js', array(), '0.7.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
 	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.15.0' );
 	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array(), '0.13.0', true );
 	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.17.0' );
-	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.1' );
+	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.2' );
 	wp_enqueue_script( 'ps-pen-paper-character', $url . 'assets/character.js', array(), '0.1.0', true );
 }
 
@@ -101,6 +101,9 @@ function ps_pen_paper_handle_admin_action() {
 	}
 	if ( 'group_adventure' === $operation ) { ps_pen_paper_handle_adventure_group_action(); }
 	if ( 'save_universe_style' === $operation ) { ps_pen_paper_handle_universe_style_action(); }
+	if ( in_array( $operation, array( 'profile_create_character', 'save_character_policy', 'member_invitation', 'upload_portrait_preset', 'select_portrait_preset', 'profile_portrait' ), true ) ) {
+		ps_pen_paper_handle_character_policy_action( $operation );
+	}
 	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'save_adventure_world', 'save_adventure_scenario', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure', 'request_adventure_review', 'review_adventure_run', 'cancel_adventure_review' ), true ) ) { ps_pen_paper_handle_adventure_action( $operation ); }
 	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) ) { ps_pen_paper_handle_trade_action( $operation ); }
 	if ( 'transfer_campaign_assets' === $operation ) { ps_pen_paper_handle_transfer_action(); }
@@ -113,7 +116,7 @@ function ps_pen_paper_handle_admin_action() {
 	if ( in_array( $operation, array( 'save_currency', 'change_wallet' ), true ) ) {
 		ps_pen_paper_handle_economy_action( $operation );
 	}
-	if ( in_array( $operation, array( 'save_equipment_schema', 'save_item', 'grant_item', 'remove_items', 'equip_items', 'review_gear', 'save_portrait', 'save_sheet_style' ), true ) ) {
+	if ( in_array( $operation, array( 'save_equipment_schema', 'save_slot_icon', 'save_item_action_policy', 'set_item_outside', 'use_item', 'review_item_use', 'end_item_effect', 'advance_game_round', 'start_game_session', 'end_game_session', 'save_item', 'grant_item', 'remove_items', 'equip_items', 'review_gear', 'save_portrait', 'save_sheet_style' ), true ) ) {
 		ps_pen_paper_handle_equipment_action( $operation );
 	}
 	if ( in_array( $operation, array( 'save_folio', 'publish_folio', 'withdraw_folio' ), true ) ) {
@@ -140,6 +143,9 @@ function ps_pen_paper_handle_admin_action() {
 		if ( '' === $title ) {
 			ps_pen_paper_fail( __( 'Bitte gib einen Kampagnennamen ein.', 'ps-pen-paper' ) );
 		}
+		$universe_id = ps_pen_paper_posted_id( 'universe_id' );
+		$universe = ps_pen_paper_validate_campaign_universe( $universe_id );
+		if ( is_wp_error( $universe ) ) { ps_pen_paper_fail( $universe->get_error_message() ); }
 		$campaign_id = wp_insert_post(
 			wp_slash( array(
 				'post_type'    => 'pspp_campaign',
@@ -162,6 +168,12 @@ function ps_pen_paper_handle_admin_action() {
 				ps_pen_paper_fail( __( 'Die Mitgliedschaft konnte nicht gespeichert werden; die unvollständige Kampagne konnte nicht entfernt werden. Bitte prüfe die Website.', 'ps-pen-paper' ) );
 			}
 			ps_pen_paper_fail( __( 'Die Kampagne konnte nicht vollständig gespeichert werden.', 'ps-pen-paper' ) );
+		}
+		$linked = ps_pen_paper_link_new_campaign( $campaign_id, $universe_id, (string) $universe['revision'] );
+		if ( is_wp_error( $linked ) ) {
+			if ( 'event_recovery_required' === $linked->get_error_code() ) { ps_pen_paper_fail( $linked->get_error_message() ); }
+			if ( ! wp_delete_post( $campaign_id, true ) ) { ps_pen_paper_fail( __( 'Die unvollständig zugeordnete Kampagne konnte nicht entfernt werden. Bitte informiere die Administration.', 'ps-pen-paper' ) ); }
+			ps_pen_paper_fail( $linked->get_error_message() );
 		}
 		ps_pen_paper_redirect( 'created', $campaign_id, $page_id, $page_id ? 'pspp-story' : 'pspp-rulebook' );
 	}
@@ -235,7 +247,7 @@ function ps_pen_paper_handle_admin_action() {
 			}
 			$input = isset( $_POST['character'] ) ? wp_unslash( $_POST['character'] ) : null;
 			$rules_revision = isset( $_POST['character_rules_revision'] ) ? $_POST['character_rules_revision'] : null;
-			$result = ps_pen_paper_save_character( $campaign_id, $character_id, ps_pen_paper_posted_id( 'owner_id' ), $input, $revision, $rules_revision );
+			$result = ps_pen_paper_save_character( $campaign_id, $character_id, ps_pen_paper_posted_id( 'owner_id' ), $input, $revision, $rules_revision, '' !== $profile_url );
 			if ( ! is_wp_error( $result ) ) {
 				$character_id = $result;
 			}
@@ -384,6 +396,8 @@ function ps_pen_paper_render_notice() {
 		'join_requested' => __( 'Teilnahme angefragt. Die Spielleitung entscheidet über deine Aufnahme.', 'ps-pen-paper' ),
 		'join_reviewed' => __( 'Beitrittsanfrage entschieden.', 'ps-pen-paper' ),
 		'settings_saved' => __( 'Rundeneinstellungen gespeichert.', 'ps-pen-paper' ),
+		'member_invitation_saved' => __( 'Einladungsaktion gespeichert.', 'ps-pen-paper' ),
+		'character_policy_saved' => __( 'Charaktervorgaben oder Porträt gespeichert.', 'ps-pen-paper' ),
 		'universe_saved' => __( 'Universum gespeichert.', 'ps-pen-paper' ),
 		'universe_linked' => __( 'Universumszuordnung gespeichert. Kampagnendaten und Rechte bleiben unverändert.', 'ps-pen-paper' ),
 		'context_saved' => __( 'Universumsvorlage, Basisbogen oder Kampagnenkontext gespeichert.', 'ps-pen-paper' ),
@@ -459,10 +473,26 @@ function ps_pen_paper_render_campaign_list() {
 
 function ps_pen_paper_render_campaign_create_form( $page_id = 0 ) {
 	if ( ! ps_pen_paper_can_create_campaign() ) { return; }
+	$universes = array();
+	foreach ( ps_pen_paper_get_universes() as $universe ) {
+		$document = ps_pen_paper_universe_document( $universe->ID );
+		if ( is_wp_error( $document ) ) { echo '<p role="alert">' . esc_html( $document->get_error_message() ) . '</p>'; }
+		else { $universes[ $universe->ID ] = $document['name']; }
+	}
+	if ( ! $universes ) {
+		echo '<h2>' . esc_html__( 'Zuerst ein Universum erstellen', 'ps-pen-paper' ) . '</h2><p>' .
+			esc_html__( 'Jede Kampagne gehört zu einem Universum. Lege zunächst deine Welt an; danach kannst du Kampagnen hinzufügen.', 'ps-pen-paper' ) .
+			'</p><a class="button button-primary" href="' . esc_url( ps_pen_paper_dashboard_url( 'universes', $page_id ) ) . '">' . esc_html__( 'Universum erstellen', 'ps-pen-paper' ) . '</a>';
+		return;
+	}
 	?>
 		<h2><?php esc_html_e( 'Neue Kampagne', 'ps-pen-paper' ); ?></h2>
 		<p><?php esc_html_e( 'Name eingeben und anlegen. Danach schreibst du die erste Szene; eine Karte ist optional. Regeln, Charaktere und weitere Einstellungen kannst du anschließend ergänzen.', 'ps-pen-paper' ); ?></p>
 		<?php ps_pen_paper_form_start( 'create', 'pspp_create', 0, $page_id ); ?>
+			<p><label><?php esc_html_e( 'Universum', 'ps-pen-paper' ); ?><select name="universe_id" required>
+				<option value=""><?php esc_html_e( 'Bitte wählen', 'ps-pen-paper' ); ?></option>
+				<?php foreach ( $universes as $universe_id => $name ) : ?><option value="<?php echo esc_attr( $universe_id ); ?>"><?php echo esc_html( $name ); ?></option><?php endforeach; ?>
+			</select></label></p>
 			<p><label for="pspp-new-title"><?php esc_html_e( 'Name', 'ps-pen-paper' ); ?></label><br>
 			<input id="pspp-new-title" name="title" type="text" class="regular-text" required></p>
 			<p><label for="pspp-new-description"><?php esc_html_e( 'Beschreibung', 'ps-pen-paper' ); ?></label><br>

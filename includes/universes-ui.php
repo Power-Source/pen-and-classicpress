@@ -4,6 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/character-policy-ui.php';
+
 function ps_pen_paper_handle_universe_action( $operation ) {
 	$page_id = ps_pen_paper_posted_id( 'pspp_frontend_page' );
 	if ( isset( $_POST['pspp_frontend_page'] ) && ! ps_pen_paper_frontend_page( $page_id ) ) {
@@ -114,6 +116,10 @@ function ps_pen_paper_render_universes( $page_id = 0 ) {
 				<?php ps_pen_paper_render_style_settings( $universe, $page_id ); ?>
 			</details>
 			<details class="pspp-fold">
+				<summary><?php esc_html_e( 'Charaktervorgaben, Einladungen und Porträts', 'ps-pen-paper' ); ?></summary>
+				<?php ps_pen_paper_render_character_policy( $universe, $page_id ); ?>
+			</details>
+			<details class="pspp-fold">
 				<summary><?php esc_html_e( 'Änderungsverlauf des Universums', 'ps-pen-paper' ); ?></summary>
 				<?php $log = ps_pen_paper_get_events( $universe ); ?>
 				<?php if ( is_wp_error( $log ) ) : ?>
@@ -132,7 +138,8 @@ function ps_pen_paper_render_universes( $page_id = 0 ) {
 		<h3><?php esc_html_e( 'Neues Universum', 'ps-pen-paper' ); ?></h3>
 		<?php ps_pen_paper_render_universe_form( 0, array( 'revision' => 0, 'name' => '', 'description' => '' ), $page_id ); ?>
 	<?php endif; ?>
-	<h3><?php esc_html_e( 'Kampagne zuordnen oder lösen', 'ps-pen-paper' ); ?></h3>
+	<h3><?php esc_html_e( 'Historische Kampagnen ausdrücklich zuordnen oder Zuordnung ändern', 'ps-pen-paper' ); ?></h3>
+	<p><?php esc_html_e( 'Nicht zugeordnete ältere Kampagnen bleiben vollständig erhalten. Wähle ihr Universum ausdrücklich; es wird niemals eines erfunden oder automatisch zugewiesen.', 'ps-pen-paper' ); ?></p>
 	<p><?php esc_html_e( 'Du benötigst Verwaltungsrechte für die Kampagne und die beteiligten Universen. Zuerst wird eine Vorschau angezeigt; erst deine Bestätigung speichert die Zuordnung.', 'ps-pen-paper' ); ?></p>
 	<form method="get" action="<?php echo esc_url( $page_id ? get_permalink( $page_id ) : admin_url( 'admin.php' ) ); ?>">
 		<input type="hidden" name="<?php echo $page_id ? 'pspp_view' : 'page'; ?>" value="<?php echo $page_id ? 'universes' : 'ps-pen-paper-universes'; ?>">

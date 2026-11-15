@@ -109,11 +109,91 @@ try {
 	$disabled = $input; $disabled['progression_mode'] = 'none';
 	$disabled_rules = ps_pen_paper_validate_rules( $disabled, $rules );
 	$check( 4 === ps_pen_paper_validate_character( $values, $disabled_rules )['values'][ $level ], 'Disabled progression overwrote an attained level.' );
-	$new_values = $values; $new_values['values'][ $xp ] = '0'; $new_values['values'][ $level ] = '1';
+	$new_values = $values; $new_values['values'][ $strength ] = '2'; $new_values['values'][ $xp ] = '0'; $new_values['values'][ $level ] = '1';
 	wp_set_current_user( $users['player'] );
 	$new_character = ps_pen_paper_save_character( $id, 0, $users['player'], $new_values, '0', '2' );
 	$check( is_int( $new_character ) && null === ps_pen_paper_raw_character_state( $new_character )['active'] &&
 		ps_pen_paper_valid_character_snapshot( ps_pen_paper_raw_character_state( $new_character )['pending'], $rules ), 'Mixed first sheet bypassed full initial approval.' );
+	wp_set_current_user( $users['gm'] );
+	$point_campaign_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_title' => 'Level point fixture ' . $suffix, 'post_author' => $users['gm'] ), true );
+	$check( is_int( $point_campaign_id ) && $point_campaign_id > 0, 'Level point fixture creation failed.' ); $parents[] = $point_campaign_id;
+	add_post_meta( $point_campaign_id, '_pspp_player', (string) $users['player'] );
+	$point_input = $input; $point_input['progression_mode'] = 'none'; $point_input['allocation_mode'] = 'none';
+	foreach ( $point_input['fields'] as &$field ) { $field['id'] = ''; } unset( $field );
+	$point_rules = ps_pen_paper_save_rules( $point_campaign_id, $point_input, '0' );
+	$check( ! is_wp_error( $point_rules ), 'Level point fields failed.' );
+	foreach ( $point_input['fields'] as $index => &$field ) { $field['id'] = $point_rules['fields'][ $index ]['id']; } unset( $field );
+	list( $point_text, $point_strength, $point_life, $point_xp, $point_level ) = array_column( $point_rules['fields'], 'id' );
+	$point_input['progression_mode'] = 'configured';
+	$point_input['progression'] = array( 'experience_field' => $point_xp, 'level_field' => $point_level, 'thresholds' => "0:1\n100:2\n300:4" );
+	$point_input['allocation_mode'] = 'level';
+	$point_input['allocation'] = array( 'points' => '5', 'per_level' => '2', 'fields' => array( $point_strength ) );
+	$point_rules = ps_pen_paper_save_rules( $point_campaign_id, $point_input, '1' );
+	$check( ! is_wp_error( $point_rules ) && ps_pen_paper_valid_rules_document( $point_rules ) && ps_pen_paper_import_rules_valid( $point_rules ), 'Level point rules failed native or import validation.' );
+	$point_values = array( 'name' => 'Level point hero', 'values' => array(
+		$point_text => 'Start', $point_strength => '5', $point_life => array( 'current' => '10', 'maximum' => '20' ), $point_xp => '0', $point_level => '1',
+	) );
+	wp_set_current_user( $users['player'] );
+	foreach ( array(
+		array( $point_strength => '6' ), array( $point_xp => '100', $point_strength => '7' ),
+		array( $point_level => '4' ), array( $point_life => array( 'current' => '11', 'maximum' => '19' ) ),
+	) as $changes ) {
+		$forged = $point_values; $forged['values'] = array_replace( $forged['values'], $changes );
+		$check( is_wp_error( ps_pen_paper_save_character( $point_campaign_id, 0, $users['player'], $forged, '0', '2' ) ), 'Player invented start points, experience, level or resources.' );
+	}
+	$point_character = ps_pen_paper_save_character( $point_campaign_id, 0, $users['player'], $point_values, '0', '2' );
+	$check( is_int( $point_character ), 'Valid initial point distribution failed.' );
+	wp_set_current_user( $users['gm'] );
+	$check( true === ps_pen_paper_review_character( $point_campaign_id, $point_character, 'approve', '1' ), 'Initial point distribution approval failed.' );
+	$point_values['values'][ $point_xp ] = '100';
+	$check( $point_character === ps_pen_paper_save_character( $point_campaign_id, $point_character, $users['player'], $point_values, '2', '2' ), 'Level-up required spending new points in the same operation.' );
+	$point_state = ps_pen_paper_raw_character_state( $point_character );
+	$check( 2 === $point_state['active']['values'][ $point_level ] &&
+		7 === ps_pen_paper_character_point_budget( $point_state['active'], $point_rules ) &&
+		5 === $point_state['active']['values'][ $point_strength ], 'Level-up failed to leave two earned points available.' );
+	wp_set_current_user( $users['player'] );
+	$forged = $point_values; $forged['values'][ $point_strength ] = '8';
+	$check( is_wp_error( ps_pen_paper_save_character( $point_campaign_id, $point_character, $users['player'], $forged, '3', '2' ) ),
+		'Level 2 accepted more than the five start points plus two earned points.' );
+	$forged = $point_values; $forged['values'][ $point_xp ] = '300'; $forged['values'][ $point_strength ] = '11';
+	$check( is_wp_error( ps_pen_paper_save_character( $point_campaign_id, $point_character, $users['player'], $forged, '3', '2' ) ) &&
+		$point_state === ps_pen_paper_raw_character_state( $point_character ), 'Forged experience unlocked unearned points.' );
+	$point_values['values'][ $point_strength ] = '7'; $point_values['values'][ $point_level ] = '2';
+	$check( $point_character === ps_pen_paper_save_character( $point_campaign_id, $point_character, $users['player'], $point_values, '3', '2' ), 'Earned point distribution failed.' );
+	$point_state = ps_pen_paper_raw_character_state( $point_character );
+	$check( 5 === $point_state['active']['values'][ $point_strength ] && 7 === $point_state['pending']['values'][ $point_strength ], 'Point distribution bypassed configured approval.' );
+	wp_set_current_user( $users['gm'] );
+	$check( true === ps_pen_paper_review_character( $point_campaign_id, $point_character, 'approve', '4' ), 'Earned point approval failed.' );
+	$point_values['values'][ $point_xp ] = '300';
+	$check( $point_character === ps_pen_paper_save_character( $point_campaign_id, $point_character, $users['player'], $point_values, '5', '2' ), 'Multi-level advancement failed.' );
+	$point_state = ps_pen_paper_raw_character_state( $point_character );
+	$check( 4 === $point_state['active']['values'][ $point_level ] &&
+		11 === ps_pen_paper_character_point_budget( $point_state['active'], $point_rules ) &&
+		ps_pen_paper_import_character_valid( $point_state, $point_rules ), 'Multi-level point budget or import validity failed.' );
+	ob_start(); ps_pen_paper_render_character_form( ps_pen_paper_get_campaign( $point_campaign_id ), $point_rules, get_post( $point_character ), 0, null, false, true ); $point_html = ob_get_clean();
+	$check( false !== strpos( $point_html, 'data-point-budget="11"' ) &&
+		false === strpos( $point_html, 'name="character[values][' . $point_life . '][maximum]" type="number"' ) &&
+		false === strpos( $point_html, 'name="character[values][' . $point_xp . ']" type="number"' ), 'Profile exposed resource or experience overrides instead of earned points.' );
+	$own_point_character = ps_pen_paper_save_character( $point_campaign_id, 0, $users['gm'], $point_values, '0', '2' );
+	$check( is_int( $own_point_character ), 'GM own profile fixture failed.' );
+	$forged = $point_values; $forged['values'][ $point_life ]['maximum'] = '19';
+	$check( is_wp_error( ps_pen_paper_save_character( $point_campaign_id, $own_point_character, $users['gm'], $forged, '1', '2', true ) ),
+		'GM profile bypassed player resource restrictions.' );
+	$migration_input = $point_input; $migration_input['allocation']['per_level'] = '3';
+	$point_preview = ps_pen_paper_preview_rules_migration( $point_campaign_id, $migration_input, '2' );
+	$check( ! is_wp_error( $point_preview ), 'Level point migration preview failed.' );
+	ob_start(); ps_pen_paper_render_rules_migration_preview( ps_pen_paper_get_campaign( $point_campaign_id ), $point_preview ); $point_preview_html = ob_get_clean();
+	$document = new DOMDocument(); @$document->loadHTML( '<?xml encoding="UTF-8">' . $point_preview_html );
+	$body = array();
+	foreach ( $document->getElementsByTagName( 'input' ) as $element ) {
+		$name = $element->getAttribute( 'name' );
+		if ( '' !== $name ) { $body[] = rawurlencode( $name ) . '=' . rawurlencode( $element->getAttribute( 'value' ) ); }
+	}
+	parse_str( implode( '&', $body ), $point_posted );
+	$posted_point_preview = ps_pen_paper_preview_rules_migration( $point_campaign_id, $point_posted['rules'], '2' );
+	$check( ! is_wp_error( $posted_point_preview ) && $posted_point_preview['hash'] === $point_preview['hash'],
+		'Migration form dropped or changed the per-level point budget.' );
+	wp_set_current_user( $users['player'] );
 	$groups = array( array( 'sides' => 6, 'rolls' => array( 1, 4, 4, 6 ) ) );
 	$check( 3 === ps_pen_paper_dice_total( $groups, 0, 'pool', 4 ) &&
 		4 === ps_pen_paper_dice_total( $groups, 0, 'pool', 1 ) && 1 === ps_pen_paper_dice_total( $groups, 0, 'pool', 6 ) &&

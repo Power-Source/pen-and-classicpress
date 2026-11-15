@@ -8,6 +8,11 @@ function ps_pen_paper_event_labels() {
 	return array(
 		'rules_saved'         => __( 'Regelwerk gespeichert', 'ps-pen-paper' ),
 		'invitation_saved'    => __( 'Einladung geändert', 'ps-pen-paper' ),
+		'character_policy_saved' => __( 'Charaktervorgaben geändert', 'ps-pen-paper' ),
+		'member_invitation_saved' => __( 'Mitgliedereinladung geändert', 'ps-pen-paper' ),
+		'universe_members_saved' => __( 'Universumsmitgliedschaft geändert', 'ps-pen-paper' ),
+		'game_round' => __( 'Spielsitzung oder Runde geändert', 'ps-pen-paper' ),
+		'item_action_policy' => __( 'Profilrechte für Gegenstände geändert', 'ps-pen-paper' ),
 		'wiki_links_saved'    => __( 'Wiki-Verknüpfungen geändert', 'ps-pen-paper' ),
 		'campaign_restored'   => __( 'Kampagne wiederhergestellt', 'ps-pen-paper' ),
 		'turn_changed'        => __( 'Zug gewechselt', 'ps-pen-paper' ),
@@ -251,6 +256,18 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 		return $error;
 	}
 	$event['id'] = $post->ID;
+	if ( in_array( $event['kind'], array( 'game_round', 'item_action_policy' ), true ) ) {
+		$validator = 'game_round' === $event['kind'] ? 'ps_pen_paper_validate_game_round' : 'ps_pen_paper_validate_item_action_policy';
+		$visibility = 'game_round' === $event['kind'] ? 'group' : 'gm';
+		if ( $visibility !== $event['visibility'] || 0 !== $event['recipient_id'] || ! $validator( $event['before'] ) || ! $validator( $event['after'] ) ||
+			$event['after']['revision'] !== $event['before']['revision'] + 1 ) {
+			return new WP_Error( 'invalid_event', __( 'Die Spielrunden- oder Gegenstandsrechte im Protokoll sind beschädigt.', 'ps-pen-paper' ) );
+		}
+	}
+	if ( in_array( $event['kind'], array( 'character_policy_saved', 'member_invitation_saved', 'universe_members_saved' ), true ) &&
+		! ps_pen_paper_valid_policy_event( $event ) ) {
+		return new WP_Error( 'invalid_event', __( 'Die Charaktervorgaben oder Einladungsstände im Protokoll sind beschädigt.', 'ps-pen-paper' ) );
+	}
 	if ( in_array( $event['kind'], array( 'invitation_saved', 'wiki_links_saved' ), true ) ) {
 		$validator = 'invitation_saved' === $event['kind'] ? 'ps_pen_paper_valid_invitations' : 'ps_pen_paper_valid_wiki_links';
 		if ( 'gm' !== $event['visibility'] || ! $validator( $event['before'] ) || ! $validator( $event['after'] ) ||

@@ -92,7 +92,7 @@ function ps_pen_paper_render_event_details( $event, $scope = null ) {
 					?>
 					<p><?php echo esc_html( $event['member_name'] . ' · #' . $event['member_id'] ); ?></p>
 					<p><?php echo esc_html( $roles[ $member['role'] ] . ' · ' . $requests[ $member['request'] ] ); ?></p>
-				<?php elseif ( in_array( $event['kind'], array( 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved' ), true ) ) : ?>
+				<?php elseif ( in_array( $event['kind'], array( 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved', 'game_round', 'item_action_policy' ), true ) ) : ?>
 					<?php ps_pen_paper_render_equipment_history( $event['kind'], $event[ $key ] ); ?>
 				<?php elseif ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) : ?>
 					<?php foreach ( array( 'draft' => __( 'Entwurf', 'ps-pen-paper' ), 'published' => __( 'Freigegebener Stand', 'ps-pen-paper' ) ) as $scope => $heading ) :
@@ -129,6 +129,16 @@ function ps_pen_paper_render_event_details( $event, $scope = null ) {
 				<?php elseif ( 'universe_saved' === $event['kind'] ) : ?>
 					<p><?php echo esc_html( $event[ $key ]['name'] ); ?></p>
 					<p class="pspp-multiline"><?php echo esc_html( $event[ $key ]['description'] ); ?></p>
+				<?php elseif ( 'character_policy_saved' === $event['kind'] ) : ?>
+					<p><?php echo esc_html( sprintf( __( 'Maximal %d Charaktere je Spieler', 'ps-pen-paper' ), $event[ $key ]['max_characters'] ) ); ?></p>
+					<p><?php echo esc_html( 'members' === $event[ $key ]['creation_access'] ? __( 'Erstellung nur für Mitglieder', 'ps-pen-paper' ) : __( 'Erstellung für Website-Mitglieder', 'ps-pen-paper' ) ); ?></p>
+					<p><?php echo esc_html( $event[ $key ]['custom_portraits'] ? __( 'Eigene Charakterbilder erlaubt', 'ps-pen-paper' ) : __( 'Eigene Charakterbilder deaktiviert', 'ps-pen-paper' ) ); ?></p>
+					<p><?php echo esc_html( 'approval' === $event[ $key ]['member_invites'] ? __( 'Spielereinladungen benötigen Freigabe', 'ps-pen-paper' ) : __( 'Direkte Spielereinladungen erlaubt', 'ps-pen-paper' ) ); ?></p>
+					<ul><?php foreach ( $event[ $key ]['presets'] as $preset ) : ?><li><?php echo esc_html( $preset['name'] . ' · #' . $preset['asset_id'] ); ?></li><?php endforeach; ?></ul>
+				<?php elseif ( 'member_invitation_saved' === $event['kind'] ) : ?>
+					<ul><?php foreach ( $event[ $key ]['entries'] as $entry ) : ?><li><?php echo esc_html( '#' . $entry['user_id'] . ' · ' . __( 'Eingeladen von', 'ps-pen-paper' ) . ' #' . $entry['inviter_id'] . ' · ' . ( 'approval' === $entry['status'] ? __( 'Freigabe ausstehend', 'ps-pen-paper' ) : __( 'Einladung offen', 'ps-pen-paper' ) ) ); ?></li><?php endforeach; ?></ul>
+				<?php elseif ( 'universe_members_saved' === $event['kind'] ) : ?>
+					<p><?php echo esc_html( __( 'Mitglieder:', 'ps-pen-paper' ) . ' ' . implode( ', ', $event[ $key ]['users'] ) ); ?></p>
 				<?php elseif ( 'universe_linked' === $event['kind'] ) : ?>
 					<p><?php echo esc_html( $event[ $key ]['universe_id'] ? $event[ $key ]['name'] : __( 'Ohne Universum', 'ps-pen-paper' ) ); ?></p>
 				<?php elseif ( 'turn_changed' === $event['kind'] ) : ?>
@@ -205,7 +215,7 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 							$snapshot = array( 'name' => $event['character_name'] );
 						} elseif ( 'currency_saved' === $event['kind'] ) {
 							$snapshot = array( 'name' => $event['after']['name'] );
-						} elseif ( in_array( $event['kind'], array( 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved' ), true ) ) {
+						} elseif ( in_array( $event['kind'], array( 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved', 'game_round', 'item_action_policy', 'character_policy_saved', 'member_invitation_saved', 'universe_members_saved' ), true ) ) {
 							$snapshot = array( 'name' => $labels[ $event['kind'] ] );
 						} elseif ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) {
 							$snapshot = array( 'name' => $event['after']['draft']['title'] );

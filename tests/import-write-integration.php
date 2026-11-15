@@ -179,6 +179,37 @@ try {
 	$image_path = wp_tempnam( 'pspp-import-write.png' );
 	$check( $image_path && false !== file_put_contents( $image_path, base64_decode( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=' ) ), 'Rich image fixture failed.' );
 	$assert_result( ps_pen_paper_save_sheet_style( $rich, '0', $image_path ), 'Rich protected image failed' );
+	$assert_result( ps_pen_paper_add_portrait_preset( $world, 'Restore portrait', $image_path, '0' ), 'Portrait policy fixture failed' );
+	$assert_result( ps_pen_paper_save_slot_icon( $rich, 'hand', '1', $image_path ), 'Slot image fixture failed' );
+	$assert_result( ps_pen_paper_change_member_invitation( $world, $users['old_owner'], 'invite', '0' ), 'World invitation fixture failed' );
+	wp_set_current_user( $users['old_owner'] );
+	$assert_result( ps_pen_paper_change_member_invitation( $world, $users['old_owner'], 'accept', '1' ), 'World membership fixture failed' );
+	wp_set_current_user( $users['gm'] );
+	$assert_result( ps_pen_paper_change_member_invitation( $world, $users['new_player'], 'invite', '2' ), 'Pending invitation fixture failed' );
+	$assert_result( ps_pen_paper_save_item_action_policy( $rich, array( 'enabled' => 'yes', 'during_active' => 'yes', 'equip' => 'allow', 'use' => 'allow' ), '0' ), 'Outside action policy fixture failed' );
+	$assert_result( ps_pen_paper_control_game_round( $rich, 'start_game_session', '0' ), 'Round fixture failed' );
+	$consumables = array();
+	foreach ( array( 'immediate', 'approval' ) as $condition ) {
+		$consumable = $assert_result( ps_pen_paper_save_item( $rich, 0, array( 'name' => 'Restore consumable ' . $condition, 'description' => '', 'kind' => 'consumable',
+			'rarity' => 'normal', 'binding' => 'tradeable', 'properties' => '', 'bonuses' => array(),
+			'use' => array( 'condition' => $condition, 'expression' => '', 'attribute' => '', 'threshold' => '0', 'failure' => 'keep',
+				'temporary' => 'temporary', 'rounds' => '0', 'effects' => array( $world_rules['fields'][0]['id'] => '1' ) ) ), '0' ), 'Consumable fixture failed' );
+		$before_items = ps_pen_paper_gear_state( $alias )['active']['items'];
+		$assert_result( ps_pen_paper_save_gear( $rich, $alias, 'grant_item', array( 'item_id' => (string) $consumable, 'item_revision' => '1' ),
+			(string) ps_pen_paper_gear_state( $alias )['revision'] ), 'Consumable grant failed' );
+		$uuid = array_key_first( array_diff_key( ps_pen_paper_gear_state( $alias )['active']['items'], $before_items ) );
+		$consumables[ $condition ] = $uuid;
+		if ( 'approval' === $condition ) { wp_set_current_user( $users['player'] ); }
+		$use_state = $assert_result( ps_pen_paper_character_state( $rich, get_post( $alias ), false ), 'Consumable character unavailable' );
+		$assert_result( ps_pen_paper_use_item( $rich, $alias, 'use_item', array( 'instance_id' => $uuid,
+			'character_revision' => ps_pen_paper_item_use_character_revision( $use_state ), 'rules_revision' => '1',
+			'round_revision' => '1', 'policy_revision' => '1' ), (string) ps_pen_paper_gear_state( $alias )['revision'],
+			'immediate' === $condition ? 'profile' : 'game' ), 'Consumable use fixture failed' );
+	}
+	$tool_uuid = array_key_first( ps_pen_paper_gear_state( $alias )['active']['items'] );
+	$assert_result( ps_pen_paper_save_gear( $rich, $alias, 'equip_items', array( 'slots' => array( 'hand' => $tool_uuid ) ),
+		(string) ps_pen_paper_gear_state( $alias )['revision'], 'profile' ), 'Pending profile equipment fixture failed' );
+	wp_set_current_user( $users['gm'] );
 	$scenes = array();
 	foreach ( array( 'Restored start', 'Restored ending' ) as $title ) {
 		$scene = $assert_result( ps_pen_paper_save_scene( $rich, 0, array( 'title' => $title, 'text' => $title, 'secret' => '', 'grid' => '0' ), '0' ), 'Rich scene failed' );
@@ -206,7 +237,24 @@ try {
 	$check( $new_context['universe_id'] === $new_world && $new_context['source_id'] !== $base &&
 		(int) get_post( $new_context['source_id'] )->post_parent === $new_world, 'Shared alias was not rebound to the copied base.' );
 	$gear = ps_pen_paper_gear_state( $new_alias );
-	$check( 1 === count( $gear['active']['items'] ) && array_keys( $gear['active']['items'] ) === array_keys( ps_pen_paper_gear_state( $alias )['active']['items'] ), 'Copy changed item UUIDs or executed the grant again.' );
+	$check( 2 === count( $gear['active']['items'] ) && array_keys( $gear['active']['items'] ) === array_keys( ps_pen_paper_gear_state( $alias )['active']['items'] ), 'Copy changed item UUIDs or executed the grant again.' );
+	$check( 'profile' === $gear['pending_context'] && $gear['pending']['slots']['hand'] === $tool_uuid &&
+		$gear['uses']['pending'][ $consumables['approval'] ]['actor_id'] === $users['player'] &&
+		$gear['uses']['receipts'][ $consumables['immediate'] ]['actor_id'] === $users['new_gm'] &&
+		'profile' === $gear['uses']['receipts'][ $consumables['immediate'] ]['context'] &&
+		3 === ps_pen_paper_character_state( $new_campaign, get_post( $new_alias ) )['active']['values'][ $world_rules['fields'][0]['id'] ],
+		'Restore lost pending context, actors, consumption receipt or temporary effect.' );
+	$new_policy = $assert_result( ps_pen_paper_character_policy( $new_world ), 'Copied character policy unreadable' );
+	$source_portrait = ps_pen_paper_character_policy( $world )['presets'][0]['asset_id'];
+	$copied_portrait = $new_policy['presets'][0]['asset_id'];
+	$copied_slot = ps_pen_paper_equipment_schema( $new_campaign )['slots']['hand']['asset_id'];
+	$check( $copied_portrait !== $source_portrait && (int) get_post( $copied_portrait )->post_parent === $new_world &&
+		(int) get_post( $copied_slot )->post_parent === $new_campaign->ID &&
+		ps_pen_paper_universe_members( $new_world )['users'] === array( $users['old_owner'] ) &&
+		ps_pen_paper_member_invitations( $new_world )['entries'][0]['inviter_id'] === $users['new_gm'] &&
+		ps_pen_paper_game_round( $new_campaign->ID ) === ps_pen_paper_game_round( $rich_id ) &&
+		ps_pen_paper_item_action_policy( $new_campaign ) === ps_pen_paper_item_action_policy( $rich ),
+		'Restore lost private asset ownership, membership, invitation actors, rounds or outside policy.' );
 	$new_wallet = $assert_result( ps_pen_paper_wallet_context( $new_campaign, $new_alias ), 'Restored wallet cannot be read' );
 	$check( 7 === $new_wallet['wallet']['balance'], 'Rich copy changed wallet balance.' );
 	$new_runs = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_parent=%d AND post_type='pspp_adventure_run'", $new_campaign->ID ) );

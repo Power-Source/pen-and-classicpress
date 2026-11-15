@@ -176,6 +176,12 @@ Im Backend unter **Pen & Paper** und auf der Startseite des Frontend-Spielbereic
 
 ### Universum anlegen und Kampagnen zuordnen
 
+Neue Kampagnen benötigen immer ein vorhandenes Universum: zuerst unter
+**Universen** die Welt erstellen, danach im Kampagnenformular diese Welt wählen.
+Ohne verwaltbares Universum führt der Einstieg direkt zur Welterstellung.
+Ältere, unzugeordnete Kampagnen werden nicht automatisch verändert; ihre
+Zuordnung erfolgt bewusst über die folgende Vorschau.
+
 1. Als Administrator oder mit der Erstellberechtigung unter **Universen**
    einen Namen und eine interne Weltbeschreibung speichern.
 2. Unter **Kampagne zuordnen oder lösen** die eigene Kampagne und das
@@ -418,7 +424,25 @@ zulässigen Werte. Ein anderer Wert wird beim Speichern abgelehnt.
 Unter **Optionale Attribut-Punkteverteilung** kann die Spielleitung Attribute
 auswählen und eine Gesamtsumme festlegen. Diese Attribute müssen zusammen
 genau die konfigurierte Punktzahl ergeben; es sind keine zusätzlichen Punkte
-oberhalb ihrer Startwerte. Ohne aktivierte Punkteverteilung gilt kein Punktepool.
+oberhalb ihrer Startwerte. Ohne aktivierte Punkteverteilung gilt kein Punktepool:
+bei der eigenen Erstellung bleiben Zahlenwerte auf den Vorgaben der Leitung.
+Name, Hintergrund und erlaubte Auswahlen können selbst eingegeben werden;
+Lebenspunkte, Ressourcenmaxima, Erfahrung und Level nicht.
+
+Für ein Levelsystem **Startpunkte und Punkte je Level** auswählen:
+
+1. Die Attribute markieren, auf die Spieler Punkte verteilen dürfen.
+2. **Startpunkte** und **Zusätzliche Punkte je Levelaufstieg** festlegen.
+3. Stufenregeln ab Level 1 und dem Erfahrungsminimum verwenden.
+
+Beispiel: 10 Startpunkte und 2 Punkte je Aufstieg erlauben auf Level 1
+insgesamt 10, auf Level 2 insgesamt 12 und auf Level 3 insgesamt 14 Punkte.
+Der Bogen zeigt die noch verfügbaren Punkte während der Eingabe an.
+Die Leitung vergibt Erfahrung; das erreichte Level bestimmt das Budget.
+Ein Aufstieg erzwingt keine sofortige Verteilung: offene Punkte bleiben
+verfügbar. Feldgrenzen und gegebenenfalls die Attributfreigabe gelten weiter.
+Manipulierte Formulare können weder zusätzliche Punkte noch eigene
+Ressourcen-, Erfahrungs- oder Levelwerte erzeugen.
 
 ### Bearbeitungsrechte je Feld
 
@@ -450,9 +474,16 @@ Stufen müssen aufsteigend sein und innerhalb ihrer Feldgrenzen liegen.
 Punkteverteilungsfelder sind ausgeschlossen. Die Stufe entspricht der höchsten
 erreichten Schwelle des jeweiligen Erfahrungsstandes; sinkende Erfahrung kann
 auch die Stufe senken. Beantragte Erfahrung verändert nur die beantragte Stufe.
+Dies gilt für Stufenregeln ohne Level-Punktepool. Mit **Startpunkte und Punkte
+je Level** vergibt ausschließlich die Leitung Erfahrung; andere Zahlenwerte
+außerhalb des Attributpools sind ebenfalls leitungsverwaltet.
 Das Stufenfeld ist nicht manuell editierbar. Klassen und Attributboni werden
 nicht vergeben; Erfahrung und Stufe erhalten keine Ausrüstungsboni oder
 Kampagnenauflagen. Beim Ausschalten bleiben vorhandene Werte erhalten.
+Bei einem aktiven Level-Punktepool muss dieser vor dem Ausschalten ausdrücklich
+auf eine feste Punkteverteilung oder **Nicht verwenden** umgestellt werden.
+Leitungskonten erhalten im Spielerprofil dieselben eingeschränkten
+Spieler-Eingaben; administrative Korrekturen erfolgen in der Spielverwaltung.
 
 ### Zusätzliche Würfelmechaniken
 
@@ -618,7 +649,8 @@ ausschließlich für Spielleitung und Administration protokolliert.
 
 ## 9. Farben anpassen
 
-Unter **„Rundeneinstellungen“ → „Farben & Lesbarkeit anpassen“**:
+Als Universumsleitung unter **„Vorbereiten & verwalten“ → „Universen“ →
+„UI-Farben des Universums (optional)“**:
 
 1. Hintergrund, Flächen, Text, Schaltflächen, Links und Rahmen auswählen.
 2. Live-Vorschau und Kontrasthinweise prüfen.
@@ -630,7 +662,11 @@ Hex-Farben haben sechs Stellen, etwa `#142b36`.
 Die Schrift auf Schaltflächen wird automatisch schwarz oder weiß gewählt.
 Der Kontrastrichtwert beträgt 4,5:1; Hinweise verhindern das Speichern nicht.
 **„Standardfarben laden“** setzt zunächst nur die Eingaben zurück.
-Die Farben verändern nicht das Theme oder andere Kampagnen.
+Die Farben gelten für die Kampagnen und Charakteransichten dieses Universums,
+auch im eigenen PS-Community-Profil. Sie verändern nicht das Theme oder andere
+Universen. Ohne eigene Farbauswahl gelten die Standardfarben.
+Noch nicht zugeordnete Bestandskampagnen behalten bis zur kontrollierten
+Universumszuordnung ihre bisherige Gestaltung.
 
 ### Ein eigenes Bild für den Spieltisch
 
@@ -965,12 +1001,46 @@ Profilseite mit `[cpc-activity-page]` anlegen und in Community zuordnen,
 falls noch keine vorhanden ist. Bei aktiviertem Permalinkmodus muss die
 zugehörige Community-Profiladresse erreichbar sein.
 
-Im **eigenen** Profil **Pen & Paper** öffnen und den eigenen
-Kampagnencharakter auswählen. Alternativ führt **Mein Charakterprofil**
+Im **eigenen** Profil **Pen & Paper** öffnen. **Meine Charaktere** bietet die
+Auswahl eigener Bögen, einschließlich noch nicht freigegebener Figuren.
+Unter **Charakter erstellen** ein verfügbares Universum wählen und **Weiter**
+anklicken. Die dort geltenden Vorgaben und das Charakterlimit bestimmen, ob
+ein neuer Bogen erstellt werden kann. Neue Figuren benötigen gegebenenfalls
+die Freigabe der Spielleitung. Erhaltene Einladungen erscheinen ebenfalls hier;
+Leitungsfreigaben werden dagegen in der betreffenden Spielrunde verwaltet.
+
+Im Profil wird ein vorhandener eigener Charakter direkt geöffnet. Die Tabs
+**Werte** und **Inventar** zeigen seine Stats, Ressourcen und Gegenstände.
+Ein eingerichtetes Universum erlaubt standardmäßig die eigene Erstellung für
+Website-Mitglieder; eine weitere Mitgliedschaft ist nicht vorgeschaltet.
+Nur eine ausdrücklich gespeicherte Zugangsbeschränkung der Leitung begrenzt dies.
+
+**Deine Einladungen** nennt jeweils die Spielrunde beziehungsweise das Universum
+und den Absender. Hier werden erhaltene Einladungen **angenommen** oder
+**abgelehnt**. Das Spielerprofil enthält keine Mitgliederverwaltung,
+Einladungsfreigaben oder Spieleauswahl.
+
+Im Spielbereich unter **Mitspieler zu dieser Runde einladen** lädt die Leitung
+oder ein berechtigtes Mitglied einen Spieler zur ausdrücklich benannten Runde
+ein. Vorschläge von Mitgliedern bestätigt standardmäßig zuerst die Leitung.
+Diese Freigaben und gesendete Einladungen werden dort verwaltet, nicht im Profil.
+Nach Annahme ist die Runde im **Spielbereich** zugänglich.
+Unter **Bögen** den freigegebenen Universumscharakter auswählen und
+**Mit diesem Charakter mitspielen** einreichen; die Leitung bestätigt die
+Aufnahme unter **Werte → Offener Antrag → Freigeben**.
+Eine leere neue Kampagne bietet **Regeln dieses Universums übernehmen**.
+Bestehende Regeln werden nicht automatisch überschrieben.
+
+Alternativ führt **Mein Charakterprofil**
 am Spieltisch dorthin. Im Tab lassen sich Bogen, Porträt und Ausrüstung
 bearbeiten. **Zur Bogenübersicht** führt zur eigenen Profilauswahl zurück.
 Profilformulare werden auf der Frontend-Profilseite verarbeitet und bleiben
 nach dem Speichern dort.
+
+Profil und Spiel verwenden dieselbe Bogenansicht: **Charakter**, **Werte**,
+**Inventar**, **Abenteuer** und die erlaubten Bearbeitungsfunktionen. Das
+Charakterbild steht zwischen den Ausrüstungsspalten. Level wird nur bei
+eingestellter Stufenentwicklung angezeigt; Universumsfarben gelten auch hier.
 
 Andere Profilbesucher und Freunde erhalten weder fremde Bögen noch Inventare.
 Auch ein direkter Community-AJAX-Aufruf vergibt keine zusätzlichen Rechte.
@@ -983,7 +1053,13 @@ Im Spielbereich **Gegenstände → Slots und Seltenheitsstufen konfigurieren**
 öffnen. Derselbe Katalog ist in der Backend-Kampagnenverwaltung und für
 Universumsleitungen beim jeweiligen Universum erreichbar.
 
-Beispiel für Slots, eine Zeile pro Slot:
+Die Vorgabe zeigt **Kopf, Beine und Füße** links sowie **Brust, Arme und Hände**
+rechts vom Charakterbild. Namen lassen sich direkt ändern; Slots können
+ausgeblendet, einer Seite zugewiesen oder mit einem privaten Bild versehen werden.
+Ausblenden verändert weder die bestehende Belegung noch ihre Boni.
+
+Zusätzliche Slots können über die erweiterte Eingabe angelegt werden.
+Beispiel für deren Zeilenformat:
 
 ```text
 kopf | Kopf | kopfbedeckung
@@ -994,8 +1070,11 @@ brust | Brust | oberbekleidung
 Die drei Teile sind **stabile Kennung | sichtbarer Name | passender
 Gegenstandstyp**. Eine Kopfbedeckung passt nur in einen entsprechend
 konfigurierten Slot. Eine konkrete Instanz darf nicht gleichzeitig mehrere
-Slots belegen. Bestehende Kennungen dürfen nicht entfernt und Slottypen
-nicht umgedeutet werden; Namen bleiben änderbar.
+Slots belegen. Bestehende Slottypen werden nicht still umgedeutet.
+**Entfernen** benötigt eine ausdrückliche Bestätigung: Belegung und betroffene
+offene Anträge werden kontrolliert angepasst; Gegenstände bleiben im Inventar,
+alte Nachweise bleiben erhalten. Die bisherige Kennung bleibt als entfernt
+registriert und darf nicht für einen anderen Gegenstandstyp wiederverwendet werden.
 
 Beispiel für unabhängige Seltenheitsstufen:
 
@@ -1028,6 +1107,63 @@ verwenden. Standalone-Kampagnen verwenden ihren eigenen Katalog.
 Vorlagenänderungen gelten nur für spätere Ausgaben, nicht für bereits
 ausgegebene Exemplare. Ein Charakter besitzt zunächst höchstens 100
 einzelne Exemplare; Stapelmengen und eine Entzugs-/Löschoberfläche fehlen.
+
+### Verbrauchsgüter und Gegenstandswirkungen
+
+In der Vorlage unter **Ausrüstung oder konfigurierbarer Verbrauch** die
+**Voraussetzung im Spiel** wählen: sofort, SL-Freigabe, Probe oder eine echte
+Spielrunde aussetzen. Slotgebundene Ausrüstung wird dagegen angelegt, nicht
+verbraucht. Für Verbrauchsgüter die gewünschten ganzzahligen Änderungen an
+Attributen, Zahlen oder dem aktuellen Ressourcenwert und die Wirkungsdauer
+eintragen. Klassen, Heiltränke und Mana sind mögliche eigene Konfigurationen,
+keine eingebauten Spielregeln. Geld bleibt im konfigurierten Guthaben.
+
+Im Charaktertab **Inventar** zeigt jedes Exemplar seine Voraussetzung und
+Wirkung. **Gezeigte Folgen bestätigen / Gegenstand verwenden** verarbeitet
+genau dieses Exemplar. Unzulässige Werte,
+fehlende Rechte oder veraltete Stände verhindern den gesamten Vorgang.
+Eine Probe wird pro Exemplar einmal aufgelöst; auch ein Fehlschlag oder eine
+Ablehnung wird gespeichert und darf nicht durch Wiederholen ersetzt werden.
+Bei erfolgreichem Verbrauch verschwindet das Exemplar aus dem Inventar,
+während der Nachweis erhalten bleibt.
+
+Temporäre Zahlenänderungen sind additive Effekte. Ressourcenänderungen werden
+am tatsächlichen Charakterstand gebucht, damit sie anschließend ausgegeben
+werden können. Beim Beenden wird nur die aufgezeichnete Änderung abgezogen,
+nicht ein alter Gesamtstand zurückgeschrieben. Ein unzulässiges Effektende
+bleibt bis zur Korrektur durch die Leitung gesperrt.
+
+Unter **Spieltisch → Spielsitzung und Runden steuern** startet und beendet die
+Leitung die Sitzung und zählt über **Nächste Spielrunde / fällige Effekte
+beenden** weiter. Aussetzen sperrt charaktergebundene Würfe, Abenteueraktionen
+und die Kartenbewegung des Besitzers bis zur nächsten ausdrücklich gezählten
+Runde. AFK, Uhrzeit und Seitenaufrufe zählen nicht. Temporäre Kampagneneffekte
+können eine zusätzliche Rundendauer haben; temporäre Universums-Basiseffekte
+beendet ausschließlich die Universumsleitung ausdrücklich.
+
+### Aktionen im Profil außerhalb des Spiels
+
+Beim Universum beziehungsweise der Kampagne **Ausrüstung und Verbrauch
+außerhalb des Spiels** öffnen. Profilaktionen sind zunächst deaktiviert.
+Die Leitung erlaubt sie ausdrücklich und entscheidet getrennt über
+**Ausrüstung wechseln** und **Gegenstände verbrauchen**: sofort, verboten oder
+mit SL-Freigabe. Optional können Aktionen während einer gestarteten Sitzung
+erlaubt werden. Ohne diese zusätzliche Erlaubnis bleiben sie dann gesperrt;
+bei einem gemeinsamen Basisbogen zählen auch dessen aktive Kampagnensitzungen.
+
+Slots und einzelne Exemplare können weitere Einschränkungen erhalten.
+Ein Verbot hat Vorrang; Freigabeauflagen bleiben wirksam. Erlaubter
+Profilverbrauch benötigt keine Probe und kein Rundenaussetzen.
+Die erforderliche Zustimmung folgt den Profilregeln, nicht der ausschließlich
+für das Spiel eingestellten Voraussetzung. Bereits offene Spielanträge lassen
+sich durch einen Profilaufruf nicht in sofortigen Verbrauch umwandeln.
+Besitz, Verbrauch, Feldgrenzen und Protokoll gelten in beiden Ansichten.
+
+Ein Universumsbasisbogen besitzt ein eigenes Inventar. Ressourcenänderungen
+werden einmal am gemeinsamen Basisstand gebucht und in verbundenen
+Kampagnen angezeigt. Kampagnenausrüstung und deren Zahlenmodifier bleiben
+unabhängig. Profilaktionen werden auf der signierten Profilseite verarbeitet;
+ein frei übermitteltes Kontextfeld vergibt keine Rechte.
 
 ### Ausrüstung auswählen und freigeben
 

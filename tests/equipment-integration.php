@@ -8,6 +8,7 @@ require_once ABSPATH . 'wp-admin/includes/user.php';
 if ( is_multisite() ) { require_once ABSPATH . 'wp-admin/includes/ms.php'; }
 foreach ( array( 'campaign', 'universe', 'character', 'item', 'asset', 'roll', 'event' ) as $type ) { call_user_func( 'ps_pen_paper_register_' . $type . '_type' ); }
 $original_user = get_current_user_id();
+$original_get = $_GET;
 $users = array();
 $parents = array();
 $path = '';
@@ -39,6 +40,8 @@ try {
 	$path = wp_tempnam( 'pspp-gear-test.png' );
 	$check( false !== file_put_contents( $path, base64_decode( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=' ) ), 'Image fixture failed.' );
 	$check( ! ps_pen_paper_community_available() && is_wp_error( ps_pen_paper_save_equipment_schema( $campaign, array(), '0' ) ), 'Inventory worked without Community.' );
+	ob_start(); ps_pen_paper_render_table_sheet( $campaign, 0 ); $standalone_sheet = ob_get_clean();
+	$check( false !== strpos( $standalone_sheet, 'Neuen Charakter erstellen' ), 'Removing duplicate profile creation also removed the standalone fallback.' );
 	wp_set_current_user( $users['player'] );
 	$check( true === ps_pen_paper_save_portrait( $campaign, $character_id, '0', 'upload', $path ), 'Core portrait requires Community.' );
 	$check( '' === ps_pen_paper_portrait_image( $campaign, $character ), 'Pending portrait exposed as approved.' );
@@ -89,8 +92,9 @@ try {
 	$check( is_int( ps_pen_paper_save_character( $profile_id, 0, $users['gm'], $foreign_values, '0', '1' ) ), 'Foreign profile character fixture failed.' );
 	wp_set_current_user( $users['player'] );
 	$profile_html = cpc_render_profile_tab_content( $users['player'], 'pspp' );
+	$check( 1 === preg_match( '/<form\b[^>]*class="pspp-character-picker"[^>]*>.*?<\/form>/s', $profile_html, $picker_match ), 'Own character picker is missing.' );
 	$check( false !== strpos( $profile_html, 'PRIVATE_HERO' ) && false !== strpos( $profile_html, 'Kampagne: Equipment fixture' ) &&
-		false === strpos( $profile_html, 'PROFILE_EMPTY_CAMPAIGN' ) && false === strpos( $profile_html, 'PROFILE_FOREIGN_CHARACTERS' ) &&
+		false === strpos( $picker_match[0], 'PROFILE_EMPTY_CAMPAIGN' ) && false === strpos( $picker_match[0], 'PROFILE_FOREIGN_CHARACTERS' ) &&
 		false === strpos( $profile_html, 'PROFILE_FOREIGN_HERO' ), 'Own profile displayed empty/foreign campaign headings or lost character association.' );
 	wp_set_current_user( $users['outsider'] );
 	$profile_html = cpc_render_profile_tab_content( $users['outsider'], 'pspp' );
@@ -104,6 +108,20 @@ try {
 	}
 	$game_page = ps_pen_paper_find_frontend_page( $page_id );
 	$check( $game_page && $game_page->ID !== $page_id, 'Profile was selected as a game page.' );
+	$_GET = array( 'pspp_character' => (string) $character_id );
+	$selected_profile = cpc_render_profile_tab_content( $users['player'], 'pspp' );
+	$check( false !== strpos( $selected_profile, 'PRIVATE_HERO' ) &&
+		false !== strpos( $selected_profile, 'name="pspp_profile"' ) &&
+		false !== strpos( $selected_profile, 'name="tab" value="pspp"' ) &&
+		false === strpos( $selected_profile, 'Meine Spiele' ) &&
+		false === strpos( $selected_profile, 'Zum Spieltisch' ) &&
+		false === strpos( $selected_profile, 'Zur Spielrunde einladen' ) &&
+		false === strpos( $selected_profile, 'Dieser Charakter gehört nicht' ), 'Profile failed to open the owned character or included game navigation/invitation administration.' );
+	$_GET['pspp_campaign'] = (string) $profile_id;
+	$mismatched_profile = cpc_render_profile_tab_content( $users['player'], 'pspp' );
+	$check( false !== strpos( $mismatched_profile, 'Dieser Charakter gehört nicht' ) &&
+		false === strpos( $mismatched_profile, 'name="pspp_profile"' ), 'Mismatched profile scope opened editable character forms.' );
+	$_GET = $original_get;
 	ob_start(); ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); $adventure_html = ob_get_clean();
 	$check( false !== strpos( $adventure_html, esc_url( ps_pen_paper_game_url( $game_page->ID, $campaign->ID ) . '#pspp-group-adventures' ) ) &&
 		false === strpos( $adventure_html, esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-group-adventures' ) ), 'Profile adventure link did not reach the actual game page.' );
@@ -180,6 +198,33 @@ try {
 	$world_field = $world_rules['fields'][0]['id'];
 	$world_input = array( 'name' => 'Shared equipment hero', 'values' => array( $world_field => '5' ) );
 	$base_id = ps_pen_paper_save_character( $universe_id, 0, $users['player'], $world_input, '0', '1' );
+	ob_start();
+	ps_pen_paper_render_character_form( $universe, $world_rules, null, 0, null, true );
+	$gm_profile_form = ob_get_clean();
+	$check( false !== strpos( $gm_profile_form, 'Charakter speichern' ) &&
+		false === strpos( $gm_profile_form, 'Zur Freigabe einreichen' ) &&
+		false === strpos( $gm_profile_form, '<select id="pspp-character-owner"' ), 'Own-profile GM creation misstated approval or offered a different owner.' );
+	$check( false === strpos( $gm_profile_form, 'name="character[values][' . $world_rules['fields'][0]['id'] . ']" type="number"' ),
+		'GM profile creation exposed arbitrary numeric start values.' );
+	$forged_profile = $world_input; $forged_profile['values'][ $world_rules['fields'][0]['id'] ] = '6';
+	$check( is_wp_error( ps_pen_paper_create_own_universe_character( $universe_id, $forged_profile, '1' ) ),
+		'GM profile creation accepted an invented numeric start value.' );
+	ob_start(); ps_pen_paper_render_campaign_create_form(); $campaign_form = ob_get_clean();
+	$check( false !== strpos( $campaign_form, '>Private item universe</option>' ) &&
+		false === strpos( $campaign_form, '>PS Pen &amp; Paper Universe</option>' ), 'Campaign creation offered technical universe titles instead of the configured world names.' );
+	$_GET = array( 'pspp_character' => (string) $base_id );
+	$gm_base_id = ps_pen_paper_save_character( $universe_id, 0, $users['gm'], $world_input, '0', '1' );
+	$check( is_int( $gm_base_id ), 'Own GM base fixture failed.' );
+	$_GET['pspp_character'] = (string) $gm_base_id;
+	$base_profile = cpc_render_profile_tab_content( $users['gm'], 'pspp' );
+	$check( false !== strpos( $base_profile, 'Universum: Private item universe' ) &&
+		false === strpos( $base_profile, 'Universum: PS Pen &amp; Paper Universe' ) &&
+		false === strpos( $base_profile, 'Website-Mitglied einladen' ) &&
+		false === strpos( $base_profile, 'Zum Universum einladen' ), 'Selected universe character lost its world name or included membership administration.' );
+	$_GET = array();
+	$default_profile = cpc_render_profile_tab_content( $users['gm'], 'pspp' );
+	$check( false !== strpos( $default_profile, 'Dein Charakter' ) && false !== strpos( $default_profile, 'Inventar' ) &&
+		false !== strpos( $default_profile, 'Werte' ), 'Own profile did not open an existing character with stats and inventory by default.' );
 	$linked_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['outsider'], 'post_title' => 'Linked equipment fixture' ), true );
 	$check( is_int( $base_id ) && is_int( $linked_id ), 'Linked fixture failed.' );
 	$parents[] = $linked_id;
@@ -190,6 +235,9 @@ try {
 	$check( ! is_wp_error( ps_pen_paper_save_universe_link( $linked_id, $universe_id, '0', '1', 'confirmed' ) ) && ! is_wp_error( ps_pen_paper_adopt_universe_rules( $linked_id, '1', 'confirmed' ) ), 'Universe link/adoption failed.' );
 	$alias_id = ps_pen_paper_attach_base_character( $linked_id, $base_id, '1', '1', 'shared', 'confirmed' );
 	$check( is_int( $alias_id ) && true === ps_pen_paper_save_equipment_schema( $universe, $schema, '0' ) && true === ps_pen_paper_save_equipment_schema( $linked, $schema, '0' ), 'Shared alias/schema failed.' );
+	ob_start(); ps_pen_paper_render_table_sheet( $linked, 0 ); $linked_sheet = ob_get_clean();
+	$check( false === strpos( $linked_sheet, 'Neuen Charakter erstellen' ) &&
+		false !== strpos( $linked_sheet, 'Charakter im Profil erstellen' ), 'Linked Community game retained a duplicate independent character creation form.' );
 	$item_input['bonuses'] = array( $world_field => '2' );
 	$world_item = ps_pen_paper_save_item( $universe, 0, $item_input, '0', $path );
 	$check( is_int( $world_item ), 'Universe item failed.' );
@@ -291,6 +339,7 @@ try {
 	WP_CLI::success( 'Community gating, real profile API ownership, core portrait approvals/privacy, private images, slots/rarity, frozen issuance, forged/duplicate/type guards, effective bonuses, stale dice tokens, immutable roll provenance, bounds, recovery, journal rollback, image cleanup and cross-document character/equipment conflicts passed.' );
 } finally {
 	wp_set_current_user( $original_user );
+	$_GET = $original_get;
 	foreach ( $parents as $parent ) {
 		foreach ( get_posts( array( 'post_type' => array( 'pspp_character', 'pspp_item', 'pspp_asset', 'pspp_roll', 'pspp_event' ), 'post_status' => array( 'private', 'draft' ), 'post_parent' => $parent, 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $id ) { wp_delete_post( $id, true ); }
 		wp_delete_post( $parent, true );

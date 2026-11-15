@@ -67,6 +67,11 @@ function ps_pen_paper_render_rule_field( $field, $index, $locked = false ) {
 		</div>
 		<div data-text-settings <?php echo in_array( $field['type'], array( 'text', 'textarea' ), true ) ? '' : 'hidden'; ?>>
 			<p>
+				<label for="<?php echo esc_attr( $element_id . '-allowed-choices' ); ?>"><?php esc_html_e( 'Erlaubte Werte für kurzen Text (optional, einer pro Zeile)', 'ps-pen-paper' ); ?></label>
+				<textarea id="<?php echo esc_attr( $element_id . '-allowed-choices' ); ?>" name="<?php echo esc_attr( $prefix . '[allowed_choices]' ); ?>" rows="4" maxlength="10000"><?php echo esc_textarea( isset( $field['choices'] ) ? implode( "\n", $field['choices'] ) : '' ); ?></textarea>
+				<span class="description"><?php esc_html_e( 'Leer bedeutet freie Eingabe. Name und Bedeutung des Feldes bestimmst du selbst, etwa Klasse oder Herkunft. Änderungen verwendeter Felder benötigen eine Migrationsvorschau.', 'ps-pen-paper' ); ?></span>
+			</p>
+			<p>
 				<label for="<?php echo esc_attr( $element_id . '-text-start' ); ?>"><?php esc_html_e( 'Vorgabewert für neue Charaktere und Datenmigration', 'ps-pen-paper' ); ?></label>
 				<textarea id="<?php echo esc_attr( $element_id . '-text-start' ); ?>" name="<?php echo esc_attr( $prefix . '[start]' ); ?>" rows="2" maxlength="<?php echo 'text' === $field['type'] ? '200' : '20000'; ?>"><?php echo esc_textarea( isset( $field['start'] ) ? $field['start'] : '' ); ?></textarea>
 			</p>
@@ -184,14 +189,17 @@ function ps_pen_paper_render_rules( $campaign, $can_manage, $page_id = 0 ) {
 						<p><label for="pspp-allocation-mode"><?php esc_html_e( 'Punkteverteilung', 'ps-pen-paper' ); ?></label>
 							<select id="pspp-allocation-mode" name="rules[allocation_mode]">
 								<option value="none" <?php selected( empty( $rules['allocation'] ) ); ?>><?php esc_html_e( 'Nicht verwenden', 'ps-pen-paper' ); ?></option>
-								<option value="configured" <?php selected( ! empty( $rules['allocation'] ) ); ?>><?php esc_html_e( 'Gesamtpunktzahl für ausgewählte Attribute festlegen', 'ps-pen-paper' ); ?></option>
+								<option value="configured" <?php selected( ! empty( $rules['allocation'] ) && ! isset( $rules['allocation']['per_level'] ) ); ?>><?php esc_html_e( 'Feste Gesamtpunktzahl', 'ps-pen-paper' ); ?></option>
+								<option value="level" <?php selected( isset( $rules['allocation']['per_level'] ) ); ?>><?php esc_html_e( 'Startpunkte und Punkte je Level', 'ps-pen-paper' ); ?></option>
 							</select></p>
-						<p><label for="pspp-allocation-points"><?php esc_html_e( 'Gesamtpunktzahl', 'ps-pen-paper' ); ?></label>
+						<p><label for="pspp-allocation-points"><?php esc_html_e( 'Startpunkte / feste Gesamtpunktzahl', 'ps-pen-paper' ); ?></label>
 							<input id="pspp-allocation-points" name="rules[allocation][points]" type="number" step="1" min="-1000000" max="1000000" value="<?php echo esc_attr( ! empty( $rules['allocation'] ) ? $rules['allocation']['points'] : 0 ); ?>"></p>
+						<p><label for="pspp-allocation-per-level"><?php esc_html_e( 'Zusätzliche Punkte je Levelaufstieg', 'ps-pen-paper' ); ?></label>
+							<input id="pspp-allocation-per-level" name="rules[allocation][per_level]" type="number" step="1" min="0" max="1000000" value="<?php echo esc_attr( $rules['allocation']['per_level'] ?? 0 ); ?>"></p>
 						<?php foreach ( $rules['fields'] as $field ) : if ( 'attribute' !== $field['type'] ) { continue; } ?>
 							<label class="pspp-check"><input type="checkbox" name="rules[allocation][fields][]" value="<?php echo esc_attr( $field['id'] ); ?>" <?php checked( ! empty( $rules['allocation'] ) && in_array( $field['id'], $rules['allocation']['fields'], true ) ); ?>> <?php echo esc_html( $field['label'] ); ?></label>
 						<?php endforeach; ?>
-						<p class="description"><?php esc_html_e( 'Beim Einreichen und Freigeben müssen die ausgewählten Attributwerte zusammen genau diese Punktzahl ergeben. Die Regel wird serverseitig geprüft.', 'ps-pen-paper' ); ?></p>
+						<p class="description"><?php esc_html_e( 'Bei „Startpunkte und Punkte je Level“ gilt: Startpunkte + (Level − 1) × Punkte je Aufstieg. Nicht verteilte Punkte bleiben verfügbar. Erfahrung vergibt die Leitung; Spieler verteilen nur ihr verfügbares Budget auf die ausgewählten Attribute. Ressourcen und andere Zahlenwerte werden bei der Erstellung vorgegeben. Die feste Gesamtpunktzahl bleibt eine exakte Summe.', 'ps-pen-paper' ); ?></p>
 					</fieldset>
 					<div data-fields>
 						<?php foreach ( $rules['fields'] as $index => $field ) : ?>
@@ -286,9 +294,10 @@ function ps_pen_paper_render_rules_migration_preview( $campaign, $preview, $page
 			<input type="hidden" name="rules[roll_visibilities_present]" value="1">
 			<?php foreach ( $rules['dice'] as $die ) : ?><input type="hidden" name="rules[dice][]" value="<?php echo esc_attr( $die ); ?>"><?php endforeach; ?>
 			<?php foreach ( ps_pen_paper_allowed_roll_visibilities( $rules ) as $visibility ) : ?><input type="hidden" name="rules[roll_visibilities][]" value="<?php echo esc_attr( $visibility ); ?>"><?php endforeach; ?>
-			<input type="hidden" name="rules[allocation_mode]" value="<?php echo esc_attr( empty( $rules['allocation'] ) ? 'none' : 'configured' ); ?>">
+			<input type="hidden" name="rules[allocation_mode]" value="<?php echo esc_attr( empty( $rules['allocation'] ) ? 'none' : ( isset( $rules['allocation']['per_level'] ) ? 'level' : 'configured' ) ); ?>">
 			<?php if ( ! empty( $rules['allocation'] ) ) : ?>
 				<input type="hidden" name="rules[allocation][points]" value="<?php echo esc_attr( $rules['allocation']['points'] ); ?>">
+				<?php if ( isset( $rules['allocation']['per_level'] ) ) : ?><input type="hidden" name="rules[allocation][per_level]" value="<?php echo esc_attr( $rules['allocation']['per_level'] ); ?>"><?php endif; ?>
 				<?php foreach ( $rules['allocation']['fields'] as $field_id ) : ?><input type="hidden" name="rules[allocation][fields][]" value="<?php echo esc_attr( $field_id ); ?>"><?php endforeach; ?>
 			<?php endif; ?>
 			<?php foreach ( $rules['fields'] as $index => $field ) : ?>
@@ -300,7 +309,7 @@ function ps_pen_paper_render_rules_migration_preview( $campaign, $preview, $page
 				<?php if ( $field['required'] ) : ?><input type="hidden" name="<?php echo esc_attr( 'rules[fields][' . $index . '][required]' ); ?>" value="1"><?php endif; ?>
 				<?php if ( in_array( $field['type'], array( 'number', 'attribute', 'resource' ), true ) ) : ?>
 					<?php foreach ( array( 'min', 'max', 'start' ) as $key ) : ?><input type="hidden" name="<?php echo esc_attr( 'rules[fields][' . $index . '][' . $key . ']' ); ?>" value="<?php echo esc_attr( $field[ $key ] ); ?>"><?php endforeach; ?>
-				<?php elseif ( 'choice' === $field['type'] ) : ?>
+				<?php elseif ( 'choice' === $field['type'] || ! empty( $field['choices'] ) ) : ?>
 					<?php foreach ( $field['choices'] as $choice ) : ?><input type="hidden" name="<?php echo esc_attr( 'rules[fields][' . $index . '][choices][]' ); ?>" value="<?php echo esc_attr( $choice ); ?>"><?php endforeach; ?>
 					<input type="hidden" name="<?php echo esc_attr( 'rules[fields][' . $index . '][start]' ); ?>" value="<?php echo esc_attr( $field['start'] ); ?>">
 				<?php else : ?>

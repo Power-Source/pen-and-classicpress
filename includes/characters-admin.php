@@ -33,12 +33,13 @@ function ps_pen_paper_render_character_snapshot( $snapshot, $rules, $campaign = 
 	<?php
 }
 
-function ps_pen_paper_render_character_form( $campaign, $rules, $character = null, $page_id = 0, $request_campaign = null ) {
+function ps_pen_paper_render_character_form( $campaign, $rules, $character = null, $page_id = 0, $request_campaign = null, $profile_request = false, $player_context = false ) {
 	$state = $character ? get_post_meta( $character->ID, '_pspp_character', true ) : array( 'revision' => 0, 'active' => null, 'pending' => null );
 	$universe = 'pspp_universe' === $campaign->post_type;
-	$requesting = $universe && $request_campaign;
-	$is_gm = ! $requesting && ps_pen_paper_can_manage_character_scope( $campaign );
-	$form_scope = $requesting ? $request_campaign : $campaign;
+	$requesting = $universe && ( $request_campaign || $profile_request );
+	$is_gm = ! $player_context && ( ! $requesting || $profile_request ) && ps_pen_paper_can_manage_character_scope( $campaign );
+	$player_creation = ! $character && ( $requesting || ! $is_gm );
+	$form_scope = $request_campaign ? $request_campaign : $campaign;
 	$element_prefix = $requesting ? 'pspp-universe-request-' . $campaign->ID : 'pspp-character';
 	$snapshot = $state['pending'] ? $state['pending'] : $state['active'];
 	if ( null === $snapshot ) {
@@ -46,14 +47,14 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 	}
 	?>
 	<h3><?php echo esc_html( $character ? __( 'Charakter bearbeiten', 'ps-pen-paper' ) : __( 'Charakter erstellen', 'ps-pen-paper' ) ); ?></h3>
-	<?php if ( $requesting ) : ?>
+	<?php if ( $requesting && ! $is_gm ) : ?>
 		<p><?php esc_html_e( 'Dieser neue Universumsbogen wird ausschließlich als Antrag gespeichert. Erst die Universumsleitung gibt ihn frei; eine Aufnahme in die Kampagne erfolgt danach gesondert.', 'ps-pen-paper' ); ?></p>
 	<?php elseif ( ! $is_gm ) : ?>
 		<p><?php esc_html_e( 'Die Rechte stehen an jedem Feld. Direkte Änderungen gelten sofort, Freigabefelder erst nach Bestätigung. Vorhandene Anträge werden durch direkte Änderungen nicht automatisch genehmigt. Ein neuer Bogen mit Freigabefeldern bleibt bis zur Erstfreigabe ein Antrag.', 'ps-pen-paper' ); ?></p>
 	<?php elseif ( $state['pending'] ) : ?>
 		<p><?php esc_html_e( 'Speichern übernimmt die unten stehenden Werte sofort und ersetzt den offenen Antrag.', 'ps-pen-paper' ); ?></p>
 	<?php endif; ?>
-	<?php ps_pen_paper_form_start( $requesting ? 'request_universe_character' : ( $universe ? 'save_base_character' : 'save_character' ), 'pspp_campaign_' . $form_scope->ID, $form_scope->ID, $page_id ); ?>
+	<?php ps_pen_paper_form_start( $profile_request ? 'profile_create_character' : ( $requesting ? 'request_universe_character' : ( $universe ? 'save_base_character' : 'save_character' ) ), 'pspp_campaign_' . $form_scope->ID, $form_scope->ID, $page_id ); ?>
 		<?php if ( $requesting ) : ?>
 			<input type="hidden" name="universe_id" value="<?php echo esc_attr( $campaign->ID ); ?>">
 			<?php $universe_epoch = ps_pen_paper_scope_epoch( $campaign->ID ); ?>
@@ -63,7 +64,7 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 		<input type="hidden" name="character_id" value="<?php echo esc_attr( $character ? $character->ID : 0 ); ?>">
 		<input type="hidden" name="character_revision" value="<?php echo esc_attr( $state['revision'] ); ?>">
 		<input type="hidden" name="character_rules_revision" value="<?php echo esc_attr( $rules['revision'] ); ?>">
-		<?php if ( ! $character && $is_gm ) : ?>
+		<?php if ( ! $character && $is_gm && ! $profile_request ) : ?>
 			<p><label for="pspp-character-owner"><?php esc_html_e( 'Besitzer', 'ps-pen-paper' ); ?></label>
 				<select id="pspp-character-owner" name="owner_id" required>
 					<?php
@@ -85,7 +86,13 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 		<p><label for="<?php echo esc_attr( $element_prefix . '-name' ); ?>"><?php esc_html_e( 'Charaktername', 'ps-pen-paper' ); ?></label>
 			<input id="<?php echo esc_attr( $element_prefix . '-name' ); ?>" name="character[name]" type="text" maxlength="200" value="<?php echo esc_attr( ! $is_gm && ! $requesting && 'gm_only' === ps_pen_paper_character_mode( $rules ) ? ( $state['active']['name'] ?? '' ) : $snapshot['name'] ); ?>" <?php echo ! $is_gm && ! $requesting && 'gm_only' === ps_pen_paper_character_mode( $rules ) ? 'readonly' : ''; ?> required></p>
 		<?php if ( ! empty( $rules['allocation'] ) ) : ?>
-			<p><?php echo esc_html( sprintf( __( 'Die für die Punkteverteilung ausgewählten Attribute müssen zusammen genau %d Punkte ergeben.', 'ps-pen-paper' ), $rules['allocation']['points'] ) ); ?></p>
+			<?php if ( isset( $rules['allocation']['per_level'] ) ) : ?>
+				<?php $budget = ps_pen_paper_character_point_budget( $snapshot, $rules ); $spent = array_sum( array_intersect_key( $snapshot['values'], array_flip( $rules['allocation']['fields'] ) ) ); ?>
+				<?php /* translators: 1: available points, 2: remaining points. */ $point_message = __( 'Attributpunkte: %1$d insgesamt, %2$d noch zu verteilen. Nicht verteilte Punkte bleiben verfügbar.', 'ps-pen-paper' ); ?>
+				<p data-character-allocation data-point-budget="<?php echo esc_attr( $budget ); ?>" data-point-message="<?php echo esc_attr( $point_message ); ?>" data-point-error="<?php esc_attr_e( 'Du hast mehr Attributpunkte verteilt, als dein Level erlaubt.', 'ps-pen-paper' ); ?>"><?php echo esc_html( sprintf( $point_message, $budget, $budget - $spent ) ); ?></p>
+			<?php else : ?>
+				<p><?php echo esc_html( sprintf( __( 'Die für die Punkteverteilung ausgewählten Attribute müssen zusammen genau %d Punkte ergeben.', 'ps-pen-paper' ), $rules['allocation']['points'] ) ); ?></p>
+			<?php endif; ?>
 		<?php endif; ?>
 		<div class="pspp-grid">
 			<?php foreach ( $rules['fields'] as $field ) : ?>
@@ -95,10 +102,10 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 				$name = 'character[values][' . $field['id'] . ']';
 				$derived = ! empty( $rules['progression'] ) && $field['id'] === $rules['progression']['level_field'];
 				$mode = ps_pen_paper_field_edit_mode( $field, $rules );
-				$protected = $derived || ( ! $is_gm && ( $requesting ? 'gm_only' === ( $field['edit_mode'] ?? 'inherit' ) : 'gm_only' === $mode ) );
+				$protected = $derived || ( $player_creation && ! ps_pen_paper_character_creation_field_editable( $field, $rules ) ) || ( ! $is_gm && 'gm_only' === $mode );
 				if ( $protected && ! $derived ) { $value = $state['active']['values'][ $field['id'] ] ?? ps_pen_paper_character_values( $rules )[ $field['id'] ]; }
 				?>
-				<fieldset class="pspp-field" <?php echo 'resource' === $field['type'] ? 'data-character-resource' : ''; ?> data-range-message="<?php esc_attr_e( 'Der aktuelle Wert darf das persönliche Maximum nicht überschreiten.', 'ps-pen-paper' ); ?>">
+				<fieldset class="pspp-field" <?php echo 'resource' === $field['type'] ? 'data-character-resource' : ''; ?> <?php echo isset( $rules['allocation']['per_level'] ) && in_array( $field['id'], $rules['allocation']['fields'], true ) ? 'data-character-allocation-field' : ''; ?> data-range-message="<?php esc_attr_e( 'Der aktuelle Wert darf das persönliche Maximum nicht überschreiten.', 'ps-pen-paper' ); ?>">
 					<legend><?php echo esc_html( $field['label'] ); ?></legend>
 					<?php if ( $derived ) : ?><p><?php esc_html_e( 'Wird automatisch aus dem Erfahrungsstand berechnet.', 'ps-pen-paper' ); ?></p>
 					<?php elseif ( ! $is_gm ) : ?><p><?php echo esc_html( ps_pen_paper_field_edit_modes()[ $mode ] ); ?></p><?php endif; ?>
@@ -107,7 +114,7 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 						<?php if ( is_array( $value ) ) : ?>
 							<?php foreach ( $value as $key => $number ) : ?><input type="hidden" name="<?php echo esc_attr( $name . '[' . $key . ']' ); ?>" value="<?php echo esc_attr( $number ); ?>"><?php endforeach; ?>
 						<?php else : ?><input type="hidden" name="<?php echo esc_attr( $name ); ?>" value="<?php echo esc_attr( $value ); ?>"><?php endif; ?>
-					<?php elseif ( 'choice' === $field['type'] ) : ?>
+					<?php elseif ( 'choice' === $field['type'] || ! empty( $field['choices'] ) ) : ?>
 						<label class="screen-reader-text" for="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $field['label'] ); ?></label>
 						<select id="<?php echo esc_attr( $id ); ?>" name="<?php echo esc_attr( $name ); ?>" <?php echo $field['required'] ? 'required' : ''; ?>>
 							<?php if ( ! $field['required'] ) : ?><option value=""><?php esc_html_e( 'Keine Auswahl', 'ps-pen-paper' ); ?></option><?php endif; ?>
@@ -142,21 +149,22 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 			<?php endforeach; ?>
 		</div>
 		<input type="hidden" name="character_complete" value="complete">
-		<?php submit_button( $requesting ? __( 'Zur Freigabe einreichen', 'ps-pen-paper' ) : __( 'Charakter speichern', 'ps-pen-paper' ) ); ?>
+		<?php submit_button( $requesting && ! $is_gm ? __( 'Zur Freigabe einreichen', 'ps-pen-paper' ) : __( 'Charakter speichern', 'ps-pen-paper' ) ); ?>
 	</form>
 	<?php
 }
 
-function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id = 0, $overview_url = '' ) {
+function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id = 0, $overview_url = '', $item_context = 'game' ) {
 	$rules = ps_pen_paper_get_rules( $campaign->ID );
+	$profile = 'profile' === $item_context;
 	?>
 	<section id="pspp-characters" class="pspp-rules" aria-labelledby="pspp-characters-heading">
-		<h2 id="pspp-characters-heading"><?php echo esc_html( 'pspp_universe' === $campaign->post_type ? __( 'Basischaraktere', 'ps-pen-paper' ) : __( 'Charaktere', 'ps-pen-paper' ) ); ?></h2>
-		<?php if ( 'pspp_campaign' === $campaign->post_type && function_exists( 'ps_pen_paper_render_campaign_base_requests' ) ) { ps_pen_paper_render_campaign_base_requests( $campaign, $page_id ); } ?>
-		<?php if ( ! $character_id || 'pspp_universe' === $campaign->post_type ) : ?>
-			<p><?php echo esc_html( 'pspp_universe' === $campaign->post_type ? __( 'Basisbögen bearbeitet ausschließlich die Universumsleitung. Besitzer erhalten ihren freigegebenen Stand erst durch die ausdrückliche Aufnahme in eine Kampagne.', 'ps-pen-paper' ) : ps_pen_paper_character_modes()[ ps_pen_paper_character_mode( $rules ) ] ); ?></p>
+		<h2 id="pspp-characters-heading"><?php echo esc_html( $profile ? __( 'Dein Charakter', 'ps-pen-paper' ) : ( 'pspp_universe' === $campaign->post_type ? __( 'Basischaraktere', 'ps-pen-paper' ) : __( 'Charaktere', 'ps-pen-paper' ) ) ); ?></h2>
+		<?php if ( ! $character_id && 'pspp_campaign' === $campaign->post_type ) { ps_pen_paper_render_campaign_base_requests( $campaign, $page_id ); } ?>
+		<?php if ( ! $profile && ( ! $character_id || 'pspp_universe' === $campaign->post_type ) ) : ?>
+			<p><?php echo esc_html( 'pspp_universe' === $campaign->post_type ? __( 'Eigene Basisbögen können im Profil erstellt werden. Neue Spielerbögen benötigen die Universumsfreigabe; bestehende Änderungen richten sich nach den Feldrechten. Eine Kampagnenaufnahme erfolgt gesondert und ausdrücklich.', 'ps-pen-paper' ) : ps_pen_paper_character_modes()[ ps_pen_paper_character_mode( $rules ) ] ); ?></p>
 		<?php endif; ?>
-		<p class="description"><?php esc_html_e( 'Kampagnenbögen sind nur für ihren Besitzer und die Spielleiter sichtbar.', 'ps-pen-paper' ); ?></p>
+		<?php if ( ! $profile ) : ?><p class="description"><?php esc_html_e( 'Kampagnenbögen sind nur für ihren Besitzer und die Spielleiter sichtbar.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 		<?php if ( $character_id ) : ?>
 			<?php
 			$character = ps_pen_paper_get_character( $campaign, $character_id );
@@ -166,11 +174,11 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 			$state = ps_pen_paper_character_state( $campaign, $character );
 			if ( is_wp_error( $state ) ) {
 				echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p>';
-				ps_pen_paper_render_character_equipment( $campaign, $character, $page_id );
+				ps_pen_paper_render_character_equipment( $campaign, $character, $page_id, true, $item_context );
 				echo '</section>';
 				return;
 			}
-			if ( 'pspp_campaign' === $campaign->post_type ) {
+			if ( ! $profile && 'pspp_campaign' === $campaign->post_type ) {
 				echo '<p>' . esc_html( isset( $state['context'] ) && 'shared' === $state['context']['mode'] ? ps_pen_paper_character_context_modes()['shared'] : ps_pen_paper_character_modes()[ ps_pen_paper_character_mode( $rules ) ] ) . '</p>';
 			}
 			$owner = get_userdata( (int) $character->post_author );
@@ -197,6 +205,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 				<?php endif; ?>
 				<?php if ( $state['pending'] ) : ?><p><?php esc_html_e( 'Freigabe ausstehend – die gültigen Werte bleiben unverändert.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 				<?php ps_pen_paper_render_character_loadout( $campaign, $character, $state['active'] ? $state['active']['name'] : __( 'Neu', 'ps-pen-paper' ) ); ?>
+				<?php ps_pen_paper_render_portrait_presets( $campaign, $character, $page_id ); ?>
 			</section>
 			<div id="<?php echo esc_attr( $tab_id . '-stats' ); ?>" class="pspp-grid" data-character-panel="stats">
 				<section class="pspp-snapshot pspp-sheet"<?php $sheet_style_result = 'pspp_campaign' === $campaign->post_type ? ps_pen_paper_sheet_attributes( $campaign ) : true; ?>>
@@ -227,7 +236,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 				<?php endif; ?>
 			</div>
 			<section id="<?php echo esc_attr( $tab_id . '-inventory' ); ?>" data-character-panel="inventory">
-				<?php ps_pen_paper_render_character_equipment( $campaign, $character, $page_id, false ); ?>
+				<?php ps_pen_paper_render_character_equipment( $campaign, $character, $page_id, false, $item_context ); ?>
 			</section>
 			<section id="<?php echo esc_attr( $tab_id . '-adventures' ); ?>" data-character-panel="adventures">
 				<?php ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); ?>
@@ -242,7 +251,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 			<?php endif; ?>
 			<?php if ( ps_pen_paper_can_edit_character( $campaign, $character ) ) : ?>
 				<?php if ( $page_id || $overview_url ) : ?><details class="pspp-fold"><summary><?php esc_html_e( 'Bogen bearbeiten', 'ps-pen-paper' ); ?></summary><?php endif; ?>
-				<?php ps_pen_paper_render_character_form( $campaign, $rules, $character, $page_id ); ?>
+				<?php ps_pen_paper_render_character_form( $campaign, $rules, $character, $page_id, null, false, $profile ); ?>
 				<?php if ( $page_id || $overview_url ) : ?></details><?php endif; ?>
 			<?php endif; ?>
 			</section></div>

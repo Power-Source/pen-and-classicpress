@@ -136,9 +136,10 @@ function ps_pen_paper_render_style_settings( $campaign, $page_id = 0 ) {
 		'accent'     => __( 'Links und Akzente', 'ps-pen-paper' ),
 		'border'     => __( 'Rahmen', 'ps-pen-paper' ),
 	);
+	$prefix = 'pspp-style-' . $campaign->ID;
 	?>
-	<section id="pspp-style" class="pspp-rules" aria-labelledby="pspp-style-heading">
-		<h2 id="pspp-style-heading"><?php esc_html_e( 'Style / Frontend-Farben', 'ps-pen-paper' ); ?></h2>
+	<section id="<?php echo esc_attr( $prefix ); ?>" class="pspp-rules" aria-labelledby="<?php echo esc_attr( $prefix . '-heading' ); ?>">
+		<h2 id="<?php echo esc_attr( $prefix . '-heading' ); ?>"><?php esc_html_e( 'UI-Farben', 'ps-pen-paper' ); ?></h2>
 		<p><?php echo esc_html( 'pspp_universe' === $campaign->post_type ? __( 'Optional: Diese Farben gelten für die Kampagnen und Charakteransichten dieses Universums, auch im Profil. Ohne eigene Auswahl gelten die Standardfarben.', 'ps-pen-paper' ) : __( 'Diese Farben gelten für diese noch nicht zugeordnete Kampagne. Nach der Universumszuordnung werden die Universumsfarben verwendet.', 'ps-pen-paper' ) ); ?></p>
 		<?php ps_pen_paper_form_start( 'pspp_universe' === $campaign->post_type ? 'save_universe_style' : 'save_style', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 			<div data-style-editor>
@@ -146,15 +147,15 @@ function ps_pen_paper_render_style_settings( $campaign, $page_id = 0 ) {
 				<div class="pspp-grid">
 					<?php foreach ( $labels as $key => $label ) : ?>
 						<div data-style-color="<?php echo esc_attr( $key ); ?>" data-default="<?php echo esc_attr( ps_pen_paper_style_defaults()[ $key ] ); ?>">
-							<label for="<?php echo esc_attr( 'pspp-color-' . $key ); ?>"><?php echo esc_html( $label ); ?></label>
+							<label for="<?php echo esc_attr( $prefix . '-' . $key ); ?>"><?php echo esc_html( $label ); ?></label>
 							<div class="pspp-color-inputs">
 								<input type="color" value="<?php echo esc_attr( $style['colors'][ $key ] ); ?>" aria-label="<?php echo esc_attr( sprintf( __( '%s: Farbwähler', 'ps-pen-paper' ), $label ) ); ?>" data-color-picker hidden>
-								<input id="<?php echo esc_attr( 'pspp-color-' . $key ); ?>" type="text" name="style_colors[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $style['colors'][ $key ] ); ?>" pattern="#[0-9a-fA-F]{6}" maxlength="7" placeholder="#334155" spellcheck="false" aria-describedby="pspp-color-help" required data-color-value>
+								<input id="<?php echo esc_attr( $prefix . '-' . $key ); ?>" type="text" name="style_colors[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( $style['colors'][ $key ] ); ?>" pattern="#[0-9a-fA-F]{6}" maxlength="7" placeholder="#334155" spellcheck="false" aria-describedby="<?php echo esc_attr( $prefix . '-help' ); ?>" required data-color-value>
 							</div>
 						</div>
 					<?php endforeach; ?>
 				</div>
-				<p id="pspp-color-help"><?php esc_html_e( 'Sechsstellige Hex-Farben verwenden. Die Schriftfarbe auf Schaltflächen wird automatisch schwarz oder weiß gewählt.', 'ps-pen-paper' ); ?></p>
+				<p id="<?php echo esc_attr( $prefix . '-help' ); ?>"><?php esc_html_e( 'Sechsstellige Hex-Farben verwenden. Die Schriftfarbe auf Schaltflächen wird automatisch schwarz oder weiß gewählt.', 'ps-pen-paper' ); ?></p>
 				<button type="button" class="button" data-style-defaults hidden><?php esc_html_e( 'Standardfarben laden', 'ps-pen-paper' ); ?></button>
 				<p role="alert" data-style-error hidden><?php esc_html_e( 'Bitte korrigiere die Farbwerte. Die Vorschau zeigt noch die letzte gültige Kombination.', 'ps-pen-paper' ); ?></p>
 				<h3><?php esc_html_e( 'Live-Vorschau', 'ps-pen-paper' ); ?></h3>
@@ -164,7 +165,7 @@ function ps_pen_paper_render_style_settings( $campaign, $page_id = 0 ) {
 					<div class="pspp-card">
 						<h4><?php esc_html_e( 'Charakterbogen', 'ps-pen-paper' ); ?></h4>
 						<p><?php esc_html_e( 'Beispieltext auf einer Inhaltsfläche.', 'ps-pen-paper' ); ?></p>
-						<a href="#pspp-style-heading"><?php esc_html_e( 'Beispiellink', 'ps-pen-paper' ); ?></a>
+						<a href="#<?php echo esc_attr( $prefix . '-heading' ); ?>"><?php esc_html_e( 'Beispiellink', 'ps-pen-paper' ); ?></a>
 						<button type="button" class="button button-primary"><?php esc_html_e( 'Beispielaktion', 'ps-pen-paper' ); ?></button>
 					</div>
 				</div>
@@ -197,7 +198,8 @@ function ps_pen_paper_handle_universe_style_action() {
 	if ( ! ps_pen_paper_get_universe( $id ) || ( isset( $_POST['pspp_frontend_page'] ) && ! ps_pen_paper_frontend_page( $page_id ) ) ) {
 		ps_pen_paper_fail( __( 'Diese Universumsverwaltung ist nicht verfügbar.', 'ps-pen-paper' ) );
 	}
-	$result = ps_pen_paper_save_style( $id, isset( $_POST['colors'] ) ? wp_unslash( $_POST['colors'] ) : null, ps_pen_paper_posted_text( 'style_revision' ) );
+	if ( 'complete' !== ps_pen_paper_posted_text( 'style_complete' ) ) { ps_pen_paper_fail( __( 'Das Formular wurde nicht vollständig übertragen.', 'ps-pen-paper' ) ); }
+	$result = ps_pen_paper_save_style( $id, isset( $_POST['style_colors'] ) ? wp_unslash( $_POST['style_colors'] ) : null, ps_pen_paper_posted_text( 'style_revision' ) );
 	if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
 	wp_safe_redirect( add_query_arg( 'pspp_notice', 'style_saved', ps_pen_paper_dashboard_url( 'universes', $page_id ) ) );
 	exit;

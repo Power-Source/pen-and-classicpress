@@ -115,6 +115,22 @@ function ps_pen_paper_roll_dice( $campaign_id, $input, $rules_revision ) {
 	if ( ! current_user_can( 'read' ) || ! $campaign || ! ps_pen_paper_can_view_campaign( $campaign ) ) {
 		return new WP_Error( 'forbidden', __( 'Du darfst in dieser Kampagne nicht würfeln.', 'ps-pen-paper' ) );
 	}
+	$write = function () use ( $campaign_id, $input, $rules_revision ) {
+		return ps_pen_paper_roll_dice_locked( $campaign_id, $input, $rules_revision );
+	};
+	if ( is_array( $input ) && isset( $input['character'] ) && is_string( $input['character'] ) &&
+		preg_match( '/^([1-9]\d{0,18}):/', $input['character'], $match ) ) {
+		$character = ps_pen_paper_get_character( $campaign, (int) $match[1] );
+		if ( $character ) { return ps_pen_paper_with_item_character_locks( $campaign, array( $character ), $write ); }
+	}
+	return ps_pen_paper_scope_write( $campaign, $write );
+}
+
+function ps_pen_paper_roll_dice_locked( $campaign_id, $input, $rules_revision ) {
+	$campaign = ps_pen_paper_get_campaign( $campaign_id );
+	if ( ! current_user_can( 'read' ) || ! $campaign || ! ps_pen_paper_can_view_campaign( $campaign ) ) {
+		return new WP_Error( 'forbidden', __( 'Du darfst in dieser Kampagne nicht würfeln.', 'ps-pen-paper' ) );
+	}
 	$rules = ps_pen_paper_get_rules( $campaign_id );
 	if ( ! is_string( $rules_revision ) || (string) $rules['revision'] !== $rules_revision ) {
 		return new WP_Error( 'conflict', __( 'Das Regelwerk wurde geändert. Lade die Würfeloberfläche neu.', 'ps-pen-paper' ) );
@@ -163,6 +179,8 @@ function ps_pen_paper_roll_dice( $campaign_id, $input, $rules_revision ) {
 		if ( ! $character || ! is_user_member_of_blog( (int) $character->post_author ) || '' === ps_pen_paper_campaign_role( $campaign, (int) $character->post_author ) ) {
 			return new WP_Error( 'invalid_character', __( 'Dieser Charakter steht für deinen Wurf nicht zur Verfügung.', 'ps-pen-paper' ) );
 		}
+		$allowed = ps_pen_paper_require_character_game_action( $campaign, (int) $character->ID );
+		if ( is_wp_error( $allowed ) ) { return $allowed; }
 		$state = ps_pen_paper_character_state( $campaign, $character );
 		if ( is_wp_error( $state ) ) {
 			return $state;

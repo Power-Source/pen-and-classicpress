@@ -1,6 +1,19 @@
 (function () {
 	'use strict';
 
+	document.querySelectorAll('[data-character-allocation]').forEach(function (counter) {
+		const inputs = Array.from(counter.closest('form').querySelectorAll('[data-character-allocation-field] input'));
+		const budget = Number(counter.dataset.pointBudget);
+		function update() {
+			const spent = inputs.reduce(function (total, input) { return total + Number(input.value); }, 0);
+			inputs.forEach(function (input) { input.setCustomValidity(Number.isFinite(spent) && spent > budget ? counter.dataset.pointError : ''); });
+			if (!Number.isFinite(spent)) return;
+			counter.textContent = counter.dataset.pointMessage.replace('%1$d', budget).replace('%2$d', budget - spent);
+		}
+		inputs.forEach(function (input) { input.addEventListener('input', update); });
+		update();
+	});
+
 	document.querySelectorAll('[data-character-tabs]').forEach(function (sheet) {
 		const navigation = sheet.querySelector('.pspp-character-tab-nav');
 		const tabs = Array.from(navigation.querySelectorAll('[data-character-tab]'));

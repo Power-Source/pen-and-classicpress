@@ -126,7 +126,8 @@ try {
 	$shared_character = get_post( $ids[0] );
 	$check( ! ps_pen_paper_can_edit_character( $campaigns[0], $shared_character ) && is_wp_error( ps_pen_paper_save_character( $campaigns[0]->ID, $ids[0], $users['player'], $base_input, '1', '1' ) ), 'Campaign edited shared base through alias.' );
 	wp_set_current_user( $users['player'] );
-	$check( null === ps_pen_paper_get_character( $universe, $base_id ) && is_wp_error( ps_pen_paper_get_events( $universe ) ), 'Base owner gained private universe access.' );
+	$own_base = ps_pen_paper_get_character( $universe, $base_id );
+	$check( $own_base && $own_base->ID === $base_id && is_wp_error( ps_pen_paper_get_events( $universe ) ), 'Base owner lost their own character or gained private universe journal access.' );
 	$state = ps_pen_paper_character_state( $campaigns[0], $shared_character );
 	$old_token = ps_pen_paper_character_token( $shared_character, $state );
 	$roll_input = array( 'expression' => 'W6', 'visibility' => 'group', 'character' => $old_token, 'attribute' => $attribute, 'label' => '' );
@@ -369,13 +370,20 @@ try {
 	ob_start();
 	ps_pen_paper_render_campaign_base_requests( $campaigns[3], 0 );
 	$onboarding_html = ob_get_clean();
-	$check( false !== strpos( $onboarding_html, 'name="pspp_operation" value="request_universe_character"' ) &&
-		false !== strpos( $onboarding_html, 'name="universe_id" value="' . $universe_id . '"' ) &&
-		false !== strpos( $onboarding_html, 'name="character[name]"' ),
-		'A member without an existing base sheet did not receive the universe request form.' );
+	if ( ps_pen_paper_community_available() ) {
+		$check( false !== strpos( $onboarding_html, esc_url( ps_pen_paper_community_url( 0, 0, $universe_id ) ) ) &&
+			false === strpos( $onboarding_html, 'name="pspp_operation" value="request_universe_character"' ),
+			'Community onboarding did not lead to profile creation or duplicated its form.' );
+	} else {
+		$check( false !== strpos( $onboarding_html, 'name="pspp_operation" value="request_universe_character"' ) &&
+			false !== strpos( $onboarding_html, 'name="universe_id" value="' . $universe_id . '"' ) &&
+			false !== strpos( $onboarding_html, 'name="character[name]"' ),
+			'A member without Community integration did not receive the fallback creation form.' );
+	}
 	$check( is_wp_error( ps_pen_paper_request_universe_character( $campaigns[0]->ID, $universe_id, $base_input, '1' ) ) &&
-		is_wp_error( ps_pen_paper_request_universe_character( $campaigns[3]->ID, $universe_id, $base_input, '0' ) ),
-		'Universe onboarding accepted a foreign campaign or stale template.' );
+		is_wp_error( ps_pen_paper_request_universe_character( $campaigns[3]->ID, $universe_id, $base_input, '0' ) ) &&
+		is_wp_error( ps_pen_paper_request_universe_character( $campaigns[3]->ID, $universe_id, $base_input, '1' ) ),
+		'Universe onboarding accepted a foreign campaign, stale template or invented resource maximum.' );
 	$page_id = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_author' => $users['gm'],
 		'post_title' => 'Universe request frontend fixture', 'post_content' => '[ps_pen_paper]' ), true );
 	$check( is_int( $page_id ), 'Frontend request page fixture failed.' ); $parents[] = $page_id;
@@ -410,6 +418,8 @@ try {
 	$request_fields = array( 'pspp_operation' => 'request_universe_character', 'campaign_id' => (string) $campaigns[3]->ID,
 		'universe_id' => (string) $universe_id, 'universe_epoch' => ps_pen_paper_scope_epoch( $universe_id ),
 		'character_complete' => 'complete', 'character_rules_revision' => '1', 'character' => $base_input );
+	$request_fields['character']['values'][ $resource ]['maximum'] = '100';
+	$request_fields['character']['values'][ $attribute ] = '5';
 	foreach ( array( array( '_wpnonce' => 'invalid' ), array( 'universe_epoch' => 'obsolete' ) ) as $invalid ) {
 		$rejected = false;
 		try { $submit_frontend( array_merge( $request_fields, $invalid ) ); }
@@ -431,8 +441,9 @@ try {
 	$new_base_state = ps_pen_paper_raw_character_state( $new_base_id );
 	$check( null === $new_base_state['active'] && null !== $new_base_state['pending'] &&
 		$users['newcomer'] === (int) get_post( $new_base_id )->post_author && $universe_id === (int) get_post( $new_base_id )->post_parent &&
-		! array_key_exists( 'context', $new_base_state ) && null === ps_pen_paper_get_character( $universe, $new_base_id ),
-		'Onboarding activated the unapproved base, assigned another owner or exposed private universe access.' );
+		! array_key_exists( 'context', $new_base_state ) && ps_pen_paper_get_character( $universe, $new_base_id ) &&
+		is_wp_error( ps_pen_paper_get_events( $universe ) ),
+		'Onboarding activated the unapproved base, assigned another owner, hid the own base or exposed the private universe journal.' );
 	wp_set_current_user( $users['assistant'] );
 	$check( is_wp_error( ps_pen_paper_review_character( $universe_id, $new_base_id, 'approve', '1' ) ),
 		'A campaign-only GM approved a universe-sheet request.' );

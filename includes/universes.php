@@ -4,6 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/character-policy.php';
+
 function ps_pen_paper_register_universe_type() {
 	register_post_type( 'pspp_universe', array(
 		'public' => false, 'publicly_queryable' => false, 'exclude_from_search' => true,

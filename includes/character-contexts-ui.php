@@ -17,6 +17,7 @@ function ps_pen_paper_handle_character_context_action( $operation ) {
 	}
 	$id = ps_pen_paper_posted_id( 'campaign_id' );
 	check_admin_referer( 'pspp_campaign_' . $id );
+	$profile_url = ps_pen_paper_profile_return( $id, ps_pen_paper_posted_id( 'character_id' ) );
 	$url = ps_pen_paper_universe_url( $id, $page_id );
 	if ( 'save_universe_rules' === $operation ) {
 		if ( 'complete' !== ps_pen_paper_posted_text( 'rules_complete' ) || ! ps_pen_paper_get_universe( $id ) ) {
@@ -64,7 +65,8 @@ function ps_pen_paper_handle_character_context_action( $operation ) {
 		$result = ps_pen_paper_save_character( $id, ps_pen_paper_posted_id( 'character_id' ), ps_pen_paper_posted_id( 'owner_id' ),
 			isset( $_POST['character'] ) ? wp_unslash( $_POST['character'] ) : null,
 			isset( $_POST['character_revision'] ) ? $_POST['character_revision'] : null,
-			isset( $_POST['character_rules_revision'] ) ? $_POST['character_rules_revision'] : null );
+			isset( $_POST['character_rules_revision'] ) ? $_POST['character_rules_revision'] : null,
+			'' !== ps_pen_paper_profile_return( $id, ps_pen_paper_posted_id( 'character_id' ) ) );
 		if ( ! is_wp_error( $result ) ) { $url = ps_pen_paper_universe_url( $id, $page_id, $result ); }
 	} elseif ( 'copy_shared_character' === $operation ) {
 		$character_id = ps_pen_paper_posted_id( 'character_id' );
@@ -81,6 +83,7 @@ function ps_pen_paper_handle_character_context_action( $operation ) {
 		}
 		$result = ps_pen_paper_request_base_character( $id, (int) $parts[1], $parts[2],
 			isset( $_POST['character_rules_revision'] ) ? $_POST['character_rules_revision'] : null );
+		if ( ! is_wp_error( $result ) ) { $url = ps_pen_paper_character_url( $id, $result, $page_id ); }
 	} elseif ( 'reattach_character' === $operation ) {
 		$character_id = ps_pen_paper_posted_id( 'character_id' );
 		$result = ps_pen_paper_reattach_character( $id, $character_id,
@@ -107,6 +110,7 @@ function ps_pen_paper_handle_character_context_action( $operation ) {
 			$result = ps_pen_paper_adopt_universe_rules( $id, isset( $_POST['source_rules_revision'] ) ? $_POST['source_rules_revision'] : null, $confirmation );
 			$link = ps_pen_paper_get_universe_link( $id );
 			if ( ! is_wp_error( $link ) ) { $url = ps_pen_paper_universe_url( $link['universe_id'], $page_id ); }
+			if ( $page_id && '1' === ps_pen_paper_posted_text( 'pspp_table_adoption' ) ) { $url = ps_pen_paper_game_url( $page_id, $id ) . '#pspp-sheet'; }
 		} else {
 			$token = ps_pen_paper_posted_text( 'base_character' );
 			if ( ! preg_match( '/^([1-9]\d*):([1-9]\d*)$/D', $token, $parts ) || (string) (int) $parts[1] !== $parts[1] || (string) (int) $parts[2] !== $parts[2] ) {
@@ -121,19 +125,22 @@ function ps_pen_paper_handle_character_context_action( $operation ) {
 	if ( is_wp_error( $result ) ) {
 		ps_pen_paper_fail( $result->get_error_message() );
 	}
-	wp_safe_redirect( add_query_arg( 'pspp_notice', 'context_saved', $url ) );
+	wp_safe_redirect( add_query_arg( 'pspp_notice', 'context_saved', $profile_url ? $profile_url : $url ) );
 	exit;
 }
 
 function ps_pen_paper_render_campaign_base_requests( $campaign, $page_id ) {
 	$link = ps_pen_paper_get_universe_link( $campaign->ID );
 	$rules = ps_pen_paper_get_rules( $campaign->ID );
-	if ( is_wp_error( $link ) || ! $link['universe_id'] || ! ps_pen_paper_can_access_site() ||
+	if ( is_wp_error( $link ) ) { echo '<p role="alert">' . esc_html( $link->get_error_message() ) . '</p>'; return; }
+	if ( ! $link['universe_id'] || ! ps_pen_paper_can_access_site() ||
 		! ps_pen_paper_campaign_role( $campaign, get_current_user_id() ) ) { return; }
 	$universe = ps_pen_paper_get_universe( $link['universe_id'] );
-	if ( ! $universe ) { return; }
+	if ( ! $universe ) { echo '<p role="alert">' . esc_html__( 'Das zugeordnete Universum ist nicht mehr verfügbar. Bitte informiere die Spielleitung.', 'ps-pen-paper' ) . '</p>'; return; }
 	$base_rules = ps_pen_paper_get_rules( $universe->ID );
-	if ( $base_rules['revision'] > 0 ) {
+	if ( $base_rules['revision'] > 0 && ps_pen_paper_community_available() ) {
+		echo '<p><a class="button" href="' . esc_url( ps_pen_paper_community_url( 0, 0, $universe->ID ) ) . '">' . esc_html__( 'Charakter im Profil erstellen', 'ps-pen-paper' ) . '</a></p>';
+	} elseif ( $base_rules['revision'] > 0 ) {
 		echo '<details class="pspp-fold"><summary>' . esc_html__( 'Neuen eigenen Universumsbogen beantragen', 'ps-pen-paper' ) . '</summary>';
 		ps_pen_paper_render_character_form( $universe, $base_rules, null, $page_id, $campaign );
 		echo '</details>';
@@ -145,6 +152,7 @@ function ps_pen_paper_render_campaign_base_requests( $campaign, $page_id ) {
 	$options = array();
 	foreach ( $bases as $base ) {
 		$state = ps_pen_paper_raw_character_state( $base->ID );
+		if ( is_wp_error( $state ) ) { echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p>'; continue; }
 		if ( ! is_wp_error( $state ) && ! array_key_exists( 'context', $state ) && $state['pending'] ) {
 			echo '<section class="pspp-card"><h3>' . esc_html__( 'Dein offener Universumsantrag', 'ps-pen-paper' ) . '</h3>';
 			ps_pen_paper_render_character_snapshot( $state['pending'], $base_rules );
@@ -158,16 +166,16 @@ function ps_pen_paper_render_campaign_base_requests( $campaign, $page_id ) {
 	if ( ! $options ) { return; }
 	?>
 	<section class="pspp-card">
-		<h3><?php esc_html_e( 'Eigenen Universumsbogen anfragen', 'ps-pen-paper' ); ?></h3>
-		<p><?php esc_html_e( 'Die Kampagnenleitung sieht deinen Antrag und muss ihn freigeben. Es werden nur dein freigegebener Basisstand und keine offenen Universumsanträge angefragt.', 'ps-pen-paper' ); ?></p>
+		<h3><?php esc_html_e( 'Mit vorhandener Figur mitspielen', 'ps-pen-paper' ); ?></h3>
+		<p><?php esc_html_e( 'Wähle deinen freigegebenen Charakter. Die Spielleitung bestätigt seine Aufnahme in diese Kampagne.', 'ps-pen-paper' ); ?></p>
 		<?php ps_pen_paper_form_start( 'request_base_character', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 			<input type="hidden" name="character_rules_revision" value="<?php echo esc_attr( $rules['revision'] ); ?>">
-			<p><label><?php esc_html_e( 'Basisbogen', 'ps-pen-paper' ); ?>
+			<p><label><?php esc_html_e( 'Charakter auswählen', 'ps-pen-paper' ); ?>
 				<select name="base_character" required>
 					<option value=""><?php esc_html_e( 'Eigenen Basisbogen auswählen', 'ps-pen-paper' ); ?></option>
 					<?php foreach ( $options as $option ) : ?><option value="<?php echo esc_attr( $option['token'] ); ?>"><?php echo esc_html( $option['label'] ); ?></option><?php endforeach; ?>
 				</select></label></p>
-			<?php submit_button( __( 'Zur Freigabe anfragen', 'ps-pen-paper' ) ); ?>
+			<?php submit_button( __( 'Mit diesem Charakter mitspielen', 'ps-pen-paper' ) ); ?>
 		</form>
 	</section>
 	<?php
@@ -191,6 +199,10 @@ function ps_pen_paper_render_universe_characters( $universe, $page_id ) {
 	<?php if ( $character_id ) : ?>
 		<?php ps_pen_paper_render_characters( $universe, $character_id, $page_id ); ?>
 	<?php else : ?>
+		<details class="pspp-fold">
+			<summary><?php esc_html_e( 'Charaktervorgaben, Einladungen und Porträts', 'ps-pen-paper' ); ?></summary>
+			<?php ps_pen_paper_render_character_policy( $universe, $page_id ); ?>
+		</details>
 		<details class="pspp-fold">
 			<summary><?php esc_html_e( 'Universumsregelwerk bearbeiten', 'ps-pen-paper' ); ?></summary>
 			<?php ps_pen_paper_render_rules( $universe, true, $page_id ); ?>

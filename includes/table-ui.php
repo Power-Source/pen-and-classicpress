@@ -7,73 +7,34 @@ if ( ! defined( 'ABSPATH' ) ) {
 function ps_pen_paper_render_table_sheet( $campaign, $page_id ) {
 	$rules = ps_pen_paper_get_rules( $campaign->ID );
 	$characters = ps_pen_paper_get_characters( $campaign );
+	$link = ps_pen_paper_get_universe_link( $campaign->ID );
+	$universe = ! is_wp_error( $link ) && $link['universe_id'] ? ps_pen_paper_get_universe( $link['universe_id'] ) : null;
+	$profile_creation = $universe && ps_pen_paper_community_available();
+	$choices = array();
+	$has_own_character = false;
+	foreach ( $characters as $character ) {
+		if ( (int) $character->post_author === get_current_user_id() ) { $has_own_character = true; }
+		$choices[] = array( 'scope' => $campaign, 'character' => $character, 'state' => ps_pen_paper_character_state( $campaign, $character ) );
+	}
 	?>
 	<h2><?php echo esc_html( ps_pen_paper_can_manage_campaign( $campaign ) ? __( 'Bögen & Freigaben', 'ps-pen-paper' ) : __( 'Mein Charakterbogen', 'ps-pen-paper' ) ); ?></h2>
 	<p class="description"><?php esc_html_e( 'Nur du und die Spielleitung sehen deine Werte.', 'ps-pen-paper' ); ?></p>
-	<?php foreach ( $characters as $character ) : ?>
-		<?php
-		$state = ps_pen_paper_character_state( $campaign, $character );
-		if ( is_wp_error( $state ) ) {
-			echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p>';
-			continue;
-		}
-		?>
-		<article class="pspp-sheet"<?php $sheet_style_result = ps_pen_paper_sheet_attributes( $campaign ); ?>>
-			<?php if ( is_wp_error( $sheet_style_result ) ) { echo '<p role="alert">' . esc_html( $sheet_style_result->get_error_message() ) . '</p>'; } ?>
-			<div class="pspp-sheet-heading">
-				<div><span class="pspp-eyebrow"><?php esc_html_e( 'Charakterbogen', 'ps-pen-paper' ); ?></span>
-					<h3><?php echo esc_html( $state['active'] ? $state['active']['name'] : __( 'Noch nicht freigegeben', 'ps-pen-paper' ) ); ?></h3>
-				</div>
-			</div>
-			<?php ps_pen_paper_render_character_loadout( $campaign, $character, $state['active'] ? $state['active']['name'] : __( 'Neu', 'ps-pen-paper' ) ); ?>
-			<?php if ( $state['active'] ) : ?>
-				<?php foreach ( array(
-					__( 'Profil & Hintergrund', 'ps-pen-paper' ) => array( 'text', 'textarea' ),
-					__( 'Attribute & Werte', 'ps-pen-paper' ) => array( 'attribute', 'number' ),
-					__( 'Ressourcen', 'ps-pen-paper' ) => array( 'resource' ),
-				) as $heading => $types ) :
-					$fields = array_filter( $rules['fields'], function ( $field ) use ( $types ) { return in_array( $field['type'], $types, true ); } );
-					if ( ! $fields ) { continue; }
-					?>
-				<section class="pspp-sheet-section">
-					<h4><?php echo esc_html( $heading ); ?></h4>
-					<dl class="pspp-sheet-fields">
-					<?php foreach ( $fields as $field ) : ?>
-						<?php $value = $state['active']['values'][ $field['id'] ]; ?>
-						<div class="<?php echo in_array( $field['type'], array( 'resource', 'text', 'textarea' ), true ) ? 'pspp-sheet-wide' : 'pspp-sheet-stat'; ?>">
-							<dt><?php echo esc_html( $field['label'] ); ?></dt>
-							<dd>
-								<?php if ( 'resource' === $field['type'] ) : ?>
-									<strong><?php echo esc_html( $value['current'] . ' / ' . $value['maximum'] ); ?></strong>
-									<?php if ( $value['maximum'] > $field['min'] ) : ?>
-										<meter min="<?php echo esc_attr( $field['min'] ); ?>" max="<?php echo esc_attr( $value['maximum'] ); ?>" value="<?php echo esc_attr( $value['current'] ); ?>" aria-label="<?php echo esc_attr( $field['label'] ); ?>"><?php echo esc_html( $value['current'] . ' / ' . $value['maximum'] ); ?></meter>
-									<?php endif; ?>
-								<?php else : ?>
-									<span class="pspp-multiline"><?php echo esc_html( $value ); ?></span>
-									<?php if ( 'attribute' === $field['type'] && 0 === $field['min'] && $field['max'] > 0 && $field['max'] <= 10 ) : ?>
-										<span class="pspp-rating" aria-hidden="true"><?php for ( $point = 1; $point <= $field['max']; $point++ ) : ?><i<?php echo $point <= $value ? ' class="is-filled"' : ''; ?>></i><?php endfor; ?></span>
-									<?php endif; ?>
-								<?php endif; ?>
-							</dd>
-						</div>
-					<?php endforeach; ?>
-					</dl>
-				</section>
-				<?php endforeach; ?>
-			<?php endif; ?>
-			<?php if ( $state['pending'] ) : ?><p class="pspp-pending"><?php esc_html_e( 'Freigabe ausstehend – die gültigen Werte bleiben unverändert.', 'ps-pen-paper' ); ?></p><?php endif; ?>
-			<?php if ( isset( $state['equipment'] ) && $state['equipment']['bonuses'] ) : ?><p><?php esc_html_e( 'Freigegebene Ausrüstungsboni sind in den angezeigten Werten enthalten. Grundwerte bleiben unverändert.', 'ps-pen-paper' ); ?></p><?php endif; ?>
-			<?php if ( isset( $state['context'] ) ) : ?><p><?php echo esc_html( ps_pen_paper_character_context_modes()[ $state['context']['mode'] ] . ' · ' . __( 'Kampagnenauflagen sind berücksichtigt.', 'ps-pen-paper' ) ); ?></p><?php endif; ?>
-			<a class="button" href="<?php echo esc_url( ps_pen_paper_character_url( $campaign->ID, $character->ID, $page_id ) ); ?>"><?php echo esc_html( $state['pending'] && ps_pen_paper_can_manage_campaign( $campaign ) ? __( 'Antrag prüfen', 'ps-pen-paper' ) : __( 'Bogen öffnen / bearbeiten', 'ps-pen-paper' ) ); ?></a>
-		</article>
-	<?php endforeach; ?>
-	<?php if ( ! $characters ) : ?><p><?php echo esc_html( ps_pen_paper_can_edit_character( $campaign ) ? __( 'Dein erster Bogen wartet noch auf dich. Öffne unten „Neuen Charakter erstellen“.', 'ps-pen-paper' ) : __( 'In dieser Runde erstellt die Spielleitung deinen Charakter. Bitte wende dich an sie.', 'ps-pen-paper' ) ); ?></p><?php endif; ?>
-	<?php if ( $rules['revision'] && ps_pen_paper_can_edit_character( $campaign ) ) : ?>
+	<?php ps_pen_paper_render_character_picker( $choices, get_permalink( $page_id ), 0, array( 'pspp_campaign' => $campaign->ID ) ); ?>
+	<?php if ( ! $has_own_character ) { ps_pen_paper_render_campaign_base_requests( $campaign, $page_id ); } ?>
+	<?php if ( ! $characters && $rules['revision'] && ! $profile_creation ) : ?><p><?php echo esc_html( ps_pen_paper_can_edit_character( $campaign ) ? __( 'Dein erster Bogen wartet noch auf dich. Öffne unten „Neuen Charakter erstellen“.', 'ps-pen-paper' ) : __( 'In dieser Runde erstellt die Spielleitung deinen Charakter. Bitte wende dich an sie.', 'ps-pen-paper' ) ); ?></p><?php endif; ?>
+	<?php if ( $rules['revision'] && ps_pen_paper_can_edit_character( $campaign ) && ! $profile_creation ) : ?>
 		<details class="pspp-fold"><summary><?php esc_html_e( 'Neuen Charakter erstellen', 'ps-pen-paper' ); ?></summary>
 			<?php ps_pen_paper_render_character_form( $campaign, $rules, null, $page_id ); ?>
 		</details>
 	<?php elseif ( ! $rules['revision'] ) : ?>
 		<p><?php esc_html_e( 'Die Spielleitung muss zuerst das Regelwerk einrichten.', 'ps-pen-paper' ); ?></p>
+		<?php
+		$source_rules = $universe ? ps_pen_paper_get_rules( $universe->ID ) : null;
+		if ( $source_rules && $source_rules['revision'] && ps_pen_paper_can_manage_campaign( $campaign ) && ps_pen_paper_can_manage_universe( $universe ) ) {
+			ps_pen_paper_form_start( 'adopt_universe_rules', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id );
+			echo '<input type="hidden" name="source_rules_revision" value="' . esc_attr( $source_rules['revision'] ) . '"><input type="hidden" name="pspp_table_adoption" value="1"><button name="context_confirmation" value="confirmed">' . esc_html__( 'Regeln dieses Universums übernehmen', 'ps-pen-paper' ) . '</button></form>';
+		}
+		?>
 	<?php endif; ?>
 	<?php
 }
@@ -170,6 +131,10 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 						</form>
 					<?php endif; ?>
 					</details>
+					<details class="pspp-fold">
+						<summary><?php esc_html_e( 'Mitspieler zu dieser Runde einladen', 'ps-pen-paper' ); ?></summary>
+						<?php ps_pen_paper_render_member_invitation_form( $campaign, $page_id ); ?>
+					</details>
 				</aside>
 				<section id="pspp-play" class="pspp-table-panel pspp-table-stage pspp-scene" data-table-panel="play"<?php if ( ! is_wp_error( $backdrop ) && $backdrop ) : ?> style="<?php echo esc_attr( '--pspp-table-image:url("' . $backdrop . '")' ); ?>"<?php endif; ?>>
 					<div class="pspp-table-prompts">
@@ -196,6 +161,7 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 						<a href="#pspp-log"><?php esc_html_e( 'Was bisher geschah', 'ps-pen-paper' ); ?></a>
 					</div>
 					</div>
+					<?php if ( $is_gm ) : ?><details class="pspp-fold"><summary><?php esc_html_e( 'Spielsitzung und Runden steuern', 'ps-pen-paper' ); ?></summary><?php ps_pen_paper_render_game_round_controls( $campaign, $page_id ); ?></details><?php endif; ?>
 				</section>
 				<section id="pspp-sheet" class="pspp-table-panel pspp-table-character" data-table-panel="sheet"><?php ps_pen_paper_render_table_sheet( $campaign, $page_id ); ?></section>
 				<section id="pspp-group-adventures" class="pspp-table-panel pspp-table-stage" data-table-panel="adventures"><?php ps_pen_paper_render_scenario_character_links( $campaign, $page_id ); ps_pen_paper_render_adventure_groups( $campaign, $page_id ); ?></section>

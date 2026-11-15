@@ -191,7 +191,9 @@ function ps_pen_paper_request_base_character( $campaign_id, $source_id, $source_
 				'kind' => 'character_requested', 'visibility' => 'owner', 'recipient_id' => get_current_user_id(),
 				'rules_revision' => $rules['revision'], 'fields' => $rules['fields'],
 			), true );
-			return $result;
+			if ( is_wp_error( $result ) ) { return $result; }
+			$portrait_event = ps_pen_paper_write_base_portrait( $campaign, (int) $id, $source_id );
+			return is_wp_error( $portrait_event ) ? $portrait_event : ( $portrait_event ?: $result );
 		} );
 	} );
 	if ( is_wp_error( $result ) ) { return $result; }
@@ -240,7 +242,7 @@ function ps_pen_paper_adopt_universe_rules( $campaign_id, $source_revision, $con
 }
 
 function ps_pen_paper_attach_base_character( $campaign_id, $source_id, $source_revision, $rules_revision, $mode, $confirmed ) {
-	return ps_pen_paper_scope_write( $campaign_id, function () use ( $campaign_id, $source_id, $source_revision, $rules_revision, $mode, $confirmed ) {
+	return ps_pen_paper_with_character_context_locks( $campaign_id, $source_id, $source_id, function () use ( $campaign_id, $source_id, $source_revision, $rules_revision, $mode, $confirmed ) {
 		return ps_pen_paper_attach_base_character_locked( $campaign_id, $source_id, $source_revision, $rules_revision, $mode, $confirmed );
 	} );
 }
@@ -282,10 +284,15 @@ function ps_pen_paper_attach_base_character_locked( $campaign_id, $source_id, $s
 	if ( ! $id ) {
 		return new WP_Error( 'save_failed', __( 'Der Kampagnenbogen konnte nicht erstellt werden.', 'ps-pen-paper' ) );
 	}
-	$result = ps_pen_paper_save_document_event( $campaign_id, $id, '_pspp_character', $before, $after, array(
-		'kind' => 'character_created', 'visibility' => 'owner', 'recipient_id' => (int) $source->post_author,
-		'rules_revision' => $rules['revision'], 'fields' => $rules['fields'],
-	), true );
+	$result = ps_pen_paper_atomic_event( (int) $id, function () use ( $campaign_id, $campaign, $id, $source, $before, $after, $rules ) {
+		$event = ps_pen_paper_write_document_event( $campaign_id, $id, '_pspp_character', $before, $after, array(
+			'kind' => 'character_created', 'visibility' => 'owner', 'recipient_id' => (int) $source->post_author,
+			'rules_revision' => $rules['revision'], 'fields' => $rules['fields'],
+		), true );
+		if ( is_wp_error( $event ) ) { return $event; }
+		$portrait_event = ps_pen_paper_write_base_portrait( $campaign, (int) $id, (int) $source->ID );
+		return is_wp_error( $portrait_event ) ? $portrait_event : ( $portrait_event ?: $event );
+	} );
 	if ( is_wp_error( $result ) ) {
 		return 'event_recovery_required' === $result->get_error_code() ? $result : ps_pen_paper_discard_record( $id, $result );
 	}
@@ -606,19 +613,13 @@ function ps_pen_paper_request_universe_character( $campaign_id, $universe_id, $i
 				return new WP_Error( 'forbidden', __( 'Die Kampagnenaufnahme oder Universumszuordnung ist nicht mehr gültig. Es wurde kein Antrag gespeichert.', 'ps-pen-paper' ) );
 			}
 			$rules = ps_pen_paper_get_rules( $universe_id );
+			$limit = ps_pen_paper_check_character_creation_limit( $universe_id, $owner_id );
+			if ( is_wp_error( $limit ) ) { return $limit; }
 			if ( ! is_string( $rules_revision ) || 0 === $rules['revision'] || (string) $rules['revision'] !== $rules_revision ) {
 				return new WP_Error( 'rules_conflict', __( 'Die Universumsvorlage fehlt oder wurde geändert. Bitte lade den Antrag neu.', 'ps-pen-paper' ) );
 			}
-			$snapshot = ps_pen_paper_validate_character( $input, $rules );
+			$snapshot = ps_pen_paper_validate_character_creation( $input, $rules );
 			if ( is_wp_error( $snapshot ) ) { return $snapshot; }
-			$defaults = ps_pen_paper_character_values( $rules );
-			foreach ( $rules['fields'] as $field ) {
-				if ( 'gm_only' === ( $field['edit_mode'] ?? 'inherit' ) &&
-					$field['id'] !== ( $rules['progression']['level_field'] ?? null ) &&
-					$snapshot['values'][ $field['id'] ] !== $defaults[ $field['id'] ] ) {
-					return new WP_Error( 'field_forbidden', __( 'Ein geschütztes Feld darf nur die Universumsleitung ändern.', 'ps-pen-paper' ) );
-				}
-			}
 			$id = wp_insert_post( array(
 				'post_type' => 'pspp_character', 'post_status' => 'draft', 'post_parent' => $universe_id,
 				'post_author' => $owner_id, 'post_title' => 'PS Pen & Paper Character',

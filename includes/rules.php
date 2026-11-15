@@ -121,6 +121,21 @@ function ps_pen_paper_validate_rules( $input, $previous ) {
 				? ( 'text' === $clean['type'] ? sanitize_text_field( $field['start'] ) : sanitize_textarea_field( $field['start'] ) )
 				: '';
 			if ( strlen( $clean['start'] ) > ( 'text' === $clean['type'] ? 200 : 20000 ) ) { return $error; }
+			if ( 'text' === $clean['type'] ) {
+				$choices = $field['allowed_choices'] ?? ( $field['choices'] ?? array() );
+				if ( is_string( $choices ) ) { $choices = '' === trim( $choices ) ? array() : preg_split( '/\r\n|\r|\n/', trim( $choices ) ); }
+				if ( ! is_array( $choices ) || count( $choices ) > 50 ) { return $error; }
+				if ( $choices ) {
+					$clean['choices'] = array();
+					foreach ( $choices as $choice ) {
+						if ( ! is_string( $choice ) || '' === sanitize_text_field( $choice ) || strlen( $choice ) > 200 ) { return $error; }
+						$choice = sanitize_text_field( $choice );
+						if ( in_array( $choice, $clean['choices'], true ) ) { return $error; }
+						$clean['choices'][] = $choice;
+					}
+					if ( '' !== $clean['start'] && ! in_array( $clean['start'], $clean['choices'], true ) ) { return $error; }
+				}
+			}
 		} elseif ( in_array( $clean['type'], array( 'number', 'attribute', 'resource' ), true ) ) {
 			foreach ( array( 'min', 'max', 'start' ) as $key ) {
 				if ( ! isset( $field[ $key ] ) || ! is_string( $field[ $key ] ) || ! preg_match( '/^-?\d{1,7}$/D', $field[ $key ] ) || abs( (int) $field[ $key ] ) > 1000000 ) {
@@ -135,11 +150,11 @@ function ps_pen_paper_validate_rules( $input, $previous ) {
 		$seen_ids[] = $id;
 		$validated['fields'][] = $clean;
 	}
-	$allocation_mode = isset( $input['allocation_mode'] ) ? $input['allocation_mode'] : ( ! empty( $previous['allocation'] ) ? 'configured' : 'none' );
-	if ( ! in_array( $allocation_mode, array( 'none', 'configured' ), true ) ) { return $error; }
-	$allocation = 'configured' === $allocation_mode ? ( isset( $input['allocation'] ) ? $input['allocation'] : null ) : null;
+	$allocation_mode = isset( $input['allocation_mode'] ) ? $input['allocation_mode'] : ( ! empty( $previous['allocation'] ) ? ( isset( $previous['allocation']['per_level'] ) ? 'level' : 'configured' ) : 'none' );
+	if ( ! in_array( $allocation_mode, array( 'none', 'configured', 'level' ), true ) ) { return $error; }
+	$allocation = 'none' !== $allocation_mode ? ( isset( $input['allocation'] ) ? $input['allocation'] : null ) : null;
 	if ( null !== $allocation ) {
-		if ( ! is_array( $allocation ) || count( $allocation ) !== 2 || ! isset( $allocation['fields'], $allocation['points'] ) ||
+		if ( ! is_array( $allocation ) || array_diff( array_keys( $allocation ), array( 'fields', 'points', 'per_level' ) ) || ! isset( $allocation['fields'], $allocation['points'] ) ||
 			! is_array( $allocation['fields'] ) || ! $allocation['fields'] || count( $allocation['fields'] ) > 30 ||
 			! is_string( $allocation['points'] ) || ! preg_match( '/^-?\d{1,7}$/D', $allocation['points'] ) || abs( (int) $allocation['points'] ) > 1000000 ) { return $error; }
 		$attribute_fields = array();
@@ -158,6 +173,11 @@ function ps_pen_paper_validate_rules( $input, $previous ) {
 		$points = (int) $allocation['points'];
 		if ( $points < $minimum || $points > $maximum ) { return $error; }
 		$validated['allocation'] = array( 'fields' => $ids, 'points' => $points );
+		if ( 'level' === $allocation_mode ) {
+			if ( ! isset( $allocation['per_level'] ) || ! is_string( $allocation['per_level'] ) ||
+				! preg_match( '/^\d{1,7}$/D', $allocation['per_level'] ) || (int) $allocation['per_level'] > 1000000 || $points < 0 ) { return $error; }
+			$validated['allocation']['per_level'] = (int) $allocation['per_level'];
+		}
 	} else {
 		$validated['allocation'] = null;
 	}
@@ -178,6 +198,13 @@ function ps_pen_paper_validate_rules( $input, $previous ) {
 		$validated['progression'] = $progression;
 	} elseif ( array_key_exists( 'progression', $previous ) || isset( $input['progression_mode'] ) ) {
 		$validated['progression'] = null;
+	}
+	if ( 'level' === $allocation_mode ) {
+		$fields = array_column( $validated['fields'], null, 'id' );
+		if ( empty( $validated['progression'] ) || 1 !== $validated['progression']['thresholds'][0]['level'] ||
+			$fields[ $validated['progression']['experience_field'] ]['start'] !== $fields[ $validated['progression']['experience_field'] ]['min'] ) {
+			return new WP_Error( 'invalid_progression', __( 'Für Startpunkte und Punkte je Level brauchst du Stufenregeln, die bei Level 1 und dem Erfahrungsminimum beginnen.', 'ps-pen-paper' ) );
+		}
 	}
 	return $validated;
 }
@@ -270,8 +297,17 @@ function ps_pen_paper_character_allocation_valid( $snapshot, $rules ) {
 			if ( ! isset( $snapshot['values'][ $id ] ) || ! is_int( $snapshot['values'][ $id ] ) ) { return false; }
 			$total += $snapshot['values'][ $id ];
 		}
-		return $total === $rules['allocation']['points'];
+		return isset( $rules['allocation']['per_level'] ) ? $total <= ps_pen_paper_character_point_budget( $snapshot, $rules ) : $total === $rules['allocation']['points'];
 	}
+
+function ps_pen_paper_character_point_budget( $snapshot, $rules ) {
+	$points = $rules['allocation']['points'];
+	if ( isset( $rules['allocation']['per_level'] ) ) {
+		$snapshot = ps_pen_paper_apply_progression( $snapshot, $rules );
+		$points += ( $snapshot['values'][ $rules['progression']['level_field'] ] - 1 ) * $rules['allocation']['per_level'];
+	}
+	return $points;
+}
 
 	function ps_pen_paper_character_allocation_defaults( $rules ) {
 		$values = array();
@@ -284,6 +320,7 @@ function ps_pen_paper_character_allocation_valid( $snapshot, $rules ) {
 			$values[ $id ] = $field['min'];
 			$left -= $field['min'];
 		}
+		if ( isset( $rules['allocation']['per_level'] ) ) { return $values; }
 		foreach ( $rules['allocation']['fields'] as $id ) {
 			$field = null;
 			foreach ( $rules['fields'] as $candidate ) { if ( $candidate['id'] === $id ) { $field = $candidate; break; } }
@@ -320,8 +357,9 @@ function ps_pen_paper_character_allocation_valid( $snapshot, $rules ) {
 		unset( $field );
 		$previous = $rules;
 		$previous['revision']--;
-		$input['allocation_mode'] = ! empty( $rules['allocation'] ) ? 'configured' : 'none';
+		$input['allocation_mode'] = ! empty( $rules['allocation'] ) ? ( isset( $rules['allocation']['per_level'] ) ? 'level' : 'configured' ) : 'none';
 		if ( isset( $input['allocation']['points'] ) && is_int( $input['allocation']['points'] ) ) { $input['allocation']['points'] = (string) $input['allocation']['points']; }
+		if ( isset( $input['allocation']['per_level'] ) && is_int( $input['allocation']['per_level'] ) ) { $input['allocation']['per_level'] = (string) $input['allocation']['per_level']; }
 		$validated = ps_pen_paper_validate_rules( $input, $previous );
 		if ( is_wp_error( $validated ) ) { return false; }
 		foreach ( $rules as $key => $value ) {

@@ -772,6 +772,8 @@ function ps_pen_paper_start_adventure_run_locked( $campaign, $adventure_id, $cha
 			if ( is_wp_error( $adventure ) || is_wp_error( $character ) || 'published' !== $adventure['status'] ||
 				! is_string( $adventure_revision ) || (string) $adventure['revision'] !== $adventure_revision ||
 				! is_string( $character_revision ) || (string) $character['state']['revision'] !== $character_revision ) { return ps_pen_paper_adventure_error(); }
+			$allowed = ps_pen_paper_require_character_game_action( $campaign, (int) $character_id );
+			if ( is_wp_error( $allowed ) ) { return $allowed; }
 			foreach ( get_posts( array( 'post_type' => 'pspp_adventure_run', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'posts_per_page' => -1 ) ) as $existing ) {
 				$state = get_post_meta( $existing->ID, '_pspp_adventure_run', true );
 				if ( ! ps_pen_paper_valid_adventure_run( $state ) ) { return ps_pen_paper_adventure_error(); }

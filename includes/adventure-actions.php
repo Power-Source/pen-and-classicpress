@@ -57,6 +57,8 @@ function ps_pen_paper_adventure_action_transaction( $campaign, $locks, $object_i
 function ps_pen_paper_execute_adventure_edge( $campaign, $character, $snapshot, $edge, $history, $locks, $event_id, $review = null, $attempt = 0 ) {
 	if ( (int) $character['post']->post_author !== get_current_user_id() || ! ps_pen_paper_can_access_site() ||
 		! ps_pen_paper_can_view_campaign( $campaign ) ) { return ps_pen_paper_adventure_error(); }
+	$allowed = ps_pen_paper_require_character_game_action( $campaign, (int) $character['post']->ID );
+	if ( is_wp_error( $allowed ) ) { return $allowed; }
 	if ( ! empty( $edge['gm_review'] ) && ( ! ps_pen_paper_valid_adventure_review( $review, get_current_user_id() ) ||
 		$review['edge_id'] !== $edge['id'] || 'approved' !== $review['status'] ||
 		! ps_pen_paper_adventure_reviewer_authority( $campaign, $review['reviewer_id'] ) ) ) {

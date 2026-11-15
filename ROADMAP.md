@@ -3,9 +3,11 @@
 ## Vision
 
 PS Pen & Paper wird ein universeller Baukasten für Pen-and-Paper-Rollenspiele
-auf WordPress und ClassicPress. Spielleiter erschaffen eigene Kampagnen, Regeln,
+auf WordPress und ClassicPress. Die Bedienung und Darstellung orientieren sich
+an einem Rollenspiel-Videospiel: Welt wählen, Figur erstellen, Einladung annehmen
+und spielen. Spielleiter erschaffen eigene Universen, Kampagnen, Regeln,
 Charakterbögen und Abenteuer. Das Plugin schreibt weder eine Spielwelt noch ein
-bestimmtes Regelsystem vor.
+bestimmtes Regelsystem vor und bildet kein MMORPG nach.
 Fachliche Optionen wählt die jeweilige Administration oder Spielleitung
 innerhalb ihrer Rechte im Plugin, pro Vorgang beziehungsweise Kampagne.
 Persönliche Entwicklungspräferenzen werden nicht als globale Spielregeln festgelegt.
@@ -14,8 +16,112 @@ Mehrere Kampagnen mit unterschiedlichen Regeln können auf derselben Website
 nebeneinander bestehen. Das Plugin soll ohne externe Spieleplattform,
 Echtzeitpflicht oder große Game-Engine nutzbar sein.
 
-Diese Roadmap ist ein Arbeitsentwurf, keine Zusage für bestimmte Termine oder
-einen endgültigen Funktionsumfang.
+## Aktueller Auftrag: einfacher, zusammenhängender Spieleinstieg
+
+Die folgenden Anforderungen sind bestätigt und werden jetzt umgesetzt.
+Die Versionsübersicht weiter unten beschreibt den bisherigen Bestand;
+ältere optionale Zuordnungen und Verwaltungswege sind nicht das Ziel dieses Umbaus.
+Ein Punkt wird erst nach nativer Prüfung und einem nachvollziehbaren Live-Test
+als abgeschlossen markiert. Es gibt keinen ungeprüften Versionssprung.
+
+### 1. Universum als verpflichtende Grundlage
+
+- [ ] Vor der ersten Kampagne muss mindestens ein Universum existieren.
+- [ ] Neue Kampagnen müssen einem bestehenden Universum zugeordnet werden.
+- [ ] Bestehende unzugeordnete Kampagnen bekommen einen ausdrücklichen
+  Zuordnungsweg. Keine automatische Wahl einer Welt, kein Löschen von Spielständen
+  und keine ungefragte Umwandlung bestehender Charaktere.
+- [ ] Optionale UI-Farben stellt die Universumsleitung ein. Kampagnen,
+  Profilbögen und SpielUI übernehmen sie; ohne eigene Auswahl gelten Standardfarben.
+
+### 2. Profil und SpielUI als echter Einstieg
+
+- Das Spielerprofil ist ausschließlich Charakterverwaltung: Universum wählen,
+  eigene Figuren erstellen und auswählen, Stats und Inventar sehen sowie
+  erlaubte Charakteraktionen ausführen. Keine Spieleauswahl, Mitgliederverwaltung
+  oder Leitungsfreigaben im Profil.
+- [ ] Im privaten Pen-&-Paper-Profil ein Universum wählen und direkt einen
+  eigenen Charakter erstellen beziehungsweise zur Freigabe einreichen.
+  Standardmäßig ohne zusätzliche Universumsmitgliedschaft; ausdrücklich
+  konfigurierte Zugangsbeschränkungen der Leitung bleiben erhalten.
+- [ ] Eigene Charaktere einschließlich offener Erstfreigaben per Dropdown wählen.
+  Leere Kampagnen und fremde Figuren gehören nicht in diese Auswahl.
+- [ ] Erhaltene Einladungen mit benannter Spielrunde beziehungsweise Universum
+  und Absender im Profil anzeigen, annehmen oder ablehnen.
+  Einladen und Leitungsfreigaben gehören zur jeweiligen Spielrunde, nicht ins
+  Spielerprofil. Vorschläge durch Mitspieler benötigen zunächst die Zustimmung
+  der Leitung.
+- [ ] Im Spielbereich eine klare Aktion zum Spielen beziehungsweise Fortsetzen
+  anbieten. Spieleauswahl, Vorbereitung und Verwaltung bleiben dort getrennt
+  und eindeutig auffindbar.
+- [ ] Ersetzte Menü- und Formularwege entfernen, nicht parallel als zweite
+  Oberfläche weiterpflegen. Bestehende Rechte und gespeicherte Inhalte erhalten.
+
+### 3. Charaktererstellung durch die Leitung konfigurieren
+
+- [ ] Anzahl eigener Charaktere je Spieler festlegen; auch offene Erstanträge
+  berücksichtigen und Grenzen serverseitig prüfen.
+- [ ] Klassen, Rassen und andere Auswahlfelder frei vorgeben oder weglassen.
+  Keine vorgeschriebenen Klassen, Rassen oder Attributboni.
+- [ ] Eigene Charakterbilder erlauben oder sperren und/oder geschützte Bilder
+  zum Auswählen bereitstellen. Charakterbilder sind keine öffentlichen Profilavatare.
+
+### 4. Gemeinsame, videogameartige Charakteransicht
+
+- [ ] Im Profil und im Spiel dieselbe Bogenoberfläche verwenden.
+- [ ] Charakterbild mittig; standardmäßig drei Slots links und drei rechts:
+  Kopf, Beine, Füße, Brust, Arme und Hände.
+- [ ] Leitung kann Slots hinzufügen, entfernen, umbenennen, ausblenden,
+  platzieren und mit eigenen beschrifteten Grafiken versehen.
+- [ ] Beim Entfernen belegter Slots Belegung, Boni und offene Anträge kontrolliert
+  aktualisieren; Gegenstände im Inventar und frühere Nachweise erhalten.
+- [ ] Stufe nur bei aktiviertem Stufensystem sichtbar hervorheben.
+- [x] Bei eigener Erstellung keine frei erfundenen Zahlenwerte: Ressourcen,
+  Maxima, Erfahrung und Level aus den Leitungs-Vorgaben übernehmen.
+- [x] Level-Punktepool: Startpunkte auf Level 1 und zusätzliche Punkte je
+  Levelaufstieg, serverseitig aus dem freigegebenen Erfahrungsstand begrenzt.
+  Nicht verteilte Punkte bleiben verfügbar; der Bogen zeigt das Restbudget.
+  Keine eigenen Erfahrungs-, Level- oder Ressourcenänderungen im Levelmodus,
+  auch nicht durch Leitungskonten im Spielerprofil. Bewusste Korrekturen
+  erfolgen getrennt in der Spielverwaltung.
+  Werte, Ressourcen, Inventar, Abenteuer und Bearbeitung über klare Tabs anbieten.
+- [ ] Gegenstände haben passende Slotarten oder gelten als Verbrauchsgüter.
+
+### 5. Verbrauch und frei konfigurierte Gegenstandswirkungen
+
+- [ ] Spieler können freigegebene Gegenstände benutzen. Verbrauch, Kosten,
+  Voraussetzungen und tatsächliche Wirkungen werden serverseitig geprüft
+  und gemeinsam protokolliert; Wiederholen darf nicht doppelt wirken.
+- [ ] Leitung definiert temporäre oder dauerhafte Wirkungen auf Attribute
+  und Ressourcen/Statuswerte. Spätere Änderungen dürfen beim Beenden eines
+  temporären Effekts nicht versehentlich zurückgesetzt werden.
+- [ ] Nutzungsbedingungen je Gegenstand: sofort, Freigabe der Leitung,
+  bestandene Probe oder eine Spielrunde aussetzen.
+- [ ] Echte Spielrunden werden durch die Leitung gesteuert; AFK, Seitenaufrufe
+  und vergangene Echtzeit ersetzen keine Runde.
+- [ ] Gold und andere Währungen bleiben in den konfigurierten Geldkonten;
+  Heil- und Manatränke sind Beispiele, keine fest eingebauten Spielregeln.
+
+### 6. Spielaktionen und Aktionen außerhalb des Spiels trennen
+
+- [ ] Leitung bestimmt, ob Spieler außerhalb des Spiels im PS-Community-Profil
+  ausrüsten, heilen, Ressourcen auffüllen oder andere erlaubte Aktionen ausführen.
+- [ ] Rechte beziehungsweise Einschränkungen für einzelne Slots, Gegenstände
+  und Aktionsarten vorsehen, nicht nur einen pauschalen Profilzugriff.
+- [ ] Erlaubte Profilaktionen ohne Würfel- oder Rundenwartezwang ausführen;
+  Kosten, Verbrauch, Freigaben und Protokoll bleiben wirksam.
+- [ ] Ein Wechsel der URL oder ein manipulierter Kontextparameter darf
+  Bedingungen einer laufenden Spielsitzung nicht umgehen.
+
+### 7. Abschluss und Bereinigung
+
+- [ ] Betroffene native Integrationstests und UI-Regressionen ausführen.
+- [ ] Mit dem bestehenden Demokonto echte Formulare, Charakterauswahl,
+  Einladungen, Slots und Gegenstandsaktionen im geteilten Browser prüfen.
+  Bestehende fremde Demos nicht als Testdaten umschreiben.
+- [ ] Handbuch, README und Übersetzungskatalog an die tatsächlichen Abläufe anpassen.
+- [ ] Überholten Code erst nach Ersetzung seiner Funktion entfernen; keine
+  Bestandsdaten, Importnachweise oder noch benötigten Berechtigungen löschen.
 
 ## Entwicklungsstand
 
@@ -34,9 +140,10 @@ einen endgültigen Funktionsumfang.
 - Der geschützte Frontend-Spielbereich per `[ps_pen_paper]` zeigt Kampagnen,
   Regeln und Charaktere mit denselben Bearbeitungs- und Freigaberechten.
   Eine optionale Spielbereich-Seitenvorlage ist unabhängig vom Theme-Layout.
-- Spielleiter passen Farben pro Kampagne über „Style“ an, einschließlich
-  Live-Vorschau, Standardfarben und Kontrasthinweisen. Freies CSS ist dafür
-  nicht nötig.
+- Bisher konnten Spielleiter Farben pro Kampagne über „Style“ einstellen.
+  Der aktuelle Umbau verlagert diese Einstellung ins Universum und übernimmt
+  sie in Profil und SpielUI. Live-Vorschau, Standardfarben und Kontrasthinweise
+  bleiben erhalten; freies CSS ist dafür nicht nötig.
 - Die erste Würfelmechanik unterstützt begrenzte W-/D-Ausdrücke, optionale
   freigegebene Attributwerte und ein geschütztes Wurfprotokoll. Spielleiter
   bestimmen erlaubte Gruppen-, Privat- und verdeckte Würfe pro Kampagne.
@@ -69,8 +176,9 @@ einen endgültigen Funktionsumfang.
   auf sämtliche dortigen Spielinhalte und die Chat-Moderation.
 - Version 0.10.0 ergänzt die private Universumsverwaltung im Backend und Frontend.
   Universen besitzen Name, interne Weltbeschreibung und revisionsgeschützte
-  Historie. Kampagnen lassen sich nach Vorschau und Bestätigung zuordnen oder
-  lösen, ohne ihre Regeln, Bögen, Freigaben oder Rechte zu verändern.
+  Historie. Die damals optionale Zuordnung wird im aktuellen Auftrag verbindlich.
+  Kontrollierte Änderungen müssen Regeln, Bögen, Freigaben und Rechte erhalten;
+  ein neues Loslösen ins Leere ist kein gültiger Zielzustand.
 - Die Textdomain `ps-pen-paper` ist eingebunden; ein POT-Katalog im Verzeichnis
   `languages/` dient als Grundlage für spätere PO/MO-Übersetzungen.
 - Version 0.12.0 ergänzt gespeicherte Szenenentwürfe mit getrennten Geheimnissen,
@@ -1117,7 +1225,8 @@ Spielwelterweiterungen werden dadurch nicht wieder zurückgestellt:
 - Komfortfunktionen für den Vergleich von Regelversionen und die gebündelte
   Übernahme umfangreicher Änderungen. Die grundlegende Absicherung und
   Nachvollziehbarkeit von Regeländerungen gehört bereits in die frühen Phasen.
-- Optionale Erfahrungs-/Stufenschwellen sind vorhanden. Weiterführende
+- Optionale Erfahrungs-/Stufenschwellen und Startpunkte mit zusätzlichen
+  Attributpunkten je Level sind vorhanden. Weiterführende
   Rangregeln und Freigabeabläufe bleiben mögliche spätere Erweiterungen.
 - Sitzungsnotizen, Terminübersicht und Zusammenfassungen vergangener Sitzungen.
 - Import und Export eigener Kampagnen- oder Regelvorlagen mit klaren Optionen

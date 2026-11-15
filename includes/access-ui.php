@@ -11,6 +11,7 @@ function ps_pen_paper_handle_access_action( $operation ) {
 		ps_pen_paper_fail( __( 'Die Spielbereich-Seite ist nicht mehr verfügbar. Bitte öffne das Formular erneut.', 'ps-pen-paper' ) );
 	}
 	check_admin_referer( ( in_array( $operation, array( 'request_membership', 'accept_invitation', 'decline_invitation' ), true ) ? 'pspp_join_' : 'pspp_campaign_' ) . $campaign_id );
+	$profile_url = ps_pen_paper_profile_return( $campaign_id, 0 );
 	$revision = isset( $_POST['settings_revision'] ) ? $_POST['settings_revision'] : null;
 	if ( in_array( $operation, array( 'invite_user', 'revoke_invitation', 'accept_invitation', 'decline_invitation' ), true ) ) {
 		$operations = array( 'invite_user' => 'invite', 'revoke_invitation' => 'revoke', 'accept_invitation' => 'accept', 'decline_invitation' => 'decline' );
@@ -40,9 +41,9 @@ function ps_pen_paper_handle_access_action( $operation ) {
 		ps_pen_paper_fail( $result->get_error_message() );
 	}
 	$notice = 'request_membership' === $operation ? 'join_requested' : ( 'review_membership' === $operation ? 'join_reviewed' : 'settings_saved' );
-	$url = $page_id ? ps_pen_paper_game_url( $page_id, $campaign_id ) : ps_pen_paper_admin_url( $campaign_id );
+	$url = $profile_url ? $profile_url : ( $page_id ? ps_pen_paper_game_url( $page_id, $campaign_id ) : ps_pen_paper_admin_url( $campaign_id ) );
 	$self_service = in_array( $operation, array( 'request_membership', 'accept_invitation', 'decline_invitation' ), true );
-	wp_safe_redirect( add_query_arg( 'pspp_notice', $notice, $url ) . ( $self_service ? '' : '#pspp-settings' ) );
+	wp_safe_redirect( add_query_arg( 'pspp_notice', $notice, $url ) . ( $self_service || $profile_url ? '' : '#pspp-settings' ) );
 	exit;
 }
 

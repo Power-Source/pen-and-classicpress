@@ -28,6 +28,36 @@ document.querySelectorAll('[data-loot-editor]').forEach((editor) => {
 	});
 	update();
 });
+document.querySelectorAll('[data-condition-editor]').forEach((editor) => {
+	const list = editor.querySelector('[data-condition-rows]');
+	const template = editor.querySelector('[data-condition-template]');
+	const add = editor.querySelector('[data-add-condition]');
+	let next = Number(editor.dataset.nextIndex);
+	const update = () => {
+		add.disabled = list.children.length >= 20;
+		list.querySelectorAll('[data-remove-condition]').forEach((button) => {
+			button.hidden = false;
+			button.disabled = list.children.length <= 1;
+		});
+	};
+	add.hidden = false;
+	add.addEventListener('click', () => {
+		if (list.children.length >= 20) return;
+		list.insertAdjacentHTML('beforeend', template.innerHTML.replace(/__INDEX__/g, String(next++)));
+		psppDirtyForms.add(editor.closest('form'));
+		list.lastElementChild.querySelector('select').focus();
+		update();
+	});
+	list.addEventListener('click', (event) => {
+		const remove = event.target.closest('[data-remove-condition]');
+		if (!remove || list.children.length <= 1) return;
+		remove.closest('[data-condition-row]').remove();
+		psppDirtyForms.add(editor.closest('form'));
+		add.focus();
+		update();
+	});
+	update();
+});
 window.addEventListener('beforeunload', (event) => {
 	if (psppDirtyForms.size) {
 		event.preventDefault();

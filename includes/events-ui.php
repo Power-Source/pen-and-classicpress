@@ -62,7 +62,9 @@ function ps_pen_paper_render_event_details( $event, $scope = null ) {
 						$step = end( $run['history'] );
 						echo '<p>' . esc_html( $step['choice'] . ( $step['roll'] ? ' · ' . $step['roll']['total'] . ' / ' . $step['roll']['threshold'] : '' ) ) . '</p>';
 						if ( isset( $step['requirement'] ) ) { echo '<p>' . esc_html( ps_pen_paper_adventure_requirement_label( $step['requirement'] ) ) . '</p>'; }
+						if ( isset( $step['conditions'] ) ) { echo '<p>' . esc_html( ps_pen_paper_adventure_conditions_label( $step['conditions'] ) ) . '</p>'; }
 						if ( array_key_exists( 'resource_cost', $step ) ) { echo '<p>' . esc_html( $step['resource_cost'] ? ps_pen_paper_adventure_cost_label( $step['resource_cost'] ) : __( 'Bei Misserfolg keine Kosten', 'ps-pen-paper' ) ) . '</p>'; }
+						if ( array_key_exists( 'reward', $step ) ) { echo '<p>' . esc_html( ps_pen_paper_adventure_reward_history_label( $run['snapshot'], $step ) ) . '</p>'; }
 					}
 					}
 					?>

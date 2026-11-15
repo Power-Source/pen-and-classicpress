@@ -113,6 +113,14 @@ einen endgültigen Funktionsumfang.
   Ressource, Betrag und Kostenzeitpunkt sind ausdrücklich konfigurierbar.
   Verbrauch und Fortschritt werden atomar protokolliert; lokale Bögen und
   unabhängige Kopien sind unterstützt, gemeinsame Basisbögen noch nicht.
+- Version 0.24.0 ergänzt optionale Soloentscheidungsbelohnungen:
+  feste Gegenstände/Währung oder eingefrorene Beutetabellen, Auslöser je
+  Entscheidung und atomare, einmalige Vergaben mit privatem Nachweis.
+  Gemeinsame Guthaben behalten die Autorisierung durch die Universumsleitung.
+- Version 0.25.0 ergänzt konfigurierbare Wertebedingungen mit UND/ODER:
+  sechs Vergleiche für Zahlen, Attribute und Ressourcen (aktueller Wert oder
+  Maximum), ohne Verbrauch und mit unveränderlichem privatem Nachweis.
+  Ältere Mindestwert-Voraussetzungen bleiben gültig.
 
 ### Universum vor Kampagne: Grundmodell seit Version 0.11.0
 
@@ -334,7 +342,7 @@ Das Handbuch beschreibt bereits die erste Spieltisch-Oberfläche.
 Die Module beschreiben fachliche Bereiche und müssen nicht als separate Plugins
 oder als komplizierte technische Architektur umgesetzt werden.
 
-## Aktuelle Priorität: Soloabenteuer sicher erweitern
+## Aktuelle Priorität: Vorhandenes Grundgerüst stabilisieren
 
 Der erste kleine Schritt aus Phase 7 ist seit **0.21.0** umgesetzt. Der
 Story-Builder bleibt Grundlage. Seit **0.16.0** stehen
@@ -344,10 +352,57 @@ ergänzen strukturierte Gegner/NPCs und bewusst aufgenommene Universumsvorlagen
 die Spielwelt. Seit **0.18.0** stehen kontrollierte Beutetabellen auf Grundlage
 der vorhandenen Würfelmechanik bereit. Seit **0.19.0** ergänzt eine erste
 optionale Wiki-Anbindung das öffentliche Weltlexikon. Seit **0.20.0** ist
-kontrollierter, konfigurierbarer Handel vorhanden. Der nächste Ausbauschritt
-ist die gezielte Erweiterung des Soloablaufs; Gruppenabenteuer und eine große
-automatische Spiel-Engine bleiben ausdrücklich zurückgestellt.
-Eine zusätzliche Wiederherstellungs-Verwaltungsoberfläche bleibt zurückgestellt.
+kontrollierter, konfigurierbarer Handel vorhanden.
+Seit 0.24.0 sind konfigurierbare Soloentscheidungsbelohnungen vorhanden.
+Seit 0.25.0 sind mehrere Wertebedingungen mit UND/ODER vorhanden.
+
+Die funktionale Grundlage ist damit umfangreich genug, um zunächst ihre
+Sicherung, Wiederherstellung und verlässliche Nutzung zu priorisieren.
+Begegnungen, Gruppen- und hybride Abläufe sowie weitere neue Funktionsbereiche
+bleiben geplant, werden aber vorerst zurückgestellt. Korrekturen und gezielte
+Verbesserungen vorhandener Funktionen bleiben möglich. Das Plugin unterstützt
+die Spielleitung; eine vollständige Game-Engine ist weiterhin kein Ziel.
+
+### Reihenfolge der nächsten Schritte
+
+1. **Kampagnenexport und Wiederherstellung:** Zunächst einen vollständigen,
+   versionierten Export entwickeln, danach Import mit Vorschau und die
+   Wiederherstellung einer einzelnen Kampagne. Regeln, Charaktere, Inventare,
+   Währung und Guthaben, Kapitel, Szenen, Handouts, NPCs, Beutetabellen,
+   Ereignishistorien, Soloabenteuer und Durchläufe sowie geschützte Assets
+   berücksichtigen. Konflikte bestehender IDs und Benutzerzuordnungen
+   ausdrücklich behandeln; keine stillen Überschreibungen und keine Änderungen
+   an anderen Kampagnen. Den Umgang mit gemeinsam genutzten Universumsdaten
+   und optionalen Integrationen vor der Wiederherstellung festlegen; keine
+   fremden oder nicht zum Export freigegebenen Daten übernehmen.
+2. **Plattform- und Wiederherstellungstests:** Unterstützte Mindestversionen
+   von WordPress, ClassicPress und PHP festlegen und anhand einer reproduzierbaren
+   Testmatrix prüfen. Betrieb mit und ohne optionale Integrationen,
+   Mehrprozess-/Zwei-Subsite-Szenarien und erfolgreiche sowie fehlgeschlagene
+   Wiederherstellungen abdecken. Bestehende Integrationsprüfungen weiterführen;
+   sie ersetzen weder die Plattformmatrix noch den Nachweis einer Wiederherstellung.
+3. **Vorhandene Modulschnittstellen dokumentieren:** Zuständigkeiten und
+   interne PHP-Lese-/Schreibwege für Kampagnen, Universen, Charaktere,
+   Ereignisse, Inventar und Story festhalten. Fachliche Änderungen über die
+   zuständigen Writer und deren Sperr-/Transaktionsregeln führen. Bestehende
+   Schnittstellen gezielt verbessern, statt eine neue API-Schicht auf Verdacht
+   oder eine öffentliche REST-API einzuführen.
+4. **Barrierefreiheit begleitend prüfen:** Zustände nicht nur über Farben
+   vermitteln; Aktionen ohne Drag-and-drop ermöglichen. Fokussteuerung,
+   dynamische Statusmeldungen, SVG-Beschriftungen und Bedienung ohne
+   Animationen bei jeder betroffenen Oberflächenänderung mitprüfen.
+
+### Entwicklungsdokumentation übersichtlicher trennen
+
+- [ ] Produktziele und Prioritäten in dieser Roadmap bündeln.
+- [ ] Technische Architektur mit Datenmodellen, Rechten, Transaktionen und
+  vorhandenen Schnittstellen separat dokumentieren.
+- [ ] Einen Changelog für tatsächlich veröffentlichte Änderungen führen;
+  geplante Funktionen nicht als vorhandenen Funktionsumfang darstellen.
+
+Die Trennung erfolgt schrittweise, ohne einen großen Dokumentations- oder
+Refactoring-Umbau zur Voraussetzung für den nächsten nutzbaren Schritt zu machen.
+Konzeptbewertungen allein sind kein Nachweis von Produktionsreife.
 
 Seit **0.15.0** verbindet ein privater Abenteuerplan die bestehenden Werkzeuge:
 
@@ -362,8 +417,9 @@ Seit **0.15.0** verbindet ein privater Abenteuerplan die bestehenden Werkzeuge:
 
 ### Abgesicherte Grundlagen und spätere Absicherung
 
-Die erledigten Konsistenzkorrekturen bleiben Grundlage. Die offenen Punkte
-werden nach Nutzen priorisiert; sie blockieren nicht jeden Story-Builder-Ausbau:
+Die erledigten Konsistenzkorrekturen bleiben Grundlage. Export/Wiederherstellung,
+Plattformtests und Schnittstellendokumentation haben jetzt Vorrang vor dem
+Ausbau weiterer Spielmechanismen:
 
 - [x] Lokale Änderungen an vorhandenen Charakterbögen, Freigaben,
   Kampagnenauflagen und Inventaren verwenden dieselbe Datenbanksperre je
@@ -379,7 +435,8 @@ werden nach Nutzen priorisiert; sie blockieren nicht jeden Story-Builder-Ausbau:
   bleiben ohne nachträglich erfundene Historie erhalten.
 - [ ] Einen bedienbaren Wiederherstellungsablauf für unklar bestätigte Vorgänge
   und unvollständige Altbestände schaffen (eigene Verwaltungsoberfläche
-  vorerst zurückgestellt). Weitere protokollpflichtige
+  für diese Sonderfälle vorerst zurückgestellt; nicht mit dem priorisierten
+  Kampagnenimport verwechseln). Weitere protokollpflichtige
   Verwaltungsänderungen ausdrücklich festlegen.
 - [x] Die zentrale Dokument-/Ereignisspeicherung hält Änderungen und Ereignisse
   mit einer gemeinsamen InnoDB-Transaktion zusammen. Ungeeignete Speicherwege
@@ -758,7 +815,9 @@ Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
 - [ ] Begrenzte Verweise auf weitere Tabellen ohne Zyklen ergänzen.
 - [ ] Weitere Würfelarten wie `W3` gesondert unterstützen; derzeit sind nur
   die vorhandenen Standardwürfel zulässig.
-- [ ] Automatische Vergabe erst im ausdrücklich freigegebenen Abenteuerablauf.
+- [x] Seit 0.24.0 automatische Vergabe im ausdrücklich freigegebenen
+  Soloabenteuerablauf ermöglichen, mit eingefrorenem Tabellenstand,
+  ausreichender Kapazität vor dem Wurf und einmaligem Vergabenachweis.
 
 ### Geplante Umsetzungsreihenfolge
 
@@ -771,15 +830,21 @@ Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
    geschützter Verwaltung, stabiler Zuordnung und bewusst veröffentlichten Texten.
 4. **Seit 0.20.0 umgesetzt:** Kontrollierter Handel mit konfigurierbaren Arten,
    verbindlicher Besitzerzustimmung und optionaler Spielleiterfreigabe.
-5. Den seit 0.21.0 vorhandenen Soloablauf zuerst begrenzt erweitern; einen
-   gemeinsamen Gruppenmodus erst nach gesonderter Konzeption angehen.
+5. **Soloausbau bis 0.25.0 vorhanden:** Mindestwerte, Ressourcenkosten,
+   Belohnungen und UND-/ODER-Wertebedingungen. Jetzt Export/Wiederherstellung,
+   Plattformtests und dokumentierte Schnittstellen vorziehen.
+6. Begegnungen sowie weitere Solo-, Gruppen- und hybride Abläufe danach
+   gezielt ausbauen; einen gemeinsamen Gruppenmodus gesondert konzipieren.
 
 ## Phase 7: Geleitete, hybride und automatisierte Abenteuer
 
 **Erster Solo-Schritt seit 0.21.0 umgesetzt.** Die bestehende Spielleitung
 behält die Kontrolle über Vorbereitung und Freigabe. Mindestwerte und
 optionale Ressourcenkosten ergänzen den Ablauf seit 0.22.0 beziehungsweise
-0.23.0. Gruppenabläufe und automatische Belohnungen sind noch nicht implementiert.
+0.23.0; seit 0.24.0 folgen konfigurierbare einmalige Belohnungen.
+Gruppenabläufe und hybride Freigabeschritte sind noch nicht implementiert.
+Weitere neue Abenteuermechanismen bleiben hinter der aktuellen
+Stabilisierungspriorität zurückgestellt.
 
 - [x] Pro Charakter einen eigenen Durchlauf aus einem ausdrücklich
   freigegebenen Szenenstand speichern; der Durchlauf friert Szenen und
@@ -804,8 +869,19 @@ optionale Ressourcenkosten ergänzen den Ablauf seit 0.22.0 beziehungsweise
   ohne offenen Werteantrag begrenzen; kostenfreie Alternativen bleiben möglich.
 - [ ] Teamdurchläufe, gemeinsame Entscheidungen, Wiedereinstieg und
   Teilnahmeverhalten ausdrücklich entwerfen.
-- [ ] Weitere Voraussetzungen und erlaubte Belohnungen erst als
-  getrennte, ausdrücklich konfigurierte Erweiterung planen.
+- [x] Seit 0.24.0 feste Gegenstände/Währung und vorhandene Beutetabellen als
+  optionale Alternativen je Soloentscheidung anbieten. Auch Misserfolg belohnen
+  oder nur Erfolg; ohne Probe immer. Vorlagen und Tabellen einfrieren,
+  ausreichende Inventar-/Guthabenkapazität vor dem Würfeln prüfen und Kosten,
+  Vergaben sowie Fortschritt gemeinsam speichern. Bestehende Vergaberechte,
+  Community-Bindung und private Protokolle erhalten; keine erneute Auszahlung.
+- [x] Seit 0.25.0 bis zu 20 Zahlen-/Attribut-/Ressourcenbedingungen je
+  Entscheidung mit UND oder ODER anbieten. Mindestens, größer, höchstens,
+  kleiner, gleich und ungleich unterstützen; Ressourcenwert und Maximum
+  unterscheiden. Aktuelle freigegebene Werte prüfen, offene Anträge nicht
+  verwenden und alle Vergleichsergebnisse im privaten Verlauf einfrieren.
+- [ ] Text- und Gegenstandsbedingungen als gesonderten Ausbau vorsehen.
+- [ ] Hybride Abläufe mit ausdrücklich notwendigen Spielleiterfreigaben ergänzen.
 
 Die Spielleitung bleibt Abenteuerautor und bestimmt je Kampagne den Modus:
 
@@ -818,8 +894,8 @@ Die Spielleitung bleibt Abenteuerautor und bestimmt je Kampagne den Modus:
 - Den vorhandenen kleinen Szenen- und Entscheidungsablauf ausbauen: Die
   Spielleitung definiert Auswahlmöglichkeiten, optionale Proben,
   Erfolgs-/Misserfolgsfolgen und erlaubte Übergänge zwischen freigegebenen
-  Szenen. Mindestwerte stehen seit 0.22.0 bereit; weitere Voraussetzungstypen
-  folgen später.
+  Szenen. Mindestwerte stehen seit 0.22.0 bereit; mehrere Wertebedingungen mit
+  UND/ODER seit 0.25.0. Text- und Gegenstandsbedingungen folgen später.
 - Vorbereitete Komplikationen statt automatisch erfundener Ergebnisse
   verwenden. Beispiel: Ein Schloss untersuchen, eine Verstandprobe ausführen
   und je Ergebnis eine freigegebene Folgeszene öffnen.
@@ -852,10 +928,14 @@ Die Spielleitung bleibt Abenteuerautor und bestimmt je Kampagne den Modus:
 
 ## Phase 8: Mögliche spätere Erweiterungen
 
-Diese Ideen sind bewusst noch nicht Teil der ersten spielbaren Version:
+Diese Ideen sind bewusst noch nicht Teil der ersten spielbaren Version und
+folgen erst nach der aktuellen Stabilisierungspriorität:
 
-- Kampagnen- und Charakterbogen-Vorlagen kopieren und zwischen eigenen
-  Kampagnen übernehmen.
+- Einen universellen Katalog für Regelwerke, Charakterbögen, NPCs,
+  Gegenstände, Szenen, Abenteuer und Beutetabellen schrittweise ausbauen.
+  Vorlagen bewusst als anpassbare Kopien übernehmen, nicht automatisch
+  synchronisieren. Versionierter Export und kontrollierter Import bilden
+  dafür die Grundlage.
 - Erweiterte Würfelmechaniken wie Erfolgswürfe, Würfelpools oder explodierende
   Würfel als optionale Regeln.
 - Komfortfunktionen für den Vergleich von Regelversionen und die gebündelte

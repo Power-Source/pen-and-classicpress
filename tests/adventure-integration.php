@@ -12,6 +12,8 @@ ps_pen_paper_register_character_type();
 ps_pen_paper_register_scene_type();
 ps_pen_paper_register_event_type();
 ps_pen_paper_register_adventure_types();
+ps_pen_paper_register_item_type();
+ps_pen_paper_register_loot_types();
 
 $original_user = get_current_user_id();
 $users = array();
@@ -394,6 +396,7 @@ try {
 		array( 'name' => 'Resource base', 'values' => array( $base_resource => array( 'current' => '4', 'maximum' => '10' ) ) ), '0', '1' );
 	$check( is_int( $cost_base_id ), 'Cost base character fixture failed.' );
 	$cost_base_before = ps_pen_paper_raw_character_state( $cost_base_id );
+	$context_campaigns = array(); $context_characters = array();
 	foreach ( array( 'shared', 'copy' ) as $context_mode ) {
 		wp_set_current_user( $users['gm'] );
 		$context_campaign_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => 'Cost context fixture' ), true );
@@ -402,10 +405,12 @@ try {
 		add_post_meta( $context_campaign_id, '_pspp_gm', (string) $users['gm'] );
 		add_post_meta( $context_campaign_id, '_pspp_player', (string) $users['player'] );
 		$context_campaign = ps_pen_paper_get_campaign( $context_campaign_id );
+		$context_campaigns[ $context_mode ] = $context_campaign;
 		$check( ! is_wp_error( ps_pen_paper_save_universe_link( $context_campaign_id, $cost_universe_id, '0', '1', 'confirmed' ) ) &&
 			! is_wp_error( ps_pen_paper_adopt_universe_rules( $context_campaign_id, '1', 'confirmed' ) ), 'Cost context universe association failed.' );
 		$context_character_id = ps_pen_paper_attach_base_character( $context_campaign_id, $cost_base_id, '1', '1', $context_mode, 'confirmed' );
 		$check( is_int( $context_character_id ), 'Cost context attachment failed.' );
+		$context_characters[ $context_mode ] = $context_character_id;
 		$context_scene_id = ps_pen_paper_save_scene( $context_campaign, 0, array( 'title' => 'Resource scene', 'text' => '', 'secret' => '', 'grid' => '0' ), '0' );
 		$check( is_int( $context_scene_id ) && true === ps_pen_paper_publish_scene( $context_campaign, $context_scene_id, '1', 'confirmed' ), 'Cost context scene fixture failed.' );
 		$context_adventure_id = ps_pen_paper_save_adventure( $context_campaign, 0, 'Resource context adventure', (string) $context_scene_id, '0' );
@@ -444,13 +449,325 @@ try {
 		$check( $cost_base_before === ps_pen_paper_raw_character_state( $cost_base_id ), 'Local cost changed the universe base character.' );
 	}
 
+	wp_set_current_user( $users['gm'] );
+	$condition_input = array( 'mode' => 'all', 'rows' => array( array( 'target' => $attribute . ':value', 'operator' => 'eq', 'value' => '6' ) ) );
+	foreach ( array(
+		array( 'operator', 'sometimes' ), array( 'value', '6.5' ), array( 'value', '1000001' ),
+		array( 'target', $resource . ':value' ), array( 'target', $attribute . ':maximum' ), array( 'target', wp_generate_uuid4() . ':value' ),
+	) as $bad ) {
+		$invalid_conditions = $condition_input; $invalid_conditions['rows'][0][ $bad[0] ] = $bad[1];
+		$check( is_wp_error( ps_pen_paper_prepare_adventure_conditions( $changed_rules, $invalid_conditions ) ), 'Invalid value condition accepted.' );
+	}
+	$invalid_conditions = $condition_input; $invalid_conditions['mode'] = 'sometimes';
+	$check( is_wp_error( ps_pen_paper_prepare_adventure_conditions( $changed_rules, $invalid_conditions ) ), 'Unknown condition mode accepted.' );
+	$invalid_conditions = $condition_input; $invalid_conditions['rows'] = array_fill( 0, 21, $condition_input['rows'][0] );
+	$check( is_wp_error( ps_pen_paper_prepare_adventure_conditions( $changed_rules, $invalid_conditions ) ), 'Unbounded condition list accepted.' );
+	$condition_cases = array(
+		array( 'operator' => 'gte', 'value' => '6', 'pass' => true ),
+		array( 'operator' => 'gt', 'value' => '6', 'pass' => false ),
+		array( 'operator' => 'gt', 'value' => '5', 'pass' => true ),
+		array( 'operator' => 'lte', 'value' => '6', 'pass' => true ),
+		array( 'operator' => 'lt', 'value' => '6', 'pass' => false ),
+		array( 'operator' => 'lt', 'value' => '7', 'pass' => true ),
+		array( 'operator' => 'eq', 'value' => '6', 'pass' => true ),
+		array( 'operator' => 'ne', 'value' => '6', 'pass' => false ),
+		array( 'operator' => 'ne', 'value' => '7', 'pass' => true ),
+		array( 'operator' => 'eq', 'value' => '6', 'pass' => false, 'mode' => 'all' ),
+		array( 'operator' => 'eq', 'value' => '6', 'pass' => true, 'mode' => 'any' ),
+	);
+	foreach ( $condition_cases as $case_index => $case ) {
+		wp_set_current_user( $users['gm'] );
+		$condition_adventure = ps_pen_paper_save_adventure( $campaign, 0, 'Comparison fixture ' . $case_index, (string) $scenes['START_ORIGINAL'], '0' );
+		$check( is_int( $condition_adventure ), 'Comparison adventure failed.' );
+		$conditions_input = $condition_input;
+		$conditions_input['rows'][0]['operator'] = $case['operator']; $conditions_input['rows'][0]['value'] = $case['value'];
+		if ( isset( $case['mode'] ) ) {
+			$conditions_input['mode'] = $case['mode'];
+			$conditions_input['rows'][] = array( 'target' => $resource . ':current', 'operator' => 'gte', 'value' => '1' );
+		}
+		$condition_edge_input = array( 'from_scene' => (string) $scenes['START_ORIGINAL'], 'choice' => 'COMPARISON_' . $case_index,
+			'expression' => '', 'attribute' => '', 'threshold' => '0', 'success_scene' => '0', 'failure_scene' => '0', 'conditions' => $conditions_input );
+		$check( true === ps_pen_paper_save_adventure_edge( $campaign, $condition_adventure, $condition_edge_input, '1' ) &&
+			true === ps_pen_paper_publish_adventure( $campaign, $condition_adventure, '2', 'confirmed' ), 'Comparison publication failed.' );
+		wp_set_current_user( $users['player'] );
+		$condition_character_before = ps_pen_paper_raw_character_state( $characters['player'] );
+		$condition_run_id = ps_pen_paper_start_adventure_run( $campaign, $condition_adventure, $characters['player'], '3', (string) $condition_character_before['revision'] );
+		$check( is_int( $condition_run_id ), 'Comparison run failed.' );
+		$condition_run_before = get_post_meta( $condition_run_id, '_pspp_adventure_run', true );
+		$condition_edge_id = $condition_run_before['snapshot']['edges'][0]['id'];
+		if ( 0 === $case_index ) {
+			wp_set_current_user( $users['gm'] );
+			$changed_character = array( 'name' => 'Player', 'values' => array( $attribute => '5', $resource => array( 'current' => '0', 'maximum' => '20' ) ) );
+			$check( $characters['player'] === ps_pen_paper_save_character( $campaign_id, $characters['player'], $users['player'], $changed_character,
+				(string) $condition_character_before['revision'], (string) $changed_rules['revision'] ), 'Stale comparison correction failed.' );
+			wp_set_current_user( $users['player'] );
+			$result = ps_pen_paper_advance_adventure_run( $campaign, $condition_run_id, $condition_edge_id, '1' );
+			$check( is_wp_error( $result ) && 'adventure_conditions_unmet' === $result->get_error_code() &&
+				$condition_run_before === get_post_meta( $condition_run_id, '_pspp_adventure_run', true ), 'Stale condition form used old approved values.' );
+			wp_set_current_user( $users['gm'] );
+			$changed_character['values'][ $attribute ] = '6';
+			$check( $characters['player'] === ps_pen_paper_save_character( $campaign_id, $characters['player'], $users['player'], $changed_character,
+				(string) ps_pen_paper_raw_character_state( $characters['player'] )['revision'], (string) $changed_rules['revision'] ), 'Comparison value restoration failed.' );
+			$changed_edge = $condition_edge_input; $changed_edge['conditions']['rows'][0]['value'] = '100';
+			$check( true === ps_pen_paper_save_adventure_edge( $campaign, $condition_adventure, array(), '3', $condition_edge_id ) &&
+				true === ps_pen_paper_save_adventure_edge( $campaign, $condition_adventure, $changed_edge, '4' ) &&
+				true === ps_pen_paper_publish_adventure( $campaign, $condition_adventure, '5', 'confirmed' ) &&
+				$condition_run_before === get_post_meta( $condition_run_id, '_pspp_adventure_run', true ), 'Republication changed running condition rules.' );
+			wp_set_current_user( $users['player'] );
+			$condition_character_before = ps_pen_paper_raw_character_state( $characters['player'] );
+		}
+		if ( 1 === $case_index ) {
+			$pending_input = array( 'name' => 'Player', 'values' => array( $attribute => '7', $resource => array( 'current' => '0', 'maximum' => '20' ) ) );
+			$check( $characters['player'] === ps_pen_paper_save_character( $campaign_id, $characters['player'], $users['player'], $pending_input,
+				(string) $condition_character_before['revision'], (string) $changed_rules['revision'] ), 'Pending comparison fixture failed.' );
+			$pending_state = ps_pen_paper_raw_character_state( $characters['player'] );
+			$result = ps_pen_paper_advance_adventure_run( $campaign, $condition_run_id, $condition_edge_id, '1' );
+			$check( is_wp_error( $result ) && 'adventure_conditions_unmet' === $result->get_error_code() &&
+				$pending_state === ps_pen_paper_raw_character_state( $characters['player'] ), 'Pending values satisfied a comparison.' );
+			wp_set_current_user( $users['gm'] );
+			$check( true === ps_pen_paper_review_character( $campaign_id, $characters['player'], 'reject', (string) $pending_state['revision'] ), 'Pending comparison cleanup failed.' );
+			wp_set_current_user( $users['player'] );
+			$condition_character_before = ps_pen_paper_raw_character_state( $characters['player'] );
+		}
+		$condition_events_before = ps_pen_paper_get_events( $campaign );
+		if ( $case_index === count( $condition_cases ) - 1 ) {
+			$fail_condition_event = static function ( $check, $id, $key, $value ) {
+				return '_pspp_event' === $key && isset( $value['kind'] ) && 'adventure_run' === $value['kind'] ? false : $check;
+			};
+			add_filter( 'update_post_metadata', $fail_condition_event, 10, 4 );
+			try { $check( is_wp_error( ps_pen_paper_advance_adventure_run( $campaign, $condition_run_id, $condition_edge_id, '1' ) ), 'Unlogged conditional progress succeeded.' ); }
+			finally { remove_filter( 'update_post_metadata', $fail_condition_event, 10 ); }
+			$check( $condition_run_before === get_post_meta( $condition_run_id, '_pspp_adventure_run', true ) &&
+				$condition_events_before === ps_pen_paper_get_events( $campaign ), 'Conditional rollback changed progress/history.' );
+		}
+		$result = ps_pen_paper_advance_adventure_run( $campaign, $condition_run_id, $condition_edge_id, '1' );
+		if ( $case['pass'] ) {
+			$condition_run_after = get_post_meta( $condition_run_id, '_pspp_adventure_run', true );
+			$check( true === $result && ps_pen_paper_valid_adventure_run( $condition_run_after ) &&
+				6 === $condition_run_after['history'][0]['conditions']['rows'][0]['value'], 'Exact value comparison or condition proof failed.' );
+			if ( isset( $case['mode'] ) ) {
+				$check( false === $condition_run_after['history'][0]['conditions']['rows'][1]['met'], 'OR discarded its unmet condition evidence.' );
+			}
+			$invalid_run = $condition_run_after; $invalid_run['history'][0]['conditions']['rows'][0]['met'] = false;
+			$check( ! ps_pen_paper_valid_adventure_run( $invalid_run ), 'Forged comparison result accepted.' );
+			$invalid_run = $condition_run_after; unset( $invalid_run['history'][0]['conditions'] );
+			$check( ! ps_pen_paper_valid_adventure_run( $invalid_run ), 'Missing condition proof accepted.' );
+			$invalid_run = $condition_run_after; $invalid_run['snapshot']['edges'][0]['conditions']['rows'][0]['operator'] = true;
+			$check( ! ps_pen_paper_valid_adventure_run( $invalid_run ), 'Untyped comparison operator accepted.' );
+		} else {
+			$check( is_wp_error( $result ) && 'adventure_conditions_unmet' === $result->get_error_code() &&
+				$condition_run_before === get_post_meta( $condition_run_id, '_pspp_adventure_run', true ) &&
+				$condition_events_before === ps_pen_paper_get_events( $campaign ), 'Unmet comparison advanced.' );
+			ob_start(); ps_pen_paper_render_character_adventures( $campaign, get_post( $characters['player'] ), 0 ); $condition_html = ob_get_clean();
+			$check( preg_match( '/<button[^>]*disabled[^>]*>COMPARISON_' . $case_index . '<\/button>/', $condition_html ) &&
+				false !== strpos( $condition_html, 'nicht erfüllt' ), 'Blocked comparison was hidden or unexplained.' );
+		}
+		$check( $condition_character_before === ps_pen_paper_raw_character_state( $characters['player'] ), 'Read-only conditions consumed character values.' );
+	}
+	wp_set_current_user( $users['gm'] );
+	$resource_condition_adventure = ps_pen_paper_save_adventure( $campaign, 0, 'Resource condition fixture', (string) $scenes['START_ORIGINAL'], '0' );
+	$resource_conditions = array( 'mode' => 'all', 'rows' => array(
+		array( 'target' => $resource . ':current', 'operator' => 'eq', 'value' => '7' ),
+		array( 'target' => $resource . ':maximum', 'operator' => 'eq', 'value' => '20' ),
+	) );
+	$resource_condition_edge = array( 'from_scene' => (string) $scenes['START_ORIGINAL'], 'choice' => 'RESOURCE_COMPARISON', 'expression' => '',
+		'attribute' => '', 'threshold' => '0', 'success_scene' => '0', 'failure_scene' => '0', 'conditions' => $resource_conditions,
+		'cost_resource' => $resource, 'cost_amount' => '2', 'cost_timing' => 'attempt' );
+	$check( is_int( $resource_condition_adventure ) && true === ps_pen_paper_save_adventure_edge( $campaign, $resource_condition_adventure, $resource_condition_edge, '1' ) &&
+		true === ps_pen_paper_publish_adventure( $campaign, $resource_condition_adventure, '2', 'confirmed' ), 'Resource condition publication failed.' );
+	wp_set_current_user( $users['other'] );
+	$resource_character_before = ps_pen_paper_raw_character_state( $characters['other'] );
+	$resource_condition_run = ps_pen_paper_start_adventure_run( $campaign, $resource_condition_adventure, $characters['other'], '3', (string) $resource_character_before['revision'] );
+	$check( is_int( $resource_condition_run ), 'Resource condition run failed.' );
+	$resource_run_before = get_post_meta( $resource_condition_run, '_pspp_adventure_run', true );
+	$check( true === ps_pen_paper_advance_adventure_run( $campaign, $resource_condition_run, $resource_run_before['snapshot']['edges'][0]['id'], '1' ), 'Resource current/maximum condition failed.' );
+	$resource_run_after = get_post_meta( $resource_condition_run, '_pspp_adventure_run', true );
+	$check( ps_pen_paper_valid_adventure_run( $resource_run_after ) &&
+		7 === $resource_run_after['history'][0]['conditions']['rows'][0]['value'] &&
+		20 === $resource_run_after['history'][0]['conditions']['rows'][1]['value'] &&
+		5 === ps_pen_paper_raw_character_state( $characters['other'] )['active']['values'][ $resource ]['current'],
+		'Resource conditions did not record the approved pre-cost values.' );
+
+	wp_set_current_user( $users['gm'] );
+	$reward_input = array( 'kind' => 'fixed', 'timing' => 'decision', 'table_id' => '0', 'item_id' => '0', 'quantity' => '0', 'money' => '3' );
+	$check( is_wp_error( ps_pen_paper_prepare_adventure_reward( $campaign, $reward_input ) ), 'Reward bypassed missing Community.' );
+	define( 'CPC_CORE_PLUGINS', 'core-profile,core-activity' );
+	require_once dirname( __DIR__, 2 ) . '/ps-community/activity/cpc_profile_tabs.php';
+	$check( true === ps_pen_paper_save_currency( $campaign, array( 'name' => 'Reward marks', 'symbol' => 'RM', 'wallet_mode' => 'campaign' ), '0' ) &&
+		true === ps_pen_paper_save_equipment_schema( $campaign, array( 'slots' => '', 'rarities' => 'normal | Normal | #abcdef' ), '0' ), 'Reward currency/schema failed.' );
+	$reward_item_input = array( 'name' => 'Original reward compass', 'description' => '', 'kind' => 'tool', 'rarity' => 'normal', 'properties' => '', 'binding' => 'tradeable' );
+	$reward_item_id = ps_pen_paper_save_item( $campaign, 0, $reward_item_input, '0' );
+	$check( is_int( $reward_item_id ), 'Reward item failed.' );
+	$reward_input['item_id'] = (string) $reward_item_id; $reward_input['quantity'] = '2';
+	$table_input = array( 'name' => 'Selected reward table', 'die' => '6', 'rows' => array(
+		array( 'from' => '1', 'to' => '6', 'label' => 'Selected outcome', 'item_id' => (string) $reward_item_id, 'quantity' => 'W6', 'money' => 'W6+4' ),
+	) );
+	$reward_table_id = ps_pen_paper_save_loot_table( $campaign, 0, $table_input, '0' );
+	$check( is_int( $reward_table_id ), 'Reward table failed.' );
+	ob_start(); ps_pen_paper_render_adventure_reward_fields( $campaign ); $reward_fields = ob_get_clean();
+	$check( false !== strpos( $reward_fields, 'value="fixed"' ) && false !== strpos( $reward_fields, 'value="table"' ) &&
+		false !== strpos( $reward_fields, 'value="' . $reward_item_id . '"' ) &&
+		false !== strpos( $reward_fields, 'value="' . $reward_table_id . '"' ), 'Reward editor cannot select fixed items and loot tables.' );
+	$private_table_input = $table_input; $private_table_input['name'] = 'UNSELECTED_REWARD_TABLE_SECRET';
+	$check( is_int( ps_pen_paper_save_loot_table( $campaign, 0, $private_table_input, '0' ) ), 'Unselected table fixture failed.' );
+	foreach ( array( array( 'money', '1000000000' ), array( 'quantity', '101' ), array( 'timing', 'sometimes' ), array( 'item_id', (string) $characters['player'] ) ) as $bad ) {
+		$invalid_reward = $reward_input; $invalid_reward[ $bad[0] ] = $bad[1];
+		$check( is_wp_error( ps_pen_paper_prepare_adventure_reward( $campaign, $invalid_reward ) ), 'Invalid reward accepted.' );
+	}
+	$reward_cases = array(
+		array( 'name' => 'FIXED_COMBINED', 'kind' => 'fixed', 'timing' => 'decision', 'expression' => '', 'grant' => true ),
+		array( 'name' => 'FAILED_SUCCESS_REWARD', 'kind' => 'fixed', 'timing' => 'success', 'expression' => 'W6-1000000', 'grant' => false ),
+		array( 'name' => 'FAILED_DECISION_REWARD', 'kind' => 'fixed', 'timing' => 'decision', 'expression' => 'W6-1000000', 'grant' => true ),
+		array( 'name' => 'SUCCESS_REWARD', 'kind' => 'fixed', 'timing' => 'success', 'expression' => 'W6+999990', 'grant' => true ),
+		array( 'name' => 'TABLE_REWARD', 'kind' => 'table', 'timing' => 'success', 'expression' => '', 'grant' => true ),
+	);
+	foreach ( $reward_cases as $case_index => $case ) {
+		wp_set_current_user( $users['gm'] );
+		$reward_adventure_id = ps_pen_paper_save_adventure( $campaign, 0, $case['name'], (string) $scenes['START_ORIGINAL'], '0' );
+		$check( is_int( $reward_adventure_id ), 'Reward adventure failed.' );
+		$case_reward = $reward_input; $case_reward['kind'] = $case['kind']; $case_reward['timing'] = $case['timing'];
+		if ( 'table' === $case['kind'] ) { $case_reward['table_id'] = (string) $reward_table_id; $case_reward['item_id'] = '0'; $case_reward['quantity'] = '0'; $case_reward['money'] = '0'; }
+		$reward_edge_input = array( 'from_scene' => (string) $scenes['START_ORIGINAL'], 'choice' => $case['name'], 'expression' => $case['expression'], 'attribute' => '',
+			'threshold' => '0', 'success_scene' => (string) $scenes['SUCCESS_SCENE'], 'failure_scene' => '0', 'reward' => $case_reward );
+		if ( 0 === $case_index ) { $reward_edge_input['cost_resource'] = $resource; $reward_edge_input['cost_amount'] = '2'; $reward_edge_input['cost_timing'] = 'attempt'; }
+		$check( true === ps_pen_paper_save_adventure_edge( $campaign, $reward_adventure_id, $reward_edge_input, '1' ) &&
+			true === ps_pen_paper_publish_adventure( $campaign, $reward_adventure_id, '2', 'confirmed' ), 'Reward publication failed.' );
+		if ( 0 === $case_index ) {
+			$reward_item_input['name'] = 'Edited reward compass'; $reward_item_input['binding'] = 'bound';
+			$check( $reward_item_id === ps_pen_paper_save_item( $campaign, $reward_item_id, $reward_item_input, '1' ), 'Reward template edit failed.' );
+		}
+		if ( 'table' === $case['kind'] ) {
+			$table_input['rows'][0]['item_id'] = '0'; $table_input['rows'][0]['quantity'] = '0'; $table_input['rows'][0]['money'] = '0';
+			$check( $reward_table_id === ps_pen_paper_save_loot_table( $campaign, $reward_table_id, $table_input, '1' ), 'Reward table edit failed.' );
+		}
+		wp_set_current_user( $users['other'] );
+		$reward_char_id = $characters['other'];
+		$reward_character_before = ps_pen_paper_raw_character_state( $reward_char_id );
+		$reward_run_id = ps_pen_paper_start_adventure_run( $campaign, $reward_adventure_id, $reward_char_id, '3', (string) $reward_character_before['revision'] );
+		$check( is_int( $reward_run_id ), 'Reward run failed.' );
+		$reward_run_before = get_post_meta( $reward_run_id, '_pspp_adventure_run', true );
+		$reward_edge = $reward_run_before['snapshot']['edges'][0]; $reward_edge_id = $reward_edge['id'];
+		$reward_wallet_before = ps_pen_paper_wallet_context( $campaign, $reward_char_id )['wallet'];
+		$reward_gear_before = ps_pen_paper_gear_state( $reward_char_id );
+		if ( 0 === $case_index ) {
+			foreach ( array( 'wallet_saved', 'gear_saved', 'adventure_run' ) as $failed_kind ) {
+				$reward_events_before = ps_pen_paper_get_events( $campaign );
+				$fail_reward_event = static function ( $check, $id, $key, $value ) use ( $failed_kind ) {
+					return '_pspp_event' === $key && isset( $value['kind'] ) && $failed_kind === $value['kind'] ? false : $check;
+				};
+				add_filter( 'update_post_metadata', $fail_reward_event, 10, 4 );
+				try { $check( is_wp_error( ps_pen_paper_advance_adventure_run( $campaign, $reward_run_id, $reward_edge_id, '1' ) ), 'Unlogged reward succeeded.' ); }
+				finally { remove_filter( 'update_post_metadata', $fail_reward_event, 10 ); }
+				$check( $reward_character_before === ps_pen_paper_raw_character_state( $reward_char_id ) &&
+					$reward_wallet_before === ps_pen_paper_wallet_context( $campaign, $reward_char_id )['wallet'] &&
+					$reward_gear_before === ps_pen_paper_gear_state( $reward_char_id ) &&
+					$reward_run_before === get_post_meta( $reward_run_id, '_pspp_adventure_run', true ) &&
+					$reward_events_before === ps_pen_paper_get_events( $campaign ) &&
+					! ps_pen_paper_currency_document( $campaign_id )['in_use'], 'Reward failure left costs, money, items, currency freeze or progress.' );
+			}
+			$full = ps_pen_paper_append_item_instances( $reward_gear_before, $reward_edge['reward']['source']['item'], 100 );
+			foreach ( array( 'active', 'pending' ) as $full_kind ) {
+				$full_state = $full;
+				if ( 'pending' === $full_kind ) { $full_state['pending'] = $full_state['active']; $full_state['active'] = $reward_gear_before['active']; }
+				update_post_meta( $reward_char_id, '_pspp_gear', wp_slash( $full_state ) );
+				$check( is_wp_error( ps_pen_paper_advance_adventure_run( $campaign, $reward_run_id, $reward_edge_id, '1' ) ) &&
+					$full_state === ps_pen_paper_gear_state( $reward_char_id ) &&
+					$reward_run_before === get_post_meta( $reward_run_id, '_pspp_adventure_run', true ), 'Full inventory was bypassed.' );
+				delete_post_meta( $reward_char_id, '_pspp_gear' );
+			}
+			$overflow = $reward_wallet_before; $overflow['revision'] = 1; $overflow['balance'] = 999999998;
+			update_post_meta( $reward_char_id, '_pspp_wallet', wp_slash( $overflow ) );
+			$check( is_wp_error( ps_pen_paper_advance_adventure_run( $campaign, $reward_run_id, $reward_edge_id, '1' ) ) &&
+				$overflow === ps_pen_paper_wallet_context( $campaign, $reward_char_id )['wallet'], 'Reward exceeded balance limit.' );
+			delete_post_meta( $reward_char_id, '_pspp_wallet' );
+		}
+		$reward_advanced = ps_pen_paper_advance_adventure_run( $campaign, $reward_run_id, $reward_edge_id, '1' );
+		$check( true === $reward_advanced, 'Configured reward failed: ' . $case['name'] . ( is_wp_error( $reward_advanced ) ? ' / ' . $reward_advanced->get_error_message() : '' ) );
+		$reward_run_after = get_post_meta( $reward_run_id, '_pspp_adventure_run', true );
+		$reward_result = $reward_run_after['history'][0]['reward'];
+		$reward_wallet_after = ps_pen_paper_wallet_context( $campaign, $reward_char_id )['wallet'];
+		$reward_gear_after = ps_pen_paper_gear_state( $reward_char_id );
+		$check( ps_pen_paper_valid_adventure_run( $reward_run_after ) && 'completed' === $reward_run_after['status'], 'Reward history invalid.' );
+		if ( $case['grant'] ) {
+			$check( ps_pen_paper_valid_adventure_reward_result( $reward_edge['reward'], $reward_result, $reward_char_id ) &&
+				$reward_wallet_after['balance'] - $reward_wallet_before['balance'] === $reward_result['money_roll']['total'] &&
+				count( $reward_gear_after['active']['items'] ) - count( $reward_gear_before['active']['items'] ) === $reward_result['quantity_roll']['total'],
+				'Reward differs from stored result.' );
+			foreach ( $reward_result['item_ids'] as $uuid ) {
+				$expected_item = ps_pen_paper_adventure_reward_rows( $reward_edge['reward'] )[ $reward_result['row'] ]['item'];
+				$check( $expected_item === $reward_gear_after['active']['items'][ $uuid ], 'Reward ignored frozen item identity/binding.' );
+			}
+			$invalid_run = $reward_run_after; $invalid_run['history'][0]['reward']['wallet']['after']['balance']++;
+			$check( ! ps_pen_paper_valid_adventure_run( $invalid_run ), 'Forged reward balance accepted.' );
+			$invalid_run = $reward_run_after; $invalid_run['history'][0]['reward']['item_ids'][] = $reward_result['item_ids'][0];
+			$check( ! ps_pen_paper_valid_adventure_run( $invalid_run ), 'Forged reward item count accepted.' );
+		} else {
+			$check( null === $reward_result && $reward_wallet_before === $reward_wallet_after && $reward_gear_before === $reward_gear_after &&
+				$reward_character_before === ps_pen_paper_raw_character_state( $reward_char_id ), 'Failed success-only reward changed holdings.' );
+		}
+		if ( 0 === $case_index ) {
+			$expected_character = $reward_character_before; $expected_character['revision']++; $expected_character['active']['values'][ $resource ]['current'] -= 2;
+			$check( $expected_character === ps_pen_paper_raw_character_state( $reward_char_id ), 'Combined cost and reward failed.' );
+		}
+		$check( is_wp_error( ps_pen_paper_advance_adventure_run( $campaign, $reward_run_id, $reward_edge_id, '1' ) ) &&
+			$reward_wallet_after === ps_pen_paper_wallet_context( $campaign, $reward_char_id )['wallet'] &&
+			$reward_gear_after === ps_pen_paper_gear_state( $reward_char_id ), 'Reward replay duplicated holdings.' );
+		$reward_event = ps_pen_paper_get_events( $campaign )['events'][0];
+		$check( false === strpos( wp_json_encode( $reward_event ), 'UNSELECTED_REWARD_TABLE_SECRET' ), 'Unselected loot table leaked.' );
+		ob_start(); ps_pen_paper_render_character_adventures( $campaign, get_post( $reward_char_id ), 0 ); $reward_html = ob_get_clean();
+		$check( false !== strpos( $reward_html, $case['grant'] ? 'Belohnung:' : 'Bei Misserfolg keine Belohnung' ), 'Reward history UI missing.' );
+		wp_set_current_user( $users['player'] );
+		$check( is_wp_error( ps_pen_paper_get_event( $campaign, $reward_event['id'] ) ) &&
+			is_wp_error( ps_pen_paper_get_loot_table( $campaign, $reward_table_id ) ), 'Other owner accessed private rewards/table.' );
+	}
+
+	wp_set_current_user( $users['gm'] );
+	$check( true === ps_pen_paper_save_currency( ps_pen_paper_get_universe( $cost_universe_id ),
+		array( 'name' => 'Shared reward marks', 'symbol' => 'SRM', 'wallet_mode' => 'universe' ), '0' ), 'Shared reward currency failed.' );
+	$shared_reward_input = array( 'kind' => 'fixed', 'timing' => 'decision', 'table_id' => '0', 'item_id' => '0', 'quantity' => '0', 'money' => '10' );
+	add_post_meta( $context_campaigns['shared']->ID, '_pspp_gm', (string) $users['other'] );
+	wp_set_current_user( $users['other'] );
+	$check( is_wp_error( ps_pen_paper_prepare_adventure_reward( $context_campaigns['shared'], $shared_reward_input ) ), 'Campaign GM authorized shared money without universe rights.' );
+	foreach ( array( 'shared', 'copy' ) as $mode ) {
+		wp_set_current_user( $users['gm'] );
+		$reward_campaign = $context_campaigns[ $mode ];
+		$scene_posts = get_posts( array( 'post_type' => 'pspp_scene', 'post_status' => 'private', 'post_parent' => $reward_campaign->ID, 'posts_per_page' => 1 ) );
+		$scene_id = $scene_posts[0]->ID;
+		$shared_reward_adventure = ps_pen_paper_save_adventure( $reward_campaign, 0, 'Shared reward test', (string) $scene_id, '0' );
+		$check( is_int( $shared_reward_adventure ) &&
+			true === ps_pen_paper_save_adventure_edge( $reward_campaign, $shared_reward_adventure,
+				array( 'from_scene' => (string) $scene_id, 'choice' => 'SHARED_REWARD', 'expression' => '', 'attribute' => '', 'threshold' => '0', 'success_scene' => '0', 'failure_scene' => '0', 'reward' => $shared_reward_input ), '1' ) &&
+			true === ps_pen_paper_publish_adventure( $reward_campaign, $shared_reward_adventure, '2', 'confirmed' ), 'Shared reward publication failed.' );
+		wp_set_current_user( $users['player'] );
+		$shared_reward_char = $context_characters[ $mode ];
+		$shared_reward_run = ps_pen_paper_start_adventure_run( $reward_campaign, $shared_reward_adventure, $shared_reward_char, '3',
+			(string) ps_pen_paper_raw_character_state( $shared_reward_char )['revision'] );
+		$check( is_int( $shared_reward_run ), 'Shared reward run failed.' );
+		$shared_run_before = get_post_meta( $shared_reward_run, '_pspp_adventure_run', true ); $shared_edge_id = $shared_run_before['snapshot']['edges'][0]['id'];
+		if ( 'shared' === $mode ) {
+			wp_update_post( array( 'ID' => $cost_universe_id, 'post_author' => $users['other'] ) );
+			$check( is_wp_error( ps_pen_paper_advance_adventure_run( $reward_campaign, $shared_reward_run, $shared_edge_id, '1' ) ) &&
+				'' === get_post_meta( $cost_base_id, '_pspp_wallet', true ) &&
+				$shared_run_before === get_post_meta( $shared_reward_run, '_pspp_adventure_run', true ), 'Revoked universe authority still paid.' );
+			wp_update_post( array( 'ID' => $cost_universe_id, 'post_author' => $users['gm'] ) );
+			$check( true === ps_pen_paper_advance_adventure_run( $reward_campaign, $shared_reward_run, $shared_edge_id, '1' ) &&
+				10 === get_post_meta( $cost_base_id, '_pspp_wallet', true )['balance'] &&
+				'' === get_post_meta( $shared_reward_char, '_pspp_wallet', true ), 'Authorized reward did not reach shared basis wallet.' );
+		} else {
+			$check( is_wp_error( ps_pen_paper_advance_adventure_run( $reward_campaign, $shared_reward_run, $shared_edge_id, '1' ) ) &&
+				'' === get_post_meta( $shared_reward_char, '_pspp_wallet', true ) &&
+				$shared_run_before === get_post_meta( $shared_reward_run, '_pspp_adventure_run', true ), 'Copy received unauthorized replacement wallet.' );
+		}
+		$check( $cost_base_before === ps_pen_paper_raw_character_state( $cost_base_id ), 'Reward changed base resources.' );
+	}
+
 	wp_set_current_user( $users['outsider'] );
 	$check( is_wp_error( ps_pen_paper_start_adventure_run( $campaign, $adventure_id, $characters['player'], (string) $published['revision'], '1' ) ), 'Nonmember started an adventure run.' );
 	echo "Adventure integration checks passed.\n";
 } finally {
 	wp_set_current_user( $original_user );
 	$errors = array();
-	$children = $parents ? get_posts( array( 'post_type' => array( 'pspp_character', 'pspp_scene', 'pspp_adventure', 'pspp_adventure_run', 'pspp_event' ),
+	$children = $parents ? get_posts( array( 'post_type' => array( 'pspp_character', 'pspp_scene', 'pspp_adventure', 'pspp_adventure_run', 'pspp_item', 'pspp_loot_table', 'pspp_event' ),
 		'post_status' => array( 'private', 'draft' ), 'post_parent__in' => $parents, 'posts_per_page' => -1, 'fields' => 'ids' ) ) : array();
 	foreach ( array_merge( $children, $parents ) as $id ) { if ( ! wp_delete_post( $id, true ) ) { $errors[] = 'Cannot remove adventure fixture ' . $id; } }
 	foreach ( $users as $id ) { if ( ! ( is_multisite() ? wpmu_delete_user( $id ) : wp_delete_user( $id ) ) ) { $errors[] = 'Cannot remove fixture account ' . $id; } }

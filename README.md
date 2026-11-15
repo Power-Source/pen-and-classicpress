@@ -70,6 +70,18 @@ gespeichert. Ohne konfigurierte Kosten bleibt der Charakter unverändert.
 Der erste Ausbau unterstützt lokale Bögen und unabhängige Kampagnenkopien;
 gemeinsame Basisbögen und offene Werteanträge sperren kostenpflichtige Versuche.
 Die Ressource muss auch bei erfolgsabhängigen Kosten vor dem Versuch reichen.
+Version 0.24.0 ergänzt optionale Belohnungen je Soloentscheidung: feste
+Gegenstände und/oder Währung oder ein eingefrorener Beutetabellenstand.
+Die Spielleitung entscheidet, ob auch misslungene Proben belohnt werden.
+Kosten, Vergaben und Fortschritt werden gemeinsam gespeichert; Wiederholen
+zahlt nicht erneut aus. Wirtschaftliche Belohnungen benötigen PS Community,
+gemeinsame Guthaben zusätzlich die Autorisierung der Universumsleitung.
+Version 0.25.0 ergänzt bis zu 20 Wertebedingungen je Soloentscheidung,
+wahlweise mit UND oder ODER: mindestens, größer, höchstens, kleiner,
+gleich oder ungleich. Zahlen und Attribute verwenden den freigegebenen
+wirksamen Wert; Ressourcen können aktuellen Wert oder Maximum prüfen.
+Die Bedingungen verbrauchen nichts und werden mit ihren damaligen Werten
+im privaten Verlauf gespeichert. Ältere Mindestwerte bleiben unverändert gültig.
 
 ## Geschützter Spielbereich im Frontend
 
@@ -141,9 +153,9 @@ Entscheidungen; optionale Würfel-/Attributproben und Folgeszenen werden servers
 geprüft und pro Charakter als privater Durchlauf gespeichert. Eine ausdrücklich
 freigegebene Fassung bleibt für jeden begonnenen Durchlauf unverändert.
 
-Soloentscheidungen verändern weder die gemeinsame Kampagnenszene noch
-Inventar oder Beute. Ohne ausdrücklich konfigurierte Ressourcenkosten bleiben
-auch Charakterwerte unverändert. Ein Durchlauf gehört genau
+Soloentscheidungen verändern die gemeinsame Kampagnenszene nicht.
+Ressourcen und Bestände ändern sich ausschließlich durch ausdrücklich
+konfigurierte Kosten beziehungsweise Belohnungen. Ein Durchlauf gehört genau
 einem Charakter und kann derzeit nicht zurückgesetzt oder gemeinsam gespielt
 werden. Die Spielleitung kann neue Starts pausieren, ohne bestehende Durchläufe
 zu löschen. Details und Grenzen stehen im
@@ -157,6 +169,22 @@ bleiben mit Voraussetzung und aktuellem Wert sichtbar. Wiederholte oder
 veraltete Formulare umgehen die Serverprüfung nicht. Der private Verlauf
 speichert den tatsächlich verwendeten Wert; ältere Durchläufe ohne
 Voraussetzungen bleiben unverändert. Mindestwerte allein verbrauchen keine Ressourcen.
+
+Seit **0.25.0** stehen unter **Optionale Wertebedingungen** mehrere Zahlen-,
+Attribut- und Ressourcenvergleiche mit UND/ODER zur Verfügung. Auch einzelne
+Mindestwerte werden für neue Entscheidungen dort konfiguriert. Nicht erfüllte
+Entscheidungen bleiben sichtbar und gesperrt; bei ODER genügt eine erfüllte
+Bedingung. Text- und Gegenstandsbedingungen sind nicht Teil dieses Ausbaus.
+
+Seit **0.24.0** kann jede Entscheidung eine feste Gegenstands-/Geldbelohnung
+oder eine vorhandene Beutetabelle verwenden: nach jeder ausgeführten
+Entscheidung oder nur bei erfolgreicher Probe; ohne Probe immer.
+Die letzte Entscheidung kann die Abschlussbelohnung vergeben.
+Gewählte Vorlagen und Tabellen werden eingefroren. Mit der Abenteuerfreigabe
+wird dieser Stand Teil des lesbaren Soloabenteuers; andere Tabellen bleiben
+privat. Inventar und Guthaben müssen vor dem Würfeln jedes mögliche Ergebnis
+aufnehmen können. Fehlende Integration, geänderte Währung oder entzogene
+Vergaberechte blockieren die Entscheidung ausdrücklich, ohne Teilvergaben.
 
 ## Öffentliches Weltlexikon seit Version 0.19.0
 

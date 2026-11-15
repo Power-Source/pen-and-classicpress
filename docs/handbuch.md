@@ -1,6 +1,6 @@
 # PS Pen & Paper – Pluginhandbuch
 
-Stand: Version 0.23.0 · 15. November 2026.
+Stand: Version 0.25.0 · 15. November 2026.
 
 Dieses Handbuch beschreibt den vorhandenen Funktionsumfang, nicht die gesamte
 Roadmap. Die Abbildungen zur Demorunde stammen aus der tatsächlich angelegten
@@ -51,7 +51,7 @@ sind seit 0.13.0 enthalten.
 | Änderungs- und Wurfprotokoll | Automatisch geprüfter Punktepool |
 | Spielleitermappe, geschützte Text-/Bild-Handouts und responsive Bedienung | Strukturierte NPC-Werte und private PDF-Dateien |
 | Private Porträts sowie Community-gebundene Inventare, Ausrüstung und kontrollierter Handel | Stapelmengen und automatische Gegenstandssynchronisierung |
-| Soloabenteuer mit freigegebenen Szenen, Entscheidungen, Mindestwerten, optionalen Proben und Ressourcenkosten sowie privaten Einzeldurchläufen | Gruppenabenteuer, Verbrauch gemeinsamer Basisressourcen und automatische Belohnungen |
+| Soloabenteuer mit freigegebenen Szenen, UND-/ODER-Wertebedingungen, Proben, optionalen Kosten und Belohnungen sowie privaten Einzeldurchläufen | Gruppenabenteuer, hybride Freigabeschritte und Verbrauch gemeinsamer Basisressourcen |
 
 Die Spielleitung kann Szenentexte und Karten vorbereiten und gezielt anzeigen.
 Die Kampagnenbeschreibung eignet sich weiter für eine gemeinsame Einleitung,
@@ -559,7 +559,9 @@ Der erste **Soloabenteuer-Ablauf** ist seit Version 0.21.0 vorhanden. Er
 ergänzt den Story-Builder um private Einzeldurchläufe, freigegebene
 Szenenpfade, Entscheidungen und optionale Zahlenproben. Seit 0.22.0 ergänzen
 Mindestwerte und seit 0.23.0 optionale Ressourcenkosten diesen Ablauf.
-Gruppenabenteuer, gemeinsame Entscheidungen und automatische Belohnungen
+Seit 0.24.0 sind feste und tabellenbasierte Belohnungen konfigurierbar.
+Seit 0.25.0 lassen sich mehrere Wertebedingungen mit UND oder ODER verknüpfen.
+Gruppenabenteuer, gemeinsame Entscheidungen und hybride Freigabeschritte
 fehlen weiterhin; Details stehen in Abschnitt 21.
 Der **Story-Builder** mit Szenen, getrennten Geheimnissen, Inhaltsvorschau,
 Freigabe, Rücknahme und Protokollierung ist vorhanden.
@@ -1408,17 +1410,19 @@ gemeinsam geleiteten Spieltisch, kein automatisches Regelwerk und keine
 Die aktuelle Umsetzung ist absichtlich begrenzt: höchstens 30 Szenen und
 100 Entscheidungen pro Abenteuer, ohne Zyklen. Proben werten nur die gespeicherten erlaubten
 Würfelgruppen und Zahlenattribute aus. Es gibt keine freie Skriptsprache,
-keine frei programmierten Effekte und keine Belastung des Inventars.
-Ressourcen werden nur durch ausdrücklich konfigurierte Kosten verändert.
+keine frei programmierten Effekte. Ressourcen werden nur durch ausdrücklich
+konfigurierte Kosten, Bestände nur durch konfigurierte Belohnungen verändert.
 
 ### Mindestwerte für Entscheidungen
 
 Seit **0.22.0** kann eine Entscheidung zusätzlich eine Voraussetzung besitzen:
 
-1. Unter **Entscheidung oder Probe ergänzen** ein Zahlen- oder Attributfeld
-   bei **Optionale Voraussetzung** wählen.
-2. Einen ganzzahligen **Mindestwert** zwischen −1000000 und 1000000 eintragen.
-   **Keine Voraussetzung** lässt die Entscheidung ohne Mindestwert zu.
+1. Unter **Entscheidung oder Probe ergänzen → Optionale Wertebedingungen**
+   ein Zahlen- oder Attributfeld wählen. Seit 0.25.0 ersetzt dieser Bereich
+   die einfache Mindestwerteingabe für neue Entscheidungen.
+2. Den Vergleich **mindestens (≥)** und einen ganzzahligen **Vergleichswert**
+   zwischen −1000000 und 1000000 wählen. **Keine Bedingung** mit Vergleichswert
+   0 lässt eine Zeile ungenutzt; ohne ausgewählte Felder gibt es keine Bedingung.
    Für eine Entscheidung ohne Würfelprobe den Würfelausdruck und das
    Probe-Attribut leer lassen, den Erfolgszielwert auf 0 lassen und bei
    Misserfolg **Abenteuer beenden** wählen.
@@ -1429,8 +1433,9 @@ Die Voraussetzung ist unabhängig von der optionalen Würfelprobe. Beispiel:
 **Tür aufbrechen** erfordert Stärke mindestens 5; erst dann darf die
 Entscheidung gewählt und gegebenenfalls gewürfelt werden.
 Der aktuelle freigegebene Charakterwert einschließlich wirksamer Ausrüstung
-zählt, nicht ein offener Änderungsantrag. Ressourcenfelder sind nicht
-auswählbar; es wird nichts verbraucht.
+zählt, nicht ein offener Änderungsantrag. Die ältere einfache Mindestwertstruktur
+gilt nur für Zahlen-/Attributfelder; die neuen Wertebedingungen unterstützen
+zusätzlich Ressourcen. Die Prüfung selbst verbraucht nichts.
 
 Bei einem zu niedrigen Wert bleiben Entscheidung, Voraussetzung und aktueller
 Wert sichtbar, aber die Schaltfläche ist gesperrt. Nach einer Wertefreigabe
@@ -1443,6 +1448,42 @@ Eine erfolgreiche Entscheidung speichert Feld, damaligen Wert und Mindestwert
 gemeinsam mit dem Fortschritt und Pflichtereignis. Spätere Werteänderungen
 schreiben diesen privaten Nachweis nicht um. Ältere Abenteuer, Durchläufe
 und Ereignisse ohne Voraussetzungen bleiben lesbar und unverändert.
+
+### Mehrere Wertebedingungen mit UND oder ODER
+
+Seit **0.25.0** kann jede Entscheidung bis zu 20 Wertebedingungen erhalten.
+Die Spielleitung entscheidet unter **Bedingungen verknüpfen**, ob **alle**
+erfüllt sein müssen (UND) oder **mindestens eine** genügt (ODER).
+Mit **Weitere Bedingung** lassen sich zusätzliche Zeilen ergänzen und wieder
+entfernen. Ohne JavaScript stehen zwei Eingabezeilen zur Verfügung.
+
+Jede Zeile wählt ein Feld, den Wertbestandteil, einen Vergleich und einen
+ganzzahligen Vergleichswert von −1000000 bis 1000000:
+
+- Zahlen und Attribute: den aktuellen freigegebenen wirksamen Wert verwenden.
+- Ressourcen: **aktuellen Wert** oder persönliches **Maximum** wählen.
+- Vergleiche: **mindestens (≥)**, **größer als (>)**, **höchstens (≤)**,
+  **kleiner als (<)**, **gleich (=)** oder **ungleich (≠)**.
+
+Beispiele: Stärke mindestens 6 **UND** Ausdauer aktuell mindestens 3;
+oder Verstand mindestens 8 **ODER** Geschicklichkeit mindestens 7.
+Offene Werteanträge zählen nicht. Aktive Ausrüstungsboni wirken auf Zahlen-
+und Attributbedingungen genauso wie auf Proben. Ressourcenprüfungen ziehen
+keine Punkte ab; etwaige Kosten werden separat und erst danach abgerechnet.
+Eine zusätzlich vorhandene ältere Mindestwert-Voraussetzung muss unabhängig
+von der neuen UND-/ODER-Gruppe ebenfalls erfüllt sein.
+
+Alle Bedingungen bleiben mit freigegebenem Wert und Vergleichsergebnis
+sichtbar. Bei ODER dürfen einzelne Bedingungen unerfüllt sein, solange eine
+andere genügt. Ist die gesamte Gruppe nicht erfüllt, bleibt die Entscheidung
+gesperrt; ein veraltetes Formular kann die erneute Serverprüfung nicht umgehen.
+Es entstehen dabei weder Kosten, Belohnungen noch Fortschritt.
+
+Der private Verlauf speichert die Gruppe mit allen damaligen Werten und
+Einzelergebnissen, auch die unerfüllten Bedingungen einer erfolgreichen
+ODER-Gruppe. Neufreigaben ändern laufende Durchläufe nicht; ältere Durchläufe
+werden nicht migriert. Text-, Gegenstands- und verschachtelte Bedingungsgruppen
+sind nicht Teil dieses Ausbaus.
 
 ### Ressourcenkosten pro Entscheidung
 
@@ -1484,6 +1525,55 @@ Der Verlauf hält die damaligen Kosten und Vorher-/Nachherwerte fest; bei einer
 misslungenen erfolgsabhängigen Probe zeigt er ausdrücklich den Nichtverbrauch.
 Ältere kostenfreie Abenteuer und Durchläufe bleiben unverändert nutzbar.
 
+### Belohnungen pro Entscheidung
+
+Seit **0.24.0** kann die Spielleitung jede Entscheidung unabhängig von
+Voraussetzung, Probe und Kosten mit einer optionalen Belohnung versehen.
+Gegenstände und Währung benötigen **PS Community**; der erzählerische Ablauf
+ohne Belohnungen bleibt davon unabhängig.
+
+1. Unter **Optionale Abenteuerbelohnung → Belohnungsart** wählen:
+   - **Keine Belohnung**: Alle zusätzlichen Auswahlen/Beträge auf 0 lassen.
+   - **Feste Gegenstände und/oder Währung**: Einen Kataloggegenstand mit
+     positiver Anzahl bis 100 und/oder einen ganzzahligen Währungsbetrag bis
+     999999999 wählen. Ohne Gegenstand die Anzahl auf 0 lassen; keine Tabelle wählen.
+   - **Vorhandene Beutetabelle**: Eine Tabelle der Kampagne wählen. Feste
+     Gegenstandsauswahl, Anzahl und Währungsbetrag auf 0 lassen. Die Tabelle
+     liefert den Ausgang und ihre bereits konfigurierten Mengen-/Geldwürfe.
+2. Den Auslöser je Entscheidung festlegen: **Nach jeder ausgeführten
+   Entscheidung, auch bei Misserfolg** oder **Nur bei Erfolg; ohne
+   Würfelprobe immer**. Eine misslungene erfolgsabhängige Probe vergibt nichts.
+3. Entscheidung speichern und das Abenteuer ausdrücklich freigeben.
+   Eine Belohnung an der letzten Entscheidung kann den Abenteuerabschluss belohnen.
+
+Beim Speichern der Entscheidung wird der gewählte Gegenstands- oder
+Tabellenstand eingefroren, einschließlich Gegenstandsbindung und Währungsbezug.
+Spätere Vorlagen-/Tabellenänderungen schreiben weder laufende Durchläufe noch
+deren Vergaben um. **Mit der Abenteuerfreigabe wird der gewählte Stand Teil des
+für berechtigte Spieler lesbaren Soloabenteuers.** Keine vertraulichen
+Tabellendaten dafür auswählen; andere Tabellen und manuelle Beutevorgänge
+bleiben privat.
+
+Vor jedem Versuch müssen das aktive und gegebenenfalls beantragte Inventar
+sowie das Guthaben **jedes mögliche Ergebnis** aufnehmen können. So wird eine
+Tabelle bei vollem Inventar nicht so lange neu gewürfelt, bis ein kleineres
+Ergebnis passt. Eine gesperrte Entscheidung bleibt mit Belohnungsregel und
+Fehlermeldung sichtbar. Belohnungen werden ins Inventar gelegt, nicht ausgerüstet;
+ein offener Ausrüstungsantrag erhält dieselben neuen Exemplare.
+
+Gemeinsame Universumsguthaben benötigen bei der Abenteuerfreigabe die
+Autorisierung der Universumsleitung oder Administration. Diese Berechtigung
+wird vor der Auszahlung erneut geprüft. Lokale Bögen und unabhängige Kopien
+erhalten bei einem gemeinsamen Kontomodell kein Ersatzkonto. Währungswechsel,
+fehlende Community oder entzogene Vergaberechte werden ausdrücklich abgewiesen.
+
+Kosten, tatsächliche Belohnung, Bestandsereignisse und Fortschritt werden
+gemeinsam gespeichert oder vollständig zurückgenommen. Dieselbe Entscheidung
+kann im Charakterdurchlauf nicht erneut auszahlen; es gibt keine Wiederholung
+oder Rücksetzung des Durchlaufs. Der private Verlauf zeigt erhaltene Gegenstände,
+Betrag, gegebenenfalls Tabellenwurf oder die ausgebliebene Belohnung bei Misserfolg.
+Ältere Abenteuer ohne Belohnungen bleiben unverändert nutzbar.
+
 ### Solo spielen
 
 1. Öffne den eigenen Charakterbogen oder den eigenen privaten
@@ -1506,13 +1596,13 @@ Abenteuer kann weitergespielt werden. Der Spielstand speichert keinen
 separaten Charakterbogen: Zahlenproben verwenden den bei der Entscheidung
 aktuellen, freigegebenen Zahlenwert des Charakters.
 
-**Keine ungefragten Änderungen:** Ein Soloabenteuer verändert weder
-die aktive Kampagnenszene noch Inventar, Guthaben oder Beute. Charakterwerte
-bleiben unverändert, außer dem Verbrauch ausdrücklich konfigurierter
-Ressourcen. Es benötigt keine Gruppenentscheidung und
+**Keine ungefragten Änderungen:** Ein Soloabenteuer verändert die aktive
+Kampagnenszene nicht. Ressourcenverbrauch und Gegenstands-/Geldvergaben erfolgen
+ausschließlich nach ausdrücklich konfigurierten und freigegebenen Regeln.
+Es benötigt keine Gruppenentscheidung und
 funktioniert unabhängig von PS Community. Teamdurchläufe, Rücksetzen,
-Voraussetzungen jenseits der beschriebenen Mindestwerte, automatische
-Ressourcenregeneration und Belohnungen bleiben spätere, getrennt zu planende
+Voraussetzungen jenseits der beschriebenen Wertebedingungen, automatische
+Ressourcenregeneration sowie hybride Freigabeschritte bleiben spätere, getrennt zu planende
 Erweiterungen.
 
 In der Nebelhafen-Demo ist **Die Wetterkapsel vor dem Ablegen** als

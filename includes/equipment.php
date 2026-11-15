@@ -373,6 +373,12 @@ function ps_pen_paper_append_item_instances( $before, $instance, $quantity ) {
 function ps_pen_paper_write_item_award( $campaign, $character, $instance, $quantity, $revision ) {
 	if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
 	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) || ! ps_pen_paper_get_character( $campaign, $character->ID ) ) { return ps_pen_paper_equipment_error( 'forbidden' ); }
+	return ps_pen_paper_write_item_award_delta( $campaign, $character, $instance, $quantity, $revision );
+}
+
+// Internal writer for an authorized award; the caller holds the lock and transaction.
+function ps_pen_paper_write_item_award_delta( $campaign, $character, $instance, $quantity, $revision ) {
+	if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
 	$before = ps_pen_paper_gear_state( $character->ID );
 	if ( is_wp_error( $before ) || ! is_string( $revision ) || (string) $before['revision'] !== $revision ) { return ps_pen_paper_equipment_error( 'conflict' ); }
 	$after = ps_pen_paper_append_item_instances( $before, $instance, $quantity );

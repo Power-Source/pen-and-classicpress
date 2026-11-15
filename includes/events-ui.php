@@ -43,6 +43,26 @@ function ps_pen_paper_render_event_details( $event, $scope = null ) {
 				<h4><?php echo esc_html( $label . ' · ' . sprintf( __( 'Revision %d', 'ps-pen-paper' ), $event[ $key ]['revision'] ) ); ?></h4>
 				<?php if ( in_array( $event['kind'], array( 'trade_policy', 'trade_changed' ), true ) ) : ?>
 					<?php ps_pen_paper_render_trade_snapshot( $event[ $key ] ); ?>
+				<?php elseif ( in_array( $event['kind'], array( 'adventure_saved', 'adventure_published' ), true ) ) : ?>
+					<?php $adventure = $event[ $key ]; ?>
+					<p><?php echo esc_html( $adventure['draft']['title'] . ' · ' . array( 'draft' => __( 'Entwurf', 'ps-pen-paper' ), 'published' => __( 'Freigegeben', 'ps-pen-paper' ), 'paused' => __( 'Pausiert', 'ps-pen-paper' ) )[ $adventure['status'] ] ); ?></p>
+					<p><?php echo esc_html( __( 'Startszene:', 'ps-pen-paper' ) . ' ' . $adventure['draft']['start_scene'] . ' · ' . __( 'Entscheidungen:', 'ps-pen-paper' ) . ' ' . count( $adventure['draft']['edges'] ) ); ?></p>
+				<?php elseif ( 'adventure_run' === $event['kind'] ) : ?>
+					<?php
+					$run = $event[ $key ];
+					if ( 0 === $run['revision'] ) { echo '<p>' . esc_html__( 'Noch kein Durchlauf.', 'ps-pen-paper' ) . '</p>'; }
+					else {
+					echo '<p>' . esc_html( $run['snapshot']['title'] . ' · ' . __( 'Charakter:', 'ps-pen-paper' ) . ' #' . $run['character_id'] . ' · ' .
+						( 'completed' === $run['status'] ? __( 'Abgeschlossen', 'ps-pen-paper' ) : __( 'Läuft', 'ps-pen-paper' ) ) ) . '</p>';
+					if ( $run['scene_id'] && isset( $run['snapshot']['scenes'][ $run['scene_id'] ] ) ) {
+						echo '<p>' . esc_html( __( 'Aktuelle Szene:', 'ps-pen-paper' ) . ' ' . $run['snapshot']['scenes'][ $run['scene_id'] ]['title'] ) . '</p>';
+					}
+					if ( $run['history'] ) {
+						$step = end( $run['history'] );
+						echo '<p>' . esc_html( $step['choice'] . ( $step['roll'] ? ' · ' . $step['roll']['total'] . ' / ' . $step['roll']['threshold'] : '' ) ) . '</p>';
+					}
+					}
+					?>
 				<?php elseif ( in_array( $event['kind'], array( 'wiki_configured', 'wiki_prepared', 'wiki_published' ), true ) ) : ?>
 					<?php ps_pen_paper_render_wiki_snapshot( $event[ $key ] ); ?>
 				<?php elseif ( in_array( $event['kind'], array( 'loot_table_saved', 'loot_rolled', 'loot_awarded' ), true ) ) : ?>

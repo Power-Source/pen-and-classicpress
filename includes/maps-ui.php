@@ -275,5 +275,6 @@ function ps_pen_paper_render_story( $campaign, $page_id ) {
 		<input type="hidden" name="scene_complete" value="complete">
 		<button type="submit"><?php esc_html_e( 'Entwurf speichern', 'ps-pen-paper' ); ?></button>
 	</form>
+	<?php ps_pen_paper_render_adventure_editor( $campaign, $page_id ); ?>
 	<?php
 }

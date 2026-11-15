@@ -1,6 +1,6 @@
 # PS Pen & Paper – Pluginhandbuch
 
-Stand: Version 0.20.0 · 15. November 2026.
+Stand: Version 0.21.0 · 15. November 2026.
 
 Dieses Handbuch beschreibt den vorhandenen Funktionsumfang, nicht die gesamte
 Roadmap. Die Abbildungen zur Demorunde stammen aus der tatsächlich angelegten
@@ -32,6 +32,7 @@ Eine fremde Partnerprogramm-Debugleiste wurde nur für diese Aufnahmen ausgeblen
 18. [Beutetabellen und bestätigte Vergabe](#18-beutetabellen-und-bestätigte-vergabe)
 19. [Öffentliches Weltlexikon mit PS Wiki](#19-öffentliches-weltlexikon-mit-ps-wiki)
 20. [Geschenke, Verkauf und Tausch](#20-geschenke-verkauf-und-tausch)
+21. [Soloabenteuer](#21-soloabenteuer)
 
 ## 1. Ist das schon spielbar?
 
@@ -50,6 +51,7 @@ sind seit 0.13.0 enthalten.
 | Änderungs- und Wurfprotokoll | Automatisch geprüfter Punktepool |
 | Spielleitermappe, geschützte Text-/Bild-Handouts und responsive Bedienung | Strukturierte NPC-Werte und private PDF-Dateien |
 | Private Porträts sowie Community-gebundene Inventare, Ausrüstung und kontrollierter Handel | Stapelmengen und automatische Gegenstandssynchronisierung |
+| Soloabenteuer mit freigegebenen Szenen, Entscheidungen, optionalen Proben und privaten Einzeldurchläufen | Gruppenabenteuer, Ressourcenverbrauch und automatische Belohnungen |
 
 Die Spielleitung kann Szenentexte und Karten vorbereiten und gezielt anzeigen.
 Die Kampagnenbeschreibung eignet sich weiter für eine gemeinsame Einleitung,
@@ -548,15 +550,20 @@ Aufforderung zur Administratorprüfung. Dann nicht blind erneut speichern.
 Das Protokoll ersetzt keine Datensicherung und ist kein manipulationssicheres
 Audit-System.
 
-### Was vor einem vollständigen Website-Abenteuer noch fehlt
+### Was beim Abenteuerablauf noch fehlt
 
-Der erste **Story-Builder-Ablauf** mit Szenen, getrennten Geheimnissen,
-Inhaltsvorschau, Freigabe, Rücknahme und Protokollierung ist vorhanden.
+Der erste **Soloabenteuer-Ablauf** ist seit Version 0.21.0 vorhanden. Er
+ergänzt den Story-Builder um private Einzeldurchläufe, freigegebene
+Szenenpfade, Entscheidungen und optionale Zahlenproben. Gruppenabenteuer,
+gemeinsame Entscheidungen, Ressourcenverbrauch und automatische Belohnungen
+fehlen weiterhin; Details stehen in Abschnitt 21.
+Der **Story-Builder** mit Szenen, getrennten Geheimnissen, Inhaltsvorschau,
+Freigabe, Rücknahme und Protokollierung ist vorhanden.
 Kapitel mit geordneter Szenenfolge, private Personen-/Orts-/Notizkarten und
 Text-/Bild-Handouts sind seit 0.13.0 vorhanden. Community-gebundene Inventare
 und Ausrüstung ergänzen seit 0.14.0 den Charakterbereich, kontrollierter Handel
-seit 0.20.0. Redaktioneller Komfort und weitere Handoutdateiformate fehlen noch. Eine normale Medien-URL ist nicht
-automatisch privat.
+seit 0.20.0. Redaktioneller Komfort und weitere Handoutdateiformate fehlen
+noch. Eine normale Medien-URL ist nicht automatisch privat.
 Auch die unterstützten WordPress-, ClassicPress- und PHP-Versionen müssen
 noch verbindlich festgelegt und plattformübergreifend geprüft werden.
 
@@ -1364,3 +1371,73 @@ Beschreibungstext des ausgegebenen Kompasses bleibt bewusst unverändert.
 
 Weiterlesen: [Demorunde mit Ergebnissen und Prüfbericht](demokampagne.md) ·
 [Technischer Überblick](../README.md) · [Roadmap](../ROADMAP.md).
+
+## 21. Soloabenteuer
+
+Seit Version **0.21.0** kann die Spielleitung aus freigegebenen Szenen ein
+kleines, individuell gespieltes Abenteuer vorbereiten. Jeder Charakter erhält
+einen eigenen privaten Durchlauf. Dieser Ablauf ist eine Ergänzung zum
+gemeinsam geleiteten Spieltisch, kein automatisches Regelwerk und keine
+Änderung an der aktiven Gruppenszene.
+
+### Abenteuer vorbereiten und freigeben
+
+1. Öffne als Spielleitung **Abenteuer & Szenen** und bearbeite die gewünschten
+   Szenen wie gewohnt. Soloabenteuer dürfen ausschließlich auf Szenen
+   verweisen, die regulär freigegeben sind.
+2. Unter **Soloabenteuer** einen Titel und eine freigegebene Startszene
+   auswählen und den privaten Entwurf speichern.
+3. Für jede Entscheidung einen sichtbaren Titel, eine Beschreibung und eine
+   freigegebene Folgeszene festlegen. Alternativ kann die Entscheidung den
+   Durchlauf beenden.
+4. Optional eine Probe mit einem im Kampagnenregelwerk erlaubten
+   Würfelausdruck, einem Zahlenattribut oder einem festen Zahlenwert und
+   Zielwert konfigurieren. Erfolgs- und Misserfolgsfolgen müssen jeweils auf
+   eine freigegebene Szene oder das Ende verweisen.
+5. Den Entwurf prüfen und **Soloabenteuer freigeben**. Das Freigeben speichert
+   einen eigenen Szenen- und Entscheidungsstand samt Regelrevision. Neue oder
+   geänderte Entwürfe werden erst nach ausdrücklicher erneuter Freigabe für
+   neu begonnene Durchläufe verwendet. Bereits freigegebene Würfelproben
+   bleiben in laufenden Durchläufen zulässig, auch wenn die aktuellen
+   erlaubten Würfel später geändert werden.
+
+Die aktuelle Umsetzung ist absichtlich begrenzt: höchstens 30 Szenen und
+100 Entscheidungen pro Abenteuer, ohne Zyklen. Pro Szene sind bis zu 10
+Entscheidungen möglich. Proben werten nur die gespeicherten erlaubten
+Würfelgruppen und Zahlenattribute aus. Es gibt keine freie Skriptsprache,
+keine automatischen Effekte und keine Belastung von Ressourcen oder Inventar.
+
+### Solo spielen
+
+1. Öffne den eigenen Charakterbogen oder den eigenen privaten
+   Pen-&-Paper-Profilbereich.
+2. Ein freigegebenes Abenteuer mit **Solo starten** beginnen. Ein Durchlauf
+   gehört genau diesem Charakter und kann nicht zurückgesetzt werden.
+3. Die angezeigte Szene lesen und eine der verfügbaren Entscheidungen wählen.
+   Proben werden serverseitig durchgeführt; der gespeicherte Verlauf enthält
+   Entscheidung, Würfelergebnis, verwendeten Zahlenwert und Szenenübergang.
+4. Bei einer abgeschlossenen Szene ohne weitere Entscheidungen ist der
+   Durchlauf beendet. Ein Neuladen oder wiederholtes Absenden erzeugt keinen
+   zweiten Fortschritt.
+
+Durchläufe und ihre Würfe sind nur für den Charakterbesitzer und die aktuelle
+Spielleitung sichtbar. Das Entfernen aus der Kampagne entzieht den Zugriff;
+ein erneuter Beitritt gewährt dem Besitzer wieder Zugriff auf den eigenen
+Durchlauf. Die Spielleitung kann neue Starts pausieren oder wieder zulassen,
+ohne laufende Durchläufe zu löschen. Ein pausiertes, bereits begonnenes
+Abenteuer kann weitergespielt werden. Der Spielstand speichert keinen
+separaten Charakterbogen: Zahlenproben verwenden den bei der Entscheidung
+aktuellen, freigegebenen Zahlenwert des Charakters.
+
+**Keine Gruppen- oder Charakteränderung:** Ein Soloabenteuer verändert weder
+die aktive Kampagnenszene noch Attribute, Lebenspunkte, andere Ressourcen,
+Inventar, Guthaben oder Beute. Es benötigt keine Gruppenentscheidung und
+funktioniert unabhängig von PS Community. Teamdurchläufe, Rücksetzen,
+Voraussetzungen jenseits der beschriebenen Zahlenproben, automatische
+Ressourcenänderungen und Belohnungen bleiben spätere, getrennt zu planende
+Erweiterungen.
+
+In der Nebelhafen-Demo ist **Die Wetterkapsel vor dem Ablegen** als
+Soloabenteuer freigegeben. Jorins Durchlauf endete nach einer erfolgreichen
+Verstandprobe mit 9 gegen Zielwert 7 an der Szene **Auf dem Servicesteg**.
+Die aktive Gruppenszene und Jorins Charakterbogen blieben dabei unverändert.

@@ -1,7 +1,7 @@
 # Demokampagne: Die letzte Fracht von Nebelhafen
 
 Ursprüngliches Probespiel: Version 0.7.0 · 14. November 2026.
-Fortgeschriebener Prüfbericht bis Version 0.20.0.
+Fortgeschriebener Prüfbericht bis Version 0.21.0.
 
 **Spoilerhinweis:** Dieses Dokument zeigt die vollständige Demorunde
 einschließlich privatem und verdecktem Ergebnis. Es enthält keine echten
@@ -728,6 +728,14 @@ Periodische XHR-/Fetch-Hintergrundabrufe waren im fokussierten Browserlauf
 isoliert; diese Prüfung ist kein Gesamttest des Website-Pollings.
 Nur die dafür erzeugten Anmeldetokens wurden widerrufen.
 
+Eine getrennte temporäre Prüfrunde durchlief außerdem ein Geschenk und einen
+vollständigen Tausch **direkt in den nativen Community-Profilen**, jeweils
+ohne zusätzliche Spielleiterfreigabe. Das Gegenexemplar wurde erst vom
+Empfänger ausgewählt und anschließend vom ursprünglichen Anbieter bestätigt.
+Alle drei Exemplar-UUIDs blieben erhalten; die Formulare kehrten ins eigene
+Profil zurück. Die Prüfrunde samt Bögen, Vorlagen und Ereignissen wurde entfernt.
+Die persistente Demo erhielt dabei weder weitere Buchungen noch neue Angebote.
+
 Die sechs betroffenen Integrationssuiten für Handel, Guthaben, Ausrüstung,
 Charakterkontexte, Beute und Ereignisse bestanden. Die neue Handelssuite
 prüft zusätzlich Geschenk und Tausch ohne zusätzliche Freigabe, reservierte
@@ -738,7 +746,27 @@ Teiländerungen zurück. Ein Verkauf über gemeinsame Basisguthaben prüfte
 außerdem die tatsächliche Kontosperre und das Ausbleiben lokaler Ersatzkonten.
 Temporäre Testkonten und Prüfrunden wurden entfernt.
 
-## Was vor einem vollständig integrierten Abenteuer noch fehlt
+### Live-Fortsetzung: Soloabenteuer mit Version 0.21.0
+
+In der bestehenden Kampagne **Die letzte Fracht von Nebelhafen – Demo** wurde
+**Die Wetterkapsel vor dem Ablegen** als Soloabenteuer aus freigegebenen Szenen
+eingerichtet. Der Ablauf bietet direkte Entscheidungen und eine optionale
+Verstandprobe mit dem Kampagnenwürfel.
+
+Jorins privater Durchlauf (**7081**) verwendete Verstand 3 und erzielte mit
+1W6 den Gesamtwert **9** gegen Zielwert **7**. Der erfolgreiche Übergang
+führte zur Szene **Auf dem Servicesteg**; dort endete der Durchlauf. Szene,
+Wurf und Ergebnis sind im persönlichen Abenteuerverlauf gespeichert.
+
+Die gemeinsame aktive Gruppenszene blieb **Die Laterne an Dock 3**. Jorins
+Charakterwerte, Ressourcen und Inventar wurden nicht verändert. Der Versuch
+bestätigt den vorgesehenen ersten Umfang: individueller Fortschritt ohne
+Gruppenentscheidung, automatische Belohnung oder Änderung des gemeinsamen
+Spieltischs. Ein erneuter Start nach Abschluss ist nicht möglich.
+Die Abenteuer-Integrationstests sowie die Karten-, Würfel- und
+Handout-Regressionen auf der Demoseite bestanden.
+
+## Was beim Abenteuerablauf noch fehlt
 
 1. **Story Builder weiter ausbauen:** Redaktioneller Komfort, weitere
    Handoutdateiformate und differenzierte Empfänger. Kapitel, eine private
@@ -750,7 +778,11 @@ Temporäre Testkonten und Prüfrunden wurden entfernt.
 3. **Optionale Kommunikation:** PS Chat ist geschützt eingebunden.
    PS Wiki ergänzt seit 0.19.0 ein bewusst öffentliches Weltlexikon;
    private Kampagnen-Wikis benötigen weiterhin durchgängige Leserechte.
-4. **Späterer Ausbau:** Migration bestehender Kampagnen, universumsweite
+4. **Soloabenteuer gezielt erweitern:** Teamdurchläufe und gemeinsame
+   Entscheidungen, breitere Voraussetzungen sowie getrennt konfigurierbare
+   Ressourcenänderungen und Belohnungen. Die erste Version seit 0.21.0 bleibt
+   auf private Einzeldurchläufe begrenzt.
+5. **Weitere spätere Ausbauten:** Migration bestehender Kampagnen, universumsweite
    Teilnahme, Punktepool, kampagnenübergreifender Handel und komplexe Würfelregeln, sofern das
    gewählte System sie benötigt. Basisbögen und lokale Zahlenauflagen sind
    seit Version 0.11.0 vorhanden.
@@ -760,8 +792,9 @@ Erzählszenen, Handouts, privaten Gegnern/NPCs und Spielleitermappe ist möglich
 PS Community ergänzen Charakterprofil, Inventar, Ausrüstung und
 protokollierte Guthabenbuchungen, kontrollierte Beutevergaben und
 konfigurierbarer Handel den Ablauf.
-Ein optionales öffentliches Weltlexikon ergänzt die Spielwelt.
-Der Kartentisch bleibt eine optionale Hilfe; automatisierte Abenteuer und
-weitere Spielmaterialien bleiben Ausbauziele.
+Ein optionales öffentliches Weltlexikon ergänzt die Spielwelt; seit Version
+0.21.0 gibt es außerdem private Soloabenteuer-Durchläufe. Der Kartentisch
+bleibt eine optionale Hilfe; Gruppenabenteuer und weitere Spielmaterialien
+bleiben Ausbauziele.
 
 [Zum Pluginhandbuch](handbuch.md) · [Zur Roadmap](../ROADMAP.md)

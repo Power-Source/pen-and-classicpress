@@ -36,6 +36,9 @@ function ps_pen_paper_event_labels() {
 		'wiki_published'      => __( 'Wiki-Artikel veröffentlicht', 'ps-pen-paper' ),
 		'trade_policy'        => __( 'Handelsregeln geändert', 'ps-pen-paper' ),
 		'trade_changed'       => __( 'Handel geändert', 'ps-pen-paper' ),
+		'adventure_saved'     => __( 'Soloabenteuer vorbereitet', 'ps-pen-paper' ),
+		'adventure_published' => __( 'Soloabenteuer freigegeben oder pausiert', 'ps-pen-paper' ),
+		'adventure_run'       => __( 'Soloabenteuer fortgesetzt', 'ps-pen-paper' ),
 		'folio_published'     => __( 'Handout freigegeben', 'ps-pen-paper' ),
 		'folio_withdrawn'     => __( 'Handout zurückgenommen', 'ps-pen-paper' ),
 		'portrait_saved'      => __( 'Charakterporträt geändert oder geprüft', 'ps-pen-paper' ),
@@ -233,6 +236,14 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 		$validate = 'trade_policy' === $event['kind'] ? 'ps_pen_paper_valid_trade_policy' : 'ps_pen_paper_valid_trade';
 		if ( 'gm' !== $event['visibility'] || ! $validate( $event['before'] ) || ! $validate( $event['after'] ) ) {
 			return new WP_Error( 'invalid_event', __( 'Die Handelsstände im Protokoll sind beschädigt.', 'ps-pen-paper' ) );
+		}
+	}
+	if ( in_array( $event['kind'], array( 'adventure_saved', 'adventure_published', 'adventure_run' ), true ) ) {
+		$validate = 'adventure_run' === $event['kind'] ? 'ps_pen_paper_valid_adventure_run' : 'ps_pen_paper_valid_adventure_state';
+		if ( ! function_exists( $validate ) || ! $validate( $event['before'] ) || ! $validate( $event['after'] ) ||
+			( 'adventure_run' === $event['kind'] && ( 'owner' !== $event['visibility'] || ! isset( $event['after']['owner_id'] ) || $event['recipient_id'] !== $event['after']['owner_id'] ) ) ||
+			( 'adventure_run' !== $event['kind'] && 'gm' !== $event['visibility'] ) ) {
+			return new WP_Error( 'invalid_event', __( 'Die Abenteuerstände im Protokoll sind beschädigt.', 'ps-pen-paper' ) );
 		}
 	}
 	if ( in_array( $event['kind'], array( 'wiki_configured', 'wiki_prepared', 'wiki_published' ), true ) ) {

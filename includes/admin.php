@@ -78,6 +78,7 @@ function ps_pen_paper_handle_admin_action() {
 	}
 
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
+	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure' ), true ) ) { ps_pen_paper_handle_adventure_action( $operation ); }
 	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) ) { ps_pen_paper_handle_trade_action( $operation ); }
 	if ( in_array( $operation, array( 'configure_wiki', 'prepare_wiki', 'publish_wiki' ), true ) ) { ps_pen_paper_handle_wiki_action( $operation ); }
 	if ( in_array( $operation, array( 'save_loot_table', 'roll_loot', 'award_loot' ), true ) ) { ps_pen_paper_handle_loot_action( $operation ); }

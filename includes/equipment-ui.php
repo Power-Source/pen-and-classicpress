@@ -134,7 +134,8 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 	if ( 'pspp_campaign' !== $campaign->post_type ) { return; }
 	if ( ! ps_pen_paper_community_available() ) {
 		echo '<p>' . esc_html__( 'Inventar, Guthaben und Ausrüstung sind ohne PS Community inaktiv; gespeicherte Bestände bleiben erhalten.', 'ps-pen-paper' ) . '</p>';
-		ps_pen_paper_render_character_trade( $campaign, $character, $page_id ); return;
+		ps_pen_paper_render_character_trade( $campaign, $character, $page_id );
+		ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); return;
 	}
 	$gear = ps_pen_paper_gear_state( $character->ID );
 	$schema = ps_pen_paper_equipment_schema( $campaign );
@@ -173,6 +174,7 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 		echo '<dt>' . esc_html( $slot['label'] ) . '</dt><dd>' . esc_html( $name ) . '</dd>';
 	}
 	echo '</dl>';
+	ps_pen_paper_render_character_adventures( $campaign, $character, $page_id );
 	ps_pen_paper_render_character_trade( $campaign, $character, $page_id );
 	if ( $is_gm ) {
 		$catalogue = ps_pen_paper_item_catalogue( $campaign );

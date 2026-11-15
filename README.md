@@ -56,6 +56,9 @@ bewusster Einrichtung, getrennten Artikeltexten und bestätigter Veröffentlichu
 Version 0.20.0 ergänzt einstellbare Geschenke, Verkäufe und Tauschangebote
 innerhalb einer Kampagne mit beiderseitiger Zustimmung und optionaler
 zusätzlicher Spielleiterfreigabe.
+Version 0.21.0 ergänzt den ersten Soloabenteuer-Ablauf mit freigegebenen
+Szenen, Entscheidungen, optionalen Serverproben und getrennten privaten
+Durchläufen. Gruppenabläufe und automatische Belohnungen sind nicht enthalten.
 
 ## Geschützter Spielbereich im Frontend
 
@@ -118,6 +121,21 @@ Neue Handelsregeln sperren den Abschluss alter Angebote; deren Ablehnung
 bleibt möglich. Ohne Community bleiben Daten und lesbare Handelsnachweise
 erhalten, wirtschaftliche Änderungen jedoch gesperrt. Pakete, Mengen,
 reine Geldgeschenke und kampagnenübergreifender Handel fehlen noch.
+
+## Soloabenteuer seit Version 0.21.0
+
+Spielleitungen können im Bereich **Abenteuer & Szenen** ein kleines
+Soloabenteuer aus bereits freigegebenen Szenen vorbereiten. Spieler treffen
+Entscheidungen; optionale Würfel-/Attributproben und Folgeszenen werden serverseitig
+geprüft und pro Charakter als privater Durchlauf gespeichert. Eine ausdrücklich
+freigegebene Fassung bleibt für jeden begonnenen Durchlauf unverändert.
+
+Soloentscheidungen verändern weder die gemeinsame Kampagnenszene noch
+Charakterwerte, Ressourcen, Inventar oder Beute. Ein Durchlauf gehört genau
+einem Charakter und kann derzeit nicht zurückgesetzt oder gemeinsam gespielt
+werden. Die Spielleitung kann neue Starts pausieren, ohne bestehende Durchläufe
+zu löschen. Details und Grenzen stehen im
+[Pluginhandbuch](docs/handbuch.md#21-soloabenteuer).
 
 ## Öffentliches Weltlexikon seit Version 0.19.0
 

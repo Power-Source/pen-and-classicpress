@@ -101,6 +101,10 @@ einen endgültigen Funktionsumfang.
   Tauschangebote derselben Kampagne, konkrete Besitzerzustimmung,
   Exemplarreservierung und einstellbare zusätzliche Spielleiterfreigabe.
   Inventare, Geld und Pflichtereignisse werden atomar übertragen.
+- Version 0.21.0 ergänzt den ersten isolierten Soloabenteuer-Ablauf:
+  freigegebene Szenen, Entscheidungen, optionale Serverproben und private,
+  revisionsgeschützte Einzeldurchläufe. Kampagnenszene, Charakterwerte,
+  Ressourcen und Beute werden dabei nicht verändert.
 
 ### Universum vor Kampagne: Grundmodell seit Version 0.11.0
 
@@ -322,18 +326,19 @@ Das Handbuch beschreibt bereits die erste Spieltisch-Oberfläche.
 Die Module beschreiben fachliche Bereiche und müssen nicht als separate Plugins
 oder als komplizierte technische Architektur umgesetzt werden.
 
-## Aktuelle Priorität: Spielwelt und Wirtschaft
+## Aktuelle Priorität: Soloabenteuer sicher erweitern
 
-Der spielbare Story-Builder-Ablauf bleibt Grundlage. Seit **0.16.0** stehen
+Der erste kleine Schritt aus Phase 7 ist seit **0.21.0** umgesetzt. Der
+Story-Builder bleibt Grundlage. Seit **0.16.0** stehen
 Währungseinstellungen, getrennte oder gemeinsame Guthaben, protokollierte
 Vergaben/Abzüge und eingefrorene Gegenstandsbindungen bereit. Seit **0.17.0**
 ergänzen strukturierte Gegner/NPCs und bewusst aufgenommene Universumsvorlagen
 die Spielwelt. Seit **0.18.0** stehen kontrollierte Beutetabellen auf Grundlage
 der vorhandenen Würfelmechanik bereit. Seit **0.19.0** ergänzt eine erste
 optionale Wiki-Anbindung das öffentliche Weltlexikon. Seit **0.20.0** ist
-kontrollierter, konfigurierbarer Handel vorhanden. Der nächste eigene
-Ausbauschritt bleibt ein kleiner vorbereiteter Abenteuerablauf nach Phase 7,
-nicht eine große automatische Spiel-Engine.
+kontrollierter, konfigurierbarer Handel vorhanden. Der nächste Ausbauschritt
+ist die gezielte Erweiterung des Soloablaufs; Gruppenabenteuer und eine große
+automatische Spiel-Engine bleiben ausdrücklich zurückgestellt.
 Eine zusätzliche Wiederherstellungs-Verwaltungsoberfläche bleibt zurückgestellt.
 
 Seit **0.15.0** verbindet ein privater Abenteuerplan die bestehenden Werkzeuge:
@@ -758,13 +763,28 @@ Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
    geschützter Verwaltung, stabiler Zuordnung und bewusst veröffentlichten Texten.
 4. **Seit 0.20.0 umgesetzt:** Kontrollierter Handel mit konfigurierbaren Arten,
    verbindlicher Besitzerzustimmung und optionaler Spielleiterfreigabe.
-5. Erst anschließend vorbereitete Solo-/Gruppenabenteuer automatisieren.
+5. Den seit 0.21.0 vorhandenen Soloablauf zuerst begrenzt erweitern; einen
+   gemeinsamen Gruppenmodus erst nach gesonderter Konzeption angehen.
 
 ## Phase 7: Geleitete, hybride und automatisierte Abenteuer
 
-**Konzeptionell vorgemerkt, noch nicht implementiert.** Dies ist ein eigener
-größerer Ausbau nach zuverlässigen Fortschritts- und Belohnungsgrundlagen,
-kein bereits vorhandener Automatikmodus.
+**Erster Solo-Schritt seit 0.21.0 umgesetzt.** Die bestehende Spielleitung
+behält die Kontrolle über Vorbereitung und Freigabe. Gruppenabläufe,
+automatische Ressourcenänderungen und Belohnungen sind weiterhin nicht
+implementiert.
+
+- [x] Pro Charakter einen eigenen Durchlauf aus einem ausdrücklich
+  freigegebenen Szenenstand speichern; der Durchlauf friert Szenen und
+  Entscheidungen samt Regelrevision ein und verändert weder Gruppenszene noch Werte.
+- [x] Entscheidungen und optionale serverseitige Würfel-/Attributproben
+  auswerten, den gewählten Pfad revisionsgeschützt protokollieren und
+  wiederholte oder veraltete Aktionen ablehnen.
+- [x] Neue Durchläufe pausieren oder wieder erlauben, ohne laufende Durchläufe
+  oder historische Würfe umzuschreiben.
+- [ ] Teamdurchläufe, gemeinsame Entscheidungen, Wiedereinstieg und
+  Teilnahmeverhalten ausdrücklich entwerfen.
+- [ ] Voraussetzungen, Ressourcenverbrauch und erlaubte Belohnungen erst als
+  getrennte, ausdrücklich konfigurierte Erweiterung planen.
 
 Die Spielleitung bleibt Abenteuerautor und bestimmt je Kampagne den Modus:
 
@@ -774,9 +794,10 @@ Die Spielleitung bleibt Abenteuerautor und bestimmt je Kampagne den Modus:
 | Hybrid | Vorbereitete Abschnitte laufen automatisch; festgelegte Entscheidungen benötigen die Spielleitung. |
 | Automatisiert | Spieler durchlaufen ausdrücklich vorbereitete Abenteuer solo oder gemeinsam, auch während die Spielleitung abwesend ist. |
 
-- Mit einem kleinen Szenen- und Entscheidungsablauf beginnen: Die
-  Spielleitung definiert Texte, Auswahlmöglichkeiten, Voraussetzungen,
-  Proben, Erfolgs-/Misserfolgsfolgen und erlaubte Übergänge.
+- Den vorhandenen kleinen Szenen- und Entscheidungsablauf ausbauen: Die
+  Spielleitung definiert Auswahlmöglichkeiten, optionale Proben,
+  Erfolgs-/Misserfolgsfolgen und erlaubte Übergänge zwischen freigegebenen
+  Szenen. Voraussetzungen jenseits der begrenzten Zahlenprobe folgen später.
 - Vorbereitete Komplikationen statt automatisch erfundener Ergebnisse
   verwenden. Beispiel: Ein Schloss untersuchen, eine Verstandprobe ausführen
   und je Ergebnis eine freigegebene Folgeszene öffnen.

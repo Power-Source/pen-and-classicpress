@@ -100,7 +100,7 @@ function ps_pen_paper_community_prepare() {
 		$character_id = ps_pen_paper_posted_id( 'character_id' );
 		$campaign = ps_pen_paper_get_campaign( $campaign_id );
 		$character = $campaign ? ps_pen_paper_get_character( $campaign, $character_id ) : null;
-		if ( ! in_array( $operation, array( 'save_character', 'save_portrait', 'equip_items', 'offer_trade', 'change_trade' ), true ) || ! $character ||
+		if ( ! in_array( $operation, array( 'save_character', 'save_portrait', 'equip_items', 'offer_trade', 'change_trade', 'start_adventure', 'advance_adventure' ), true ) || ! $character ||
 			(int) $character->post_author !== get_current_user_id() || ! ps_pen_paper_profile_return( $campaign_id, $character_id ) ) {
 			ps_pen_paper_fail( __( 'Diese Profilaktion ist nicht erlaubt. Bitte öffne deinen eigenen Charakter erneut.', 'ps-pen-paper' ) );
 		}

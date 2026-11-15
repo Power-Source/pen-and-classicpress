@@ -42,6 +42,9 @@ function ps_pen_paper_handle_frontend_action() {
 		return;
 	}
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
+	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
+	if ( in_array( $operation, array( 'configure_wiki', 'prepare_wiki', 'publish_wiki' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
+	if ( in_array( $operation, array( 'save_loot_table', 'roll_loot', 'award_loot' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'save_npc', 'offer_npc', 'copy_npc', 'approve_npc', 'save_currency', 'change_wallet', 'save_equipment_schema', 'save_item', 'grant_item', 'equip_items', 'review_gear', 'save_portrait', 'save_sheet_style' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) {
 		ps_pen_paper_handle_admin_action();
 	}
@@ -57,7 +60,7 @@ function ps_pen_paper_enqueue_frontend() {
 	}
 	$url = plugin_dir_url( dirname( __DIR__ ) . '/ps-pen-paper.php' );
 	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.1' );
-	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.7.0', true );
+	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.18.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
 	wp_enqueue_script( 'ps-pen-paper-table', $url . 'assets/table.js', array(), '0.14.0', true );
 	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.17.0' );

@@ -29,7 +29,7 @@ function ps_pen_paper_enqueue_admin_assets( $hook ) {
 	$url = plugin_dir_url( dirname( __DIR__ ) . '/ps-pen-paper.php' );
 	wp_enqueue_style( 'ps-pen-paper-admin', $url . 'assets/admin.css', array(), '0.7.0' );
 	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.1' );
-	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.7.0', true );
+	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.18.0', true );
 	wp_enqueue_script( 'ps-pen-paper-style', $url . 'assets/styles.js', array(), '0.7.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
 	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.15.0' );
@@ -78,6 +78,9 @@ function ps_pen_paper_handle_admin_action() {
 	}
 
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
+	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) ) { ps_pen_paper_handle_trade_action( $operation ); }
+	if ( in_array( $operation, array( 'configure_wiki', 'prepare_wiki', 'publish_wiki' ), true ) ) { ps_pen_paper_handle_wiki_action( $operation ); }
+	if ( in_array( $operation, array( 'save_loot_table', 'roll_loot', 'award_loot' ), true ) ) { ps_pen_paper_handle_loot_action( $operation ); }
 	if ( in_array( $operation, array( 'save_npc', 'offer_npc', 'copy_npc', 'approve_npc' ), true ) ) {
 		ps_pen_paper_handle_npc_action( $operation );
 	}
@@ -351,6 +354,10 @@ function ps_pen_paper_render_notice() {
 		'context_saved' => __( 'Universumsvorlage, Basisbogen oder Kampagnenkontext gespeichert.', 'ps-pen-paper' ),
 		'scene_saved' => __( 'Szenenaktion gespeichert. Freigabe und Anzeige am Tisch sind getrennte Schritte.', 'ps-pen-paper' ),
 		'folio_saved' => __( 'Mappenaktion gespeichert. Nur ausdrücklich freigegebene Handouts sind für die Runde sichtbar.', 'ps-pen-paper' ),
+		'npc_saved' => __( 'Figur privat gespeichert. Spielerbögen und Personenkarten bleiben unverändert.', 'ps-pen-paper' ),
+		'npc_offered' => __( 'Figur an das Universum übergeben. Ohne eigene Universumsleitung bleibt sie bis zu deren Zustimmung ein privater Aufnahmevorschlag.', 'ps-pen-paper' ),
+		'npc_copied' => __( 'Vorlagenstand als unabhängige Kampagnenfigur übernommen.', 'ps-pen-paper' ),
+		'npc_approved' => __( 'Aufnahme bestätigt. Die Vorlage ist jetzt für Spielleitungen zugeordneter Kampagnen verfügbar.', 'ps-pen-paper' ),
 	);
 	$notice = isset( $_GET['pspp_notice'] ) && is_string( $_GET['pspp_notice'] ) ? sanitize_key( wp_unslash( $_GET['pspp_notice'] ) ) : '';
 	if ( isset( $notices[ $notice ] ) ) {

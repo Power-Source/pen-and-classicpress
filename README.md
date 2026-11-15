@@ -47,6 +47,15 @@ Version 0.15.0 verbindet die vorhandenen Story-Werkzeuge zu einem privaten
 Abenteuerplan mit Kapitelreihenfolge, Szenenstatus und szenenbezogener Regie.
 Version 0.16.0 ergänzt einstellbare Währungen mit ganzzahligen Guthaben,
 protokollierte Spielleiterbuchungen und eingefrorene Gegenstandsbindungen.
+Version 0.17.0 ergänzt private Gegner/NPCs, bewusste Universumsaufnahme
+und unabhängige Kampagnenkopien wiederverwendbarer Vorlagen.
+Version 0.18.0 ergänzt kampagnenbezogene Beutetabellen, eingefrorene
+Würfelvorschläge und ausdrücklich bestätigte, einmalige Gegenstands-/Geldvergaben.
+Version 0.19.0 ergänzt ein optionales öffentliches PS-Wiki-Weltlexikon mit
+bewusster Einrichtung, getrennten Artikeltexten und bestätigter Veröffentlichung.
+Version 0.20.0 ergänzt einstellbare Geschenke, Verkäufe und Tauschangebote
+innerhalb einer Kampagne mit beiderseitiger Zustimmung und optionaler
+zusätzlicher Spielleiterfreigabe.
 
 ## Geschützter Spielbereich im Frontend
 
@@ -79,6 +88,141 @@ Seiten-Caches oder CDNs die Spielbereich-Seite einschließlich aller
 Abfrageparameter ausdrücklich vom Caching ausschließen.** Solche Systeme
 können bereits vor dem Start des Plugins antworten. `noindex` ersetzt keine
 Zugriffsprüfung.
+
+## Konfigurierbarer Handel seit Version 0.20.0
+
+Mit aktivem PS Community stellt die zuständige Spielleitung unter
+**Handelsregeln** Geschenk, Verkauf und Tausch unabhängig voneinander ein.
+Standardmäßig ist keine Art aktiviert; eine zusätzliche Spielleiterfreigabe
+ist voreingestellt. Universumsregeln werden unverändert übernommen,
+eigenständige Kampagnen konfigurieren ihre Regeln lokal.
+
+Besitzer bieten am eigenen Charakter ein handelbares, aktiv wie beantragt
+abgelegtes Exemplar einem anderen Besitzer derselben Kampagne an.
+Ein Verkauf vereinbart einen positiven ganzzahligen Preis; beim Tausch
+wählt der Empfänger sein konkretes Gegenexemplar, bevor der Anbieter den
+exakten Tausch bestätigt. Die Spielleitung ersetzt keine Besitzerzustimmung.
+Empfänger werden nur mit freigegebenem Charakternamen angeboten; fremde Bögen,
+weitere Inventargegenstände und Guthaben bleiben privat.
+
+Offene Angebote reservieren Exemplare, nicht Guthaben. Beim Abschluss werden
+Mitgliedschaft, Regeln, Bindung, Bestände, Kapazität und aktuelle Konten erneut
+geprüft. Beide Inventare einschließlich offener Ausrüstungsanträge, eventuelle
+Geldbuchungen und Pflichtereignisse werden gemeinsam gespeichert oder
+zurückgenommen. UUID und eingefrorener Gegenstandsstand bleiben erhalten;
+empfangene Gegenstände werden nicht automatisch ausgerüstet. Verkäufe können
+auch die ausdrücklich eingebundenen gemeinsamen Basisguthaben verwenden.
+
+Zurückziehen, Ablehnen und Spielleiterablehnung geben Reservierungen frei.
+Neue Handelsregeln sperren den Abschluss alter Angebote; deren Ablehnung
+bleibt möglich. Ohne Community bleiben Daten und lesbare Handelsnachweise
+erhalten, wirtschaftliche Änderungen jedoch gesperrt. Pakete, Mengen,
+reine Geldgeschenke und kampagnenübergreifender Handel fehlen noch.
+
+## Öffentliches Weltlexikon seit Version 0.19.0
+
+Unter **Universen → Regelwerk & Basischaraktere → Öffentliches Weltlexikon**
+kann die Universumsleitung PS Wiki optional anbinden. Einrichtung,
+Kategorienänderung und Pausieren benötigen zusätzlich die nativen
+PS-Wiki-Veröffentlichungs- und Kategorienrechte, beispielsweise durch die
+Administration. Die ausdrückliche Aktivierung erlaubt der Universumsleitung
+nur die Artikel dieses Lexikons über den Adapter zu pflegen; sie vergibt
+keine allgemeinen Wiki-Rechte oder neuen Rollen.
+
+Der öffentliche Lexikonname ist unabhängig vom privaten Universumsnamen.
+Einrichten erzeugt eine Hauptkategorie und sechs benennbare Unterkategorien:
+Personen, Gegner, Orte, Fraktionen, Gegenstände und Regeln. **Kategorienamen
+sind sofort öffentlich, auch ohne veröffentlichte Artikel.**
+
+Bestätigte Universums-NPC-/Gegnervorlagen können stabil mit einem Artikel
+verknüpft werden; freie Welt-/Regelartikel benötigen keine Figur.
+Titel und Text werden ausdrücklich separat eingegeben. Es werden keine
+Geheimnisse, internen Beschreibungen, Bilder, Eigenschaften, Werte oder
+Beutedaten automatisch kopiert. Reiner Text führt keine Shortcodes aus.
+**Artikelentwurf vorbereiten** legt zunächst einen nativen Wiki-Entwurf an.
+Auch dort gehören ausschließlich zur Veröffentlichung bestimmte Inhalte hinein:
+Wiki-Redakteure können ihn nach den eigenen Wiki-Rechten bearbeiten/veröffentlichen.
+Eine eigene Bestätigung veröffentlicht den vorbereiteten Stand über den Adapter.
+
+Vorbereitete Änderungen lassen eine bestehende öffentliche Fassung unverändert.
+Direkte redaktionelle Wiki-Änderungen sperren die Synchronisierung, statt
+Inhalte zu überschreiben; solche Artikel anschließend im Wiki weiterpflegen.
+Umbenennen oder erneutes Anbieten derselben Figur erzeugt keine zweite Zuordnung.
+Wiki-Änderungen verändern keine Spielmechanik.
+
+Kategorien, Artikel, Zuordnungen und erforderliche Ereignisse werden innerhalb
+derselben geprüften Transaktion gespeichert. Bei dieser Integration müssen
+auch die vier beteiligten WordPress-Taxonomietabellen InnoDB unterstützen.
+Native PS-Wiki-Benachrichtigungen werden erst nach erfolgreichem Commit ausgelöst.
+**Pausieren oder Deaktivieren nimmt keine Veröffentlichung zurück.**
+Veröffentlichte Artikel und deren Revisionen gehören zum öffentlichen Wiki.
+Private Kampagnen-Wikis, automatische Übernahme aller Figuren, zusätzliche
+Kategorieebenen und Verknüpfungen zu einzelnen Szenen/Feldern bleiben Ausbauziele.
+Ohne PS Wiki bleiben Kernsystem und gespeicherte Zuordnungen erhalten;
+Wiki-Schreibvorgänge sind gesperrt.
+
+## Beutetabellen seit Version 0.18.0
+
+Unter **Spielleitermappe → Beutetabellen** legt die Kampagnenleitung einen
+erlaubten Standardwürfel und bis zu 30 lückenlose, überschneidungsfreie
+Ergebnisbereiche fest. Jeder Bereich liefert keine Beute, einen Gegenstandstyp,
+Geld oder beides. Mengen und Beträge sind ganze Zahlen oder erlaubte
+Würfelausdrücke wie `2W6`. Alle möglichen Ergebnisse müssen in den Grenzen
+liegen: Gegenstandsmengen 1–100, Geld 0–999999999; ohne Gegenstand gilt Menge 0.
+Geldbeute benötigt eine eingerichtete Währung, Änderungen aktives PS Community.
+
+**Beutevorschlag auswürfeln** speichert Tabellenstand, Gegenstand samt Bindung,
+Währung und alle Einzelwürfe. Neuladen und dieselbe wiederholte POST-Anfrage
+würfeln nicht erneut. Die Spielleitung wählt anschließend einen Empfänger
+für die gesamte Beute und bestätigt die Vergabe. Erst dann entstehen konkrete,
+nicht automatisch ausgerüstete Exemplare und/oder eine Guthabenbuchung.
+Inventar, Guthaben, Vergabezustand und Pflichtereignisse werden gemeinsam
+gespeichert oder zurückgenommen. Ein abgeschlossener Vorgang kann nicht
+erneut auszahlen; ein bewusst neu gestarteter Wurf ist ein eigener Vorgang.
+Die bisherigen Kontorechte gelten auch bei gemeinsamem Universumsguthaben.
+
+Tabellen und Vorschläge bleiben ausschließlich für die Kampagnenleitung
+sichtbar. Empfänger sehen ihre tatsächlichen Gegenstände und Buchungen, nicht
+geheime Chancen oder Begründungen. Gegner/NPCs können auf eine lokale Tabelle
+verweisen; Universumsvorlagen übernehmen diese Kampagnenreferenz nicht.
+Bestehende Vorschläge bleiben bei späteren Tabellenänderungen unverändert.
+
+Noch nicht enthalten: Gegenstandsgruppen, verschachtelte Tabellen,
+universumsweite Beutekataloge, Aufteilung auf mehrere Empfänger und automatische
+Vergabe. `W3` ist kein unterstützter Standardwürfel. Handel besteht separat
+seit Version 0.20.0.
+
+## Gegner und NPCs seit Version 0.17.0
+
+Unter **Spielleitermappe → Gegner und NPCs verwalten** erstellt die
+Kampagnenleitung strukturierte Figuren: Name, Beschreibung, geschütztes Bild,
+getrennte Geheimnisse, freie Texteigenschaften und ganzzahlige Werte.
+Eine Szenenverknüpfung zeigt die Figur zusätzlich in der privaten Regie des
+Abenteuerplans. Vorhandene Personenkarten bleiben unveränderte Erzählnotizen.
+Es gibt keine fest vorgeschriebenen Attribute, Klassen oder Kampfabläufe.
+
+**Ins Universum aufnehmen** teilt bewusst den gespeicherten Stand samt Bild,
+Werten und Geheimnissen. Leitet der Ersteller nicht auch das Universum,
+entsteht zunächst ein privater Vorschlag. Die Universumsleitung prüft und
+bestätigt ihn unter **Universen → Regelwerk & Basischaraktere → Gegner & NPCs**.
+Erst dann können Spielleitungen anderer zugeordneter Kampagnen die Vorlage
+sehen und als eigenständige Figur übernehmen. Die Universumsleitung kann
+auch direkt Vorlagen anlegen. Erneutes Anbieten derselben lokalen Figur
+erzeugt keine zweite Vorlage, auch nicht nach einer Umbenennung.
+
+Kopien übernehmen einen eingefrorenen Stand einschließlich eigenständiger
+Bildkopie, aber keine Szenenzuordnung. Lokale Verletzungen oder andere
+Werteänderungen beeinflussen weder Vorlage noch weitere Figuren.
+Vorlagenänderungen werden nicht automatisch nachgezogen. Nach dem Lösen
+einer Universumszuordnung entfällt der Katalogzugriff; lokale Kopien bleiben.
+**Figuren und Vorlagen neu laden** holt bewusst den aktuellen Stand.
+
+Figuren, Aufnahmevorschläge und ihre Historie bleiben für Spieler und Gäste
+gesperrt. Änderungen und Pflichtereignisse werden gemeinsam gespeichert
+oder zurückgenommen. Die Figurenverwaltung funktioniert ohne PS Community
+und PS Wiki. Lokale Beutetabellen sind seit 0.18.0 optional verknüpfbar;
+automatische Kämpfe sind noch nicht implementiert. Seit 0.19.0 lassen sich
+bestätigte Universumsvorlagen bewusst mit öffentlichen Wiki-Artikeln verbinden.
 
 ## Währung und Gegenstandsbindung seit Version 0.16.0
 
@@ -118,7 +262,8 @@ Gegenstandsvorlagen besitzen **Charaktergebunden** oder **Handelbar**. Jede
 neue Ausgabe friert diese Auswahl im konkreten Exemplar ein. Ändern der
 Vorlage verändert keine ausgegebenen Bindungen. Ältere interne
 Demo-Snapshots ohne Bindungsfeld werden gebunden gelesen, nicht umgeschrieben.
-Eine Handels-, Kauf- oder Übertragungsfunktion ist damit noch nicht vorhanden.
+Die gesondert aktivierbare Handelsfunktion seit 0.20.0 berücksichtigt
+diese eingefrorene Bindung.
 Ohne verwendbares PS Community sind wirtschaftliche Änderungen gesperrt;
 gespeicherte Guthaben und Gegenstände bleiben erhalten.
 
@@ -148,7 +293,7 @@ Auch die Profilseite einschließlich ihrer Parameter vom Seiten-Cache ausschlie�
 **Inventar, Gegenstandskatalog und Ausrüstung benötigen PS Community.**
 Ohne diese Integration bleiben Daten erhalten, Bestandsänderungen gesperrt
 und Ausrüstungsboni inaktiv. Charaktere, Würfel, Porträts und Geschichten
-funktionieren weiter. Handel ist noch nicht implementiert.
+funktionieren weiter. Der optionale Handel benötigt ebenfalls PS Community.
 
 Die Spielleitung konfiguriert unter **Gegenstände**:
 
@@ -180,7 +325,7 @@ die Spielleitung kann es freigeben oder unmittelbar korrigieren.
 
 Schema- und Vorlagenhistorie bleiben der Spielleitung vorbehalten;
 Inventar- und Porträthistorie sehen nur Besitzer und aktuelle Spielleitung.
-Es gibt keine Handelsoberfläche, Stapelmengen, automatische Gegenstandssynchronisierung,
+Es gibt keine Stapelmengen, automatische Gegenstandssynchronisierung,
 Mehrfachslot-Belegung, Lösch-/Entzugsoberfläche oder frei positionierbaren
 grafischen Slotdesigner. Die erste Slotoberfläche verwendet zugängliche Auswahlfelder.
 
@@ -698,6 +843,27 @@ Kontomodellfestlegung, Wiederholungs-/Revisionskonflikte, getrennte und
 gemeinsame Konten, Universumsrechte, gemeinsame Basissperren, private
 Historie und entzogene Mitgliedschaften. Die Ausrüstungsprüfung ergänzt
 eingefrorene Bindungen und die Ablehnung ungültiger Bindungswerte.
+
+`tests/npcs-integration.php` prüft private strukturierte Figuren, freie Werte,
+geschützte Bildkopien, bestätigte Universumsaufnahme, private Vorschläge,
+Schutz vor doppelten Angeboten, unabhängige Wiederverwendung, Szenenregie,
+Rücknahme bei Protokollfehlern und entzogenen Katalogzugriff.
+
+`tests/loot-integration.php` prüft vollständige Ergebnisbereiche, erlaubte
+Mengen und Würfelgrenzen, eingefrorene Tabellen und Gegenstandsbindungen,
+wiederholte Anfragen, bestätigte einmalige Vergaben, volle Inventare,
+Sperrkonflikte, gemeinsame Kontorechte und private Historie.
+Protokollfehler müssen Inventar, Guthaben, erste Kontomodellfestlegung und
+Vergabezustand zusammen zurücknehmen. Temporäre Prüfdaten werden entfernt.
+
+`tests/wiki-integration.php` lädt die echte lokale PS-Wiki-API und prüft
+native Aktivierungsrechte, begrenzte Delegation, öffentliche Kategorien,
+getrennte Artikeltexte, Entwürfe, ausdrückliche Veröffentlichung, stabile
+Figurenzuordnungen und redaktionelle Konflikte. Fehler im Pflichtprotokoll
+müssen auch Kategorien und native Wiki-Artikel zurücknehmen. Ergänzt werden
+Schutz vor ausgeführten Shortcodes, unveränderte öffentliche Fassungen bei
+vorbereiteten Änderungen, Pausieren und gesperrte Fremdzugriffe.
+PS Wiki muss daneben installiert sein; temporäre Prüfdaten werden entfernt.
 
 `tests/maps-integration.php` prüft Entwürfe, getrennte Geheimnisse, private
 Kartenbilder, ausdrückliche Freigabe und Szenenauswahl, aktuelle Markerrechte,

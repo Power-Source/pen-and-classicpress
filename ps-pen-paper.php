@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PS Pen & Paper
  * Description: Ein universeller Baukasten für Pen-and-Paper-Kampagnen.
- * Version: 0.17.0
+ * Version: 0.20.0
  * Author: PSOURCE
  * Text Domain: ps-pen-paper
  * Domain Path: /languages
@@ -31,10 +31,16 @@ require_once __DIR__ . '/includes/folio.php';
 require_once __DIR__ . '/includes/folio-ui.php';
 require_once __DIR__ . '/includes/npcs.php';
 require_once __DIR__ . '/includes/npcs-ui.php';
+require_once __DIR__ . '/includes/wiki.php';
+require_once __DIR__ . '/includes/wiki-ui.php';
 require_once __DIR__ . '/includes/community.php';
 require_once __DIR__ . '/includes/equipment.php';
 require_once __DIR__ . '/includes/economy.php';
 require_once __DIR__ . '/includes/economy-ui.php';
+require_once __DIR__ . '/includes/loot.php';
+require_once __DIR__ . '/includes/loot-ui.php';
+require_once __DIR__ . '/includes/trade.php';
+require_once __DIR__ . '/includes/trade-ui.php';
 require_once __DIR__ . '/includes/appearance.php';
 require_once __DIR__ . '/includes/equipment-ui.php';
 require_once __DIR__ . '/includes/universes.php';
@@ -57,6 +63,9 @@ add_action( 'init', 'ps_pen_paper_register_asset_type' );
 add_action( 'init', 'ps_pen_paper_register_scene_type' );
 add_action( 'init', 'ps_pen_paper_register_folio_type' );
 add_action( 'init', 'ps_pen_paper_register_npc_type' );
+add_action( 'init', 'ps_pen_paper_register_wiki_type' );
+add_action( 'init', 'ps_pen_paper_register_loot_types' );
+add_action( 'init', 'ps_pen_paper_register_trade_type' );
 add_action( 'init', 'ps_pen_paper_register_item_type' );
 add_filter( 'cpc_profile_tabs', 'ps_pen_paper_community_tabs', 10, 3 );
 add_filter( 'cpc_profile_tab_content', 'ps_pen_paper_community_content', 10, 4 );

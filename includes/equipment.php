@@ -186,6 +186,12 @@ function ps_pen_paper_save_item( $scope, $id, $input, $revision, $image_path = n
 	return $id;
 }
 
+function ps_pen_paper_valid_item_instance( $item ) {
+	if ( ! is_array( $item ) || ! isset( $item['source_id'], $item['scope_id'], $item['revision'], $item['item'] ) ) { return false; }
+	foreach ( array( 'source_id', 'scope_id', 'revision' ) as $key ) { if ( ! is_int( $item[ $key ] ) || $item[ $key ] < 1 ) { return false; } }
+	return ps_pen_paper_validate_item( $item['item'] );
+}
+
 function ps_pen_paper_gear_state( $character_id ) {
 	$state = get_post_meta( $character_id, '_pspp_gear', true );
 	if ( '' === $state ) { return array( 'revision' => 0, 'active' => array( 'items' => array(), 'slots' => array() ), 'pending' => null ); }
@@ -275,9 +281,8 @@ function ps_pen_paper_save_gear_locked( $campaign, $character_id, $operation, $i
 		$source = $catalogue[ $id ];
 		$instance = array( 'source_id' => $id, 'scope_id' => $source['scope_id'], 'revision' => $source['revision'], 'item' => $source['item'] );
 		$instance['item']['binding'] = ps_pen_paper_item_binding( $source['item'] );
-		$uuid = wp_generate_uuid4();
-		$after['active']['items'][ $uuid ] = $instance;
-		if ( $after['pending'] ) { $after['pending']['items'][ $uuid ] = $instance; }
+		$after = ps_pen_paper_append_item_instances( $before, $instance, 1 );
+		if ( is_wp_error( $after ) ) { return $after; }
 	} elseif ( 'review_gear' === $operation ) {
 		if ( ! $is_gm || null === $before['pending'] || ! isset( $input['decision'] ) || ! in_array( $input['decision'], array( 'approve', 'reject' ), true ) ) { return ps_pen_paper_equipment_error(); }
 		if ( 'approve' === $input['decision'] ) { $after['active'] = $before['pending']; $validate[] = $after['active']; }
@@ -305,6 +310,8 @@ function ps_pen_paper_save_gear_locked( $campaign, $character_id, $operation, $i
 		$state = ps_pen_paper_character_state( $campaign, $character, false );
 		if ( is_wp_error( $state ) ) { return $state; }
 		foreach ( $validate as $snapshot ) {
+			$reserved = ps_pen_paper_check_reserved_gear( $campaign, $character_id, $snapshot );
+			if ( is_wp_error( $reserved ) ) { return $reserved; }
 			$valid = ps_pen_paper_gear_bonus( $campaign, $snapshot, $state['active'] );
 			if ( is_wp_error( $valid ) ) { return $valid; }
 		}
@@ -313,6 +320,67 @@ function ps_pen_paper_save_gear_locked( $campaign, $character_id, $operation, $i
 		'kind' => 'gear_saved', 'visibility' => 'owner', 'recipient_id' => (int) $character->post_author,
 		'fields' => array(), 'rules_revision' => ps_pen_paper_get_rules( $campaign->ID )['revision'],
 	) );
+}
+
+// Internal writer: both inventories are locked and the trade is authorized.
+function ps_pen_paper_write_item_exchange( $campaign, $characters, $uuids, $instances ) {
+	$states = array();
+	foreach ( $characters as $i => $character ) {
+		$before = ps_pen_paper_gear_state( $character->ID );
+		if ( is_wp_error( $before ) ) { return $before; }
+		$out = $uuids[ $i ]; $in = $uuids[ 1 - $i ];
+		foreach ( array( $before['active'], $before['pending'] ) as $snapshot ) {
+			if ( null === $snapshot ) { continue; }
+			if ( $out && ( ! isset( $snapshot['items'][ $out ] ) || $snapshot['items'][ $out ] !== $instances[ $i ] ||
+				in_array( $out, $snapshot['slots'], true ) || 'tradeable' !== ps_pen_paper_item_binding( $snapshot['items'][ $out ]['item'] ) ) ) { return ps_pen_paper_equipment_error(); }
+			if ( $in && isset( $snapshot['items'][ $in ] ) ) { return ps_pen_paper_equipment_error(); }
+		}
+		$after = $before; $after['revision']++;
+		foreach ( array( 'active', 'pending' ) as $key ) {
+			if ( null === $after[ $key ] ) { continue; }
+			if ( $out ) { unset( $after[ $key ]['items'][ $out ] ); }
+			if ( $in ) { $after[ $key ]['items'][ $in ] = $instances[ 1 - $i ]; }
+			if ( count( $after[ $key ]['items'] ) > 100 ) { return new WP_Error( 'inventory_full', __( 'Das Zielinventar ist voll. Der Handel wurde nicht ausgeführt.', 'ps-pen-paper' ) ); }
+		}
+		$states[ $i ] = array( $before, $after );
+	}
+	foreach ( $characters as $i => $character ) {
+		$result = ps_pen_paper_write_document_event( $campaign->ID, $character->ID, '_pspp_gear', $states[ $i ][0], $states[ $i ][1], array(
+			'kind' => 'gear_saved', 'visibility' => 'owner', 'recipient_id' => (int) $character->post_author,
+			'fields' => array(), 'rules_revision' => ps_pen_paper_get_rules( $campaign->ID )['revision'],
+		), false );
+		if ( is_wp_error( $result ) ) { return $result; }
+	}
+	return $result;
+}
+
+function ps_pen_paper_append_item_instances( $before, $instance, $quantity ) {
+	if ( ! is_int( $quantity ) || $quantity < 1 || $quantity > 100 || ! ps_pen_paper_validate_item( $instance['item'] ) ||
+		count( $before['active']['items'] ) + $quantity > 100 || ( $before['pending'] && count( $before['pending']['items'] ) + $quantity > 100 ) ) {
+		return new WP_Error( 'inventory_full', __( 'Diese Vergabe überschreitet die Grenze von 100 Exemplaren oder enthält ungültige Gegenstände.', 'ps-pen-paper' ) );
+	}
+	$after = $before; $after['revision']++;
+	$instance['item']['binding'] = ps_pen_paper_item_binding( $instance['item'] );
+	for ( $i = 0; $i < $quantity; $i++ ) {
+		$uuid = wp_generate_uuid4();
+		$after['active']['items'][ $uuid ] = $instance;
+		if ( $after['pending'] ) { $after['pending']['items'][ $uuid ] = $instance; }
+	}
+	return $after;
+}
+
+// Internal writer: the caller holds the character lock and event transaction.
+function ps_pen_paper_write_item_award( $campaign, $character, $instance, $quantity, $revision ) {
+	if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) || ! ps_pen_paper_get_character( $campaign, $character->ID ) ) { return ps_pen_paper_equipment_error( 'forbidden' ); }
+	$before = ps_pen_paper_gear_state( $character->ID );
+	if ( is_wp_error( $before ) || ! is_string( $revision ) || (string) $before['revision'] !== $revision ) { return ps_pen_paper_equipment_error( 'conflict' ); }
+	$after = ps_pen_paper_append_item_instances( $before, $instance, $quantity );
+	if ( is_wp_error( $after ) ) { return $after; }
+	return ps_pen_paper_write_document_event( $campaign->ID, $character->ID, '_pspp_gear', $before, $after, array(
+		'kind' => 'gear_saved', 'visibility' => 'owner', 'recipient_id' => (int) $character->post_author,
+		'fields' => array(), 'rules_revision' => ps_pen_paper_get_rules( $campaign->ID )['revision'],
+	), false );
 }
 
 function ps_pen_paper_check_character_gear( $scope, $character, $snapshot ) {

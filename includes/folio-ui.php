@@ -81,6 +81,7 @@ function ps_pen_paper_render_folio( $campaign, $page_id ) {
 	<h2><?php esc_html_e( 'Spielleitermappe', 'ps-pen-paper' ); ?></h2>
 	<p><?php esc_html_e( 'Kapitel ordnen dein Abenteuer. Personen, Orte und Notizen bleiben privat. Nur Handouts können ausdrücklich für die gesamte Runde freigegeben werden; Verknüpfungen geben niemals Inhalte automatisch frei.', 'ps-pen-paper' ); ?></p>
 	<p><a href="<?php echo esc_url( ps_pen_paper_npc_url( $campaign, $page_id ) ); ?>"><?php esc_html_e( 'Gegner und NPCs verwalten', 'ps-pen-paper' ); ?></a></p>
+	<p><a href="<?php echo esc_url( ps_pen_paper_loot_url( $campaign, $page_id ) ); ?>"><?php esc_html_e( 'Beutetabellen verwalten', 'ps-pen-paper' ); ?></a></p>
 	<a class="button" href="<?php echo esc_url( $url . '#pspp-folio' ); ?>"><?php esc_html_e( 'Neuer Mappeneintrag', 'ps-pen-paper' ); ?></a>
 	<div class="pspp-folio-index">
 	<?php foreach ( $types as $type => $label ) : ?>
@@ -147,4 +148,5 @@ function ps_pen_paper_render_folio( $campaign, $page_id ) {
 		<?php endforeach; ?>
 	<?php endif;
 	ps_pen_paper_render_npcs( $campaign, $page_id );
+	ps_pen_paper_render_loot( $campaign, $page_id );
 }

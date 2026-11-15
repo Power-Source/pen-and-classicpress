@@ -6,6 +6,28 @@ document.querySelectorAll('[data-pspp-form]').forEach((form) => {
 	form.addEventListener('input', () => psppDirtyForms.add(form));
 	form.addEventListener('change', () => psppDirtyForms.add(form));
 });
+document.querySelectorAll('[data-loot-editor]').forEach((editor) => {
+	const list = editor.querySelector('[data-loot-rows]');
+	const template = editor.querySelector('[data-loot-template]');
+	const add = editor.querySelector('[data-add-loot]');
+	let next = Number(editor.dataset.nextIndex);
+	const update = () => { add.disabled = list.children.length >= 30; };
+	add.addEventListener('click', () => {
+		if (list.children.length >= 30) return;
+		list.insertAdjacentHTML('beforeend', template.innerHTML.replace(/__INDEX__/g, String(next++)));
+		psppDirtyForms.add(editor.closest('form'));
+		list.lastElementChild.querySelector('input').focus();
+		update();
+	});
+	list.addEventListener('click', (event) => {
+		if (!event.target.closest('[data-remove-loot]')) return;
+		event.target.closest('[data-loot-row]').remove();
+		psppDirtyForms.add(editor.closest('form'));
+		add.focus();
+		update();
+	});
+	update();
+});
 window.addEventListener('beforeunload', (event) => {
 	if (psppDirtyForms.size) {
 		event.preventDefault();

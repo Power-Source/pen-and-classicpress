@@ -1,7 +1,7 @@
 # Demokampagne: Die letzte Fracht von Nebelhafen
 
 Ursprüngliches Probespiel: Version 0.7.0 · 14. November 2026.
-Fortgeschriebener Prüfbericht bis Version 0.16.0.
+Fortgeschriebener Prüfbericht bis Version 0.20.0.
 
 **Spoilerhinweis:** Dieses Dokument zeigt die vollständige Demorunde
 einschließlich privatem und verdecktem Ergebnis. Es enthält keine echten
@@ -542,6 +542,202 @@ Ganzzahlgrenzen, Buchungsrechte, gemeinsame Konten, fehlgeschlagene
 Erstbuchungen mit vollständiger Rücknahme, Revisionskonflikte, private
 Historie und eingefrorene Gegenstandsbindungen.
 
+### Live-Fortsetzung: Gegner und NPCs mit Version 0.17.0
+
+Zwei Figuren wurden als Demo-Spielleitung über die echten Frontend-Formulare
+angelegt und der aktiven Szene **Die Laterne an Dock 3** zugeordnet:
+
+| Figur | Art | Freie Werte |
+|---|---|---|
+| Tessa Wolkensteg – Hafenlotsin | NPC | Ortskenntnis 4, Überzeugen 3 |
+| Zollwache an Dock 3 | Gegner | Aufmerksamkeit 3, Ausdauer 6 |
+
+Tessa besitzt die Eigenschaften **Aufgabe: Hafenlotsin** und **Haltung:
+Hilfsbereit**. Die Zollwache gehört zur Hafenbehörde und tritt wachsam auf.
+Beide Figuren haben getrennte geheime Regiehinweise. Die Zollwache ist
+lediglich eine mögliche Gegenpartei; es wird kein Kampf ausgelöst.
+Vorhandene Personenkarten bleiben unverändert.
+
+Die Figuren erscheinen in der privaten Szenenregie. Die Spieleransicht
+lieferte weder Geheimnisse noch Figurenformulare aus. Die Demo bleibt ohne
+Universumszuordnung; es wurde keine neue gemeinsame Welt dafür angelegt.
+Regeln, vollständige Charakterstände, Ausrüstung, Guthaben, Währung,
+historische Würfe und bestehende Mappeneinträge wurden vor und nach dem
+abschließenden Browserlauf verglichen und blieben unverändert.
+
+Eine separate temporäre Prüfwelt mit zwei Kampagnen und einer anderen
+Universumsleitung durchlief über echte Formulare:
+
+1. Lokale Figur mit geschütztem Bild erstellen.
+2. Bewusst einen privaten Aufnahmevorschlag senden.
+3. Bestätigen, dass die zweite Kampagne den Vorschlag noch nicht sieht.
+4. Als Universumsleitung prüfen und die Aufnahme bestätigen.
+5. Den Katalog in der Kampagne über **Figuren und Vorlagen neu laden**
+   tatsächlich vom Server nachladen.
+6. Die Vorlage als unabhängige Figur übernehmen und lokal ändern.
+
+Der Wert **Mut** blieb am Original und an der Vorlage jeweils **4**;
+die lokale Kopie erhielt **1**. Alle drei Figuren hatten eigene Bilddatensätze.
+Die Prüfwelt einschließlich Figuren, Bildern und Ereignissen wurde entfernt.
+Nur die eigens erzeugten Testsitzungen wurden widerrufen.
+
+Die Figurenverwaltung hatte bei **320, 390, 768, 1024 und 1440 Pixeln**
+keinen internen horizontalen Überlauf. Es gab keine JavaScript-Seitenfehler;
+periodische Hintergrundabrufe waren im fokussierten Browserlauf isoliert.
+Ein zunächst fragmentbasierter Wiederabruf wurde als echter Dokumentabruf
+abgesichert und anschließend im vollständigen Ablauf geprüft. Abbildung 27
+zeigt Tessa aus der persistenten Demo; Abbildung 28 eine bestätigte Vorlage
+aus der anschließend entfernten Prüfwelt.
+
+Die sechs betroffenen Integrationssuiten für Figuren, Spielleitermappe,
+Szenen/Karten, Ereignisse, Charakterkontexte und Spieltisch bestanden.
+Die Figurenprüfung deckt außerdem doppelte Angebote, veraltete Stände,
+Rücknahme bei fehlgeschlagenem Protokoll und entzogenen Katalogzugriff ab.
+Wiki-Veröffentlichung bleibt geplant; die folgende Fortsetzung ergänzt Beute.
+
+### Live-Fortsetzung: Beutetabellen mit Version 0.18.0
+
+Die Spielleitung erstellte über den echten Frontendeditor die dauerhafte
+W6-Tabelle **Dock 3 – Fundkiste** und verknüpfte sie mit der Zollwache:
+
+| Bereich | Ausgang | Belohnung |
+|---|---|---|
+| 1–2 | Einzelne Dockmark | 1 DM |
+| 3–4 | Vergessene Reisekasse | 2W6 DM |
+| 5–6 | Kompass und Kleingeld | 1 handelbarer Messingkompass vom Dock und 2 DM |
+
+Der Anlass **Docksuche – die vergessene Vorratskiste** ergab den tatsächlichen
+W6-Wurf **2**. Der eingefrorene Vorschlag blieb beim erneuten Öffnen und
+Neuladen unverändert. Eine wiederholte identische Wurfanfrage verwendete
+denselben Vorgang. Vor der Bestätigung wurde nichts ausgezahlt.
+
+Die Spielleitung wählte **Jorin Funkenflug** und bestätigte **1 Dockmark**.
+Sein Guthaben stieg von **8 auf 9 DM**; er erhielt keinen Gegenstand.
+Eine wiederholte Vergabe wurde abgelehnt. Tabelle **5816** und Vorgang
+**5828** bleiben als spielbare und nachvollziehbare Demo erhalten.
+
+Eine separate temporäre Prüfrunde durchlief zusätzlich über echte Formulare
+die kombinierte Vergabe eines charaktergebundenen Kompasses und **2W6**
+Währungseinheiten. Das gespeicherte Würfelergebnis entsprach dem tatsächlichen
+Guthaben; das konkrete Exemplar behielt seine Bindung. Die Prüfrunde samt
+eigenen Inhalten und Ereignissen wurde anschließend entfernt. Nur eigens
+erzeugte Testsitzungen wurden widerrufen; bestehende Anmeldungen blieben erhalten.
+
+Unverändert blieben beide Charakterdokumente, Regeln, Währung, Maras
+Guthaben/Ausrüstung und die historischen Würfe. Jorin sah sein aktualisiertes
+Guthaben; die Spieleransicht erhielt weder geheime Tabellen noch Formulare.
+Der Editor hatte bei **320, 390, 768, 1024 und 1440 Pixeln** keinen internen
+horizontalen Überlauf. Es gab keine JavaScript-Seitenfehler. Periodische
+Hintergrundabrufe waren im fokussierten Browserlauf isoliert.
+Die Abbildungen 29 und 30 zeigen die gespeicherte Tabelle und den Abschluss.
+
+Die sieben betroffenen Integrationssuiten für Beute, Guthaben, Ausrüstung,
+Würfel, Figuren, Spielleitermappe und Ereignisse bestanden. Die neue Suite
+prüft außerdem ungültige Bereiche und Mengen, eingefrorene Gegenstände,
+volle Inventare, Sperrkonflikte, gemeinsame Kontorechte und vollständige
+Rücknahme bei fehlgeschlagenen Pflichtprotokollen.
+
+### Live-Fortsetzung: Öffentliches Weltlexikon mit Version 0.19.0
+
+Für die Wiki-Prüfung wurde das separate **Nebelhafen – Wiki-Demouniversum**
+angelegt. Die laufende Kampagne wurde weder damit verknüpft noch auf ein
+anderes Währungs-/Charaktermodell umgestellt.
+
+Über echte Frontend-Formulare entstand die öffentliche Hauptkategorie
+**Nebelhafen – Öffentliches Weltlexikon** mit den Unterkategorien Personen,
+Gegner, Orte, Fraktionen, Gegenstände und Regeln. Die Administration bestätigte
+die Aktivierung und die ausdrücklich auf dieses Lexikon begrenzte Pflege
+durch die Universumsleitung. Die Demo-Spielleitung besitzt weiterhin keine
+allgemeinen Wiki-Erstellungs-, Veröffentlichungs- oder Kategorienrechte.
+
+Die bestätigte Universumsvorlage **Tessa – private Lexikonvorlage** besitzt
+eine getrennte interne Beschreibung, einen privaten Regiehinweis und den
+Wert **Ortskenntnis 4**. Davon wurde nichts vorausgefüllt oder automatisch
+übertragen. Die Spielleitung bereitete ausdrücklich den Titel
+**Tessa Wolkensteg – Hafenlotsin** und einen eigenen öffentlichen Text vor:
+Tessa ist Hafenlotsin und hilft Reisenden an den Luftschiffstegen.
+
+Der native Wiki-Entwurf war für den unangemeldeten Browser nicht lesbar.
+Erst die eigene Veröffentlichungsbestätigung machte den Artikel öffentlich.
+Die anschließende Gastansicht enthielt den gewählten Beschreibungstext,
+aber weder Regiehinweis noch internen Namen oder Werte. Eine wiederholte
+Freigabeanfrage wurde abgelehnt. Ein fremdes Konto erhielt keine
+Lexikonverwaltung und keine privaten Figureninformationen.
+
+Die Demo bleibt dauerhaft erhalten:
+
+- Universum **6253**, Figurenvorlage **6256**, Artikeleintrag **6258**.
+- Nativer Wiki-Artikel **6259**:
+  [Tessa Wolkensteg – Hafenlotsin](http://ps-dev.local/pen-paper/wiki/weltartikel-81704866-0906-45e5-9b3b-6829be578bcc/).
+- Abbildung 31 zeigt die Einrichtung durch die Administration;
+  Abbildung 32 den freigegebenen Artikel bei der Universumsleitung.
+
+Die vorhandene Kampagne, beide Charaktere samt Inventaren und Guthaben,
+Figuren, Beutetabelle, Vergabe und historische Würfe wurden vor und nach dem
+Browserlauf vollständig per Metadatenvergleich geprüft und blieben unverändert.
+Der Lexikonbereich hatte bei **320, 390, 768, 1024 und 1440 Pixeln** keinen
+internen horizontalen Überlauf. Es gab keine JavaScript-Seitenfehler;
+periodische Hintergrundabrufe waren im fokussierten Browserlauf isoliert.
+Nur eigens erzeugte Testsitzungen wurden widerrufen.
+
+Die sechs betroffenen Integrationssuiten für Wiki, Ereignisse, Figuren,
+Spielleitermappe, Charakterkontexte und Universen bestanden. Die neue Suite
+nutzt die echte PS-Wiki-API und prüft zusätzlich vollständige Rücknahme
+von Kategorien, Entwürfen und Veröffentlichungen bei Protokollfehlern,
+stabile Artikelidentitäten bei Umbenennung, unveränderte öffentliche Fassungen
+bei vorbereiteten Änderungen und die Ablehnung redaktioneller Überschreibungen.
+Temporäre Testbenutzer, Kategorien und Artikel wurden entfernt.
+
+### Live-Fortsetzung: Konfigurierbarer Handel mit Version 0.20.0
+
+Die Demo-Spielleitung aktivierte in **Rundeneinstellungen → Handelsregeln**
+Geschenk, Verkauf und Tausch. Zusätzliche Spielleiterfreigabe blieb
+eingeschaltet. Die eigenständige Kampagne wurde keinem Universum zugeordnet.
+
+Der Verkauf durchlief mit den echten, getrennten Demoanmeldungen die
+Frontend-Formulare:
+
+1. Mara bot ihren **Messingkompass vom Dock** Jorin für **3 DM** an.
+2. Jorin prüfte das konkrete Exemplar und nahm verbindlich an.
+3. Vor der Spielleiterfreigabe besaß weiterhin Mara den Kompass; Jorin hatte
+   weiterhin 9 DM. Es wurde noch nichts übertragen.
+4. Die Spielleitung gab den Vorgang frei.
+5. Ein erneutes Absenden desselben Freigabeformulars wurde abgelehnt.
+   Neuladen zeigte weiterhin denselben abgeschlossenen Vorgang.
+
+**Dauerhafter Abschluss:**
+
+| Bereich | Vorher | Nachher |
+|---|---|---|
+| Mara, Guthaben | 10 DM | **13 DM** |
+| Jorin, Guthaben | 9 DM | **6 DM** |
+| Messingkompass vom Dock | Mara | **Jorin, abgelegt** |
+| Gebundener Bordausweis | Mara | **Unverändert bei Mara** |
+
+Der Handelsvorgang **6747** bleibt gespeichert. Das Kompass-Exemplar behält
+seine UUID **02f822e5-12d2-48aa-963f-b2178a10e945** und den vollständigen
+ausgegebenen Stand, einschließlich des älteren Beschreibungstextes.
+Maras Inventar hat anschließend Revision **7**, Jorins Revision **1**.
+Das Exemplar wurde weder neu erzeugt noch automatisch ausgerüstet.
+Abbildungen 33 und 34 zeigen Regeln und tatsächlichen Abschluss.
+
+Jorins Seite enthielt den angebotenen Kompass, aber nicht Maras weiteren
+Bordausweis. Gäste erhielten keine Handelsnachweise. Bei **320, 390, 768,
+1024 und 1440 Pixeln** gab es weder internen noch Dokument-Überlauf.
+Periodische XHR-/Fetch-Hintergrundabrufe waren im fokussierten Browserlauf
+isoliert; diese Prüfung ist kein Gesamttest des Website-Pollings.
+Nur die dafür erzeugten Anmeldetokens wurden widerrufen.
+
+Die sechs betroffenen Integrationssuiten für Handel, Guthaben, Ausrüstung,
+Charakterkontexte, Beute und Ereignisse bestanden. Die neue Handelssuite
+prüft zusätzlich Geschenk und Tausch ohne zusätzliche Freigabe, reservierte
+und gebundene Exemplare, fremde Teilnehmer, ausstehende Ausrüstungsanträge,
+den vollen Grenzbestand von 100 Exemplaren und fehlendes Guthaben.
+Fehler bei Guthaben-, Inventar- oder Handelsprotokollen nehmen sämtliche
+Teiländerungen zurück. Ein Verkauf über gemeinsame Basisguthaben prüfte
+außerdem die tatsächliche Kontosperre und das Ausbleiben lokaler Ersatzkonten.
+Temporäre Testkonten und Prüfrunden wurden entfernt.
+
 ## Was vor einem vollständig integrierten Abenteuer noch fehlt
 
 1. **Story Builder weiter ausbauen:** Redaktioneller Komfort, weitere
@@ -551,18 +747,21 @@ Historie und eingefrorene Gegenstandsbindungen.
    Abenteuerplan und die szenenbezogene Regie ergänzen ihn seit 0.15.0.
 2. **Selbstständige Spielleiter auf dieser Website:** Die Backend-Weiterleitung
    klären; nicht durch pauschale Administratorrechte umgehen.
-3. **Optionale Kommunikation:** PS Chat ist inzwischen geschützt eingebunden.
-   Für PS Wiki fehlen noch die kampagnenbezogenen Rechteprüfungen.
+3. **Optionale Kommunikation:** PS Chat ist geschützt eingebunden.
+   PS Wiki ergänzt seit 0.19.0 ein bewusst öffentliches Weltlexikon;
+   private Kampagnen-Wikis benötigen weiterhin durchgängige Leserechte.
 4. **Späterer Ausbau:** Migration bestehender Kampagnen, universumsweite
-   Teilnahme, Punktepool, Handel und komplexe Würfelregeln, sofern das
+   Teilnahme, Punktepool, kampagnenübergreifender Handel und komplexe Würfelregeln, sofern das
    gewählte System sie benötigt. Basisbögen und lokale Zahlenauflagen sind
    seit Version 0.11.0 vorhanden.
 
 **Fazit:** Eine begleitete Runde mit Charakterbögen, Würfeln, Kapiteln,
-Erzählszenen, Handouts und privater Spielleitermappe ist möglich. Mit
+Erzählszenen, Handouts, privaten Gegnern/NPCs und Spielleitermappe ist möglich. Mit
 PS Community ergänzen Charakterprofil, Inventar, Ausrüstung und
-protokollierte Guthabenbuchungen den Ablauf.
-Der Kartentisch bleibt eine optionale Hilfe; Handel und weitere
-Spielmaterialien bleiben Ausbauziele.
+protokollierte Guthabenbuchungen, kontrollierte Beutevergaben und
+konfigurierbarer Handel den Ablauf.
+Ein optionales öffentliches Weltlexikon ergänzt die Spielwelt.
+Der Kartentisch bleibt eine optionale Hilfe; automatisierte Abenteuer und
+weitere Spielmaterialien bleiben Ausbauziele.
 
 [Zum Pluginhandbuch](handbuch.md) · [Zur Roadmap](../ROADMAP.md)

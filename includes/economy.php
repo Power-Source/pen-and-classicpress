@@ -79,7 +79,12 @@ function ps_pen_paper_wallet_context( $scope, $character_id ) {
 	if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
 	$character = ps_pen_paper_can_access_site() ? ps_pen_paper_get_character( $scope, $character_id ) : null;
 	if ( ! $character ) { return new WP_Error( 'forbidden', __( 'Dieses Guthaben ist für dich nicht verfügbar.', 'ps-pen-paper' ) ); }
-	$state = ps_pen_paper_character_state( $scope, $character, false );
+	return ps_pen_paper_resolve_wallet_context( $scope, $character );
+}
+
+// Internal resolver; the caller checks the character and the operation's authority.
+function ps_pen_paper_resolve_wallet_context( $scope, $character ) {
+	$state = ps_pen_paper_resolve_character_state( $scope, $character, false );
 	if ( is_wp_error( $state ) ) { return $state; }
 	if ( ! $state['active'] ) { return new WP_Error( 'unapproved_character', __( 'Guthaben benötigen einen freigegebenen Charakter.', 'ps-pen-paper' ) ); }
 	$currency_scope = ps_pen_paper_currency_scope( $scope );
@@ -143,23 +148,7 @@ function ps_pen_paper_change_wallet( $scope, $character_id, $operation, $amount,
 					! is_string( $currency_revision ) || (string) $current['currency']['revision'] !== $currency_revision ) {
 					return new WP_Error( 'conflict', __( 'Guthaben, Währung oder Zuordnung wurden geändert. Bitte lade neu; es wurde nichts gebucht.', 'ps-pen-paper' ) );
 				}
-				$before = $current['wallet'];
-				$units = (int) $amount;
-				if ( ( 'debit' === $operation && $before['balance'] < $units ) || ( 'grant' === $operation && 999999999 - $before['balance'] < $units ) ) {
-					return new WP_Error( 'balance_range', __( 'Die Buchung würde das Guthaben unter 0 oder über 999999999 bringen. Es wurde nichts gebucht.', 'ps-pen-paper' ) );
-				}
-				if ( ! $current['currency']['in_use'] ) {
-					$frozen = $current['currency']; $frozen['revision']++; $frozen['in_use'] = true;
-					$result = ps_pen_paper_write_document_event( $currency_scope_id, $currency_scope_id, '_pspp_currency', $current['currency'], $frozen,
-						array( 'kind' => 'currency_saved', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0 ), false );
-					if ( is_wp_error( $result ) ) { return $result; }
-				}
-				$after = $before; $after['revision']++;
-				$after['balance'] += 'grant' === $operation ? $units : -$units;
-				$after['name'] = $current['currency']['name']; $after['symbol'] = $current['currency']['symbol'];
-				return ps_pen_paper_write_document_event( $current['scope']->ID, $target_id, '_pspp_wallet', $before, $after,
-					array( 'kind' => 'wallet_saved', 'visibility' => 'owner', 'recipient_id' => (int) $current['character']->post_author,
-						'fields' => array(), 'rules_revision' => 0, 'reason' => sanitize_textarea_field( $reason ), 'character_name' => $current['character_name'] ), false );
+				return ps_pen_paper_write_wallet_booking( $current, $operation, (int) $amount, $reason );
 			} );
 		} finally {
 			foreach ( array_unique( array( (int) $scope->ID, (int) $character_id, $target_id ) ) as $id ) { clean_post_cache( $id ); }
@@ -168,6 +157,49 @@ function ps_pen_paper_change_wallet( $scope, $character_id, $operation, $amount,
 	return ps_pen_paper_with_character_lock( $character_id, function () use ( $character_id, $target_id, $write ) {
 		return (int) $character_id === $target_id ? $write() : ps_pen_paper_with_character_lock( $target_id, $write );
 	} );
+}
+
+// Internal writer: the caller holds the account locks and the surrounding event transaction.
+function ps_pen_paper_write_wallet_booking( $current, $operation, $units, $reason ) {
+	if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
+	if ( ! ps_pen_paper_can_manage_character_scope( $current['scope'] ) || ! in_array( $operation, array( 'grant', 'debit' ), true ) ||
+		! is_int( $units ) || $units < 1 || $units > 999999999 || ! is_string( $reason ) || '' === trim( $reason ) || strlen( $reason ) > 1000 ) {
+		return new WP_Error( 'invalid_booking', __( 'Die Guthabenbuchung ist nicht zulässig.', 'ps-pen-paper' ) );
+	}
+	return ps_pen_paper_write_wallet_delta( $current, $operation, $units, $reason );
+}
+
+// Internal transaction writer for an authorized booking or mutually confirmed trade.
+function ps_pen_paper_write_wallet_delta( $current, $operation, $units, $reason ) {
+	$before = $current['wallet'];
+	if ( ( 'debit' === $operation && $before['balance'] < $units ) || ( 'grant' === $operation && 999999999 - $before['balance'] < $units ) ) {
+		return new WP_Error( 'balance_range', __( 'Die Buchung würde das Guthaben unter 0 oder über 999999999 bringen. Es wurde nichts gebucht.', 'ps-pen-paper' ) );
+	}
+	$scope_id = (int) $current['currency_scope']->ID;
+	if ( ! $current['currency']['in_use'] ) {
+		$frozen = $current['currency']; $frozen['revision']++; $frozen['in_use'] = true;
+		$result = ps_pen_paper_write_document_event( $scope_id, $scope_id, '_pspp_currency', $current['currency'], $frozen,
+			array( 'kind' => 'currency_saved', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0 ), false );
+		if ( is_wp_error( $result ) ) { return $result; }
+	}
+	$after = $before; $after['revision']++;
+	$after['balance'] += 'grant' === $operation ? $units : -$units;
+	$after['name'] = $current['currency']['name']; $after['symbol'] = $current['currency']['symbol'];
+	return ps_pen_paper_write_document_event( $current['scope']->ID, $current['character']->ID, '_pspp_wallet', $before, $after,
+		array( 'kind' => 'wallet_saved', 'visibility' => 'owner', 'recipient_id' => (int) $current['character']->post_author,
+			'fields' => array(), 'rules_revision' => 0, 'reason' => sanitize_textarea_field( $reason ), 'character_name' => $current['character_name'] ), false );
+}
+
+function ps_pen_paper_write_wallet_transfer( $payer, $payee, $units, $reason ) {
+	if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
+	if ( ! is_int( $units ) || $units < 1 || $units > 999999999 || $payer['character']->ID === $payee['character']->ID ||
+		$payer['currency_scope']->ID !== $payee['currency_scope']->ID || $payer['currency']['currency_id'] !== $payee['currency']['currency_id'] ) { return new WP_Error( 'invalid_transfer', __( 'Diese Guthabenübertragung ist nicht zulässig.', 'ps-pen-paper' ) ); }
+	$result = ps_pen_paper_write_wallet_delta( $payer, 'debit', $units, $reason );
+	if ( is_wp_error( $result ) ) { return $result; }
+	// The debit may have frozen the currency's account model.
+	$payee['currency'] = ps_pen_paper_currency_document( $payee['currency_scope']->ID );
+	if ( is_wp_error( $payee['currency'] ) ) { return $payee['currency']; }
+	return ps_pen_paper_write_wallet_delta( $payee, 'grant', $units, $reason );
 }
 
 function ps_pen_paper_campaign_has_wallets( $campaign_id ) {

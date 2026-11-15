@@ -28,6 +28,14 @@ function ps_pen_paper_event_labels() {
 		'npc_offered'         => __( 'Figur dem Universum angeboten', 'ps-pen-paper' ),
 		'npc_approved'        => __( 'Figur ins Universum aufgenommen', 'ps-pen-paper' ),
 		'npc_copied'          => __( 'Universumsvorlage als Figur übernommen', 'ps-pen-paper' ),
+		'loot_table_saved'    => __( 'Beutetabelle gespeichert', 'ps-pen-paper' ),
+		'loot_rolled'         => __( 'Beutevorschlag ausgewürfelt', 'ps-pen-paper' ),
+		'loot_awarded'        => __( 'Beutevorgang abgeschlossen', 'ps-pen-paper' ),
+		'wiki_configured'     => __( 'Weltlexikon konfiguriert', 'ps-pen-paper' ),
+		'wiki_prepared'       => __( 'Wiki-Artikel vorbereitet', 'ps-pen-paper' ),
+		'wiki_published'      => __( 'Wiki-Artikel veröffentlicht', 'ps-pen-paper' ),
+		'trade_policy'        => __( 'Handelsregeln geändert', 'ps-pen-paper' ),
+		'trade_changed'       => __( 'Handel geändert', 'ps-pen-paper' ),
 		'folio_published'     => __( 'Handout freigegeben', 'ps-pen-paper' ),
 		'folio_withdrawn'     => __( 'Handout zurückgenommen', 'ps-pen-paper' ),
 		'portrait_saved'      => __( 'Charakterporträt geändert oder geprüft', 'ps-pen-paper' ),
@@ -103,17 +111,19 @@ function ps_pen_paper_save_document_event( $campaign_id, $object_id, $key, $befo
 	} );
 }
 
-function ps_pen_paper_atomic_event( $object_id, $write ) {
+function ps_pen_paper_atomic_event( $object_id, $write, $extra_tables = array() ) {
 	global $wpdb;
 	$unsupported = new WP_Error( 'transaction_unavailable', __( 'Diese Änderung benötigt eine sichere Datenbanktransaktion. Sie wurde nicht übernommen. Bitte informiere den Administrator über die erforderliche InnoDB-Unterstützung und die Standard-Datenbankverbindung.', 'ps-pen-paper' ) );
 	if ( 'wpdb' !== get_class( $wpdb ) || ! ( $wpdb->dbh instanceof mysqli ) || ! is_int( $wpdb->reconnect_retries ) ) {
 		return $unsupported;
 	}
+	if ( ! is_array( $extra_tables ) || array_diff( $extra_tables, array( $wpdb->terms, $wpdb->term_taxonomy, $wpdb->term_relationships, $wpdb->termmeta ) ) ) { return $unsupported; }
+	$required_tables = array_values( array_unique( array_merge( array( $wpdb->posts, $wpdb->postmeta ), $extra_tables ) ) );
 	$tables = $wpdb->get_results( $wpdb->prepare(
-		'SELECT TABLE_NAME, ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (%s, %s)',
-		$wpdb->posts, $wpdb->postmeta
+		'SELECT TABLE_NAME, ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (' . implode( ',', array_fill( 0, count( $required_tables ), '%s' ) ) . ')',
+		$required_tables
 	), ARRAY_A );
-	if ( $wpdb->last_error || ! is_array( $tables ) || 2 !== count( $tables ) || array( 'InnoDB' ) !== array_values( array_unique( array_column( $tables, 'ENGINE' ) ) ) || '1' !== $wpdb->get_var( 'SELECT @@session.autocommit' ) ) {
+	if ( $wpdb->last_error || ! is_array( $tables ) || count( $required_tables ) !== count( $tables ) || array( 'InnoDB' ) !== array_values( array_unique( array_column( $tables, 'ENGINE' ) ) ) || '1' !== $wpdb->get_var( 'SELECT @@session.autocommit' ) ) {
 		return $unsupported;
 	}
 	// This configures our next transaction and refuses an already active transaction.
@@ -219,6 +229,24 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 		return $error;
 	}
 	$event['id'] = $post->ID;
+	if ( in_array( $event['kind'], array( 'trade_policy', 'trade_changed' ), true ) ) {
+		$validate = 'trade_policy' === $event['kind'] ? 'ps_pen_paper_valid_trade_policy' : 'ps_pen_paper_valid_trade';
+		if ( 'gm' !== $event['visibility'] || ! $validate( $event['before'] ) || ! $validate( $event['after'] ) ) {
+			return new WP_Error( 'invalid_event', __( 'Die Handelsstände im Protokoll sind beschädigt.', 'ps-pen-paper' ) );
+		}
+	}
+	if ( in_array( $event['kind'], array( 'wiki_configured', 'wiki_prepared', 'wiki_published' ), true ) ) {
+		$validate = 'wiki_configured' === $event['kind'] ? 'ps_pen_paper_valid_wiki_config' : 'ps_pen_paper_valid_wiki_entry';
+		if ( ! $universe || 'gm' !== $event['visibility'] || ! $validate( $event['before'] ) || ! $validate( $event['after'] ) ) {
+			return new WP_Error( 'invalid_event', __( 'Die Lexikonstände im Protokoll sind beschädigt.', 'ps-pen-paper' ) );
+		}
+	}
+	if ( in_array( $event['kind'], array( 'loot_table_saved', 'loot_rolled', 'loot_awarded' ), true ) ) {
+		$validate = 'loot_table_saved' === $event['kind'] ? 'ps_pen_paper_valid_loot_table' : 'ps_pen_paper_valid_loot_run';
+		if ( 'gm' !== $event['visibility'] || ! $validate( $event['before'] ) || ! $validate( $event['after'] ) ) {
+			return new WP_Error( 'invalid_event', __( 'Die Beutestände im Protokoll sind beschädigt.', 'ps-pen-paper' ) );
+		}
+	}
 	if ( in_array( $event['kind'], array( 'npc_saved', 'npc_offered', 'npc_approved', 'npc_copied' ), true ) &&
 		( 'gm' !== $event['visibility'] || ! ps_pen_paper_valid_npc_state( $event['before'] ) || ! ps_pen_paper_valid_npc_state( $event['after'] ) ) ) {
 		return new WP_Error( 'invalid_event', __( 'Die Figurenstände im Protokoll sind beschädigt.', 'ps-pen-paper' ) );

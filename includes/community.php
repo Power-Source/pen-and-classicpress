@@ -100,7 +100,7 @@ function ps_pen_paper_community_prepare() {
 		$character_id = ps_pen_paper_posted_id( 'character_id' );
 		$campaign = ps_pen_paper_get_campaign( $campaign_id );
 		$character = $campaign ? ps_pen_paper_get_character( $campaign, $character_id ) : null;
-		if ( ! in_array( $operation, array( 'save_character', 'save_portrait', 'equip_items' ), true ) || ! $character ||
+		if ( ! in_array( $operation, array( 'save_character', 'save_portrait', 'equip_items', 'offer_trade', 'change_trade' ), true ) || ! $character ||
 			(int) $character->post_author !== get_current_user_id() || ! ps_pen_paper_profile_return( $campaign_id, $character_id ) ) {
 			ps_pen_paper_fail( __( 'Diese Profilaktion ist nicht erlaubt. Bitte öffne deinen eigenen Charakter erneut.', 'ps-pen-paper' ) );
 		}
@@ -112,7 +112,7 @@ function ps_pen_paper_community_assets() {
 	if ( ps_pen_paper_community_available() && is_singular( 'page' ) && (int) get_option( 'cpccom_profile_page' ) === get_queried_object_id() ) {
 		$url = plugin_dir_url( dirname( __DIR__ ) . '/ps-pen-paper.php' );
 		wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.1' );
-		wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.7.0', true );
+		wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.18.0', true );
 		wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.0' );
 	}
 }

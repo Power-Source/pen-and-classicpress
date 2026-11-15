@@ -1,12 +1,13 @@
 # PS Pen & Paper – Pluginhandbuch
 
-Stand: Version 0.16.0 · 15. November 2026.
+Stand: Version 0.20.0 · 15. November 2026.
 
 Dieses Handbuch beschreibt den vorhandenen Funktionsumfang, nicht die gesamte
 Roadmap. Die Abbildungen zur Demorunde stammen aus der tatsächlich angelegten
 [Demokampagne „Die letzte Fracht von Nebelhafen“](demokampagne.md).
 Ihre Welt, Namen und Demoregeln sind Beispiele, keine Vorgaben des Plugins.
 Die Universums- und Kartenabbildungen zeigen getrennte, anschließend entfernte Prüfwelten.
+Die Wiki-Abbildungen zeigen ein separat erhaltenes Lexikon-Demouniversum.
 Eine fremde Partnerprogramm-Debugleiste wurde nur für diese Aufnahmen ausgeblendet.
 
 ## Inhalt
@@ -27,6 +28,10 @@ Eine fremde Partnerprogramm-Debugleiste wurde nur für diese Aufnahmen ausgeblen
 14. [Porträts und Bogenhintergründe](#14-porträts-und-bogenhintergründe)
 15. [Community-Profil, Gegenstände und Ausrüstung](#15-community-profil-gegenstände-und-ausrüstung)
 16. [Währung, Guthaben und Gegenstandsbindung](#16-währung-guthaben-und-gegenstandsbindung)
+17. [Gegner, NPCs und Universumsvorlagen](#17-gegner-npcs-und-universumsvorlagen)
+18. [Beutetabellen und bestätigte Vergabe](#18-beutetabellen-und-bestätigte-vergabe)
+19. [Öffentliches Weltlexikon mit PS Wiki](#19-öffentliches-weltlexikon-mit-ps-wiki)
+20. [Geschenke, Verkauf und Tausch](#20-geschenke-verkauf-und-tausch)
 
 ## 1. Ist das schon spielbar?
 
@@ -44,13 +49,14 @@ sind seit 0.13.0 enthalten.
 | Würfel, Attributwerte und geschützte Ergebnisse | Automatische Erfolgsbewertung oder komplexe Würfelmechaniken |
 | Änderungs- und Wurfprotokoll | Automatisch geprüfter Punktepool |
 | Spielleitermappe, geschützte Text-/Bild-Handouts und responsive Bedienung | Strukturierte NPC-Werte und private PDF-Dateien |
-| Private Porträts sowie Community-gebundene Kataloge, Inventare und Ausrüstung | Handel, Stapelmengen und automatische Gegenstandssynchronisierung |
+| Private Porträts sowie Community-gebundene Inventare, Ausrüstung und kontrollierter Handel | Stapelmengen und automatische Gegenstandssynchronisierung |
 
 Die Spielleitung kann Szenentexte und Karten vorbereiten und gezielt anzeigen.
 Die Kampagnenbeschreibung eignet sich weiter für eine gemeinsame Einleitung,
 **nicht für Geheimnisse**. Dafür gibt es das getrennte Geheimnisfeld der Szene.
 PS Chat lässt sich mit den ergänzten Spieltisch-Schnittstellen geschützt
-einbetten; PS Wiki ist noch nicht mit Kampagnenrechten verbunden.
+einbetten. Seit 0.19.0 ergänzt PS Wiki ein ausdrücklich freigegebenes
+öffentliches Weltlexikon; private Kampagnen-Wikis sind nicht enthalten.
 
 ## 2. Installation und Spielbereich
 
@@ -548,8 +554,8 @@ Der erste **Story-Builder-Ablauf** mit Szenen, getrennten Geheimnissen,
 Inhaltsvorschau, Freigabe, Rücknahme und Protokollierung ist vorhanden.
 Kapitel mit geordneter Szenenfolge, private Personen-/Orts-/Notizkarten und
 Text-/Bild-Handouts sind seit 0.13.0 vorhanden. Community-gebundene Inventare
-und Ausrüstung ergänzen seit 0.14.0 den Charakterbereich. Handel,
-redaktioneller Komfort und weitere Handoutdateiformate fehlen noch. Eine normale Medien-URL ist nicht
+und Ausrüstung ergänzen seit 0.14.0 den Charakterbereich, kontrollierter Handel
+seit 0.20.0. Redaktioneller Komfort und weitere Handoutdateiformate fehlen noch. Eine normale Medien-URL ist nicht
 automatisch privat.
 Auch die unterstützten WordPress-, ClassicPress- und PHP-Versionen müssen
 noch verbindlich festgelegt und plattformübergreifend geprüft werden.
@@ -914,7 +920,7 @@ Schema- und Vorlagenänderungen stehen privat im Spielleiterprotokoll;
 Inventar- und Porträtänderungen sind nur für Besitzer und aktuelle
 Spielleitung sichtbar. Das ist keine Datenbanksicherung.
 
-**Noch offen:** Handel, Stapelmengen, Mehrfachslot-Gegenstände, Entzug/
+**Noch offen:** Stapelmengen, Mehrfachslot-Gegenstände, Entzug/
 Entfernen von Exemplaren und ein frei positionierbarer grafischer Slotdesigner.
 Die aktuelle Oberfläche verwendet zugängliche Auswahlfelder, kein Drag-and-drop.
 
@@ -974,22 +980,387 @@ Beim Erstellen oder Bearbeiten einer Gegenstandsvorlage unter
 **Gegenstandsbindung** wählen:
 
 - **Charaktergebunden:** Das konkrete Exemplar gehört zu diesem Charakter.
-- **Handelbar:** Das Exemplar ist für einen späteren Handel entsprechend
-  gekennzeichnet.
+- **Handelbar:** Das Exemplar kann nach den eingestellten Handelsregeln
+  angeboten werden.
 
 Beim Ausgeben wird die Auswahl im Exemplar festgehalten. Ein späterer
-Vorlagenwechsel verändert vorhandene Exemplare nicht. **Es gibt noch keine
-Handels-, Kauf-, Verkaufs- oder Übertragungsaktion.** Eine manuelle Geldbuchung
-ist kein automatischer Kauf.
+Vorlagenwechsel verändert vorhandene Exemplare nicht. Die Handelsfunktion
+seit 0.20.0 berücksichtigt diese Bindung; siehe Abschnitt 20. Eine manuelle
+Geldbuchung ist kein automatischer Kauf.
 
-Die Demo enthält jetzt **Dockmark (DM)**: Mara erhält 12 DM, davon werden
-2 DM mit Begründung für Vorräte abgezogen; ihr Stand beträgt **10 DM**.
+Der Ausgangsstand der Währungsdemo enthält **Dockmark (DM)**: Mara erhält
+12 DM, davon werden 2 DM mit Begründung für Vorräte abgezogen; ihr damaliger Stand beträgt **10 DM**.
 Jorin erhält getrennt **8 DM**. Mara besitzt zusätzlich einen gebundenen
 **Bordausweis der Morgenröte** und einen handelbar gekennzeichneten
 **Messingkompass vom Dock**, beide ohne neue Werteboni.
+Spätere Beute und Handel verändern diesen Stand; der aktuelle Abschluss
+steht in Abschnitt 20 und im Demobericht.
 
 Ohne verwendbares PS Community sind wirtschaftliche Änderungen inaktiv;
 gespeicherte Guthaben und Gegenstände werden nicht gelöscht.
+
+## 17. Gegner, NPCs und Universumsvorlagen
+
+Figuren sind private Werkzeuge der Spielleitung, unabhängig von PS Community
+und PS Wiki. Eine Personenkarte bleibt eine Erzählnotiz; sie wird nicht
+automatisch in einen Gegner oder NPC umgewandelt.
+
+### Eine Kampagnenfigur vorbereiten
+
+1. **Spielleitermappe → Gegner und NPCs verwalten** öffnen.
+2. **Neue Kampagnenfigur** wählen, die Art **NPC** oder **Gegner** einstellen.
+3. Name, Beschreibung und getrennte Geheimnisse eintragen.
+4. Eigenschaften als `Bezeichnung | Text`, Werte als `Bezeichnung | ganze Zahl`
+   eintragen, jeweils eine Zeile pro Eintrag.
+5. Optional eine Szene und ein geschütztes Bild auswählen.
+6. **Figur speichern** wählen. Die Vorschau zeigt den gespeicherten Stand.
+
+Beispiel für Eigenschaften:
+
+```text
+Aufgabe | Hafenlotsin
+Haltung | Hilfsbereit
+```
+
+Beispiel für Werte:
+
+```text
+Ortskenntnis | 4
+Überzeugen | 3
+```
+
+Es sind höchstens **30 Eigenschaften und 30 Werte** möglich. Zahlen liegen
+zwischen **-1000000 und 1000000**; Nachkommastellen und doppelte Bezeichnungen
+innerhalb einer Liste werden abgewiesen. Es gibt keine vorgeschriebene
+Attributliste. Werte verändern keine Spielerbögen und lösen weder Kämpfe
+noch Proben automatisch aus.
+
+Bilder werden wie andere private Spielbilder gespeichert: PNG, JPEG oder
+WebP bis 2 MiB und 3000 × 3000 Pixel, ohne öffentliche Mediathek-Adresse.
+Eine Szenenzuordnung macht die Figur in der **privaten Regie des
+Abenteuerplans** erreichbar. Sie veröffentlicht weder Beschreibung noch
+Bild, Werte oder Geheimnisse für Spieler.
+
+![Tessa Wolkensteg als private strukturierte NPC-Figur der Nebelhafen-Demo](images/27-gegner-npc.png)
+
+### Ins Universum aufnehmen
+
+Bei einer zugeordneten Kampagne besitzt die gespeicherte Figur eine
+ausdrücklich zu bestätigende Aufnahmeaktion. **Dabei werden auch Werte,
+Bild und Geheimnisse mit der Universumsleitung geteilt.**
+
+- Leitet dieselbe Person auch das Universum, erstellt **Ins Universum
+  aufnehmen** direkt eine Vorlage.
+- Andernfalls erzeugt **Aufnahme ins Universum vorschlagen** zunächst einen
+  privaten Vorschlag. Andere Kampagnen sehen ihn noch nicht.
+- Die Universumsleitung öffnet **Universen → Regelwerk & Basischaraktere →
+  Gegner & NPCs**, prüft den Vorschlag und bestätigt **Aufnahme ins Universum
+  bestätigen**. Sie kann dort auch eigene Vorlagen erstellen.
+
+Wiederholtes Anbieten derselben Figur erzeugt keine weitere Vorlage, auch
+nicht nach einer Umbenennung. Spätere Änderungen werden nicht ungefragt
+übertragen. Eine Kampagne ohne Universum behält ihre Figuren ausschließlich lokal.
+
+![Bestätigte Universumsvorlage aus einer separaten temporären Prüfwelt](images/28-universumsvorlage.png)
+
+### Vorlagen in einer anderen Kampagne verwenden
+
+1. Als Spielleitung einer zugeordneten Kampagne die Figurenverwaltung öffnen.
+2. Unter **Vorlagen aus dem Universum** die Vorlage prüfen.
+3. **Als Kampagnenfigur übernehmen** ausdrücklich bestätigen.
+4. Name, aktuelle Werte und Szenenverknüpfung der lokalen Figur anpassen.
+
+Jede Übernahme friert den Vorlagenstand ein und kopiert das geschützte Bild.
+Die Szenenzuordnung ist zunächst leer. Eine verletzte lokale Wache verändert
+keine anderen Wachen; spätere Vorlagenänderungen verändern keine bestehenden
+Kopien. Nach einer gelösten Universumszuordnung verschwindet der Katalogzugriff,
+die eigenen Kampagnenfiguren bleiben erhalten.
+
+Nach Änderungen oder Freigaben durch eine andere Spielleitung
+**Figuren und Vorlagen neu laden** verwenden. Veraltete Speicherformulare
+überschreiben keine neueren Stände. Ohne erforderlichen Protokolleintrag
+wird die Figurenänderung nicht übernommen.
+
+Die Demo enthält **Tessa Wolkensteg – Hafenlotsin** und die optionale
+**Zollwache an Dock 3**. Beide sind Dock 3 zugeordnet und bleiben privat.
+Es wird kein Kampf gestartet. Seit 0.18.0 ist eine lokale Beutetabelle
+optional verknüpfbar. Die Verknüpfung wird nicht in Universumsvorlagen
+übernommen. Für bestätigte Universumsvorlagen kann seit 0.19.0 ein separater
+öffentlicher Wiki-Artikel vorbereitet werden.
+
+## 18. Beutetabellen und bestätigte Vergabe
+
+Seit Version 0.18.0 kann die Spielleitung Beute vorbereiten, auswürfeln und
+anschließend bewusst vergeben. Das ist keine automatische Kampfbelohnung.
+Die Verwaltung bleibt privat und benötigt für Änderungen aktives PS Community.
+
+### Eine Tabelle vorbereiten
+
+1. Als Kampagnenleitung **Spielleitermappe → Beutetabellen** öffnen und
+   **Neue Beutetabelle** wählen.
+2. Name und einen im Kampagnenregelwerk erlaubten Standardwürfel einstellen.
+3. Für jeden Ausgang einen Bereich von/bis einschließlich und einen Namen
+   eintragen. **Ausgang hinzufügen** ergänzt weitere Bereiche.
+4. Optional eine Gegenstandsvorlage und Menge auswählen sowie einen
+   Währungsbetrag eintragen. Ohne Gegenstand muss die Menge **0** sein.
+5. **Beutetabelle speichern**.
+
+Alle Würfelwerte müssen genau einmal vorkommen. Eine W6-Tabelle könnte
+die Bereiche **1–2**, **3–4** und **5–6** enthalten: Jeder hat die Chance
+**2/6**. Lücken, Überschneidungen und mehr als 30 Ausgänge werden abgelehnt.
+Ein Ausgang kann keine Beute, einen Gegenstandstyp, Geld oder beides enthalten.
+
+Mengen sind feste ganze Zahlen von **1 bis 100** oder ein erlaubter
+Würfelausdruck wie **2W6**. Geld darf **0 bis 999999999** ergeben und benötigt
+eine eingerichtete Kampagnen-/Universumswährung. Auch alle theoretisch
+möglichen Würfelergebnisse müssen innerhalb der Grenzen liegen.
+Nachkommastellen und negative Ergebnisse sind nicht erlaubt. **W3 ist derzeit
+nicht unterstützt**; es gelten die vorhandenen Standardwürfel.
+Weitere Ausgänge hinzufügen oder entfernen benötigt JavaScript.
+
+Speichern friert die aktuellen Gegenstandsvorlagen samt Bindung ein.
+Erneutes Speichern übernimmt den dann aktuellen Vorlagenstand für neue
+Vorgänge, verändert aber keine bereits gespeicherten Beutevorschläge.
+
+![Beutetabelle mit drei möglichen Ergebnissen in der Nebelhafen-Demo](images/29-beutetabelle.png)
+
+### Auswürfeln ist noch keine Vergabe
+
+1. Die gespeicherte Tabelle öffnen.
+2. Einen privaten Anlass eintragen.
+3. **Beutevorschlag auswürfeln** wählen.
+4. Ergebnis, Menge, Geldbetrag und gegebenenfalls Gegenstandsbindung prüfen.
+5. Einen **Empfänger der gesamten Beute** auswählen.
+6. Die Bestätigung setzen und **Beute verbindlich vergeben** wählen.
+
+Der Vorschlag enthält den damaligen Tabellenstand sowie sämtliche Einzelwürfe.
+Neuladen, späteres Öffnen und eine Wiederholung derselben Anfrage würfeln
+nicht neu. **Ein bewusst neu gestarteter Wurf ist dagegen ein neuer Vorgang.**
+Bis zur bestätigten Vergabe verändern sich weder Inventar noch Guthaben.
+Ein Ergebnis ohne Belohnung wird mit **Ohne Beute abschließen** abgeschlossen.
+
+Die gesamte Vergabe wird gemeinsam gespeichert: konkrete Gegenstandsexemplare,
+Guthaben, Abschluss und erforderliche Protokolle. Scheitert ein Teil,
+beispielsweise wegen eines vollen Inventars, bleibt auch das Geld unvergeben.
+Ein abgeschlossener Vorgang kann nicht erneut auszahlen.
+Ausgegebene Gegenstände sind nicht automatisch ausgerüstet.
+
+Die bisherigen Buchungsrechte gelten unverändert: Bei gemeinsamem
+Universumsguthaben benötigt die vergebende Kampagnenleitung zusätzlich das
+zuständige Universumsrecht. Veraltete Empfänger-/Guthabenstände werden nicht
+überschrieben; bei einem Konflikt den Vorgang neu laden und erneut prüfen.
+
+![Einmalig abgeschlossener Beutevorgang für Jorin](images/30-beutevergabe.png)
+
+### Verknüpfung, Sichtbarkeit und Grenzen
+
+Im Gegner-/NPC-Editor kann eine lokale Beutetabelle ausgewählt werden.
+Der Link öffnet die Tabelle für die Spielleitung; er startet keinen Wurf und
+keine automatische Auszahlung. Universumsvorlagen und daraus erstellte
+Kampagnenkopien übernehmen diese lokale Tabellenreferenz nicht.
+
+Tabellen, Chancen, private Anlässe und Vorschläge sehen nur Spielleitungen.
+Charakterbesitzer sehen ihre erhaltenen Gegenstände und Guthabenbuchungen,
+nicht die geheime Tabelle. Ohne aktives PS Community bleiben gespeicherte
+Tabellen und Vorgänge erhalten; Änderungen sind gesperrt.
+
+Noch nicht enthalten sind Gegenstandsgruppen, verschachtelte Tabellen,
+universumsweite Beutekataloge, Aufteilung auf mehrere Empfänger und
+automatische Vergaben. In der Demo ist **Dock 3 – Fundkiste** mit der
+Zollwache verknüpft. Der gespeicherte W6-Wurf **2** ergab **1 Dockmark**
+für Jorin: Sein Guthaben stieg von **8 auf 9 DM**.
+
+## 19. Öffentliches Weltlexikon mit PS Wiki
+
+Seit Version 0.19.0 kann jedes Universum ein optionales öffentliches
+Regel-/Weltlexikon erhalten. PS Wiki muss auf derselben Website aktiv sein
+und seine Kategorien bereitstellen. PS Community ist dafür nicht erforderlich.
+**Das ist kein privates Kampagnen-Wiki.**
+
+### Einmalig aktivieren und Kategorien festlegen
+
+1. **Universen → Regelwerk & Basischaraktere → Öffentliches Weltlexikon**
+   öffnen.
+2. Unter **Öffentliche Kategorien und Anbindung** einen öffentlichen
+   Lexikonnamen wählen. Der private Universumsname wird nicht vorausgefüllt.
+3. Die sechs Unterkategorien **Personen, Gegner, Orte, Fraktionen, Gegenstände
+   und Regeln** nach Wunsch benennen.
+4. **Aktivieren** auswählen, die ausdrückliche Freigabe bestätigen und
+   **Lexikonanbindung speichern** wählen.
+
+Einrichten, Kategorien umbenennen und Pausieren benötigen neben den
+Universumsrechten zusätzlich die nativen PS-Wiki-Rechte zum Veröffentlichen
+und Verwalten von Kategorien. Fehlen diese, kann beispielsweise die
+Administration die Einrichtung übernehmen. **Sie erlaubt damit ausdrücklich
+der Universumsleitung, die zugeordneten Artikel dieses Lexikons über den
+Pen-&-Paper-Adapter vorzubereiten und zu veröffentlichen.** Allgemeine
+Wiki-Rechte oder Administratorrollen werden dadurch nicht vergeben.
+
+Die Hauptkategorie und ihre sechs Unterkategorien entstehen automatisch
+mit stabiler Zuordnung. **Ihre Namen sind sofort öffentlich sichtbar,
+auch wenn noch kein Artikel veröffentlicht ist.** Kategorien schützen keine
+Geheimnisse. Zusätzliche freie Kategorieebenen sind noch nicht vorgesehen.
+
+![Ausdrückliche Einrichtung des öffentlichen Lexikons durch die Administration](images/31-wiki-einrichtung.png)
+
+### Einen Artikel bewusst vorbereiten
+
+1. Als Universumsleitung **Neuen Artikel vorbereiten** wählen.
+2. Optional eine **bestätigte Universumsvorlage** auswählen. Vorgeschlagene
+   und noch nicht aufgenommene Kampagnenfiguren können nicht verknüpft werden.
+   Für Orte, Fraktionen oder Hausregeln **Freier Welt-/Regelartikel** verwenden.
+3. Kategorie sowie einen separaten **öffentlichen Artikeltitel** und
+   **öffentlichen Artikeltext** eintragen.
+4. Die Bestätigung setzen und **Artikelentwurf vorbereiten** wählen.
+
+Es werden keine internen Texte vorausgefüllt. Geheimnisse, private Identitäten,
+Bilder, Eigenschaften, Zahlenwerte und Beuteinformationen werden nicht
+automatisch übertragen. **Nur die separat eingegebenen Titel und Texte**
+werden für den Artikel verwendet. Der Text ist reiner Text; Shortcodes werden
+nicht ausgeführt.
+
+Beim ersten Vorbereiten entsteht ein nativer PS-Wiki-Entwurf, noch kein über
+diesen Ablauf veröffentlichter Artikel. Trotzdem niemals Geheimnisse eintragen:
+**Wiki-Redakteure können Entwürfe mit den eigenen Wiki-Rechten lesen, ändern
+oder außerhalb dieses Ablaufs veröffentlichen.**
+
+Jede Figur kann genau einen solchen Artikeleintrag erhalten. Umbenennen der
+Figur oder erneutes Anbieten erzeugt keine zweite Zuordnung. Zum Weiterarbeiten
+den vorhandenen Eintrag unter **Zugeordnete Artikel** öffnen.
+Eine Regelbeschreibung im Wiki verändert keine überprüfbaren Spielregeln.
+
+### Veröffentlichen und später ändern
+
+1. Den gespeicherten öffentlichen Titel und Text prüfen.
+2. Die eigene Veröffentlichungsbestätigung setzen.
+3. **Artikel öffentlich veröffentlichen** wählen.
+4. Über **Öffentlichen Wiki-Artikel öffnen** die tatsächliche Gastansicht prüfen.
+
+Veröffentlicht wird genau der gespeicherte Stand. Ein veraltetes oder
+wiederholtes Freigabeformular wird abgelehnt. Neue vorbereitete Änderungen
+lassen die bisherige öffentliche Fassung unverändert; erst die nächste
+bewusste Freigabe ersetzt sie.
+
+Kategorien, Artikel, Zuordnungen und erforderliche Protokolle werden gemeinsam
+gespeichert oder zurückgenommen. Dazu müssen auch die beteiligten
+WordPress-Taxonomietabellen InnoDB unterstützen. Native Wiki-Benachrichtigungen
+werden erst nach erfolgreichem Abschluss ausgelöst.
+
+![Freigegebener öffentlicher Artikel für Tessa, verwaltet durch die Universumsleitung](images/32-wiki-freigabe.png)
+
+### Redaktionelle Konflikte, Pausieren und Grenzen
+
+Ändert jemand den Artikel direkt in PS Wiki, überschreibt der Adapter diese
+Ergänzungen nicht. Stattdessen erscheint ein Konflikthinweis; den Artikel
+anschließend direkt im Wiki weiterpflegen. Ein automatischer Wiederabgleich
+oder eine Zusammenführung ist noch nicht vorhanden. Dasselbe Schutzprinzip
+gilt für außerhalb der Integration veränderte Kategorien.
+
+**Pausieren nimmt keine Veröffentlichung zurück.** Kategorien, veröffentlichte
+Artikel und deren frühere Wiki-Revisionen bleiben bestehen. Auch Deaktivieren
+von PS Wiki oder Lösen einer Kampagnenzuordnung entfernt keine bereits
+veröffentlichten Inhalte. Inhalte im Wiki nach dessen eigenen Möglichkeiten
+verwalten; Veröffentlichung ist kein Weg, Geheimnisse zwischenzuspeichern.
+
+Ohne aktives PS Wiki bleiben gespeicherte Zuordnungen und die gesamte
+Pen-&-Paper-Runde erhalten; Wiki-Änderungen sind gesperrt. Private
+Kampagnenleserechte, automatische Übernahme aller Figuren, zusätzliche
+Kategorieebenen und Verknüpfungen zu einzelnen Szenen/Feldern folgen später.
+
+Die öffentliche Demo **Tessa Wolkensteg – Hafenlotsin** gehört zum getrennten
+**Nebelhafen – Wiki-Demouniversum**. Die bestehende Nebelhafen-Kampagne mit
+ihren Charakteren und Guthaben wurde dafür nicht umgehängt.
+
+## 20. Geschenke, Verkauf und Tausch
+
+Seit Version 0.20.0 gibt es kontrollierten Handel mit aktivem **PS Community**.
+Die Regeln legt die Spielleitung fest, nicht das Plugin für jede Runde gleich.
+
+### Handelsregeln einstellen
+
+- **Ohne Universum:** **Rundeneinstellungen → Handelsregeln** öffnen.
+- **Mit Universum:** Die Universumsleitung öffnet **Universen → Regelwerk &
+  Basischaraktere → Handelsregeln**. Kampagnen übernehmen diese Regeln
+  unverändert und können sie nicht lokal überschreiben.
+- **Geschenk**, **Verkauf** und **Tausch** einzeln erlauben oder ausschalten.
+- Unter **Nach Zustimmung beider Besitzer** zusätzliche Spielleiterfreigabe
+  verlangen oder den direkten Abschluss wählen.
+- **Handelsregeln speichern**.
+
+Standardmäßig sind **alle Arten ausgeschaltet** und die zusätzliche Freigabe
+ist voreingestellt. Jede gespeicherte Regeländerung macht bisher offene
+Angebote nicht mehr ausführbar, auch wenn dieselben Arten gewählt bleiben.
+Diese Angebote zuerst zurückziehen oder ablehnen und bei Bedarf neu erstellen.
+
+![Unabhängig aktivierte Handelsarten und zusätzliche Spielleiterfreigabe in der Demo](images/33-handelsregeln.png)
+
+### Ein konkretes Exemplar anbieten
+
+1. Im Spielbereich den **eigenen Charakterbogen** öffnen, alternativ den
+   eigenen privaten **Pen-&-Paper-Profilbereich**.
+2. Unter **Handel → Neues Angebot** die erlaubte Handelsart wählen.
+3. Ein eigenes **handelbares, abgelegtes Exemplar** auswählen. Gebundene,
+   bereits reservierte oder aktiv/in einem Ausrüstungsantrag angelegte
+   Exemplare können nicht angeboten werden.
+4. Einen freigegebenen Charakter eines **anderen Besitzers derselben
+   Kampagne** wählen. Nur dessen freigegebener Name wird zur Auswahl gezeigt,
+   nicht Bogenwerte, Inventar oder Guthaben.
+5. Beim **Verkauf** einen ganzen Preis ab 1 eintragen; Geschenk und Tausch
+   verwenden **0**. Der Käufer zahlt in der konfigurierten Währung.
+6. Exemplar und Bedingungen bestätigen und **Handelsangebot erstellen** wählen.
+
+Angebotene Exemplare sind bis zum Abschluss oder zur Ablehnung reserviert
+und können nicht angelegt oder nochmals angeboten werden. **Geld wird nicht
+reserviert:** Das tatsächliche Guthaben wird erst beim Abschluss geprüft.
+
+### Zustimmen und abschließen
+
+- **Geschenk/Verkauf:** Der Empfänger öffnet den eigenen Bogen, prüft das
+  gespeicherte Exemplar und gegebenenfalls den Preis und nimmt verbindlich an.
+- **Tausch:** Der Empfänger wählt zunächst ein eigenes zulässiges
+  Gegenexemplar und bestätigt dieses Gegenangebot. Anschließend muss der
+  ursprüngliche Anbieter den jetzt vollständig bestimmten Tausch bestätigen.
+- Ist zusätzliche Spielleiterfreigabe eingestellt, bleibt der Vorgang
+  **Wartet auf Spielleiterfreigabe**. Erst die Spielleitung bestätigt am
+  betreffenden Bogen **Handel freigeben und abschließen**.
+- Ohne zusätzliche Freigabe erfolgt der Abschluss nach der letzten nötigen
+  Besitzerzustimmung. Die Spielleitung kann diese Zustimmung nicht ersetzen.
+
+**Abgeschlossen** bedeutet: Gegenstände, gegebenenfalls Geld und alle nötigen
+Protokolle sind gemeinsam gespeichert. Schlägt etwas fehl, bleibt nichts
+teilweise übertragen. Volle Inventare, fehlendes Guthaben, entzogene
+Mitgliedschaft oder geänderte Bedingungen führen zu einem ausdrücklichen Fehler.
+Die Gegenstands-UUID und der eingefrorene Stand bleiben erhalten; auch offene
+Ausrüstungsanträge werden angepasst, damit eine spätere Freigabe nichts
+verdoppelt oder zurückholt. Empfangene Exemplare bleiben abgelegt.
+Verkäufe verwenden je nach Kontomodell getrennte Kampagnenkonten oder die
+ausdrücklich eingebundenen gemeinsamen Basisguthaben, keine Ersatzkonten.
+
+Besitzer sehen ihre betreffenden Angebote und Abschlüsse; die Spielleitung
+sieht die Kampagnenvorgänge und deren zentrale Historie. Weitere Inventarteile
+und fremde Kontostände bleiben privat. Veraltete Abschlussformulare und
+Neuladen übertragen nichts ein zweites Mal.
+
+### Abbrechen, Grenzen und Demo
+
+Der Anbieter kann ein offenes Angebot **zurückziehen**, der Empfänger
+**ablehnen**, die Spielleitung **als Spielleitung ablehnen**. Das löst die
+Reservierungen, auch wenn inzwischen die Handelsregeln geändert wurden.
+Ohne Community bleiben Angebote und Nachweise gespeichert und im Spielbereich
+lesbar; alle wirtschaftlichen Änderungen einschließlich Handelsentscheidungen
+sind inaktiv.
+
+Zunächst gilt **ein Exemplar je Seite, dieselbe Kampagne, unterschiedliche
+Besitzer**. Pakete, Mengen, reine Geldgeschenke, Übertragungen eigener Figuren
+untereinander und kampagnenübergreifender Handel fehlen noch.
+
+In der Nebelhafen-Demo verkauft Mara den **Messingkompass vom Dock** für
+**3 DM** an Jorin. Beide Besitzer stimmen zu; die Demo-Spielleitung gibt frei.
+Mara besitzt anschließend **13 DM**, Jorin **6 DM** und genau dasselbe
+Kompass-Exemplar. Der gebundene Bordausweis bleibt bei Mara. Der alte
+Beschreibungstext des ausgegebenen Kompasses bleibt bewusst unverändert.
+
+![Abgeschlossener Verkauf mit konkretem Exemplar, drei Dockmark und bestätigter Historie](images/34-handel-abschluss.png)
 
 Weiterlesen: [Demorunde mit Ergebnissen und Prüfbericht](demokampagne.md) ·
 [Technischer Überblick](../README.md) · [Roadmap](../ROADMAP.md).

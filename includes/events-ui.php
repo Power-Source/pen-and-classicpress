@@ -41,7 +41,13 @@ function ps_pen_paper_render_event_details( $event, $scope = null ) {
 		<?php foreach ( array( 'before' => __( 'Vorher', 'ps-pen-paper' ), 'after' => __( 'Nachher', 'ps-pen-paper' ) ) as $key => $label ) : ?>
 			<section class="pspp-snapshot">
 				<h4><?php echo esc_html( $label . ' · ' . sprintf( __( 'Revision %d', 'ps-pen-paper' ), $event[ $key ]['revision'] ) ); ?></h4>
-				<?php if ( in_array( $event['kind'], array( 'npc_saved', 'npc_offered', 'npc_approved', 'npc_copied' ), true ) ) : ?>
+				<?php if ( in_array( $event['kind'], array( 'trade_policy', 'trade_changed' ), true ) ) : ?>
+					<?php ps_pen_paper_render_trade_snapshot( $event[ $key ] ); ?>
+				<?php elseif ( in_array( $event['kind'], array( 'wiki_configured', 'wiki_prepared', 'wiki_published' ), true ) ) : ?>
+					<?php ps_pen_paper_render_wiki_snapshot( $event[ $key ] ); ?>
+				<?php elseif ( in_array( $event['kind'], array( 'loot_table_saved', 'loot_rolled', 'loot_awarded' ), true ) ) : ?>
+					<?php ps_pen_paper_render_loot_snapshot( $event[ $key ], 'loot_table_saved' === $event['kind'] ); ?>
+				<?php elseif ( in_array( $event['kind'], array( 'npc_saved', 'npc_offered', 'npc_approved', 'npc_copied' ), true ) ) : ?>
 					<?php
 					if ( ! $scope && isset( $event['id'] ) ) {
 						$record = get_post( $event['id'] );
@@ -162,7 +168,13 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 					<?php else : ?>
 						<p><strong><?php echo esc_html( $labels[ $event['kind'] ] ); ?></strong></p>
 						<?php
-						if ( in_array( $event['kind'], array( 'npc_saved', 'npc_offered', 'npc_approved', 'npc_copied' ), true ) ) {
+						if ( in_array( $event['kind'], array( 'trade_policy', 'trade_changed' ), true ) ) {
+							$snapshot = array( 'name' => __( 'Handel', 'ps-pen-paper' ) );
+						} elseif ( in_array( $event['kind'], array( 'wiki_configured', 'wiki_prepared', 'wiki_published' ), true ) ) {
+							$snapshot = array( 'name' => 'wiki_configured' === $event['kind'] ? $event['after']['name'] : $event['after']['title'] );
+						} elseif ( in_array( $event['kind'], array( 'loot_table_saved', 'loot_rolled', 'loot_awarded' ), true ) ) {
+							$snapshot = array( 'name' => 'loot_table_saved' === $event['kind'] ? $event['after']['table']['name'] : $event['after']['proposal']['table']['table']['name'] );
+						} elseif ( in_array( $event['kind'], array( 'npc_saved', 'npc_offered', 'npc_approved', 'npc_copied' ), true ) ) {
 							$snapshot = array( 'name' => $event['after']['npc']['name'] );
 						} elseif ( 'wallet_saved' === $event['kind'] ) {
 							$snapshot = array( 'name' => $event['character_name'] );

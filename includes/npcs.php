@@ -44,6 +44,7 @@ function ps_pen_paper_valid_npc_state( $state ) {
 		! is_string( $npc['secret'] ) || strlen( $npc['secret'] ) > 20000 ||
 		! is_int( $npc['asset_id'] ) || $npc['asset_id'] < 0 || ! is_int( $npc['scene_id'] ) || $npc['scene_id'] < 0 ||
 		( 'figure' !== $state['status'] && 0 !== $npc['scene_id'] ) ) { return false; }
+	if ( isset( $npc['loot_table_id'] ) && ( ! is_int( $npc['loot_table_id'] ) || $npc['loot_table_id'] < 0 || ( 'figure' !== $state['status'] && $npc['loot_table_id'] ) ) ) { return false; }
 	foreach ( array( 'properties', 'values' ) as $key ) {
 		if ( ! is_array( $npc[ $key ] ) || count( $npc[ $key ] ) > 30 ) { return false; }
 		$labels = array();
@@ -152,6 +153,10 @@ function ps_pen_paper_save_npc( $scope, $id, $input, $revision, $image_path = nu
 			'asset_id' => $asset_id ?: ( isset( $input['remove_image'] ) ? 0 : ( $before['npc'] ? $before['npc']['asset_id'] : 0 ) ),
 			'properties' => $properties, 'values' => $values,
 		);
+		$loot_id = isset( $input['loot_table_id'] ) ? $input['loot_table_id'] : (string) ( isset( $before['npc']['loot_table_id'] ) ? $before['npc']['loot_table_id'] : 0 );
+		if ( ! is_string( $loot_id ) || ! preg_match( '/^(0|[1-9]\d{0,10})$/D', $loot_id ) ) { return ps_pen_paper_npc_error(); }
+		$after['npc']['loot_table_id'] = (int) $loot_id;
+		if ( $after['npc']['loot_table_id'] && is_wp_error( ps_pen_paper_get_loot_table( $scope, $after['npc']['loot_table_id'] ) ) ) { return ps_pen_paper_npc_error(); }
 		if ( ! ps_pen_paper_valid_npc_state( $after ) || ( $after['npc']['scene_id'] && is_wp_error( ps_pen_paper_get_scene( $scope, $after['npc']['scene_id'] ) ) ) ) { return ps_pen_paper_npc_error(); }
 		return ps_pen_paper_write_npc( $scope, $id, $before, $after, 'npc_saved' );
 	} );
@@ -193,6 +198,7 @@ function ps_pen_paper_transfer_npc( $campaign, $source_id, $revision, $confirmat
 		$after['status'] = $offer ? ( ps_pen_paper_can_manage_universe( $universe ) ? 'template' : 'proposed' ) : 'figure';
 		$after['source'] = array( 'scope_id' => (int) $source->ID, 'record_id' => (int) $source_id, 'revision' => $state['revision'] );
 		$after['npc']['scene_id'] = 0;
+		$after['npc']['loot_table_id'] = 0;
 		if ( $state['npc']['asset_id'] ) {
 			if ( is_wp_error( ps_pen_paper_private_image_data( $source, $state['npc']['asset_id'] ) ) ) { return ps_pen_paper_npc_error(); }
 			$asset = get_post( $state['npc']['asset_id'] );

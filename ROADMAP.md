@@ -84,12 +84,23 @@ einen endgültigen Funktionsumfang.
   Universums-Gegenstandskataloge, frei benannte Slots/Seltenheiten, konkrete
   Inventarexemplare und freigabefähige Ausrüstung mit additiven Boni.
   Ohne Community bleiben Bestände erhalten und Boni inaktiv.
-  Handel und ein grafischer Slotdesigner sind noch nicht vorhanden.
+  Handel ergänzt Version 0.20.0; ein grafischer Slotdesigner fehlt weiterhin.
 - Version 0.15.0 ergänzt den privaten Abenteuerplan mit Kapitelreihenfolge,
   aktueller/nächster Szene und szenenbezogener Regie.
 - Version 0.16.0 ergänzt Währungsname und Kürzel, ganzzahlige Guthaben,
   einstellbare getrennte oder gemeinsame Konten, zuständige
   Spielleiterbuchungen und eingefrorene Gegenstandsbindungen.
+- Version 0.17.0 ergänzt strukturierte Gegner/NPCs, private Szenenregie,
+  bestätigte Universumsaufnahme und unabhängige Kopien von Figurenvorlagen.
+- Version 0.18.0 ergänzt lokale Beutetabellen, eingefrorene Würfelvorschläge
+  und bestätigte einmalige Vergaben von Gegenständen und/oder Währung.
+- Version 0.19.0 ergänzt das optionale öffentliche PS-Wiki-Weltlexikon:
+  bewusst freigegebene Kategorien, getrennte Artikeltexte, stabile
+  Figurenzuordnungen und ausdrücklich bestätigte Veröffentlichungen.
+- Version 0.20.0 ergänzt unabhängig aktivierbare Geschenke, Verkäufe und
+  Tauschangebote derselben Kampagne, konkrete Besitzerzustimmung,
+  Exemplarreservierung und einstellbare zusätzliche Spielleiterfreigabe.
+  Inventare, Geld und Pflichtereignisse werden atomar übertragen.
 
 ### Universum vor Kampagne: Grundmodell seit Version 0.11.0
 
@@ -315,9 +326,14 @@ oder als komplizierte technische Architektur umgesetzt werden.
 
 Der spielbare Story-Builder-Ablauf bleibt Grundlage. Seit **0.16.0** stehen
 Währungseinstellungen, getrennte oder gemeinsame Guthaben, protokollierte
-Vergaben/Abzüge und eingefrorene Gegenstandsbindungen bereit. Als Nächstes
-folgen strukturierte Gegner-/NPC-Vorlagen und darauf aufbauend kontrollierte
-Beutetabellen. Handel und Automatisierung folgen erst danach.
+Vergaben/Abzüge und eingefrorene Gegenstandsbindungen bereit. Seit **0.17.0**
+ergänzen strukturierte Gegner/NPCs und bewusst aufgenommene Universumsvorlagen
+die Spielwelt. Seit **0.18.0** stehen kontrollierte Beutetabellen auf Grundlage
+der vorhandenen Würfelmechanik bereit. Seit **0.19.0** ergänzt eine erste
+optionale Wiki-Anbindung das öffentliche Weltlexikon. Seit **0.20.0** ist
+kontrollierter, konfigurierbarer Handel vorhanden. Der nächste eigene
+Ausbauschritt bleibt ein kleiner vorbereiteter Abenteuerablauf nach Phase 7,
+nicht eine große automatische Spiel-Engine.
 Eine zusätzliche Wiederherstellungs-Verwaltungsoberfläche bleibt zurückgestellt.
 
 Seit **0.15.0** verbindet ein privater Abenteuerplan die bestehenden Werkzeuge:
@@ -512,7 +528,7 @@ Rundenteilnehmer.
 
 ### PS Community: Charakterprofil und optionale Ausrüstung
 
-**Grundlage seit 0.14.0, Währung und Bindung seit 0.16.0 implementiert; Handel geplant:**
+**Grundlage seit 0.14.0, Währung und Bindung seit 0.16.0, Handel seit 0.20.0:**
 
 - Ein eigener Profil-Tab „Pen & Paper“ bündelt die eigenen Charaktere mit
   ausdrücklicher Auswahl des Kampagnenkontexts. Charakterbearbeitung verwendet
@@ -520,7 +536,7 @@ Rundenteilnehmer.
 - Profilbesucher und Freunde erhalten nicht automatisch Zugriff auf Bögen,
   Inventare oder private Spielinhalte. Freundschaften ersetzen keine
   Kampagnenmitgliedschaft oder Handelsberechtigung.
-- Inventar, Ausrüstung, Guthaben und der geplante Handel setzen aktives PS Community mit den
+- Inventar, Ausrüstung, Guthaben und Handel setzen aktives PS Community mit den
   benötigten Schnittstellen und Modulen voraus. Verfügbarkeit auf jeder
   relevanten Lese- und Schreibschnittstelle prüfen, nicht nur Menüs ausblenden.
   Ohne die Integration bleiben Charaktere, Würfel, Szenen und Handouts nutzbar.
@@ -539,11 +555,12 @@ fremder Profilbereiche geben keine Inventare aus.
 
 Universumswährung, getrennte oder gemeinsame Guthaben sowie handelbar
 beziehungsweise charaktergebunden gekennzeichnete Exemplare sind seit
-0.16.0 vorhanden. **Geplanter Ausbau:** revisionssichere Handelsangebote. Beteiligte
+0.16.0 vorhanden. **Seit 0.20.0 vorhanden:** revisionsgeschützte Handelsangebote. Beteiligte
 stimmen ausdrücklich zu; eine zusätzliche Spielleiterfreigabe ist einstellbar
 und standardmäßig erforderlich. Handelsgrundregeln gehören zum Universum;
-Kampagnen ohne Universum benötigen eine eigene Einstellung. Vererbung,
-Abweichungsrechte und kampagnenübergreifender Handel sind noch festzulegen.
+Kampagnen ohne Universum besitzen eine eigene Einstellung. Universumsregeln
+werden verbindlich ohne lokale Abweichung übernommen. Zunächst ist nur
+Handel derselben Kampagne zwischen unterschiedlichen Besitzern möglich.
 Freundschaften dürfen höchstens die Auswahl unterstützen, nicht Kampagnen-
 oder Handelsrechte ersetzen. Außerdem fehlen Entzug/Entfernen von Exemplaren,
 Mengen und ein grafischer, frei positionierbarer Slotdesigner.
@@ -552,34 +569,37 @@ Abenteuerabläufe in Phase 7.
 
 ### PS Wiki
 
-PS Wiki eignet sich als optionales **Regel- und Weltlexikon**: Es bietet laut
-Dokumentation unter anderem Frontend-Bearbeitung, Kategorien, Suche und einen
-Verlauf mit Revisionen. Denkbare Inhalte sind Hausregeln, Beschreibungen von
-Attributen, Orte, Fraktionen, Gegenstände und bekannte Figuren.
+**Erster öffentlicher Ausbau seit 0.19.0.** PS Wiki liefert native Artikel,
+Kategorien, Suche, Frontend-Bearbeitung und Revisionen. Es ist derzeit kein
+privates Kampagnen-Wiki. Die Integration verwaltet ausschließlich separat
+gewählte öffentliche Titel/Texte; Spielregeln und Werte bleiben im Kern.
 
-- Wiki-Seiten mit einer Kampagne, einem Charakterfeld oder einer Szene
+- [ ] Wiki-Seiten mit einer Kampagne, einem Charakterfeld oder einer Szene
   verknüpfen, damit die passenden Erläuterungen schnell erreichbar sind.
-- Universen automatisch eindeutig mit ihrem Lexikon verknüpfen. Nach
-  ausdrücklicher Freigabe der Wiki-Anbindung Kategorien und Unterkategorien
-  für beispielsweise Personen, Fraktionen, Gegner, Gegenstände und Orte
-  anlegen; Bezeichnungen und Gliederung bleiben konfigurierbar.
-- Kampagnen-NPCs und Gegner nach bewusster Aufnahme ins Universum als
-  wiederverwendbare Vorlagen mit Wiki-Artikeln verbinden. Stabile Zuordnungen
-  verhindern Duplikate bei Umbenennung oder erneuter Synchronisierung.
-- Automatische Artikelentwürfe von bewusster Veröffentlichung trennen.
-  Bereits private Universums- und Kategorienamen dürfen nicht ungefragt
-  öffentlich werden. Redaktionelle Ergänzungen nicht still überschreiben.
-- Freigegebene Beschreibungen von geheimen Identitäten, Gegnerwerten,
-  Beutetabellen und Lootchancen trennen. Mechanische Daten bleiben im
-  Pen-&-Paper-Plugin; Wiki-Artikel sind keine zweite Regel-Datenquelle.
-- Klar trennen: **PS Wiki erklärt Regeln in Textform; die überprüfbaren
-  Spielregeln und Charakterwerte liegen im Pen-&-Paper-Plugin.** Eine Änderung
-  eines Wiki-Artikels verändert nicht automatisch die Spielmechanik.
-- Vor einer privaten oder kampagnenspezifischen Nutzung prüfen, ob PS Wiki die
-  notwendigen Lese- und Bearbeitungsrechte auf allen Zugriffswegen unterstützt.
-  Kategorien oder Links allein schützen keine Geheimnisse.
-- Ist PS Wiki nicht verfügbar, bleibt die Kampagne spielbar; Wiki-Verknüpfungen
-  sind dann nicht nutzbar.
+- [x] Pro Universum bewusst ein Lexikon aktivieren. Zusätzlich vorhandene
+  native Wiki-Veröffentlichungs- und Kategorienrechte verlangen; danach
+  ausschließlich die Lexikonpflege an die Universumsleitung delegieren.
+  Keine pauschalen Wiki-Rechte vergeben.
+- [x] Einen separat gewählten öffentlichen Hauptkategorienamen und sechs
+  benennbare Unterkategorien anlegen: Personen, Gegner, Orte, Fraktionen,
+  Gegenstände und Regeln. Vor sofort öffentlich sichtbaren Namen warnen.
+- [x] Bestätigte Universumsvorlagen stabil mit Artikelentwürfen verbinden,
+  daneben freie Welt-/Regelartikel erlauben. Keine zweite Zuordnung bei
+  Umbenennung oder erneutem Angebot derselben Vorlage.
+- [x] Titel/Text ausdrücklich separat eingeben und Entwurf von bestätigter
+  Veröffentlichung trennen. Keine automatischen Kopien privater Beschreibungen,
+  Bilder, Geheimnisse, Werte, Eigenschaften oder Beutedaten.
+- [x] Bestehende öffentliche Fassungen beim Vorbereiten von Änderungen
+  erhalten. Direkt im Wiki redaktionell geänderte Artikel nicht überschreiben;
+  diese werden vorerst dort weitergepflegt, ohne automatischen Abgleich.
+- [x] Kategorien, native Artikel, Zuordnungen und Pflichtprotokolle atomar
+  speichern. Wiki-Benachrichtigungen erst nach erfolgreichem Commit.
+- [x] Anbindung pausieren und Zuordnungen bei fehlendem Plugin erhalten.
+  Pausieren oder Deaktivieren löscht keine öffentlichen Inhalte.
+- [ ] Freie zusätzliche Kategorieebenen, umfangreichere Vorlage-Assistenten
+  und einen ausdrücklich geprüften Wiederabgleich redaktioneller Änderungen.
+- [ ] Private oder kampagnenspezifische Wikis erst nach einer durchgängigen
+  Leserechte-Schnittstelle in PS Wiki. Kategorien und Links sind kein Schutz.
 
 **Ergebnis:** Geprüfte Integrationen ergänzen das Spiel, ohne das Kernsystem
 oder seine Berechtigungen von ihnen abhängig zu machen.
@@ -595,7 +615,8 @@ Grundwerte bleiben unverändert; unzulässige kombinierte Werte werden
 ausdrücklich gemeldet und lassen sich durch Ablegen reparieren.
 
 - Seit 0.13.0: private Personen-, Orts- und Notizkarten mit Kapitel- und
-  Szenenverknüpfungen. Strukturierte NPC-Eigenschaften bleiben ein späterer Ausbau.
+  Szenenverknüpfungen. Seit 0.17.0 ergänzen davon getrennte strukturierte
+  NPCs und Gegner mit freien Eigenschaften und Werten die Spielleitermappe.
 - Begegnungen, Gegner und Ereignisse für Szenen vorbereiten.
 - Gegenstandsvorlagen in einem gemeinsamen Universumskatalog sowie ergänzend
   kampagneneigenen Katalogen verwalten. Kampagnen ohne Universum verwenden
@@ -625,9 +646,9 @@ ausdrücklich gemeldet und lassen sich durch Ablegen reparieren.
 - Über ein geeignetes Schutzkonzept für private Dateien entscheiden: Normale
   Upload-URLs können direkt erreichbar sein und sind nicht automatisch privat.
 
-### Währung und Gegenstandsbindung seit 0.16.0; Handel geplant
+### Währung und Gegenstandsbindung seit 0.16.0; Handel seit 0.20.0
 
-**Währung, Guthaben und Bindung implementiert; Handel noch nicht.**
+**Währung, Guthaben, Bindung und erster kontrollierter Handel implementiert.**
 Die Universumsleitung beziehungsweise Administration wählt in den Einstellungen
 getrennte Kampagnenkonten oder ein gemeinsames Konto am Universumscharakter.
 Kampagnen ohne Universum konfigurieren ihre Währung lokal.
@@ -646,79 +667,97 @@ Kampagnen ohne Universum konfigurieren ihre Währung lokal.
   die Eigenschaft im ausgegebenen Exemplar einfrieren. Vorlagenänderungen
   verändern keine bereits ausgegebenen Bindungen.
 
-**Weiterhin geplant:**
+**Handel seit 0.20.0:**
 
-- Verschenken, Tauschen sowie Kaufen und Verkaufen mit vereinbartem Betrag
+- [x] Geschenk, Verkauf und Tausch unabhängig aktivieren; standardmäßig keine
+  Art erlauben und zusätzliche Spielleiterfreigabe verlangen. Universumsregeln
+  verbindlich übernehmen, eigenständige Kampagnen lokal konfigurieren.
+- [x] Verschenken, Tauschen sowie Kaufen und Verkaufen mit vereinbartem Betrag
   ermöglichen. Beide Besitzer müssen den konkreten Bedingungen zustimmen;
   unbekannte Gegenleistungen dürfen nicht automatisch als angenommen gelten.
-- Handelsangebote reservieren die angebotenen Exemplare. Besitz, Bindung,
+- [x] Handelsangebote reservieren die angebotenen Exemplare, nicht Geld. Besitz, Bindung,
   Guthaben, Reservierung, Mitgliedschaft und aktuelle Rechte serverseitig
   prüfen. Ein Angebot öffnet nicht das gesamte fremde Inventar.
-- Gegenstände und gegebenenfalls Geld gemeinsam übertragen oder gar nicht.
+- [x] Gegenstände und gegebenenfalls Geld gemeinsam übertragen oder gar nicht.
   Gleichzeitige Annahmen, wiederholte Anfragen und Neuladen dürfen weder
   Gegenstände vervielfachen noch Guthaben doppelt abbuchen oder auszahlen.
   Negative Guthaben nicht durch einen unvollständigen Handel erzeugen.
-- Ablehnen, Zurückziehen und Spielleiterentscheidungen nachvollziehbar
+- [x] Ablehnen, Zurückziehen und Spielleiterentscheidungen nachvollziehbar
   behandeln. Bei fehlendem PS Community keine wirtschaftlichen Änderungen
   oder unvollständigen Übertragungen ausführen; vorhandene Daten erhalten.
 
-**Noch offen:** Handel nur innerhalb einer Kampagne oder auch zwischen
-Kampagnen desselben Universums sowie mögliche spätere lokale Abweichungen
-von Universumsregeln. Derzeit werden die Währungseinstellungen unverändert
-übernommen. Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
+**Erste Grenze:** Je ein Exemplar pro Seite innerhalb derselben Kampagne,
+zwischen unterschiedlichen Besitzern. UUID und eingefrorener Stand bleiben
+erhalten; auch offene Ausrüstungsanträge werden angepasst, nichts wird
+automatisch angelegt. Regeländerungen sperren den Abschluss alter Angebote,
+nicht deren Zurückziehen/Ablehnen. Gemeinsame Basisguthaben sind bei Verkäufen
+ausdrücklich eingebunden, ohne neue lokale Ersatzkonten zu erzeugen.
 
-### Geplant: Strukturierte Gegner, NPCs und Universumsvorlagen
+**Noch offen:** Pakete, Mengen, reine Geldgeschenke, kampagnenübergreifende
+Übertragungen und mögliche spätere lokale Abweichungen von Universumsregeln.
+Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
 
-- Gegner und NPCs pro Kampagne mit Name, Beschreibung, geschütztem Bild,
+### Gegner, NPCs und Universumsvorlagen seit 0.17.0
+
+- [x] Gegner und NPCs pro Kampagne mit Name, Beschreibung, geschütztem Bild,
   frei definierten Eigenschaften, Werten und getrennten Geheimnissen erstellen.
   Die vorhandenen Personenkarten bleiben erzählerische Notizen und werden
   nicht ungefragt in ein festes Gegner- oder Kampfsystem umgewandelt.
-- Über **Ins Universum aufnehmen** bewusst eine wiederverwendbare Vorlage
+- [x] Szenen zuordnen und Figuren in der privaten Regie des Abenteuerplans
+  anzeigen. Spieler erhalten dadurch keinen Zugriff auf Figuren oder Werte.
+- [x] Über **Ins Universum aufnehmen** bewusst eine wiederverwendbare Vorlage
   erstellen beziehungsweise zuordnen. Die Universumsleitung entscheidet
-  über die Aufnahme, falls der Ersteller diese Berechtigung nicht besitzt.
-- Vorlagen von konkreten Figuren und Begegnungen unterscheiden. Lokale
-  Verletzungen, Ressourcen oder andere Zustandsänderungen verändern nicht
-  alle Exemplare oder die Universumsvorlage.
-- Gegnern, NPCs und Begegnungen optionale Beutetabellen zuordnen.
-  Keine fest vorgeschriebenen Attribute, Gegnerklassen oder Kampfabläufe.
-- Freigegebene Lexikonbeschreibungen über die optionale PS-Wiki-Anbindung
+  über einen privaten Vorschlag, falls der Ersteller diese Berechtigung
+  nicht besitzt. Wiederholte Angebote und Umbenennungen erzeugen keine Duplikate.
+- [x] Universumsvorlagen als unabhängige Kampagnenfiguren mit eingefrorenem
+  Herkunftsstand und eigener geschützter Bildkopie übernehmen. Lokale
+  Verletzungen und Ressourcen verändern weder Vorlage noch andere Figuren.
+  Vorlagenänderungen werden nicht automatisch synchronisiert.
+- [x] Private Figurenhistorie und atomare Speicherung mit Ereignis.
+  Gegnerverwaltung funktioniert ohne PS Community oder PS Wiki.
+- [x] Optionale lokale Beutetabellen an Gegnern/NPCs verknüpfen.
+- [ ] Begegnungsabläufe ergänzen. Keine fest vorgeschriebenen Attribute,
+  Gegnerklassen oder Kampfabläufe.
+- [x] Freigegebene Lexikonbeschreibungen über die optionale PS-Wiki-Anbindung
   zugänglich machen; geheime Werte und Beuteinformationen bleiben geschützt.
-  Gegnerverwaltung und Spielregeln funktionieren auch ohne PS Wiki.
 
-### Geplant: Würfelbasierte Beutetabellen
+### Würfelbasierte Beutetabellen seit 0.18.0
 
-- Die bestehende serverseitige Würfelmechanik für frei definierte
-  Ergebnisbereiche verwenden, etwa W100 mit unterschiedlichen Beuteausgängen.
-- Je Ergebnis keine Beute, bestimmte Gegenstände, Auswahlen aus einer
-  Gegenstandsgruppe, Währungsbeträge oder Kombinationen davon vorsehen.
-  Mengen und Beträge können feste Werte oder begrenzte Würfelausdrücke wie
-  `1W3` beziehungsweise `2W6` sein.
-- Verweise auf weitere Beutetabellen ermöglichen, ohne unbegrenzte
-  Verschachtelung oder zyklische Aufrufe zuzulassen. Bereichsüberschneidungen,
-  Lücken und die Bedeutung von Chancen vor der Ausführung eindeutig prüfen.
-- Die Spielleitung wählt zunächst bewusst den Anlass und die Tabelle.
+- [x] Kampagnenbezogene Tabellen mit einem erlaubten Standardwürfel und
+  bis zu 30 frei definierten Ergebnisbereichen. Jeden Würfelwert genau einmal
+  abdecken; Lücken und Überschneidungen werden abgelehnt. Chancen als
+  Bereichsgröße geteilt durch Würfelgröße anzeigen.
+- [x] Je Ausgang keine Beute, ein Gegenstandstyp, Währung oder beides.
+  Mengen und Beträge als ganze Zahlen oder erlaubte Würfelausdrücke wie
+  `2W6`; alle möglichen Ergebnisse müssen innerhalb der Grenzen liegen.
+  Konkrete Exemplare erhalten eigene Identitäten und eingefrorene Bindungen.
+- [x] Die Spielleitung wählt bewusst Anlass und Tabelle.
   Den Wurf einschließlich verwendetem Tabellenstand und ermittelter Beute
-  speichern; Neuladen zeigt denselben Vorgang und würfelt nicht erneut.
-- Beute zunächst als Vorschlag anzeigen. Empfänger und Vergabe bestätigt
-  die Spielleitung; konkrete Exemplare übernehmen ihre Gegenstandsbindung.
-  Währungsvergaben verwenden dieselben geprüften Guthabenregeln wie manuelle
-  Vergaben.
-- Eine Belohnung darf pro vorgesehenem Vorgang nur einmal vergeben werden.
-  Bestände, Beträge und Vergabezustand gemeinsam und nachvollziehbar sichern;
-  Wiederholungsanfragen dürfen keine zweite Auszahlung erzeugen.
-- Automatische Vergabe erst im ausdrücklich dafür freigegebenen
-  Abenteuerablauf erlauben. Verdeckte Beuteinformationen nicht über Wiki,
-  Spielerprotokolle oder Vorschauen verraten.
+  speichern; Neuladen und dieselbe POST-Anfrage würfeln nicht erneut.
+- [x] Zunächst nur einen Vorschlag anzeigen. Einen Empfänger für die gesamte
+  Beute und die Vergabe ausdrücklich bestätigen. Bestehende Kontorechte gelten.
+  Bestände, Beträge, Vergabezustand und Protokolle gemeinsam speichern oder
+  zurücknehmen. Derselbe Vorgang kann nicht zweimal auszahlen.
+- [x] Tabellen, Chancen, Anlässe und Vorschläge privat halten.
+  Besitzer sehen lediglich tatsächliche Gegenstands- und Guthabenänderungen.
+- [ ] Gegenstandsgruppen, Aufteilung auf mehrere Empfänger und ausdrücklich
+  verwaltete Universums-Beutekataloge ergänzen.
+- [ ] Begrenzte Verweise auf weitere Tabellen ohne Zyklen ergänzen.
+- [ ] Weitere Würfelarten wie `W3` gesondert unterstützen; derzeit sind nur
+  die vorhandenen Standardwürfel zulässig.
+- [ ] Automatische Vergabe erst im ausdrücklich freigegebenen Abenteuerablauf.
 
 ### Geplante Umsetzungsreihenfolge
 
 1. **Seit 0.16.0 umgesetzt:** Einstellbare Geltungsbereiche, passende
    Buchungsrechte, Währung, Guthaben und eingefrorene Gegenstandsbindung.
-2. Strukturierte Gegner-/NPC-Vorlagen und kontrollierte Beutetabellen
-   auf Grundlage der vorhandenen Würfelmechanik aufbauen.
-3. Die optionale PS-Wiki-Anbindung mit geschützter Zuordnung und bewusst
-   veröffentlichten Lexikoninhalten ergänzen.
-4. Darauf aufbauend sicheren Handel mit optionaler Spielleiterfreigabe umsetzen.
+2. **Gegner-/NPC-Vorlagen seit 0.17.0 und erste kontrollierte Beutetabellen
+   seit 0.18.0 umgesetzt.** Gruppen, verschachtelte Tabellen und Aufteilung
+   bleiben spätere Erweiterungen.
+3. **Seit 0.19.0 umgesetzt:** Optionale öffentliche PS-Wiki-Anbindung mit
+   geschützter Verwaltung, stabiler Zuordnung und bewusst veröffentlichten Texten.
+4. **Seit 0.20.0 umgesetzt:** Kontrollierter Handel mit konfigurierbaren Arten,
+   verbindlicher Besitzerzustimmung und optionaler Spielleiterfreigabe.
 5. Erst anschließend vorbereitete Solo-/Gruppenabenteuer automatisieren.
 
 ## Phase 7: Geleitete, hybride und automatisierte Abenteuer
@@ -820,8 +859,8 @@ Diese Ideen sind bewusst noch nicht Teil der ersten spielbaren Version:
    gegebenenfalls Erweiterungen der anderen Plugins benötigt?
 6. Welche weiteren Handoutformate und Empfängerkreise werden neben den
    geschützten Text-/Bild-Handouts für die gesamte Runde benötigt?
-7. Wie gelten Universums-Handelsregeln in Kampagnen: verbindliche Vererbung,
-   ausschließlich strengere lokale Regeln oder frei erlaubte Abweichungen?
+7. **Seit 0.20.0 entschieden:** Universums-Handelsregeln gelten verbindlich
+   ohne lokale Abweichung. Weitere Abweichungsmodelle bleiben späterer Ausbau.
 8. **Seit 0.16.0 entschieden:** Die Universumsleitung wählt getrennte
    Kampagnenkonten oder gemeinsame Universumscharakterkonten. Erstere
    verwaltet die Kampagnenleitung, letztere die Universumsleitung;

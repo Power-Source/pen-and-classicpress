@@ -57,6 +57,11 @@ function ps_pen_paper_character_state( $scope, $character, $with_equipment = tru
 	if ( ! ps_pen_paper_get_character( $scope, $character->ID ) ) {
 		return new WP_Error( 'forbidden', __( 'Dieser Charakterstand ist für dich nicht verfügbar.', 'ps-pen-paper' ) );
 	}
+	return ps_pen_paper_resolve_character_state( $scope, $character, $with_equipment );
+}
+
+// Internal resolver; public callers must first check access to the character.
+function ps_pen_paper_resolve_character_state( $scope, $character, $with_equipment = true ) {
 	$state = ps_pen_paper_raw_character_state( $character->ID );
 	if ( is_wp_error( $state ) ) {
 		return $state;

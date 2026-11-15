@@ -39,7 +39,8 @@ function ps_pen_paper_handle_npc_action( $operation ) {
 		if ( ! is_wp_error( $result ) && 'copy_npc' === $operation ) { $id = $result; }
 	}
 	if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
-	wp_safe_redirect( ps_pen_paper_npc_url( $scope, $page_id, $id ) );
+	$notices = array( 'save_npc' => 'npc_saved', 'offer_npc' => 'npc_offered', 'copy_npc' => 'npc_copied', 'approve_npc' => 'npc_approved' );
+	wp_safe_redirect( add_query_arg( 'pspp_notice', $notices[ $operation ], ps_pen_paper_npc_url( $scope, $page_id, $id ) ) );
 	exit;
 }
 
@@ -51,6 +52,7 @@ function ps_pen_paper_render_npc_card( $scope, $state, $campaign = null ) {
 		<h4><?php echo esc_html( $npc['name'] . ' · ' . ps_pen_paper_npc_kinds()[ $npc['kind'] ] ); ?></h4>
 		<p><?php echo esc_html( ps_pen_paper_npc_statuses()[ $state['status'] ] ); ?></p>
 		<p class="pspp-multiline"><?php echo esc_html( $npc['description'] ); ?></p>
+		<?php if ( ! empty( $npc['loot_table_id'] ) && 'pspp_campaign' === $scope->post_type ) : ?><p><a href="<?php echo esc_url( ps_pen_paper_loot_url( $scope, ps_pen_paper_is_frontend_page() ? get_queried_object_id() : 0, $npc['loot_table_id'] ) ); ?>"><?php esc_html_e( 'Zugeordnete Beutetabelle öffnen', 'ps-pen-paper' ); ?></a></p><?php endif; ?>
 		<?php if ( $npc['asset_id'] ) :
 			$image = ps_pen_paper_private_image_data( $scope, $npc['asset_id'] );
 			if ( is_wp_error( $image ) ) : ?><p role="alert"><?php echo esc_html( $image->get_error_message() ); ?></p>
@@ -83,13 +85,22 @@ function ps_pen_paper_render_npcs( $scope, $page_id ) {
 	$state = is_wp_error( $id ) ? $id : ( $id ? ps_pen_paper_get_npc( $scope, $id ) : ps_pen_paper_npc_default( $scope ) );
 	if ( is_wp_error( $records ) || is_wp_error( $state ) || is_wp_error( $open ) ) { echo '<p role="alert">' . esc_html__( 'Die Figurenverwaltung konnte nicht geladen werden. Bitte prüfe die Auswahl.', 'ps-pen-paper' ) . '</p>'; return; }
 	$universe_scope = 'pspp_universe' === $scope->post_type;
+	$reload_url = ps_pen_paper_npc_url( $scope, $page_id, $id );
+	$reload_args = array();
+	wp_parse_str( wp_parse_url( $reload_url, PHP_URL_QUERY ), $reload_args );
 	$npc = $state['npc'] ?: array( 'kind' => 'npc', 'name' => '', 'description' => '', 'secret' => '', 'properties' => array(), 'values' => array(), 'scene_id' => 0, 'asset_id' => 0 );
 	?>
 	<section id="pspp-npcs" class="pspp-npcs">
 	<h2><?php esc_html_e( 'Gegner & NPCs', 'ps-pen-paper' ); ?></h2>
-	<p><?php esc_html_e( 'Private Figuren mit freien Eigenschaften und Werten. Personenkarten bleiben erzählerische Notizen. Kein festes Kampfsystem, keine automatische Beute und keine Veröffentlichung im Wiki.', 'ps-pen-paper' ); ?></p>
+	<p><?php esc_html_e( 'Private Figuren mit freien Eigenschaften und Werten. Personenkarten bleiben erzählerische Notizen. Kein festes Kampfsystem, keine automatische Beutevergabe und keine automatische Veröffentlichung im Wiki.', 'ps-pen-paper' ); ?></p>
 	<details class="pspp-fold"<?php if ( $id || $open ) { echo ' open'; } ?>>
 		<summary><?php esc_html_e( 'Figuren und Vorlagen verwalten', 'ps-pen-paper' ); ?></summary>
+		<form method="get" action="<?php echo esc_url( $reload_url ); ?>">
+			<?php foreach ( $reload_args as $key => $value ) : ?><input type="hidden" name="<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $value ); ?>"><?php endforeach; ?>
+			<?php // A new query prevents fragment-only navigation without a document request. ?>
+			<input type="hidden" name="pspp_npc_reload" value="<?php echo esc_attr( wp_generate_uuid4() ); ?>">
+			<button type="submit"><?php esc_html_e( 'Figuren und Vorlagen neu laden', 'ps-pen-paper' ); ?></button>
+		</form>
 		<p><a class="button" href="<?php echo esc_url( ps_pen_paper_npc_url( $scope, $page_id ) ); ?>"><?php echo esc_html( $universe_scope ? __( 'Neue Universumsvorlage', 'ps-pen-paper' ) : __( 'Neue Kampagnenfigur', 'ps-pen-paper' ) ); ?></a></p>
 		<ul><?php foreach ( $records as $record_id => $record ) : ?><li><a href="<?php echo esc_url( ps_pen_paper_npc_url( $scope, $page_id, $record_id ) ); ?>"><?php echo esc_html( $record['npc']['name'] ); ?></a> · <?php echo esc_html( ps_pen_paper_npc_statuses()[ $record['status'] ] ); ?></li><?php endforeach; ?></ul>
 		<?php if ( $id ) { ps_pen_paper_render_npc_card( $scope, $state ); } ?>
@@ -113,6 +124,12 @@ function ps_pen_paper_render_npcs( $scope, $page_id ) {
 					?><option value="<?php echo esc_attr( $scene_post->ID ); ?>" <?php selected( $npc['scene_id'], $scene_post->ID ); ?>><?php echo esc_html( $scene['draft']['title'] ); ?></option>
 				<?php endforeach; ?></select></label>
 			<?php else : ?><input type="hidden" name="npc[scene_id]" value="0"><?php endif; ?>
+			<?php if ( ! $universe_scope ) : $loot_tables = ps_pen_paper_loot_tables( $scope ); ?>
+				<label><?php esc_html_e( 'Beutetabelle (optional, nur Vorschlag)', 'ps-pen-paper' ); ?><select name="npc[loot_table_id]"><option value="0"><?php esc_html_e( 'Keine', 'ps-pen-paper' ); ?></option>
+				<?php if ( is_wp_error( $loot_tables ) ) : ?><option disabled><?php echo esc_html( $loot_tables->get_error_message() ); ?></option>
+				<?php else : foreach ( $loot_tables as $loot_id => $loot_table ) : ?><option value="<?php echo esc_attr( $loot_id ); ?>" <?php selected( isset( $npc['loot_table_id'] ) ? $npc['loot_table_id'] : 0, $loot_id ); ?>><?php echo esc_html( $loot_table['table']['name'] ); ?></option><?php endforeach; endif; ?>
+				</select></label>
+			<?php else : ?><input type="hidden" name="npc[loot_table_id]" value="0"><?php endif; ?>
 			<label><?php esc_html_e( 'Geschütztes Figurenbild (optional)', 'ps-pen-paper' ); ?><input type="file" name="npc_image" accept="image/png,image/jpeg,image/webp"></label>
 			<p><?php esc_html_e( 'PNG, JPEG oder WebP bis 2 MiB und 3000 × 3000 Pixel. Keine öffentliche Mediathek-URL.', 'ps-pen-paper' ); ?></p>
 			<?php if ( $npc['asset_id'] ) : ?><label class="pspp-check"><input type="checkbox" name="npc[remove_image]" value="1"><?php esc_html_e( 'Figurenbild entfernen (nicht gleichzeitig ein neues hochladen)', 'ps-pen-paper' ); ?></label><?php endif; ?>

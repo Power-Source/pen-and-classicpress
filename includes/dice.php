@@ -66,6 +66,17 @@ function ps_pen_paper_parse_dice( $expression, $allowed_dice ) {
 	return array( 'expression' => $canonical, 'groups' => $groups, 'modifier' => $modifier );
 }
 
+function ps_pen_paper_evaluate_dice( $parsed ) {
+	$result = array( 'expression' => $parsed['expression'], 'modifier' => $parsed['modifier'], 'total' => $parsed['modifier'], 'groups' => array() );
+	foreach ( $parsed['groups'] as $group ) {
+		$rolls = array();
+		for ( $i = 0; $i < $group['count']; $i++ ) { $rolls[] = wp_rand( 1, $group['sides'] ); }
+		$result['total'] += array_sum( $rolls );
+		$result['groups'][] = array( 'sides' => $group['sides'], 'rolls' => $rolls );
+	}
+	return $result;
+}
+
 function ps_pen_paper_roll_dice( $campaign_id, $input, $rules_revision ) {
 	$campaign = ps_pen_paper_get_campaign( $campaign_id );
 	if ( ! current_user_can( 'read' ) || ! $campaign || ! ps_pen_paper_can_view_campaign( $campaign ) ) {
@@ -135,20 +146,12 @@ function ps_pen_paper_roll_dice( $campaign_id, $input, $rules_revision ) {
 	} elseif ( '' !== $input['attribute'] ) {
 		return new WP_Error( 'invalid_attribute', __( 'Für einen Attributwert musst du einen Charakter auswählen.', 'ps-pen-paper' ) );
 	}
-	$total = $parsed['modifier'] + ( $attribute_snapshot ? $attribute_snapshot['value'] : 0 );
-	$groups = array();
-	foreach ( $parsed['groups'] as $group ) {
-		$rolls = array();
-		for ( $i = 0; $i < $group['count']; $i++ ) {
-			$rolls[] = wp_rand( 1, $group['sides'] );
-		}
-		$total += array_sum( $rolls );
-		$groups[] = array( 'sides' => $group['sides'], 'rolls' => $rolls );
-	}
+	$rolled = ps_pen_paper_evaluate_dice( $parsed );
+	$total = $rolled['total'] + ( $attribute_snapshot ? $attribute_snapshot['value'] : 0 );
 	$event = array(
 		'version'        => 1,
 		'expression'     => $parsed['expression'],
-		'groups'         => $groups,
+		'groups'         => $rolled['groups'],
 		'modifier'       => $parsed['modifier'],
 		'total'          => $total,
 		'visibility'     => $input['visibility'],

@@ -113,7 +113,7 @@ function ps_pen_paper_render_item_form( $scope, $schema, $page_id, $id = 0, $sta
 		<?php foreach ( $schema['rarities'] as $key => $entry ) : ?><option value="<?php echo esc_attr( $key ); ?>" <?php selected( $item['rarity'], $key ); ?>><?php echo esc_html( $entry['label'] ); ?></option><?php endforeach; ?>
 		</select></label>
 		<label><?php esc_html_e( 'Gegenstandsbindung', 'ps-pen-paper' ); ?><select name="equipment[binding]" required><?php foreach ( ps_pen_paper_item_bindings() as $key => $label ) : ?><option value="<?php echo esc_attr( $key ); ?>" <?php selected( ps_pen_paper_item_binding( $item ), $key ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?></select></label>
-		<p><?php esc_html_e( 'Die Bindung wird beim Ausgeben im Exemplar festgehalten. Vorlagenänderungen binden oder lösen keine bereits ausgegebenen Gegenstände. Handelsaktionen folgen in einem späteren Ausbau.', 'ps-pen-paper' ); ?></p>
+		<p><?php esc_html_e( 'Die Bindung wird beim Ausgeben im Exemplar festgehalten. Vorlagenänderungen binden oder lösen keine bereits ausgegebenen Gegenstände. Ob und wie handelbare Exemplare übertragen werden dürfen, bestimmt die zuständige Spielleitung in den Handelsregeln.', 'ps-pen-paper' ); ?></p>
 		<label><?php esc_html_e( 'Eigenschaften: Bezeichnung | Wert, eine Zeile pro Eigenschaft', 'ps-pen-paper' ); ?><textarea name="equipment[properties]" rows="3"><?php
 			$lines = array(); foreach ( $item['properties'] as $key => $value ) { $lines[] = $key . ' | ' . $value; } echo esc_textarea( implode( "\n", $lines ) );
 		?></textarea></label>
@@ -133,7 +133,8 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 	ps_pen_paper_render_wallet( $campaign, $character, $page_id );
 	if ( 'pspp_campaign' !== $campaign->post_type ) { return; }
 	if ( ! ps_pen_paper_community_available() ) {
-		echo '<p>' . esc_html__( 'Inventar, Guthaben und Ausrüstung sind ohne PS Community inaktiv; gespeicherte Bestände bleiben erhalten.', 'ps-pen-paper' ) . '</p>'; return;
+		echo '<p>' . esc_html__( 'Inventar, Guthaben und Ausrüstung sind ohne PS Community inaktiv; gespeicherte Bestände bleiben erhalten.', 'ps-pen-paper' ) . '</p>';
+		ps_pen_paper_render_character_trade( $campaign, $character, $page_id ); return;
 	}
 	$gear = ps_pen_paper_gear_state( $character->ID );
 	$schema = ps_pen_paper_equipment_schema( $campaign );
@@ -172,6 +173,7 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 		echo '<dt>' . esc_html( $slot['label'] ) . '</dt><dd>' . esc_html( $name ) . '</dd>';
 	}
 	echo '</dl>';
+	ps_pen_paper_render_character_trade( $campaign, $character, $page_id );
 	if ( $is_gm ) {
 		$catalogue = ps_pen_paper_item_catalogue( $campaign );
 		if ( is_wp_error( $catalogue ) ) { echo '<p role="alert">' . esc_html( $catalogue->get_error_message() ) . '</p>'; return; }

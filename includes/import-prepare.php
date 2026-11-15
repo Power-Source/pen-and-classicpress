@@ -22,6 +22,7 @@ function ps_pen_paper_prepare_import_known_meta() {
 		'_pspp_item_origin', '_pspp_transfer_receipts',
 		'_pspp_character_policy', '_pspp_member_invitations', '_pspp_universe_members',
 		'_pspp_game_round', '_pspp_item_action_policy',
+		'_pspp_play_options', '_pspp_play_round', '_pspp_play_token', '_pspp_play_origin',
 	);
 }
 
@@ -29,7 +30,8 @@ function ps_pen_paper_prepare_import_type_meta() {
 	$campaign = array( '_pspp_gm', '_pspp_player', '_pspp_access', '_pspp_membership', '_pspp_archived',
 		'_pspp_rules', '_pspp_invitations', '_pspp_wiki_links', '_pspp_universe_link', '_pspp_turn', '_pspp_scene_selection', '_pspp_backdrop',
 		'_pspp_style', '_pspp_sheet_style', '_pspp_equipment_schema', '_pspp_currency', '_pspp_trade_policy',
-		'_pspp_import_epoch', '_pspp_import_receipt', '_pspp_import_backup', '_pspp_import_archive', '_pspp_member_invitations', '_pspp_game_round', '_pspp_item_action_policy' );
+		'_pspp_import_epoch', '_pspp_import_receipt', '_pspp_import_backup', '_pspp_import_archive', '_pspp_member_invitations', '_pspp_game_round', '_pspp_item_action_policy',
+		'_pspp_play_options', '_pspp_play_round', '_pspp_play_token' );
 	$universe = array( '_pspp_rules', '_pspp_universe', '_pspp_style', '_pspp_sheet_style', '_pspp_equipment_schema',
 		'_pspp_currency', '_pspp_trade_policy', '_pspp_wiki', '_pspp_import_epoch', '_pspp_import_receipt',
 		'_pspp_import_backup', '_pspp_import_archive', '_pspp_character_policy', '_pspp_member_invitations', '_pspp_universe_members', '_pspp_item_action_policy' );
@@ -48,7 +50,7 @@ function ps_pen_paper_prepare_import_type_meta() {
 		'pspp_loot_table' => array( '_pspp_loot_table', '_pspp_import_archive' ),
 		'pspp_loot_run' => array( '_pspp_loot_run', '_pspp_import_archive' ),
 		'pspp_trade' => array( '_pspp_trade', '_pspp_import_archive' ),
-		'pspp_adventure' => array( '_pspp_adventure', '_pspp_import_archive' ),
+		'pspp_adventure' => array( '_pspp_adventure', '_pspp_import_archive', '_pspp_play_origin' ),
 		'pspp_adventure_run' => array( '_pspp_adventure_run', '_pspp_import_archive' ),
 		'pspp_adventure_group' => array( '_pspp_adventure_group', '_pspp_import_archive' ),
 	);
@@ -381,6 +383,7 @@ function ps_pen_paper_prepare_import_event_snapshot_valid( $kind, $snapshot, $ev
 		'equipment_schema' => '_pspp_equipment_schema', 'item_saved' => '_pspp_item', 'gear_saved' => '_pspp_gear',
 		'character_policy_saved' => '_pspp_character_policy', 'member_invitation_saved' => '_pspp_member_invitations', 'universe_members_saved' => '_pspp_universe_members',
 		'game_round' => '_pspp_game_round', 'item_action_policy' => '_pspp_item_action_policy',
+		'play_options' => '_pspp_play_options', 'play_round' => '_pspp_play_round',
 	);
 	if ( ! isset( $document_key[ $kind ] ) ) { return false; }
 	$key = $document_key[ $kind ];
@@ -536,6 +539,7 @@ function ps_pen_paper_prepare_import_validate_event( $event, $record, $parsed ) 
 		'invitation_saved' => 'gm', 'wiki_links_saved' => 'gm',
 		'character_policy_saved' => 'gm', 'member_invitation_saved' => 'gm', 'universe_members_saved' => 'gm',
 		'game_round' => 'group', 'item_action_policy' => 'gm',
+		'play_options' => 'gm', 'play_round' => 'group',
 	);
 	if ( array_key_exists( $kind, $checks ) ) {
 		$visibility = $checks[ $kind ];
@@ -559,7 +563,7 @@ function ps_pen_paper_prepare_import_validate_event( $event, $record, $parsed ) 
 		! ps_pen_paper_valid_membership_snapshot( $event['member_before'] ) || ! ps_pen_paper_valid_membership_snapshot( $event['member_after'] ) ) ) { return false; }
 	if ( in_array( $kind, array( 'character_policy_saved', 'member_invitation_saved', 'universe_members_saved' ), true ) &&
 		! ps_pen_paper_valid_policy_event( $event ) ) { return false; }
-	if ( in_array( $kind, array( 'game_round', 'item_action_policy' ), true ) &&
+	if ( in_array( $kind, array( 'game_round', 'item_action_policy', 'play_options', 'play_round' ), true ) &&
 		( 0 !== $event['recipient_id'] || $event['after']['revision'] !== $event['before']['revision'] + 1 ) ) { return false; }
 	if ( in_array( $kind, array( 'turn_changed', 'access_saved', 'universe_saved', 'universe_linked', 'character_created',
 		'character_saved', 'character_requested', 'character_approved', 'character_rejected', 'character_context',
@@ -614,7 +618,8 @@ function ps_pen_paper_prepare_import_validate_known( $key, $value, $record, $par
 		case '_pspp_universe':
 			return is_array( $value ) && isset( $value['revision'], $value['name'], $value['description'] ) &&
 				is_int( $value['revision'] ) && $value['revision'] > 0 && is_string( $value['name'] ) &&
-				'' !== $value['name'] && is_string( $value['description'] );
+				'' !== $value['name'] && is_string( $value['description'] ) &&
+				( ! array_key_exists( 'introduction', $value ) || ( is_string( $value['introduction'] ) && strlen( $value['introduction'] ) <= 20000 ) );
 		case '_pspp_character':
 			$rules = ps_pen_paper_import_meta( $parsed, $parent_id, '_pspp_rules' );
 			return ps_pen_paper_import_rules_valid( $rules ) && ps_pen_paper_import_character_valid( $value, $rules );
@@ -680,6 +685,12 @@ function ps_pen_paper_prepare_import_validate_known( $key, $value, $record, $par
 		case '_pspp_member_invitations': return ps_pen_paper_valid_member_invitations( $value );
 		case '_pspp_character_policy': return ps_pen_paper_valid_character_policy( $value ) && $value['revision'] > 0;
 		case '_pspp_game_round': return ps_pen_paper_validate_game_round( $value );
+		case '_pspp_play_options': return ps_pen_paper_valid_play_options( $value );
+		case '_pspp_play_round': return ps_pen_paper_valid_play_round( $value );
+		case '_pspp_play_token': return is_string( $value ) && preg_match( '/^[a-f0-9]{64}$/D', $value );
+		case '_pspp_play_origin':
+			return is_array( $value ) && array_keys( $value ) === array( 'campaign_id', 'adventure_id' ) &&
+				is_int( $value['campaign_id'] ) && $value['campaign_id'] > 0 && is_int( $value['adventure_id'] ) && $value['adventure_id'] > 0;
 		case '_pspp_item_action_policy': return ps_pen_paper_validate_item_action_policy( $value );
 		case '_pspp_wiki_links': return ps_pen_paper_valid_wiki_links( $value );
 		case '_pspp_handout_asset': return '1' === $value;
@@ -1236,6 +1247,10 @@ function ps_pen_paper_prepare_import_remap_value( $key, &$value, $record, $parse
 			}
 			return ps_pen_paper_valid_adventure_group( $value ) ? true : ps_pen_paper_prepare_import_error();
 		case '_pspp_event':
+			if ( 'play_round' === $value['kind'] ) {
+				$archive['references'][] = array( 'kind' => 'historical_play_round', 'snapshots' => array( $value['before'], $value['after'] ) );
+				$archive['warnings'][] = __( 'Historische Rundenverknüpfungen bleiben Herkunftsangaben und werden nicht als aktuelle Kampagnen oder Teilnehmer aufgelöst.', 'ps-pen-paper' );
+			}
 			$policy_documents = array( 'character_policy_saved' => '_pspp_character_policy',
 				'member_invitation_saved' => '_pspp_member_invitations', 'universe_members_saved' => '_pspp_universe_members',
 				'gear_saved' => '_pspp_gear', 'item_saved' => '_pspp_item', 'equipment_schema' => '_pspp_equipment_schema' );
@@ -1399,6 +1414,18 @@ function ps_pen_paper_prepare_import( $parsed, $options, $id_map, $archive_unkno
 			if ( ! $allowed ) { return ps_pen_paper_prepare_import_error(); }
 			$valid = ps_pen_paper_prepare_import_validate_known( $key, $value, $record, $parsed );
 			if ( null === $valid || ! $valid ) { return ps_pen_paper_prepare_import_error(); }
+			if ( in_array( $key, array( '_pspp_play_round', '_pspp_play_token', '_pspp_play_origin' ), true ) ) {
+				$archive['metadata'][] = array( 'key' => $key, 'value' => $entry['value'] );
+				$archive['warnings'][] = __( 'Die importierte Runde wird als eigenständige Kampagne vorbereitet. Frühere Rundenverknüpfungen und Startkennungen werden nicht aktiviert.', 'ps-pen-paper' );
+				continue;
+			}
+			if ( ! empty( $parsed['meta'][ $parsed['archive']['payload']['source']['campaign_id'] ]['_pspp_play_round'] ) &&
+				( '_pspp_game_round' === $key || ( in_array( $key, array( '_pspp_adventure_run', '_pspp_adventure_group' ), true ) && 'active' === $value['status'] ) ) ) {
+				$archive['metadata'][] = array( 'key' => $key, 'value' => $entry['value'] );
+				if ( '_pspp_game_round' === $key ) { $value['active'] = false; }
+				else { $value['status'] = 'paused'; }
+				$archive['warnings'][] = __( 'Die frühere Spielsitzung wird beim Import nicht automatisch fortgesetzt.', 'ps-pen-paper' );
+			}
 			if ( '_pspp_import_epoch' === $key || '_pspp_import_receipt' === $key || '_pspp_import_backup' === $key ||
 				'_pspp_wiki' === $key || '_pspp_wiki_entry' === $key || '_pspp_wiki_owner' === $key || '_pspp_wiki_links' === $key ) {
 				$archive['metadata'][] = array( 'key' => $key, 'value' => $entry['value'] );

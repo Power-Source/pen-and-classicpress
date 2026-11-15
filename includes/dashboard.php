@@ -32,17 +32,9 @@ function ps_pen_paper_render_dashboard_navigation( $page_id = 0 ) {
 
 function ps_pen_paper_render_dashboard( $page_id = 0 ) {
 	?>
-	<h2><?php esc_html_e( 'Dein Spielbereich', 'ps-pen-paper' ); ?></h2>
-	<p><?php esc_html_e( 'Wähle unten deine Kampagne und klicke „Spielen“. Du kommst direkt zum Spieltisch. Die Spielleitung findet ihre Werkzeuge getrennt unter „Vorbereiten & verwalten“.', 'ps-pen-paper' ); ?></p>
-	<details class="pspp-fold">
-		<summary><?php esc_html_e( 'Neu dabei? So kommst du zum Charakterbogen', 'ps-pen-paper' ); ?></summary>
-		<ol>
-			<li><?php esc_html_e( 'Mit deinem bestehenden Website-Konto anmelden. Ein Konto wird nicht automatisch vom Plugin angelegt.', 'ps-pen-paper' ); ?></li>
-			<li><?php esc_html_e( 'Den Kampagnenlink von der Spielleitung öffnen und die Teilnahme beantragen. Bei einer geschlossenen Runde fügt dich die Spielleitung persönlich hinzu.', 'ps-pen-paper' ); ?></li>
-			<li><?php esc_html_e( 'Nach der Aufnahme die Kampagne öffnen und „Ersten Charakter erstellen“ oder „Mein Bogen“ wählen.', 'ps-pen-paper' ); ?></li>
-			<li><?php esc_html_e( 'Den Bogen ausfüllen und speichern. Verlangt das Regelwerk eine Freigabe, prüft die Spielleitung deinen Entwurf.', 'ps-pen-paper' ); ?></li>
-		</ol>
-	</details>
+	<h2><?php esc_html_e( 'Vorbereiten & verwalten', 'ps-pen-paper' ); ?></h2>
+	<?php $game_page = ps_pen_paper_find_frontend_page( $page_id ); ?>
+	<?php if ( $game_page ) : ?><p><a href="<?php echo esc_url( ps_pen_paper_game_url( $game_page->ID ) ); ?>"><?php esc_html_e( 'Zur Game-Lounge', 'ps-pen-paper' ); ?></a></p><?php endif; ?>
 	<?php
 }
 

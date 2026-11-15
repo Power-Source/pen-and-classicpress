@@ -20,6 +20,7 @@ function ps_pen_paper_trade_statuses() {
 
 function ps_pen_paper_trade_actions() {
 	return array( 'offer' => __( 'Angebot erstellt', 'ps-pen-paper' ), 'counter' => __( 'Tauschgegenstand bestätigt', 'ps-pen-paper' ),
+		'play_ended' => __( 'Teilnahme oder Runde beendet', 'ps-pen-paper' ),
 		'accept' => __( 'Bedingungen angenommen', 'ps-pen-paper' ), 'approve' => __( 'Durch Spielleitung freigegeben', 'ps-pen-paper' ),
 		'cancel' => __( 'Angebot zurückgezogen', 'ps-pen-paper' ), 'decline' => __( 'Angebot abgelehnt', 'ps-pen-paper' ), 'reject' => __( 'Durch Spielleitung abgelehnt', 'ps-pen-paper' ) );
 }
@@ -165,6 +166,9 @@ function ps_pen_paper_can_read_trade( $campaign, $state ) {
 }
 
 function ps_pen_paper_reserved_trade_items( $campaign, $character_id, $except = 0 ) {
+	$target = ps_pen_paper_shared_gear_target( $character_id );
+	if ( is_wp_error( $target ) ) { return $target; }
+	if ( $target ) { return ps_pen_paper_play_reserved_items( $target, $except ); }
 	$records = ps_pen_paper_trade_records_internal( $campaign );
 	if ( is_wp_error( $records ) ) { return $records; }
 	$ids = array();
@@ -203,6 +207,13 @@ function ps_pen_paper_trade_transaction( $campaign, $from, $to, $sale, $write ) 
 	$policy = ps_pen_paper_trade_policy( $campaign );
 	if ( is_wp_error( $policy ) ) { return $policy; }
 	$ids = array( $from, $to ); $scope_id = (int) $policy['scope']->ID;
+	$shared = false; $targets = array();
+	foreach ( array( $from, $to ) as $id ) {
+		$target = ps_pen_paper_shared_gear_target( $id );
+		if ( is_wp_error( $target ) ) { return $target; }
+		$targets[ $id ] = $target;
+		if ( $target ) { $shared = true; $ids[] = $target['character_id']; $ids[] = $target['scope_id']; }
+	}
 	if ( $sale ) {
 		foreach ( array( $from, $to ) as $id ) {
 			$party = ps_pen_paper_trade_party( $campaign, $id );
@@ -213,9 +224,7 @@ function ps_pen_paper_trade_transaction( $campaign, $from, $to, $sale, $write ) 
 		}
 	}
 	$ids = array_values( array_unique( $ids ) ); sort( $ids, SORT_NUMERIC );
-	return ps_pen_paper_trade_locks( $ids, function () use ( $campaign, $ids, $scope_id, $write, $from, $to, $sale ) {
-		try {
-			return ps_pen_paper_atomic_event( $scope_id, function () use ( $campaign, $ids, $scope_id, $write, $from, $to, $sale ) {
+	$transaction = function () use ( $campaign, $ids, $scope_id, $write, $from, $to, $sale, $shared, $targets ) {
 				global $wpdb;
 				foreach ( array_unique( array_merge( array( (int) $campaign->ID ), $ids ) ) as $id ) {
 					if ( $id !== $scope_id && (int) $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE ID = %d FOR UPDATE", $id ) ) !== $id ) { return ps_pen_paper_trade_error(); }
@@ -223,6 +232,19 @@ function ps_pen_paper_trade_transaction( $campaign, $from, $to, $sale, $write ) 
 				}
 				$fresh = ps_pen_paper_get_campaign( $campaign->ID ); $policy = $fresh ? ps_pen_paper_trade_policy( $fresh ) : ps_pen_paper_trade_error();
 				if ( is_wp_error( $policy ) || (int) $policy['scope']->ID !== $scope_id ) { return ps_pen_paper_trade_error(); }
+				if ( $shared ) {
+					$round = ps_pen_paper_play_round( $fresh->ID );
+					if ( is_wp_error( $round ) || ( $round && ( 'active' !== $round['status'] ||
+						array_diff( array( $from, $to ), array_column( array_filter( $round['participants'], static function ( $participant ) { return $participant['active']; } ), 'character_id' ) ) ) ) ) { return ps_pen_paper_trade_error(); }
+					foreach ( array( $from, $to ) as $id ) {
+						$target = ps_pen_paper_shared_gear_target( $id );
+						if ( is_wp_error( $target ) || $target !== $targets[ $id ] ) { return ps_pen_paper_trade_error(); }
+						if ( (int) ps_pen_paper_record_post( $id )->post_author === get_current_user_id() ) {
+							$allowed = ps_pen_paper_require_character_game_action( $fresh, $id );
+							if ( is_wp_error( $allowed ) ) { return $allowed; }
+						}
+					}
+				}
 				if ( $sale ) {
 					foreach ( array( $from, $to ) as $id ) {
 						$party = ps_pen_paper_trade_party( $fresh, $id );
@@ -231,9 +253,11 @@ function ps_pen_paper_trade_transaction( $campaign, $from, $to, $sale, $write ) 
 					}
 				}
 				return $write( $fresh, $policy );
-			} );
-		} finally { foreach ( array_merge( $ids, array( $scope_id, (int) $campaign->ID ) ) as $id ) { clean_post_cache( $id ); } }
-	} );
+	};
+	try {
+		if ( $shared ) { return ps_pen_paper_adventure_action_transaction( $campaign, array_merge( $ids, array( $scope_id ) ), $scope_id, $transaction ); }
+		return ps_pen_paper_trade_locks( $ids, function () use ( $scope_id, $transaction ) { return ps_pen_paper_atomic_event( $scope_id, $transaction ); } );
+	} finally { foreach ( array_merge( $ids, array( $scope_id, (int) $campaign->ID ) ) as $id ) { clean_post_cache( $id ); } }
 }
 
 function ps_pen_paper_write_trade( $campaign, &$id, $before, $after, $action ) {

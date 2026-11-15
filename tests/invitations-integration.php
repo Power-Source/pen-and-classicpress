@@ -31,6 +31,12 @@ try {
 	$html = ps_pen_paper_render_campaign_preview( $campaign, 1 );
 	$check( false !== strpos( $html, 'INVITATION_PRIVATE_TITLE' ) && false !== strpos( $html, 'accept_invitation' ) &&
 		! ps_pen_paper_can_view_campaign( $campaign ), 'Invitation not shown privately or granted access prematurely.' );
+	$lounge = ps_pen_paper_lounge_data();
+	$rows = array_values( array_filter( $lounge['campaigns'], static function ( $row ) use ( $campaign_id ) { return $row['post']->ID === $campaign_id; } ) );
+	$check( 1 === count( $rows ) && ! $rows[0]['accessible'] && $rows[0]['invitation']['legacy'], 'Lounge omitted legacy invitation or granted premature access.' );
+	ob_start(); ps_pen_paper_render_lounge_campaign( $rows[0], 1 ); $invited_card = ob_get_clean();
+	$check( false !== strpos( $invited_card, '#pspp-lounge-invitations' ) && false === strpos( $invited_card, 'Spielmodus wählen' ),
+		'Invited player has no invitation link or sees play controls before acceptance.' );
 	$check( is_wp_error( ps_pen_paper_change_invitation( $campaign_id, $users['invited'], 'accept', '1', '1' ) ) &&
 		! ps_pen_paper_can_view_campaign( $campaign ), 'Stale membership revision accepted.' );
 	$failure = static function ( $data ) { if ( 'pspp_event' === $data['post_type'] && 'private' === $data['post_status'] ) { $data['post_status'] = 'draft'; } return $data; };

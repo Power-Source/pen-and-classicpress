@@ -43,7 +43,10 @@
 
 	const hashes = { '#pspp-play': 'play', '#pspp-sheet': 'sheet', '#pspp-group': 'group', '#pspp-group-adventures': 'adventures', '#pspp-dice': 'dice', '#pspp-log': 'log', '#pspp-rulebook': 'rules', '#pspp-settings': 'settings', '#pspp-story': 'story', '#pspp-folio': 'folio', '#pspp-handouts': 'handouts', '#pspp-equipment': 'equipment' };
 	function followHash() {
-		showView(hashes[window.location.hash] || 'play');
+		const target = document.getElementById(window.location.hash.slice(1));
+		const panel = target && table.contains(target) ? target.closest('[data-table-panel]') : null;
+		showView(hashes[window.location.hash] || (panel ? panel.dataset.tablePanel : 'play'));
+		if (panel && target !== panel) target.scrollIntoView({ block: 'start' });
 	}
 	if (panels.length) {
 		followHash();

@@ -88,6 +88,32 @@ Spielleiter sind dort nicht eingeblendet.*
 
 ### Der Spieltisch
 
+Der Einstieg ist die **Game-Lounge**. Bei mehreren Universen wählst du eine Welt
+und öffnest deren Kampagnen. **Meine Kampagnen und laufenden Spiele · alle
+Universen** bleibt unabhängig von dieser Auswahl sichtbar.
+
+- **Meine Charaktere** öffnet dein Charakterprofil.
+- **Weltwiki öffnen** erscheint, wenn ein Weltlexikon verknüpft ist.
+- An den Kampagnen findest du **Story / Einleitung**, **Regelwerk**, **Handouts**
+  und **Spielverlauf**.
+- **Spielmodus wählen** bietet den Spieltisch mit Spielleiter und die passenden
+  freigegebenen Solo-/Gruppenabenteuer. Für Solo wählst du deinen freigegebenen
+  Kampagnencharakter.
+- **Einladungen** kannst du annehmen oder ablehnen. Vor der Annahme erhältst du
+  keine internen Kampagnendaten.
+- **Kampagne verlassen** beendet nach Bestätigung deine Mitgliedschaft und
+  aktiven Gruppenteilnahmen. Charaktere und bisheriger Verlauf bleiben erhalten.
+  Eine einzelne Gruppenrunde verlässt du dort über **Teilnahme beenden**.
+
+Die Universumsleitung kann unter **Welt vorbereiten → Universum bearbeiten**
+eine optionale **Welteinleitung für die Game-Lounge** eintragen. Diese ist für
+alle angemeldeten Personen sichtbar, denen die Welt angeboten wird. Geheimnisse
+gehören ausschließlich in die getrennte **Interne Weltbeschreibung**.
+Die Lounge übernimmt die optionalen Farben des ausgewählten Universums.
+
+Die Lounge bündelt den bestehenden Spieleinstieg. Eine getrennte Warte-Lobby
+und mehrere unabhängig geleitete Runden derselben Kampagne sind noch offen.
+
 Die kompakte Gruppenleiste steht oberhalb der großen Spielfläche.
 „Mein Bogen“ öffnet den gegliederten Charakterbogen mit Profil, Attributen
 und Ressourcen. Spielleiter sehen unter „Bögen“ auch die Bögen ihrer Spieler

@@ -123,8 +123,8 @@ try {
 		false === strpos( $mismatched_profile, 'name="pspp_profile"' ), 'Mismatched profile scope opened editable character forms.' );
 	$_GET = $original_get;
 	ob_start(); ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); $adventure_html = ob_get_clean();
-	$check( false !== strpos( $adventure_html, esc_url( ps_pen_paper_game_url( $game_page->ID, $campaign->ID ) . '#pspp-group-adventures' ) ) &&
-		false === strpos( $adventure_html, esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-group-adventures' ) ), 'Profile adventure link did not reach the actual game page.' );
+	$check( false !== strpos( $adventure_html, esc_url( ps_pen_paper_play_url( $game_page->ID, $campaign->ID, 'solo' ) ) ) &&
+		false === strpos( $adventure_html, esc_url( ps_pen_paper_play_url( $page_id, $campaign->ID, 'solo' ) ) ), 'Profile adventure link did not reach the actual lounge page.' );
 	$check( is_wp_error( ps_pen_paper_item_catalogue( $campaign ) ) && is_wp_error( ps_pen_paper_save_gear( $campaign, $character_id, 'grant_item', array(), '1' ) ), 'Player accessed catalogue/issuance.' );
 	$check( is_wp_error( ps_pen_paper_save_gear( $campaign, $character_id, 'equip_items', array( 'slots' => array( 'kopf' => wp_generate_uuid4() ) ), '1' ) ), 'Forged item equipped.' );
 	$check( is_wp_error( ps_pen_paper_save_gear( $campaign, $character_id, 'equip_items', array( 'slots' => array( 'kopf' => $instance, 'hand' => $instance ) ), '1' ) ), 'Same instance equipped twice.' );

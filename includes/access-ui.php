@@ -43,6 +43,7 @@ function ps_pen_paper_handle_access_action( $operation ) {
 	$notice = 'request_membership' === $operation ? 'join_requested' : ( 'review_membership' === $operation ? 'join_reviewed' : 'settings_saved' );
 	$url = $profile_url ? $profile_url : ( $page_id ? ps_pen_paper_game_url( $page_id, $campaign_id ) : ps_pen_paper_admin_url( $campaign_id ) );
 	$self_service = in_array( $operation, array( 'request_membership', 'accept_invitation', 'decline_invitation' ), true );
+	if ( $page_id && ! $profile_url && in_array( $operation, array( 'accept_invitation', 'decline_invitation' ), true ) ) { $url = ps_pen_paper_game_url( $page_id ); }
 	wp_safe_redirect( add_query_arg( 'pspp_notice', $notice, $url ) . ( $self_service || $profile_url ? '' : '#pspp-settings' ) );
 	exit;
 }

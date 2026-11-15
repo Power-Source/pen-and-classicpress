@@ -4,6 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/lounge.php';
+
 function ps_pen_paper_frontend_page( $page_id ) {
 	$page = get_post( $page_id );
 	return $page && 'page' === $page->post_type && 'publish' === $page->post_status && has_shortcode( $page->post_content, 'ps_pen_paper' ) ? $page : null;
@@ -51,6 +53,9 @@ function ps_pen_paper_handle_frontend_action() {
 		return;
 	}
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
+	if ( in_array( $operation, array( 'save_play_options', 'create_play_round', 'change_play_round' ), true ) &&
+		ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
+	if ( 'leave_campaign' === $operation && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'save_slot_icon', 'save_item_action_policy', 'set_item_outside', 'use_item', 'review_item_use', 'end_item_effect', 'advance_game_round', 'start_game_session', 'end_game_session' ), true ) &&
 		ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'save_universe_style', 'profile_create_character', 'save_character_policy', 'member_invitation', 'upload_portrait_preset', 'select_portrait_preset', 'profile_portrait' ), true ) &&
@@ -76,10 +81,10 @@ function ps_pen_paper_enqueue_frontend() {
 		return;
 	}
 	$url = plugin_dir_url( dirname( __DIR__ ) . '/ps-pen-paper.php' );
-	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.3' );
+	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.29.1' );
 	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.26.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
-	wp_enqueue_script( 'ps-pen-paper-table', $url . 'assets/table.js', array(), '0.14.2', true );
+	wp_enqueue_script( 'ps-pen-paper-table', $url . 'assets/table.js', array(), '0.29.1', true );
 	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.17.0' );
 	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.2' );
 	wp_enqueue_script( 'ps-pen-paper-character', $url . 'assets/character.js', array(), '0.1.0', true );
@@ -114,7 +119,12 @@ function ps_pen_paper_frontend_message( $message ) {
 }
 
 function ps_pen_paper_frontend_login( $page_id, $campaign_id = 0 ) {
-	return '<div class="pspp-game pspp-lobby"><p>' . esc_html__( 'Bitte melde dich an, um deine Kampagnen zu sehen.', 'ps-pen-paper' ) . '</p><a class="button button-primary" href="' . esc_url( wp_login_url( ps_pen_paper_game_url( $page_id, $campaign_id ) ) ) . '">' . esc_html__( 'Anmelden', 'ps-pen-paper' ) . '</a><p>' . esc_html__( 'Noch kein Konto? Nutze die normale Registrierung dieser Website, falls angeboten, oder kontaktiere den Betreiber. Anschließend brauchst du die Aufnahme in deine Runde durch die Spielleitung.', 'ps-pen-paper' ) . '</p></div>';
+	$registration = is_multisite() ? in_array( get_site_option( 'registration' ), array( 'user', 'all' ), true ) : get_option( 'users_can_register' );
+	return '<div class="pspp-game pspp-lobby"><h2>' . esc_html__( 'Game-Lounge', 'ps-pen-paper' ) . '</h2><p>' .
+		esc_html__( 'Melde dich an, um deine Welten, Einladungen und Spiele zu sehen.', 'ps-pen-paper' ) .
+		'</p><a class="button button-primary" href="' . esc_url( wp_login_url( ps_pen_paper_game_url( $page_id, $campaign_id ) ) ) . '">' .
+		esc_html__( 'Anmelden', 'ps-pen-paper' ) . '</a>' . ( $registration ? '<a class="button" href="' . esc_url( wp_registration_url() ) . '">' .
+			esc_html__( 'Konto erstellen', 'ps-pen-paper' ) . '</a>' : '' ) . '</div>';
 }
 
 function ps_pen_paper_frontend_shortcode() {
@@ -147,7 +157,25 @@ function ps_pen_paper_frontend_shortcode() {
 	if ( $character_id && ! ps_pen_paper_get_character( $campaign, $character_id ) ) {
 		return ps_pen_paper_frontend_message( __( 'Dieser Charakter ist für dich nicht verfügbar.', 'ps-pen-paper' ) );
 	}
-	$style = $campaign ? ps_pen_paper_effective_style( $campaign_id ) : array( 'colors' => ps_pen_paper_style_defaults() );
+	$round_id = ps_pen_paper_frontend_id( 'pspp_round' );
+	$mode = $_GET['pspp_mode'] ?? '';
+	if ( is_wp_error( $round_id ) || ! is_string( $mode ) || ( '' !== $mode && 'choose' !== $mode && ! isset( ps_pen_paper_play_modes()[ $mode ] ) ) ||
+		( ( $round_id || $mode ) && ! $campaign ) ) { return ps_pen_paper_frontend_message( ps_pen_paper_play_error()->get_error_message() ); }
+	$round = null; $round_state = $campaign ? ps_pen_paper_play_round( $campaign->ID ) : null;
+	if ( is_wp_error( $round_state ) ) { return ps_pen_paper_frontend_message( $round_state->get_error_message() ); }
+	if ( $round_state ) {
+		$round = $campaign; $campaign = ps_pen_paper_get_campaign( $round_state['source_id'] );
+		if ( ! $campaign || ! ps_pen_paper_can_view_campaign( $campaign ) ) { return ps_pen_paper_frontend_message( ps_pen_paper_play_error()->get_error_message() ); }
+	} elseif ( $round_id ) {
+		$round = ps_pen_paper_get_campaign( $round_id ); $round_state = $round ? ps_pen_paper_play_round( $round_id ) : null;
+		if ( ! $round_state || is_wp_error( $round_state ) || $round_state['source_id'] !== (int) $campaign->ID ) { return ps_pen_paper_frontend_message( ps_pen_paper_play_error()->get_error_message() ); }
+	}
+	$lounge = ! $campaign && 'overview' === $view ? ps_pen_paper_lounge_data() : null;
+	if ( is_wp_error( $lounge ) ) { return ps_pen_paper_frontend_message( $lounge->get_error_message() ); }
+	$universe_id = $lounge ? ps_pen_paper_lounge_universe_id( $lounge ) : 0;
+	if ( is_wp_error( $universe_id ) ) { return ps_pen_paper_frontend_message( $universe_id->get_error_message() ); }
+	$style_scope = $campaign ? $campaign_id : $universe_id;
+	$style = $style_scope ? ps_pen_paper_effective_style( $style_scope ) : array( 'colors' => ps_pen_paper_style_defaults() );
 	if ( is_wp_error( $style ) ) {
 		return ps_pen_paper_frontend_message( $style->get_error_message() );
 	}
@@ -158,26 +186,25 @@ function ps_pen_paper_frontend_shortcode() {
 	<div class="pspp-game<?php echo $campaign ? ' pspp-workspace' : ''; ?>" style="<?php echo esc_attr( ps_pen_paper_style_variables( $style['colors'] ) ); ?>">
 		<?php if ( ! $campaign ) : ?>
 			<?php ps_pen_paper_render_notice(); ?>
+			<?php if ( 'overview' === $view ) { ps_pen_paper_render_lounge( $page_id, $lounge, $universe_id ); } ?>
+			<?php if ( 'overview' !== $view || ps_pen_paper_can_create_campaign() || ps_pen_paper_get_universes() ||
+				array_filter( $lounge['campaigns'], static function ( $row ) { return 'gm' === $row['role']; } ) ) : ?>
 			<?php if ( 'overview' === $view ) : ?><details class="pspp-fold"><summary><?php esc_html_e( 'Vorbereiten & verwalten', 'ps-pen-paper' ); ?></summary><?php endif; ?>
 			<?php ps_pen_paper_render_dashboard_navigation( $page_id ); ?>
 			<?php if ( 'overview' === $view ) : ?></details><?php endif; ?>
+			<?php endif; ?>
 			<?php if ( 'universes' === $view ) : ?>
 				<?php ps_pen_paper_render_universes( $page_id ); ?>
 			<?php elseif ( 'characters' === $view ) : ?>
 				<?php ps_pen_paper_render_character_library( $page_id ); ?>
 			<?php elseif ( 'settings' === $view ) : ?>
 				<?php ps_pen_paper_render_settings_directory( $page_id ); ?>
-			<?php else : ?>
-			<?php if ( 'overview' === $view ) { ps_pen_paper_render_dashboard( $page_id ); } ?>
+			<?php elseif ( 'campaigns' === $view ) : ?>
 			<h2><?php esc_html_e( 'Deine Kampagnen', 'ps-pen-paper' ); ?></h2>
 			<?php $campaigns = ps_pen_paper_get_campaigns(); ?>
 			<?php if ( ! $campaigns ) : ?>
 				<p><?php esc_html_e( 'Du bist noch keiner Kampagne zugeordnet.', 'ps-pen-paper' ); ?></p>
-				<ol class="pspp-onboarding">
-					<li><?php esc_html_e( 'Lass dir von der Spielleitung den Kampagnenlink geben.', 'ps-pen-paper' ); ?></li>
-					<li><?php esc_html_e( 'Öffne den Link und wähle „Teilnahme beantragen“, sofern die Runde Anfragen erlaubt. Andernfalls nimmt dich die Spielleitung persönlich auf.', 'ps-pen-paper' ); ?></li>
-					<li><?php esc_html_e( 'Nach der Freigabe erscheint die Runde hier. Unter „Mein Bogen“ kannst du deinen Charakter erstellen und gegebenenfalls zur Freigabe einreichen.', 'ps-pen-paper' ); ?></li>
-				</ol>
+				<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id ) . '#pspp-lounge-invitations' ); ?>"><?php esc_html_e( 'Zur Game-Lounge und meinen Einladungen', 'ps-pen-paper' ); ?></a>
 			<?php else : ?>
 				<div class="pspp-grid">
 					<?php foreach ( $campaigns as $item ) : ?>
@@ -197,7 +224,9 @@ function ps_pen_paper_frontend_shortcode() {
 			<?php ps_pen_paper_render_campaign_create_form( $page_id ); ?>
 			<?php endif; ?>
 		<?php else : ?>
-			<?php ps_pen_paper_render_table( $campaign, $page_id, $character_id ); ?>
+			<?php if ( $round ) { ps_pen_paper_render_play_round( $campaign, $round, $page_id, $round_state ); }
+			elseif ( $mode ) { ps_pen_paper_render_play_directory( $campaign, $page_id, $mode ); }
+			else { ps_pen_paper_render_table( $campaign, $page_id, $character_id ); } ?>
 		<?php endif; ?>
 	</div>
 	<?php

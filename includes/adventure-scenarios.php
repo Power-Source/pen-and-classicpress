@@ -124,8 +124,23 @@ function ps_pen_paper_scenario_outcome( $snapshot, $history ) {
 
 function ps_pen_paper_scenario_progress( $campaign, $owner_id ) {
 	$progress = array();
+	$scope_ids = array( (int) $campaign->ID ); $origins = array();
+	$round = ps_pen_paper_play_round( $campaign->ID );
+	if ( is_wp_error( $round ) ) { return $round; }
+	if ( $round ) {
+		$source = ps_pen_paper_get_campaign( $round['source_id'] );
+		if ( ! $source ) { return ps_pen_paper_scenario_error(); }
+		$rounds = ps_pen_paper_play_rounds( $source );
+		if ( is_wp_error( $rounds ) ) { return $rounds; }
+		$scope_ids = array_merge( array( $round['source_id'] ), array_map( static function ( $row ) { return (int) $row['post']->ID; }, $rounds ) );
+		foreach ( get_posts( array( 'post_type' => 'pspp_adventure', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'posts_per_page' => -1 ) ) as $adventure ) {
+			$origin = get_post_meta( $adventure->ID, '_pspp_play_origin', true );
+			if ( ! is_array( $origin ) || ( $origin['campaign_id'] ?? 0 ) !== $round['source_id'] || ! is_int( $origin['adventure_id'] ?? null ) ) { return ps_pen_paper_scenario_error(); }
+			$origins[ $origin['adventure_id'] ] = (int) $adventure->ID;
+		}
+	}
 	foreach ( array( 'pspp_adventure_run' => '_pspp_adventure_run', 'pspp_adventure_group' => '_pspp_adventure_group' ) as $type => $key ) {
-		foreach ( get_posts( array( 'post_type' => $type, 'post_status' => 'private', 'post_parent' => $campaign->ID,
+		foreach ( get_posts( array( 'post_type' => $type, 'post_status' => 'private', 'post_parent__in' => $scope_ids,
 			'posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'ASC' ) ) as $post ) {
 			$state = get_post_meta( $post->ID, $key, true );
 			$valid = 'pspp_adventure_run' === $type ? ps_pen_paper_valid_adventure_run( $state ) : ps_pen_paper_valid_adventure_group( $state );
@@ -134,12 +149,20 @@ function ps_pen_paper_scenario_progress( $campaign, $owner_id ) {
 				in_array( $owner_id, array_column( $state['participants'], 'owner_id' ), true );
 			if ( ! $joined ) { continue; }
 			$id = $state['adventure_id'];
+			$scope_round = ps_pen_paper_play_round( (int) $post->post_parent );
+			if ( is_wp_error( $scope_round ) ) { return $scope_round; }
+			if ( $round ) {
+				$origin = $scope_round ? get_post_meta( $id, '_pspp_play_origin', true ) : array( 'adventure_id' => $id );
+				if ( ! is_array( $origin ) || ! is_int( $origin['adventure_id'] ?? null ) ) { return ps_pen_paper_scenario_error(); }
+				if ( ! isset( $origins[ $origin['adventure_id'] ] ) ) { continue; }
+				$id = $origins[ $origin['adventure_id'] ];
+			}
 			if ( ! isset( $progress[ $id ] ) ) { $progress[ $id ] = array( 'attempts' => 0, 'completed' => false, 'success' => false, 'active' => array() ); }
 			$progress[ $id ]['attempts']++;
 			if ( 'completed' !== $state['status'] ) {
 				$active = 'pspp_adventure_run' === $type;
 				foreach ( $state['participants'] ?? array() as $participant ) { if ( $participant['owner_id'] === $owner_id && $participant['active'] ) { $active = true; } }
-				if ( $active ) { $progress[ $id ]['active'][] = $post->ID; }
+				if ( $active && ( ! $scope_round || 'completed' !== $scope_round['status'] ) ) { $progress[ $id ]['active'][] = $post->ID; }
 				continue;
 			}
 			$history = 'pspp_adventure_run' === $type ? $state['history'] : array_column( $state['history'], 'decision' );

@@ -99,7 +99,16 @@ function ps_pen_paper_handle_admin_action() {
 			ps_pen_paper_fail( __( 'Die Runde wurde inzwischen wiederhergestellt. Alte Eingaben wurden nicht übernommen. Bitte lade die Seite neu.', 'ps-pen-paper' ) );
 		}
 	}
+	if ( in_array( $operation, array( 'save_play_options', 'create_play_round', 'change_play_round' ), true ) ) { ps_pen_paper_handle_play_action( $operation, $page_id, $scope_id ); }
 	if ( 'group_adventure' === $operation ) { ps_pen_paper_handle_adventure_group_action(); }
+	if ( 'leave_campaign' === $operation ) {
+		if ( ! ps_pen_paper_frontend_page( $page_id ) ) { ps_pen_paper_fail( __( 'Die Spielbereich-Seite ist nicht mehr verfügbar.', 'ps-pen-paper' ) ); }
+		check_admin_referer( 'pspp_campaign_' . $scope_id );
+		if ( 'confirmed' !== ps_pen_paper_posted_text( 'leave_confirmation' ) ) { ps_pen_paper_fail( __( 'Bitte bestätige, dass du diese Kampagne verlassen möchtest.', 'ps-pen-paper' ) ); }
+		$result = ps_pen_paper_change_membership( $scope_id, get_current_user_id(), 'leave', '', ps_pen_paper_posted_text( 'membership_revision' ) );
+		if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
+		wp_safe_redirect( ps_pen_paper_game_url( $page_id ) ); exit;
+	}
 	if ( 'save_universe_style' === $operation ) { ps_pen_paper_handle_universe_style_action(); }
 	if ( in_array( $operation, array( 'profile_create_character', 'save_character_policy', 'member_invitation', 'upload_portrait_preset', 'select_portrait_preset', 'profile_portrait' ), true ) ) {
 		ps_pen_paper_handle_character_policy_action( $operation );

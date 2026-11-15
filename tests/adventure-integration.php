@@ -875,14 +875,12 @@ try {
 	$document = new DOMDocument(); @$document->loadHTML( '<?xml encoding="UTF-8">' . $group_start_html );
 	$xpath = new DOMXPath( $document );
 	$form = $xpath->query( '//form[input[@name="group_operation" and @value="create"] and input[@name="adventure_id" and @value="' . $hybrid_adventure . '"]]' )->item( 0 );
-	$check( null !== $form, 'Published adventure has no group start form.' );
+	$check( null === $form && false !== strpos( $group_start_html, 'Game-Lounge' ), 'Old group creation form bypasses the lounge.' );
 	$default_group = ps_pen_paper_write_adventure_group( $hybrid, 0, '0', 'create', array(
-		'title' => $xpath->query( './/input[@name="group_title"]', $form )->item( 0 )->getAttribute( 'value' ),
-		'rule' => $xpath->query( './/select[@name="group_rule"]/option[@selected]', $form )->item( 0 )->getAttribute( 'value' ),
-		'adventure_id' => (int) $xpath->query( './/input[@name="adventure_id"]', $form )->item( 0 )->getAttribute( 'value' ),
-		'adventure_revision' => $xpath->query( './/input[@name="adventure_revision"]', $form )->item( 0 )->getAttribute( 'value' ),
+		'title' => 'Legacy group', 'rule' => 'any', 'adventure_id' => $hybrid_adventure,
+		'adventure_revision' => (string) get_post_meta( $hybrid_adventure, '_pspp_adventure', true )['revision'],
 	) );
-	$check( is_int( $default_group ), 'Group could not start with unchanged optional form fields.' );
+	$check( is_int( $default_group ), 'Legacy group API no longer creates a valid group.' );
 	foreach ( array( 'any', 'majority', 'unanimous', 'gm' ) as $group_rule ) {
 		$group_chars = array();
 		foreach ( array( 'player', 'other', 'outsider' ) as $owner ) {
@@ -1051,6 +1049,38 @@ try {
 		finally { update_post_meta( $group_event['id'], '_pspp_event', $raw_event ); }
 	}
 
+	wp_set_current_user( $users['player'] );
+	$check( true === ps_pen_paper_write_adventure_group( $hybrid, $default_group, '1', 'join', array( 'character_id' => $group_chars['player'] ) ),
+		'Departure regression group join failed.' );
+	$departure_group = get_post_meta( $default_group, '_pspp_adventure_group', true );
+	wp_set_current_user( $users['gm'] );
+	$leading_runs = ps_pen_paper_lounge_running_adventures( $hybrid );
+	$check( ! is_wp_error( $leading_runs ) && in_array( 'pspp-adventure-group-' . $default_group, array_column( $leading_runs, 'anchor' ), true ),
+		'Lounge hides the ongoing group from its nonparticipating game master.' );
+	wp_set_current_user( $users['player'] );
+	$check( true === ps_pen_paper_write_adventure_group( $hybrid, $default_group, (string) $departure_group['revision'], 'propose',
+		array( 'character_id' => $group_chars['player'], 'edge_id' => $hybrid_edge_id ) ), 'Departure proposal failed.' );
+	$departure_group = get_post_meta( $default_group, '_pspp_adventure_group', true );
+	$departure_character = ps_pen_paper_raw_character_state( $group_chars['player'] );
+	$membership_revision = (string) ps_pen_paper_membership_revision( $hybrid_id )['revision'];
+	$fail_departure = static function ( $data ) {
+		if ( 'pspp_event' === $data['post_type'] && 'private' === $data['post_status'] ) { $data['post_status'] = 'draft'; }
+		return $data;
+	};
+	add_filter( 'wp_insert_post_data', $fail_departure );
+	try {
+		$check( is_wp_error( ps_pen_paper_change_membership( $hybrid_id, $users['player'], 'leave', '', $membership_revision ) ) &&
+			$departure_group === get_post_meta( $default_group, '_pspp_adventure_group', true ) &&
+			'player' === ps_pen_paper_campaign_role( $hybrid, $users['player'] ), 'Unlogged departure changed membership or group proposal.' );
+	} finally { remove_filter( 'wp_insert_post_data', $fail_departure ); }
+	$check( true === ps_pen_paper_change_membership( $hybrid_id, $users['player'], 'leave', '', $membership_revision ), 'Campaign departure failed.' );
+	$left_group = get_post_meta( $default_group, '_pspp_adventure_group', true );
+	$check( null === $left_group['proposal'] && ! $left_group['participants'][0]['active'] &&
+		$departure_group['history'] === $left_group['history'] && $departure_group['scene_id'] === $left_group['scene_id'] &&
+		$departure_character === ps_pen_paper_raw_character_state( $group_chars['player'] ), 'Departure lost progress or left an active voter.' );
+	wp_set_current_user( $users['gm'] );
+	$check( true === ps_pen_paper_change_membership( $hybrid_id, $users['player'], 'add', 'player',
+		(string) ps_pen_paper_membership_revision( $hybrid_id )['revision'] ), 'Regression membership restoration failed.' );
 	wp_set_current_user( $users['outsider'] );
 	$check( is_wp_error( ps_pen_paper_start_adventure_run( $campaign, $adventure_id, $characters['player'], (string) $published['revision'], '1' ) ), 'Nonmember started an adventure run.' );
 	$check_world_foundations();

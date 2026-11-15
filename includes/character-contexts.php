@@ -26,6 +26,9 @@ function ps_pen_paper_validate_context( $context, $rules ) {
 		return new WP_Error( 'invalid_context', __( 'Der Kampagnenkontext ist beschädigt. Bitte informiere die Spielleitung.', 'ps-pen-paper' ) );
 	}
 	$fields = array_column( $rules['fields'], null, 'id' );
+	if ( array_key_exists( 'gear_shared', $context ) && ( true !== $context['gear_shared'] || 'shared' !== $context['mode'] ) ) {
+		return new WP_Error( 'invalid_context', __( 'Das gemeinsame Inventar braucht eine gültige Verbindung zum Basisbogen.', 'ps-pen-paper' ) );
+	}
 	foreach ( $context['overrides'] as $id => $value ) {
 		if ( ! isset( $fields[ $id ] ) || ! in_array( $fields[ $id ]['type'], array( 'number', 'attribute' ), true ) || ! is_int( $value ) ||
 			$value < $fields[ $id ]['min'] || $value > $fields[ $id ]['max'] ||
@@ -379,6 +382,9 @@ function ps_pen_paper_preview_character_copy( $campaign_id, $id ) {
 	}
 	$before = ps_pen_paper_raw_character_state( $id );
 	if ( is_wp_error( $before ) ) { return $before; }
+	if ( ! empty( $before['context']['gear_shared'] ) ) {
+		return new WP_Error( 'invalid_context', __( 'Diese Rundenfigur verwendet das Inventar ihres Basisbogens. Verwende für einen unabhängigen Charakter einen eigenen Basisbogen.', 'ps-pen-paper' ) );
+	}
 	if ( ! isset( $before['context']['mode'] ) || 'shared' !== $before['context']['mode'] || null !== $before['pending'] ) {
 		return new WP_Error( 'invalid_context', __( 'Nur ein gemeinsamer Basisbogen ohne offenen Kampagnenantrag kann unabhängig weitergeführt werden.', 'ps-pen-paper' ) );
 	}

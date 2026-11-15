@@ -231,6 +231,14 @@ function ps_pen_paper_character_sitting_out( $campaign, $character_id ) {
 }
 
 function ps_pen_paper_require_character_game_action( $campaign, $character_id ) {
+	$round = ps_pen_paper_play_round( $campaign->ID );
+	if ( is_wp_error( $round ) ) { return $round; }
+	if ( $round && 'active' !== $round['status'] ) {
+		return ps_pen_paper_play_error( __( 'Spielaktionen sind erst nach dem Spielstart und nicht während einer Pause möglich.', 'ps-pen-paper' ) );
+	}
+	if ( $round && ! in_array( (int) $character_id, array_column( array_filter( $round['participants'], static function ( $participant ) { return $participant['active']; } ), 'character_id' ), true ) ) {
+		return ps_pen_paper_play_error( __( 'Dieser Charakter nimmt nicht an der laufenden Runde teil.', 'ps-pen-paper' ) );
+	}
 	$blocked = ps_pen_paper_character_sitting_out( $campaign, $character_id );
 	return is_wp_error( $blocked ) ? $blocked : ( $blocked ? new WP_Error( 'character_sitting_out', __( 'Dieser Charakter setzt für einen Gegenstandsverbrauch die aktuelle Spielrunde aus. Erst die ausdrücklich weitergezählte Spielrunde gibt Spielaktionen wieder frei.', 'ps-pen-paper' ), array( 'status' => 409 ) ) : true );
 }
@@ -246,6 +254,9 @@ function ps_pen_paper_item_action_permission( $scope, $context, $kind, $entries 
 	if ( ! $policy['enabled'] || ( $round['active'] && ! $policy['during_active'] ) ) { return ps_pen_paper_equipment_error( 'outside_game_denied' ); }
 	if ( 'pspp_universe' === $scope->post_type && ! $policy['during_active'] && $character_id ) {
 		foreach ( ps_pen_paper_item_shared_aliases( (int) $scope->ID, (int) $character_id ) as $alias ) {
+			$round_state = ps_pen_paper_play_round( (int) $alias->post_parent );
+			if ( is_wp_error( $round_state ) ) { return $round_state; }
+			if ( $round_state && ! ps_pen_paper_play_participant( $round_state, (int) $alias->post_author ) ) { continue; }
 			$play = ps_pen_paper_game_round( (int) $alias->post_parent );
 			if ( is_wp_error( $play ) ) { return $play; }
 			if ( $play['active'] ) { return ps_pen_paper_equipment_error( 'outside_game_denied' ); }
@@ -478,7 +489,7 @@ function ps_pen_paper_write_item_effect_ending( $campaign, $character, $effect )
 // Internal writer: the caller holds character/context locks and the event transaction.
 function ps_pen_paper_write_permanent_item_effect( $campaign, $character, $deltas ) {
 	$before = ps_pen_paper_raw_character_state( $character->ID );
-	$state = ps_pen_paper_character_state( $campaign, $character, false );
+	$state = ps_pen_paper_resolve_character_state( $campaign, $character, false );
 	if ( is_wp_error( $before ) || is_wp_error( $state ) ) { return is_wp_error( $before ) ? $before : $state; }
 	$fields = ps_pen_paper_item_effect_fields( ps_pen_paper_get_rules( $campaign->ID ) );
 	$after = $before;

@@ -41,7 +41,8 @@ function ps_pen_paper_universe_document( $id ) {
 	$document = get_post_meta( $id, '_pspp_universe', true );
 	if ( ! is_array( $document ) || ! isset( $document['revision'], $document['name'], $document['description'] ) ||
 		! is_int( $document['revision'] ) || $document['revision'] < 1 ||
-		! is_string( $document['name'] ) || '' === $document['name'] || ! is_string( $document['description'] ) ) {
+		! is_string( $document['name'] ) || '' === $document['name'] || ! is_string( $document['description'] ) ||
+		( array_key_exists( 'introduction', $document ) && ( ! is_string( $document['introduction'] ) || strlen( $document['introduction'] ) > 20000 ) ) ) {
 		return new WP_Error( 'invalid_universe', __( 'Das Universum ist unvollständig. Bitte informiere den Administrator.', 'ps-pen-paper' ) );
 	}
 	return $document;
@@ -59,12 +60,16 @@ function ps_pen_paper_save_universe( $id, $input, $revision ) {
 	if ( ! is_string( $revision ) || (string) $before['revision'] !== $revision ) {
 		return new WP_Error( 'conflict', __( 'Das Universum wurde inzwischen geändert. Bitte lade die Seite neu.', 'ps-pen-paper' ) );
 	}
-	if ( ! is_array( $input ) || count( $input ) !== 2 || ! isset( $input['name'], $input['description'] ) ||
+	if ( ! is_array( $input ) || array_diff( array_keys( $input ), array( 'name', 'description', 'introduction' ) ) || ! isset( $input['name'], $input['description'] ) ||
 		! is_string( $input['name'] ) || ! is_string( $input['description'] ) ||
-		'' === sanitize_text_field( $input['name'] ) || strlen( $input['name'] ) > 200 || strlen( $input['description'] ) > 20000 ) {
+		'' === sanitize_text_field( $input['name'] ) || strlen( $input['name'] ) > 200 || strlen( $input['description'] ) > 20000 ||
+		( array_key_exists( 'introduction', $input ) && ( ! is_string( $input['introduction'] ) || strlen( $input['introduction'] ) > 20000 ) ) ) {
 		return new WP_Error( 'invalid_universe', __( 'Bitte gib einen Universumsnamen mit höchstens 200 Bytes und eine Beschreibung mit höchstens 20000 Bytes ein.', 'ps-pen-paper' ) );
 	}
 	$after = array( 'revision' => $before['revision'] + 1, 'name' => sanitize_text_field( $input['name'] ), 'description' => sanitize_textarea_field( $input['description'] ) );
+	if ( array_key_exists( 'introduction', $input ) || array_key_exists( 'introduction', $before ) ) {
+		$after['introduction'] = sanitize_textarea_field( $input['introduction'] ?? $before['introduction'] );
+	}
 	$creating = ! $id;
 	if ( $creating ) {
 		$id = wp_insert_post( array( 'post_type' => 'pspp_universe', 'post_status' => 'draft', 'post_author' => get_current_user_id(), 'post_title' => 'PS Pen & Paper Universe' ), true );

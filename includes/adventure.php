@@ -786,21 +786,26 @@ function ps_pen_paper_start_adventure_run_locked( $campaign, $adventure_id, $cha
 			$access = ps_pen_paper_scenario_access( $campaign, (int) $adventure_id, $snapshot, $character, 'solo' );
 			if ( is_wp_error( $access ) ) { return $access; }
 			if ( ! $access['met'] ) { return ps_pen_paper_scenario_access_error( $access ); }
-			$before = array( 'revision' => 0, 'status' => 'new', 'history' => array() );
-			$after = array( 'revision' => 0, 'status' => 'active', 'adventure_id' => (int) $adventure_id,
-				'adventure_publication' => $snapshot['publication'], 'character_id' => (int) $character_id,
-				'owner_id' => get_current_user_id(), 'scene_id' => $snapshot['start_scene'], 'snapshot' => $snapshot, 'history' => array() );
-			if ( isset( $snapshot['scenario'] ) ) { $after['scenario_attempt'] = $access['attempt']; }
-			if ( ! ps_pen_paper_valid_adventure_run( array_merge( $after, array( 'revision' => 1 ) ) ) ) { return ps_pen_paper_adventure_error(); }
-			$run_id = wp_insert_post( array( 'post_type' => 'pspp_adventure_run', 'post_status' => 'draft', 'post_parent' => $campaign->ID, 'post_title' => 'PS Pen & Paper Adventure Run' ), true );
-			if ( is_wp_error( $run_id ) || ! $run_id ) { return ps_pen_paper_adventure_error(); }
-			$result = ps_pen_paper_write_adventure_event( $campaign, $run_id, $before, $after, 'adventure_run', 'owner', (int) $character['post']->post_author, true );
-			return is_wp_error( $result ) ? $result : (int) $run_id;
+			$run_id = ps_pen_paper_write_adventure_start( $campaign, (int) $adventure_id, $snapshot, $character, $access );
+			return $run_id;
 		} );
 	} );
 	if ( is_wp_error( $result ) ) { return $result; }
 	if ( is_int( $result ) && $result > 0 ) { return $result; }
 	return $run_id;
+}
+
+function ps_pen_paper_write_adventure_start( $campaign, $adventure_id, $snapshot, $character, $access ) {
+	$before = array( 'revision' => 0, 'status' => 'new', 'history' => array() );
+	$after = array( 'revision' => 0, 'status' => 'active', 'adventure_id' => $adventure_id,
+		'adventure_publication' => $snapshot['publication'], 'character_id' => (int) $character['post']->ID,
+		'owner_id' => (int) $character['post']->post_author, 'scene_id' => $snapshot['start_scene'], 'snapshot' => $snapshot, 'history' => array() );
+	if ( isset( $snapshot['scenario'] ) ) { $after['scenario_attempt'] = $access['attempt']; }
+	if ( ! ps_pen_paper_valid_adventure_run( array_merge( $after, array( 'revision' => 1 ) ) ) ) { return ps_pen_paper_adventure_error(); }
+	$id = wp_insert_post( array( 'post_type' => 'pspp_adventure_run', 'post_status' => 'draft', 'post_parent' => $campaign->ID, 'post_title' => 'PS Pen & Paper Adventure Run' ), true );
+	if ( is_wp_error( $id ) || ! $id ) { return ps_pen_paper_adventure_error(); }
+	$result = ps_pen_paper_write_adventure_event( $campaign, $id, $before, $after, 'adventure_run', 'owner', (int) $character['post']->post_author, true );
+	return is_wp_error( $result ) ? $result : (int) $id;
 }
 
 function ps_pen_paper_advance_adventure_run( $campaign, $run_id, $edge_id, $revision ) {
@@ -851,6 +856,9 @@ function ps_pen_paper_advance_adventure_run( $campaign, $run_id, $edge_id, $revi
 			$after['history'][] = $entry;
 			if ( array_key_exists( 'approval', $after ) ) { $after['approval'] = null; }
 			if ( ! ps_pen_paper_valid_adventure_run( $after ) ) { return ps_pen_paper_adventure_error(); }
-			return ps_pen_paper_write_adventure_event( $campaign, $run_id, $before, $after, 'adventure_run', 'owner', $before['owner_id'] );
+			$result = ps_pen_paper_write_adventure_event( $campaign, $run_id, $before, $after, 'adventure_run', 'owner', $before['owner_id'] );
+			if ( is_wp_error( $result ) ) { return $result; }
+			$progress = ps_pen_paper_write_play_progress( $campaign, $after['status'] );
+			return is_wp_error( $progress ) ? $progress : $result;
 	} );
 }

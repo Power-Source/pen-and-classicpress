@@ -9,13 +9,18 @@ function ps_pen_paper_handle_adventure_group_action() {
 	if ( ! $campaign || ! ps_pen_paper_can_access_site() || ( isset( $_POST['pspp_frontend_page'] ) && ! ps_pen_paper_frontend_page( $page_id ) ) ) {
 		ps_pen_paper_fail( ps_pen_paper_adventure_group_error()->get_error_message() );
 	}
+	if ( 'create' === ps_pen_paper_posted_text( 'group_operation' ) ) {
+		ps_pen_paper_fail( __( 'Lege die Runde über die Game-Lounge an und wähle dort die Teilnehmer und Charaktere.', 'ps-pen-paper' ) );
+	}
 	$result = ps_pen_paper_write_adventure_group( $campaign, ps_pen_paper_posted_id( 'group_id' ), ps_pen_paper_posted_text( 'group_revision' ),
 		ps_pen_paper_posted_text( 'group_operation' ), array( 'title' => ps_pen_paper_posted_text( 'group_title' ),
 			'rule' => ps_pen_paper_posted_text( 'group_rule' ), 'adventure_id' => ps_pen_paper_posted_id( 'adventure_id' ),
 			'adventure_revision' => ps_pen_paper_posted_text( 'adventure_revision' ), 'character_id' => ps_pen_paper_posted_id( 'character_id' ),
 			'edge_id' => ps_pen_paper_posted_text( 'adventure_edge' ) ) );
 	if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
-	wp_safe_redirect( ps_pen_paper_game_url( $page_id, $campaign_id ) . '#pspp-group-adventures' ); exit;
+	$group_id = ps_pen_paper_posted_id( 'group_id' ) ?: $result;
+	$url = $page_id ? ps_pen_paper_game_url( $page_id, $campaign_id ) : ps_pen_paper_admin_url( $campaign_id );
+	wp_safe_redirect( $url . '#pspp-adventure-group-' . $group_id ); exit;
 }
 
 function ps_pen_paper_adventure_group_form( $campaign, $page_id, $id, $revision, $operation ) {
@@ -32,6 +37,8 @@ function ps_pen_paper_adventure_group_user_label( $user_id ) {
 }
 
 function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
+	$round = ps_pen_paper_play_round( $campaign->ID );
+	if ( is_wp_error( $round ) || ( $round && 'group' !== $round['mode'] ) ) { return; }
 	$records = ps_pen_paper_adventure_group_records( $campaign );
 	if ( is_wp_error( $records ) ) { echo '<p role="alert">' . esc_html( $records->get_error_message() ) . '</p>'; return; }
 	$gm = ps_pen_paper_can_manage_campaign( $campaign ); $own_characters = array();
@@ -44,34 +51,19 @@ function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 	$statuses = array( 'active' => __( 'Aktiv', 'ps-pen-paper' ), 'paused' => __( 'Pausiert', 'ps-pen-paper' ), 'completed' => __( 'Abgeschlossen', 'ps-pen-paper' ) );
 	?>
 	<section class="pspp-adventure-groups"><h3><?php esc_html_e( 'Gemeinsam spielen', 'ps-pen-paper' ); ?></h3>
-	<p><?php echo esc_html( $gm ? __( 'Starte ein freigegebenes Abenteuer mit dem Button darunter. Deine Spieler öffnen diese Runde und klicken „Mitspielen“. Bereits gestartete Abenteuer stehen weiter unten.', 'ps-pen-paper' ) : __( 'Wähle unten ein gestartetes Abenteuer und klicke „Mitspielen“. Danach erscheinen die gemeinsame Szene und eure Entscheidungen. Neue Abenteuer startet die Spielleitung.', 'ps-pen-paper' ) ); ?></p>
+	<?php if ( ! $round ) : ?>
+	<p><a href="<?php echo esc_url( ps_pen_paper_play_url( $page_id, $campaign->ID, 'group' ) ); ?>"><?php esc_html_e( 'Gruppenrunden in der Game-Lounge öffnen', 'ps-pen-paper' ); ?></a></p>
 	<details><summary><?php esc_html_e( 'Spielregeln und Freigaben', 'ps-pen-paper' ); ?></summary>
 	<p><?php esc_html_e( 'Ein gemeinsamer Szenenstand für alle Teilnehmer. Der Vorschlag legt fest, welcher Besitzer die Entscheidung ausführt. Nur dessen Charakter würfelt, bezahlt persönliche Kosten und erhält persönliche Belohnungen. Fremde Charakterwerte bleiben privat.', 'ps-pen-paper' ); ?></p>
 	<p><?php esc_html_e( 'Teilnahmewechsel, Pausieren und Änderungen der Entscheidungsregel verwerfen offene Vorschläge und Freigaben, aber niemals den bisherigen Fortschritt. Pro Benutzer kann eine Figur gleichzeitig aktiv teilnehmen. Bis zu 100 Figuren einschließlich früherer Teilnehmer bleiben im Verlauf zugeordnet.', 'ps-pen-paper' ); ?></p>
 	</details>
-	<?php if ( $gm ) :
-		$adventures = ps_pen_paper_adventure_records( $campaign, false );
-		if ( is_wp_error( $adventures ) ) : echo '<p role="alert">' . esc_html( $adventures->get_error_message() ) . '</p>';
-		else : foreach ( $adventures as $adventure_id => $adventure ) :
-			if ( 'published' !== $adventure['status'] || ( isset( $adventure['published']['scenario'] ) && 'solo' === $adventure['published']['scenario']['mode'] ) ) { continue; } ?>
-			<article class="pspp-card"><h4><?php echo esc_html( $adventure['published']['title'] ); ?></h4>
-				<?php ps_pen_paper_adventure_group_form( $campaign, $page_id, 0, 0, 'create' ); ?>
-				<input type="hidden" name="adventure_id" value="<?php echo esc_attr( $adventure_id ); ?>"><input type="hidden" name="adventure_revision" value="<?php echo esc_attr( $adventure['revision'] ); ?>">
-				<details><summary><?php esc_html_e( 'Gruppenname und Entscheidungsregel anpassen (optional)', 'ps-pen-paper' ); ?></summary>
-				<label><?php esc_html_e( 'Gruppenname', 'ps-pen-paper' ); ?><input type="text" name="group_title" maxlength="200" value="<?php echo esc_attr( $adventure['published']['title'] ); ?>" required></label>
-				<label><?php esc_html_e( 'Wie entscheidet diese Gruppe?', 'ps-pen-paper' ); ?><select name="group_rule">
-					<?php foreach ( ps_pen_paper_adventure_group_rules() as $rule => $label ) : ?><option value="<?php echo esc_attr( $rule ); ?>"<?php selected( 'unanimous', $rule ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?>
-				</select></label>
-				</details>
-				<button type="submit"><?php esc_html_e( 'Abenteuer für die Gruppe starten', 'ps-pen-paper' ); ?></button></form>
-			</article>
-		<?php endforeach; endif; endif; ?>
+	<?php endif; ?>
 	<?php if ( ! $records ) : ?><p><?php echo esc_html( $gm ? __( 'Noch kein gemeinsames Abenteuer gestartet.', 'ps-pen-paper' ) : __( 'Die Spielleitung hat noch kein gemeinsames Abenteuer gestartet.', 'ps-pen-paper' ) ); ?></p><?php endif; ?>
 	<?php foreach ( $records as $id => $record ) : $group = $record['state']; ?>
-		<article class="pspp-adventure-group" data-group-id="<?php echo esc_attr( $id ); ?>">
+		<article class="pspp-adventure-group" id="pspp-adventure-group-<?php echo esc_attr( $id ); ?>" data-group-id="<?php echo esc_attr( $id ); ?>">
 			<h4><?php echo esc_html( $record['title'] . ' · ' . $statuses[ $record['status'] ] ); ?></h4>
 			<?php $member = $group ? ps_pen_paper_adventure_group_member( $campaign, $group, get_current_user_id() ) : null;
-			if ( ! $member && 'completed' !== $record['status'] ) :
+			if ( ! $round && ! $member && 'completed' !== $record['status'] ) :
 				if ( $own_characters ) :
 					$raw_group = $group ?? get_post_meta( $id, '_pspp_adventure_group', true );
 					$available = array();
@@ -95,23 +87,25 @@ function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 				<?php endif;
 			endif; ?>
 			<?php if ( ! $group ) : ?><p><?php esc_html_e( 'Szenen und Verlauf sind erst nach eigener Teilnahme sichtbar.', 'ps-pen-paper' ); ?></p></article><?php continue; endif; ?>
-			<p><?php echo esc_html( ps_pen_paper_adventure_group_rules()[ $group['rule'] ] ); ?></p>
+			<p><?php echo esc_html( $round && 'any' === $group['rule'] ? __( 'Jeder Teilnehmer kann mit seinem Charakter eine Aktion ausführen.', 'ps-pen-paper' ) : ps_pen_paper_adventure_group_rules()[ $group['rule'] ] ); ?></p>
+			<?php if ( ! $round ) : ?>
 			<ul><?php foreach ( $group['participants'] as $participant ) : ?>
 				<li><?php echo esc_html( ps_pen_paper_adventure_group_user_label( $participant['owner_id'] ) . ' · ' . ( $participant['active'] ? __( 'Nimmt teil', 'ps-pen-paper' ) : __( 'Abwesend', 'ps-pen-paper' ) ) ); ?>
-					<?php if ( $participant['active'] && ( $gm || $participant['owner_id'] === get_current_user_id() ) ) :
+					<?php if ( ! $round && $participant['active'] && ( $gm || $participant['owner_id'] === get_current_user_id() ) ) :
 						ps_pen_paper_adventure_group_form( $campaign, $page_id, $id, $record['revision'], 'leave' ); ?>
 						<input type="hidden" name="character_id" value="<?php echo esc_attr( $participant['character_id'] ); ?>">
 						<button type="submit"><?php esc_html_e( 'Teilnahme beenden', 'ps-pen-paper' ); ?></button></form>
 					<?php endif; ?>
 				</li>
 			<?php endforeach; ?></ul>
+			<?php endif; ?>
 			<?php if ( $group['scene_id'] ) : $scene = $group['snapshot']['scenes'][ $group['scene_id'] ]; ?>
 				<h5><?php echo esc_html( $scene['title'] ); ?></h5><p class="pspp-multiline"><?php echo esc_html( $scene['text'] ); ?></p>
 			<?php endif; ?>
 			<?php ps_pen_paper_render_adventure_world_progress( $group['snapshot'], $group['scene_id'], array_column( $group['history'], 'decision' ) ); ?>
 			<?php if ( 'completed' === $group['status'] ) : ?><p role="status"><?php echo esc_html( ps_pen_paper_scenario_outcomes()[ ps_pen_paper_scenario_outcome( $group['snapshot'], array_column( $group['history'], 'decision' ) ) ] ); ?></p><?php endif; ?>
 			<?php if ( $group['scene_id'] ) { ps_pen_paper_render_wiki_target_link( $campaign, 'scene:' . $group['scene_id'] ); } ?>
-			<?php if ( $gm && 'completed' !== $group['status'] ) :
+			<?php if ( ! $round && $gm && 'completed' !== $group['status'] ) :
 				ps_pen_paper_adventure_group_form( $campaign, $page_id, $id, $record['revision'], 'active' === $group['status'] ? 'pause' : 'resume' ); ?>
 				<button type="submit"><?php echo esc_html( 'active' === $group['status'] ? __( 'Gruppendurchlauf pausieren', 'ps-pen-paper' ) : __( 'Gruppendurchlauf fortsetzen', 'ps-pen-paper' ) ); ?></button></form>
 				<details><summary><?php esc_html_e( 'Entscheidungsregel anpassen', 'ps-pen-paper' ); ?></summary>
@@ -177,7 +171,7 @@ function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 					$effective_reward = ps_pen_paper_scenario_reward( $group['snapshot'], $edge, $member['scenario_attempt'] ?? 0 );
 					ps_pen_paper_adventure_group_form( $campaign, $page_id, $id, $record['revision'], 'propose' ); ?>
 					<input type="hidden" name="character_id" value="<?php echo esc_attr( $member['character_id'] ); ?>"><input type="hidden" name="adventure_edge" value="<?php echo esc_attr( $edge['id'] ); ?>">
-					<button type="submit"><?php echo esc_html( __( 'Vorschlagen:', 'ps-pen-paper' ) . ' ' . $edge['choice'] ); ?></button>
+					<button type="submit"><?php echo esc_html( ( $round && 'any' === $group['rule'] ? __( 'Ausführen:', 'ps-pen-paper' ) : __( 'Vorschlagen:', 'ps-pen-paper' ) ) . ' ' . $edge['choice'] ); ?></button>
 					<?php if ( $edge['expression'] ) : ?><p><?php echo esc_html( __( 'Serverprobe:', 'ps-pen-paper' ) . ' ' . $edge['expression'] . ' · ' . __( 'Erfolg ab', 'ps-pen-paper' ) . ' ' . $edge['threshold'] ); ?></p><?php endif; ?>
 					<?php if ( isset( $edge['resource_cost'] ) ) : ?><p><?php echo esc_html( __( 'Persönliche Ressourcenkosten:', 'ps-pen-paper' ) . ' ' . $edge['resource_cost']['amount'] . ' · ' . ps_pen_paper_adventure_cost_timings()[ $edge['resource_cost']['timing'] ] ); ?></p><?php endif; ?>
 					<?php if ( $effective_reward ) : ?><p><?php echo esc_html( ps_pen_paper_adventure_reward_label( $effective_reward ) . ' · ' . ps_pen_paper_adventure_reward_timings()[ $effective_reward['timing'] ] ); ?></p><?php endif; ?>

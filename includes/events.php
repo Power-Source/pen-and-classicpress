@@ -12,6 +12,8 @@ function ps_pen_paper_event_labels() {
 		'member_invitation_saved' => __( 'Mitgliedereinladung geändert', 'ps-pen-paper' ),
 		'universe_members_saved' => __( 'Universumsmitgliedschaft geändert', 'ps-pen-paper' ),
 		'game_round' => __( 'Spielsitzung oder Runde geändert', 'ps-pen-paper' ),
+		'play_options' => __( 'Angebotene Spielarten geändert', 'ps-pen-paper' ),
+		'play_round' => __( 'Spielrunde geändert', 'ps-pen-paper' ),
 		'item_action_policy' => __( 'Profilrechte für Gegenstände geändert', 'ps-pen-paper' ),
 		'wiki_links_saved'    => __( 'Wiki-Verknüpfungen geändert', 'ps-pen-paper' ),
 		'campaign_restored'   => __( 'Kampagne wiederhergestellt', 'ps-pen-paper' ),
@@ -205,6 +207,11 @@ function ps_pen_paper_atomic_event_unlocked( $object_id, $write, $extra_tables =
 }
 
 function ps_pen_paper_write_document_event( $campaign_id, $object_id, $key, $before, $after, $event, $publish_object ) {
+	if ( '_pspp_gear' === $key ) {
+		$target = ps_pen_paper_shared_gear_target( $object_id );
+		if ( is_wp_error( $target ) ) { return $target; }
+		if ( $target ) { $campaign_id = $target['scope_id']; $object_id = $target['character_id']; }
+	}
 	$event['version'] = 1;
 	$event['actor_name'] = wp_get_current_user()->display_name;
 	$event['object_id'] = (int) $object_id;
@@ -256,6 +263,11 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 		return $error;
 	}
 	$event['id'] = $post->ID;
+	if ( in_array( $event['kind'], array( 'play_options', 'play_round' ), true ) ) {
+		$validator = 'play_options' === $event['kind'] ? 'ps_pen_paper_valid_play_options' : 'ps_pen_paper_valid_play_round';
+		if ( ! $validator( $event['before'] ) || ! $validator( $event['after'] ) ||
+			$event['after']['revision'] !== $event['before']['revision'] + 1 ) { return ps_pen_paper_play_error(); }
+	}
 	if ( in_array( $event['kind'], array( 'game_round', 'item_action_policy' ), true ) ) {
 		$validator = 'game_round' === $event['kind'] ? 'ps_pen_paper_validate_game_round' : 'ps_pen_paper_validate_item_action_policy';
 		$visibility = 'game_round' === $event['kind'] ? 'group' : 'gm';

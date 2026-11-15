@@ -13,6 +13,15 @@ function ps_pen_paper_require_community() {
 function ps_pen_paper_require_equipment_character_scope( $scope, $character, $context ) {
 	if ( ! in_array( $scope->post_type, array( 'pspp_campaign', 'pspp_universe' ), true ) || ! in_array( $context, array( 'game', 'profile' ), true ) ||
 		! ps_pen_paper_can_access_site() || ! $character || ! ps_pen_paper_get_character( $scope, $character->ID ) ) { return ps_pen_paper_equipment_error( 'forbidden' ); }
+	if ( 'pspp_campaign' === $scope->post_type ) {
+		$round = ps_pen_paper_play_round( $scope->ID );
+		if ( is_wp_error( $round ) ) { return $round; }
+		if ( $round ) {
+			if ( 'game' !== $context ) { return ps_pen_paper_play_error( __( 'Verwalte diesen Charakter über seinen Universumsbogen im Profil.', 'ps-pen-paper' ) ); }
+			$allowed = ps_pen_paper_require_character_game_action( $scope, (int) $character->ID );
+			if ( is_wp_error( $allowed ) ) { return $allowed; }
+		}
+	}
 	if ( 'pspp_universe' === $scope->post_type ) {
 		$raw = ps_pen_paper_raw_character_state( $character->ID );
 		if ( is_wp_error( $raw ) ) { return $raw; }
@@ -24,7 +33,9 @@ function ps_pen_paper_require_equipment_character_scope( $scope, $character, $co
 }
 
 function ps_pen_paper_equipment_reserved_items( $scope, $character_id ) {
-	return 'pspp_universe' === $scope->post_type ? array() : ps_pen_paper_reserved_trade_items( $scope, $character_id );
+	return 'pspp_universe' === $scope->post_type
+		? ps_pen_paper_play_reserved_items( array( 'scope_id' => (int) $scope->ID, 'character_id' => $character_id ) )
+		: ps_pen_paper_reserved_trade_items( $scope, $character_id );
 }
 
 function ps_pen_paper_register_item_type() {
@@ -431,6 +442,9 @@ function ps_pen_paper_valid_item_instance( $item ) {
 }
 
 function ps_pen_paper_gear_state( $character_id ) {
+	$target = ps_pen_paper_shared_gear_target( $character_id );
+	if ( is_wp_error( $target ) ) { return $target; }
+	if ( $target ) { $character_id = $target['character_id']; }
 	$state = get_post_meta( $character_id, '_pspp_gear', true );
 	if ( '' === $state ) { return array( 'revision' => 0, 'active' => array( 'items' => array(), 'slots' => array() ), 'pending' => null ); }
 	return ps_pen_paper_validate_gear_state( $state );

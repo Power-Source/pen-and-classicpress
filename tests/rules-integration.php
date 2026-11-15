@@ -88,7 +88,8 @@ try {
 		'Direkt trotz Antrag' === $state['pending']['values'][ $text ], 'Direct edit approved XP or was lost from pending state.' );
 	ob_start(); ps_pen_paper_render_character_form( $campaign, $rules, get_post( $character ) ); $html = ob_get_clean();
 	$check( false === strpos( $html, 'name="character[values][' . $life . '][current]" type="number"' ) &&
-		false !== strpos( $html, 'Wird automatisch aus dem Erfahrungsstand berechnet.' ), 'Protected fields or computed level remained editable.' );
+		false !== strpos( $html, 'Wird automatisch aus dem Erfahrungsstand berechnet.' ) &&
+		false === strpos( $html, 'data-character-resource' ), 'Protected fields remained editable or were advertised as numeric resource editors.' );
 	wp_set_current_user( $users['outsider'] );
 	$check( is_wp_error( ps_pen_paper_save_character( $id, $character, $users['player'], $values, (string) $state['revision'], '2' ) ), 'Outsider could change field values.' );
 	wp_set_current_user( $users['gm'] );

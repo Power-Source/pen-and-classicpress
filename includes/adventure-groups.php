@@ -10,6 +10,12 @@ function ps_pen_paper_adventure_group_default() {
 	return array( 'revision' => 0, 'status' => 'new', 'history' => array() );
 }
 
+function ps_pen_paper_adventure_group_initial( $id, $snapshot, $title, $rule ) {
+	return array( 'revision' => 1, 'title' => sanitize_text_field( $title ), 'status' => 'active',
+		'adventure_id' => $id, 'snapshot' => $snapshot, 'scene_id' => $snapshot['start_scene'],
+		'rule' => $rule, 'participants' => array(), 'proposal' => null, 'history' => array() );
+}
+
 function ps_pen_paper_adventure_group_rules() {
 	return array( 'any' => __( 'Ein Teilnehmer entscheidet', 'ps-pen-paper' ),
 		'majority' => __( 'Mehrheit der aktiven Teilnehmer', 'ps-pen-paper' ),
@@ -135,6 +141,16 @@ function ps_pen_paper_adventure_group_records( $campaign ) {
 }
 
 function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operation, $input = array() ) {
+	if ( ! $campaign ) { return ps_pen_paper_adventure_group_error(); }
+	$round = ps_pen_paper_play_round( $campaign->ID );
+	if ( is_wp_error( $round ) ) { return $round; }
+	if ( ! $round ) { return ps_pen_paper_write_adventure_group_locked( $campaign, $id, $revision, $operation, $input ); }
+	if ( 'group' !== $round['mode'] || $round['run_id'] !== $id || 'active' !== $round['status'] ||
+		! in_array( $operation, array( 'propose', 'vote', 'unvote', 'cancel', 'execute' ), true ) ) { return ps_pen_paper_play_error(); }
+	return ps_pen_paper_write_adventure_group_locked( $campaign, $id, $revision, $operation, $input );
+}
+
+function ps_pen_paper_write_adventure_group_locked( $campaign, $id, $revision, $operation, $input = array() ) {
 	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_campaign( $campaign ) || ! is_int( $id ) || $id < 0 ||
 		! is_string( $revision ) || ! is_array( $input ) || ! in_array( $operation,
 			array( 'create', 'join', 'leave', 'propose', 'vote', 'unvote', 'cancel', 'approve', 'reject', 'execute', 'pause', 'resume', 'configure' ), true ) ||
@@ -161,6 +177,29 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 			if ( is_wp_error( $action_locks ) ) { return $action_locks; }
 			$locks = array_merge( $locks, $action_locks );
 		}
+		$round = ps_pen_paper_play_round( $campaign->ID );
+		if ( is_wp_error( $round ) ) { return $round; }
+		if ( $round ) {
+			if ( 'group' !== $round['mode'] || $round['run_id'] !== $id || 'active' !== $round['status'] ||
+				! in_array( $operation, array( 'propose', 'vote', 'unvote', 'cancel', 'execute' ), true ) ) { return ps_pen_paper_play_error(); }
+			$locks[] = $round['source_id'];
+			foreach ( get_posts( array( 'post_type' => 'pspp_character', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'posts_per_page' => -1 ) ) as $character ) {
+				$raw = ps_pen_paper_raw_character_state( $character->ID );
+				if ( is_wp_error( $raw ) ) { return $raw; }
+				$context = ps_pen_paper_validate_context( $raw['context'] ?? null, ps_pen_paper_get_rules( $campaign->ID ) );
+				if ( is_wp_error( $context ) ) { return $context; }
+				$locks = array_merge( $locks, array( (int) $character->ID, $context['source_id'], $context['universe_id'] ) );
+			}
+		}
+		if ( $round && 'propose' === $operation && 'any' === $initial['rule'] ) {
+			$edge = ps_pen_paper_adventure_group_edge( $initial, $input['edge_id'] ?? '' );
+			if ( ! $edge ) { return ps_pen_paper_adventure_group_error(); }
+			$attempt = 0;
+			foreach ( $initial['participants'] as $participant ) { if ( $participant['character_id'] === $input['character_id'] ) { $attempt = $participant['scenario_attempt'] ?? 0; } }
+			$action_locks = ps_pen_paper_adventure_action_locks( $campaign, $input['character_id'], $edge, $initial['snapshot'], $attempt );
+			if ( is_wp_error( $action_locks ) ) { return $action_locks; }
+			$locks = array_merge( $locks, $action_locks );
+		}
 		$locks = array_values( array_unique( $locks ) ); sort( $locks, SORT_NUMERIC );
 		$created_id = 0;
 		$result = ps_pen_paper_adventure_action_transaction( $campaign, $locks, (int) $campaign->ID, function () use ( $campaign, $id, $revision, $operation, $input, $initial, $locks, &$created_id ) {
@@ -182,9 +221,7 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 						! isset( $input['adventure_revision'], $input['title'], $input['rule'] ) ||
 						! is_string( $input['adventure_revision'] ) || (string) $adventure['revision'] !== $input['adventure_revision'] ||
 						! is_string( $input['title'] ) || ! is_string( $input['rule'] ) ) { return ps_pen_paper_adventure_group_error(); }
-					$after = array( 'revision' => 1, 'title' => sanitize_text_field( $input['title'] ), 'status' => 'active',
-						'adventure_id' => $input['adventure_id'], 'snapshot' => $adventure['published'], 'scene_id' => $adventure['published']['start_scene'],
-						'rule' => $input['rule'], 'participants' => array(), 'proposal' => null, 'history' => array() );
+					$after = ps_pen_paper_adventure_group_initial( $input['adventure_id'], $adventure['published'], $input['title'], $input['rule'] );
 				} else {
 					$after = $before; $after['revision']++;
 					$member = ps_pen_paper_adventure_group_member( $campaign, $before, $user_id );
@@ -254,25 +291,18 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 							if ( ! $gm || $proposal['reviewer_id'] || ( 'gm' !== $before['rule'] && empty( $edge['gm_review'] ) ) ) { return ps_pen_paper_adventure_group_error(); }
 							$after['proposal']['reviewer_id'] = $user_id;
 						} elseif ( 'execute' === $operation ) {
-							$edge = ps_pen_paper_adventure_group_edge( $before, $proposal['edge_id'] );
-							$electorate = ps_pen_paper_adventure_group_electorate( $before );
-							if ( ! $member || $proposal['owner_id'] !== $user_id ||
-								! ps_pen_paper_adventure_group_quorum( $before['rule'], $electorate, $proposal['votes'], $proposal['reviewer_id'] ) ||
-								( ( 'gm' === $before['rule'] || ! empty( $edge['gm_review'] ) ) && ! ps_pen_paper_adventure_reviewer_authority( $campaign, $proposal['reviewer_id'] ) ) ) { return ps_pen_paper_adventure_group_error(); }
-							foreach ( $electorate as $voter ) { if ( ! ps_pen_paper_adventure_group_member( $campaign, $before, $voter ) ) { return ps_pen_paper_adventure_group_error(); } }
-							$character = ps_pen_paper_adventure_character( $campaign, $proposal['character_id'], true );
-							if ( is_wp_error( $character ) ) { return $character; }
-							$review = ! empty( $edge['gm_review'] ) ? array( 'edge_id' => $edge['id'], 'status' => 'approved', 'requester_id' => $user_id, 'reviewer_id' => $proposal['reviewer_id'] ) : null;
-							$history = array_column( $before['history'], 'decision' );
-							$decision = ps_pen_paper_execute_adventure_edge( $campaign, $character, $before['snapshot'], $edge, $history, $locks, $id, $review, $member['scenario_attempt'] ?? 0 );
-							if ( is_wp_error( $decision ) ) { return $decision; }
-							$after['history'][] = array( 'character_id' => $proposal['character_id'], 'owner_id' => $user_id, 'rule' => $before['rule'],
-								'electorate' => $electorate, 'votes' => $proposal['votes'], 'reviewer_id' => $proposal['reviewer_id'], 'decision' => $decision );
-							$after['scene_id'] = $decision['target_scene']; $after['proposal'] = null;
-							$next = array_filter( $before['snapshot']['edges'], static function ( $candidate ) use ( $after ) { return $after['scene_id'] && $candidate['from_scene'] === $after['scene_id']; } );
-							if ( ! $after['scene_id'] || ! $next ) { $after['status'] = 'completed'; }
+							$executed = ps_pen_paper_execute_group_proposal( $campaign, $id, $before, $after, $locks );
+							if ( is_wp_error( $executed ) ) { return $executed; }
 						}
 					}
+				}
+				$round = ps_pen_paper_play_round( $campaign->ID );
+				if ( is_wp_error( $round ) ) { return $round; }
+				if ( $round && 'active' !== $round['status'] ) { return ps_pen_paper_play_error(); }
+				if ( $round && 'propose' === $operation && 'any' === $before['rule'] ) {
+					$proposed = $before; $proposed['proposal'] = $after['proposal'];
+					$executed = ps_pen_paper_execute_group_proposal( $campaign, $id, $proposed, $after, $locks );
+					if ( is_wp_error( $executed ) ) { return $executed; }
 				}
 				if ( ! ps_pen_paper_valid_adventure_group( $after ) ) { return ps_pen_paper_adventure_group_error(); }
 				$new = ! $id;
@@ -284,8 +314,36 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 				}
 				$result = ps_pen_paper_write_document_event( $campaign->ID, $id, '_pspp_adventure_group', $before, $after,
 					array( 'kind' => 'adventure_group', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => $after['snapshot']['rules_revision'] ), $new );
+				if ( is_wp_error( $result ) ) { return $result; }
+				if ( $round && count( $after['history'] ) > count( $before['history'] ) ) {
+					$progress = ps_pen_paper_write_play_progress( $campaign, $after['status'] );
+					if ( is_wp_error( $progress ) ) { return $progress; }
+				}
 				return $result;
 		} );
 		return is_wp_error( $result ) ? $result : ( $created_id ? $created_id : true );
 	} );
+}
+
+function ps_pen_paper_execute_group_proposal( $campaign, $id, $before, &$after, $locks ) {
+	$proposal = $before['proposal']; $user_id = get_current_user_id();
+	$member = ps_pen_paper_adventure_group_member( $campaign, $before, $user_id );
+	$edge = ps_pen_paper_adventure_group_edge( $before, $proposal['edge_id'] );
+	$electorate = ps_pen_paper_adventure_group_electorate( $before );
+	if ( ! $member || ! $edge || $proposal['owner_id'] !== $user_id ||
+		! ps_pen_paper_adventure_group_quorum( $before['rule'], $electorate, $proposal['votes'], $proposal['reviewer_id'] ) ||
+		( ( 'gm' === $before['rule'] || ! empty( $edge['gm_review'] ) ) && ! ps_pen_paper_adventure_reviewer_authority( $campaign, $proposal['reviewer_id'] ) ) ) { return ps_pen_paper_adventure_group_error(); }
+	foreach ( $electorate as $voter ) { if ( ! ps_pen_paper_adventure_group_member( $campaign, $before, $voter ) ) { return ps_pen_paper_adventure_group_error(); } }
+	$character = ps_pen_paper_adventure_character( $campaign, $proposal['character_id'], true );
+	if ( is_wp_error( $character ) ) { return $character; }
+	$review = ! empty( $edge['gm_review'] ) ? array( 'edge_id' => $edge['id'], 'status' => 'approved', 'requester_id' => $user_id, 'reviewer_id' => $proposal['reviewer_id'] ) : null;
+	$decision = ps_pen_paper_execute_adventure_edge( $campaign, $character, $before['snapshot'], $edge, array_column( $before['history'], 'decision' ),
+		$locks, $id, $review, $member['scenario_attempt'] ?? 0 );
+	if ( is_wp_error( $decision ) ) { return $decision; }
+	$after['history'][] = array( 'character_id' => $proposal['character_id'], 'owner_id' => $user_id, 'rule' => $before['rule'],
+		'electorate' => $electorate, 'votes' => $proposal['votes'], 'reviewer_id' => $proposal['reviewer_id'], 'decision' => $decision );
+	$after['scene_id'] = $decision['target_scene']; $after['proposal'] = null;
+	$next = array_filter( $before['snapshot']['edges'], static function ( $candidate ) use ( $after ) { return $after['scene_id'] && $candidate['from_scene'] === $after['scene_id']; } );
+	if ( ! $after['scene_id'] || ! $next ) { $after['status'] = 'completed'; }
+	return 0;
 }

@@ -105,7 +105,7 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 				$protected = $derived || ( $player_creation && ! ps_pen_paper_character_creation_field_editable( $field, $rules ) ) || ( ! $is_gm && 'gm_only' === $mode );
 				if ( $protected && ! $derived ) { $value = $state['active']['values'][ $field['id'] ] ?? ps_pen_paper_character_values( $rules )[ $field['id'] ]; }
 				?>
-				<fieldset class="pspp-field" <?php echo 'resource' === $field['type'] ? 'data-character-resource' : ''; ?> <?php echo isset( $rules['allocation']['per_level'] ) && in_array( $field['id'], $rules['allocation']['fields'], true ) ? 'data-character-allocation-field' : ''; ?> data-range-message="<?php esc_attr_e( 'Der aktuelle Wert darf das persönliche Maximum nicht überschreiten.', 'ps-pen-paper' ); ?>">
+				<fieldset class="pspp-field" <?php echo 'resource' === $field['type'] && ! $protected ? 'data-character-resource' : ''; ?> <?php echo isset( $rules['allocation']['per_level'] ) && in_array( $field['id'], $rules['allocation']['fields'], true ) ? 'data-character-allocation-field' : ''; ?> data-range-message="<?php esc_attr_e( 'Der aktuelle Wert darf das persönliche Maximum nicht überschreiten.', 'ps-pen-paper' ); ?>">
 					<legend><?php echo esc_html( $field['label'] ); ?></legend>
 					<?php if ( $derived ) : ?><p><?php esc_html_e( 'Wird automatisch aus dem Erfahrungsstand berechnet.', 'ps-pen-paper' ); ?></p>
 					<?php elseif ( ! $is_gm ) : ?><p><?php echo esc_html( ps_pen_paper_field_edit_modes()[ $mode ] ); ?></p><?php endif; ?>

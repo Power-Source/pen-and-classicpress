@@ -57,6 +57,26 @@ als abgeschlossen markiert. Es gibt keinen ungeprüften Versionssprung.
 - [ ] Ersetzte Menü- und Formularwege entfernen, nicht parallel als zweite
   Oberfläche weiterpflegen. Bestehende Rechte und gespeicherte Inhalte erhalten.
 
+### Game-Lounge und wiederverwendbare Kampagnen
+
+- [x] Spielbereich als Game-Lounge statt allgemeinem Anleitungskasten:
+  Universumsauswahl, Kampagnen dieser Welt und globale eigene Kampagnenübersicht.
+- [x] Konkrete Links zu Charakterprofil, Story/Einleitung, Regeln, Handouts,
+  Spielverlauf und vorhandenem Weltwiki; optionale sichtbare Welteinleitung
+  getrennt von internen Leitungsnotizen.
+- [x] Universumsfarben übernehmen; Einladungen annehmen oder ablehnen und
+  Kampagnen nach Bestätigung verlassen, ohne Charaktere oder Verlauf zu löschen.
+- [x] Eigene laufende Abenteuer direkt öffnen; Gruppenstart zum neu angelegten
+  Durchlauf zurückführen statt zur allgemeinen Übersicht.
+- [ ] Drei ausdrücklich konfigurierbare Angebote: geleitet, solo und automatische
+  Gruppe. Der Lounge-Einstieg nutzt derzeit Spieltisch und veröffentlichte
+  Abenteuer; die eigenständige Modusfreigabe durch die Leitung ist noch offen.
+- [ ] Vorbereitete Kampagnen von Spielrunden trennen: dieselbe Kampagne mit
+  unterschiedlichen Gruppen und getrennten Spielständen wiederverwenden,
+  auch für geleitetes Spiel.
+- [ ] Warte-Lobby mit Teilnehmern, Charakterwahl und ausdrücklichem Rundenstart.
+  „Neue Runde anlegen“, „Beitreten“ und „Fortsetzen“ dürfen nicht verwechselt werden.
+
 ### 3. Charaktererstellung durch die Leitung konfigurieren
 
 - [ ] Anzahl eigener Charaktere je Spieler festlegen; auch offene Erstanträge

@@ -371,6 +371,35 @@ try {
 	pspp_test_assert( is_int( $creation_universe ) && $creation_universe > 0, 'Required campaign universe fixture failed.' ); $post_ids[] = $creation_universe;
 	$html = ps_pen_paper_frontend_shortcode();
 	pspp_test_assert( false !== strpos( $html, 'name="pspp_operation" value="create"' ) && false !== strpos( $html, 'name="pspp_frontend_page" value="' . $page_id . '"' ) && false === strpos( $html, 'admin-post.php' ), 'Permitted frontend campaign creation is absent or posts into the backend.' );
+	pspp_test_assert( $creation_universe === ps_pen_paper_save_universe( $creation_universe, array( 'name' => 'Creation universe ' . $suffix,
+		'description' => 'LOUNGE_PRIVATE_WORLD_NOTES', 'introduction' => 'LOUNGE_PLAYER_WORLD_INTRO' ), '1' ), 'World introduction could not be saved.' );
+	pspp_test_assert( is_array( ps_pen_paper_save_universe_link( $campaign_id, $creation_universe, '0', '2', 'confirmed' ) ), 'Lounge campaign universe link failed.' );
+	$second_universe = ps_pen_paper_save_universe( 0, array( 'name' => 'Second lounge world ' . $suffix, 'description' => '' ), '0' );
+	pspp_test_assert( is_int( $second_universe ), 'Second lounge universe failed.' ); $post_ids[] = $second_universe;
+	$second_lounge_campaign = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $user_ids['owner'],
+		'post_title' => 'SECOND_LOUNGE_CAMPAIGN' ), true );
+	pspp_test_assert( is_int( $second_lounge_campaign ), 'Second lounge campaign failed.' ); $post_ids[] = $second_lounge_campaign;
+	pspp_test_assert( is_array( ps_pen_paper_save_universe_link( $second_lounge_campaign, $second_universe, '0', '1', 'confirmed' ) ) &&
+		true === ps_pen_paper_change_membership( $second_lounge_campaign, $user_ids['player'], 'add', 'player', '0' ), 'Second lounge membership failed.' );
+	wp_set_current_user( $user_ids['player'] );
+	$_GET = array( 'pspp_universe' => (string) $creation_universe );
+	$lounge_html = ps_pen_paper_frontend_shortcode();
+	$lounge_dom = new DOMDocument(); @$lounge_dom->loadHTML( '<?xml encoding="UTF-8">' . $lounge_html );
+	$lounge_xpath = new DOMXPath( $lounge_dom );
+	pspp_test_assert( false !== strpos( $lounge_html, 'Game-Lounge' ) && false !== strpos( $lounge_html, 'LOUNGE_PLAYER_WORLD_INTRO' ) &&
+		false === strpos( $lounge_html, 'LOUNGE_PRIVATE_WORLD_NOTES' ) && false === strpos( $lounge_html, 'Neu dabei?' ) &&
+		false === strpos( $lounge_html, 'name="pspp_operation" value="create"' ) && false === strpos( $lounge_html, 'Vorbereiten &amp; verwalten' ),
+		'Lounge leaks notes, retains old onboarding or mixes campaign management into player view.' );
+	pspp_test_assert( 0 === $lounge_xpath->query( '//section[contains(@class,"pspp-lounge-world")]//*[@data-lounge-campaign="' . $second_lounge_campaign . '"]' )->length &&
+		false !== strpos( $lounge_xpath->query( '//*[@id="pspp-lounge-running"]' )->item( 0 )->textContent, 'SECOND_LOUNGE_CAMPAIGN' ),
+		'Universe selection filtered global campaigns or mixed worlds in the selected world.' );
+	pspp_test_assert( false !== strpos( $lounge_html, '#pspp-rulebook' ) && false !== strpos( $lounge_html, 'leave_confirmation' ),
+		'Lounge lost information links or confirmed self-departure.' );
+	$_GET = array( 'pspp_universe' => array( '1' ) );
+	pspp_test_assert( false === strpos( ps_pen_paper_frontend_shortcode(), 'LOUNGE_PLAYER_WORLD_INTRO' ), 'Malformed universe selection disclosed world introduction.' );
+	wp_set_current_user( $user_ids['owner'] );
+	pspp_test_assert( $creation_universe === ps_pen_paper_save_universe( $creation_universe, array( 'name' => 'Creation universe ' . $suffix, 'description' => '' ), '2' ) &&
+		'LOUNGE_PLAYER_WORLD_INTRO' === ps_pen_paper_universe_document( $creation_universe )['introduction'], 'Older universe forms erased the lounge introduction.' );
 	$owner->remove_cap( 'ps_pen_paper_create_campaigns' );
 	wp_set_current_user( $user_ids['player'] );
 	$_GET = array( 'pspp_campaign' => (string) $campaign_id );
@@ -442,6 +471,14 @@ try {
 		ps_pen_paper_valid_character_snapshot( $migration_event['before']['active'], $migration_event['migration_rules_before'] ) &&
 		ps_pen_paper_valid_character_snapshot( $migration_event['after']['active'], $migration_event['migration_rules_after'] ),
 		'Character migration history did not preserve separate historical schemas.' );
+	wp_set_current_user( $user_ids['player'] );
+	$preserved_character = get_post_meta( $character_id, '_pspp_character', true );
+	$membership = ps_pen_paper_membership_revision( $campaign_id );
+	pspp_test_assert( is_wp_error( ps_pen_paper_change_membership( $campaign_id, $user_ids['gm'], 'leave', '', (string) $membership['revision'] ) ) &&
+		is_wp_error( ps_pen_paper_change_membership( $campaign_id, $user_ids['player'], 'leave', '', '999999' ) ), 'Departure accepted a foreign user or stale membership.' );
+	pspp_test_assert( true === ps_pen_paper_change_membership( $campaign_id, $user_ids['player'], 'leave', '', (string) $membership['revision'] ) &&
+		'' === ps_pen_paper_campaign_role( $campaign, $user_ids['player'] ) && $preserved_character === get_post_meta( $character_id, '_pspp_character', true ),
+		'Player could not leave their campaign without losing the character.' );
 } finally {
 	wp_set_current_user( $original_user );
 	$GLOBALS['wp_query'] = $original_query;

@@ -46,6 +46,9 @@ function ps_pen_paper_render_universe_form( $id, $document, $page_id ) {
 			<input name="universe[name]" type="text" class="regular-text" value="<?php echo esc_attr( $document['name'] ); ?>" required></label></p>
 		<p><label><?php esc_html_e( 'Interne Weltbeschreibung', 'ps-pen-paper' ); ?><br>
 			<textarea name="universe[description]" rows="4" class="large-text"><?php echo esc_textarea( $document['description'] ); ?></textarea></label></p>
+		<p><label><?php esc_html_e( 'Welteinleitung für die Game-Lounge (optional)', 'ps-pen-paper' ); ?><br>
+			<textarea name="universe[introduction]" rows="4" maxlength="20000" class="large-text"><?php echo esc_textarea( $document['introduction'] ?? '' ); ?></textarea></label></p>
+		<p><?php esc_html_e( 'Diese Einleitung sehen alle angemeldeten Personen, denen dieses Universum angeboten wird. Keine Geheimnisse eintragen. Die interne Weltbeschreibung bleibt ausschließlich bei der Leitung.', 'ps-pen-paper' ); ?></p>
 		<input type="hidden" name="universe_complete" value="complete">
 		<?php submit_button( $id ? __( 'Universum speichern', 'ps-pen-paper' ) : __( 'Universum erstellen', 'ps-pen-paper' ) ); ?>
 	</form>

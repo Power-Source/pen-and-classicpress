@@ -97,17 +97,23 @@ function ps_pen_paper_render_scenario_access( $snapshot, $access ) {
 	foreach ( $access['messages'] as $message ) { echo '<p>' . esc_html( $message ) . '</p>'; }
 }
 
-function ps_pen_paper_render_scenario_character_links( $campaign, $page_id ) {
+function ps_pen_paper_render_scenario_character_links( $campaign, $page_id, $show_heading = true ) {
 	$heading_shown = false;
 	foreach ( ps_pen_paper_get_characters( $campaign ) as $character ) {
 		if ( (int) $character->post_author !== get_current_user_id() ) { continue; }
 		$state = ps_pen_paper_character_state( $campaign, $character );
 		if ( is_wp_error( $state ) ) { echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p>'; continue; }
 		if ( ! $state['active'] ) { continue; }
-		if ( ! $heading_shown ) { echo '<h3>' . esc_html__( 'Allein spielen', 'ps-pen-paper' ) . '</h3>'; $heading_shown = true; }
+		if ( ! $heading_shown && $show_heading ) { echo '<h3>' . esc_html__( 'Allein spielen', 'ps-pen-paper' ) . '</h3>'; }
+		$heading_shown = true;
 		/* translators: %s: player's approved character name. */
 		$label = sprintf( __( 'Mit %s spielen', 'ps-pen-paper' ), $state['active']['name'] );
 		echo '<p><a href="' . esc_url( ps_pen_paper_character_url( $campaign->ID, $character->ID, $page_id ) . '#pspp-adventures' ) . '">' .
 			esc_html( $label ) . '</a></p>';
+	}
+	if ( ! $heading_shown && ! $show_heading ) {
+		$url = ps_pen_paper_community_url();
+		echo '<p>' . esc_html__( 'Du brauchst einen eigenen freigegebenen Charakter für diese Kampagne.', 'ps-pen-paper' ) . '</p>';
+		if ( $url ) { echo '<a href="' . esc_url( $url ) . '">' . esc_html__( 'Meine Charaktere öffnen', 'ps-pen-paper' ) . '</a>'; }
 	}
 }

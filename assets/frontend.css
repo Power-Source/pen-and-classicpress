@@ -430,6 +430,34 @@
 }
 
 .pspp-game.pspp-workspace { padding: 0; overflow: clip; border-radius: 4px; }
+.pspp-game .pspp-lounge-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 16px;
+}
+.pspp-game .pspp-lounge-picker {
+	display: flex;
+	align-items: end;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin-block: 20px;
+}
+.pspp-game .pspp-lounge-picker select { width: min(100%, 420px); }
+.pspp-game .pspp-lounge > section { margin-block: 28px; }
+.pspp-game .pspp-lounge .pspp-grid {
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+.pspp-game .pspp-lounge-running { list-style: none; margin: 0; padding: 0; }
+.pspp-game .pspp-lounge-running > li {
+	padding: 16px;
+	margin-block: 12px;
+	border: 1px solid var(--pspp-border);
+	background: var(--pspp-surface);
+	border-radius: 6px;
+}
+.pspp-game .pspp-lounge-running > li > span { display: block; }
 .pspp-game.pspp-lobby { max-width: 850px; margin: 6vh auto; padding: clamp(20px, 6vw, 64px); border-block: 4px double var(--pspp-border); }
 .pspp-workspace > .pspp-table > .notice,
 .pspp-workspace .pspp-table-feedback { margin-inline: 24px; }

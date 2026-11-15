@@ -115,6 +115,18 @@ function ps_pen_paper_render_item_effects( $campaign, $character, $gear, $page_i
 function ps_pen_paper_render_game_round_controls( $campaign, $page_id ) {
 	$round = ps_pen_paper_game_round( $campaign->ID );
 	if ( is_wp_error( $round ) ) { echo '<p role="alert">' . esc_html( $round->get_error_message() ) . '</p>'; return; }
+	$play = ps_pen_paper_play_round( $campaign->ID );
+	if ( is_wp_error( $play ) ) { echo '<p role="alert">' . esc_html( $play->get_error_message() ) . '</p>'; return; }
+	if ( $play ) {
+		if ( 'guided' !== $play['mode'] ) { return; }
+		echo '<section class="pspp-game-round"><h3>' . esc_html__( 'Spielzüge', 'ps-pen-paper' ) . '</h3><p>' . esc_html( sprintf( __( 'Aktueller Zug: %d', 'ps-pen-paper' ), $round['round'] ) ) . '</p>';
+		if ( 'active' === $play['status'] && ps_pen_paper_can_manage_campaign( $campaign ) ) {
+			ps_pen_paper_equipment_form_start( $campaign, 'advance_game_round', $round['revision'], $page_id );
+			echo '<button>' . esc_html__( 'Nächster Spielzug', 'ps-pen-paper' ) . '</button></form>';
+		}
+		echo '</section>';
+		return;
+	}
 	echo '<section class="pspp-game-round"><h3>' . esc_html__( 'Echte Spielrunden', 'ps-pen-paper' ) . '</h3><p>' . esc_html( __( 'Spielrunde:', 'ps-pen-paper' ) . ' ' . $round['round'] . ' · ' . ( $round['active'] ? __( 'Sitzung aktiv', 'ps-pen-paper' ) : __( 'Sitzung beendet', 'ps-pen-paper' ) ) ) . '</p><p>' . esc_html__( 'Nur die Spielleitung zählt Runden weiter. Anwesenheit, AFK, Uhrzeit und Seitenaufrufe zählen niemals als Spielrunde. Ende der Sitzung hält die Rundenzählung an; Effekte mit Dauer laufen nur beim ausdrücklichen Weiterzählen ab.', 'ps-pen-paper' ) . '</p>';
 	if ( ps_pen_paper_can_manage_campaign( $campaign ) ) {
 		foreach ( $round['active'] ? array( 'advance_game_round' => __( 'Nächste Spielrunde / fällige Effekte beenden', 'ps-pen-paper' ), 'end_game_session' => __( 'Spielsitzung beenden', 'ps-pen-paper' ) ) : array( 'start_game_session' => __( 'Spielsitzung ausdrücklich starten', 'ps-pen-paper' ) ) as $operation => $label ) {

@@ -215,8 +215,28 @@ verfügbar; der gespeicherte Abschlussnachweis bleibt unabhängig davon erhalten
 ## Geschützter Spielbereich im Frontend
 
 Eine normale Seite mit dem Shortcode `[ps_pen_paper]` veröffentlichen; pro Seite
-eine Instanz verwenden. Angemeldete Mitglieder sehen dort ihre Kampagnen,
-Regeln und eigenen Charaktere. Spielleiter können Charaktere für Mitglieder
+eine Instanz verwenden. Die Startseite ist die **Game-Lounge**: Universum wählen,
+Kampagnen und erhaltene Einladungen sehen und eigene Spiele über alle Universen
+hinweg öffnen. Der Universumsfilter verändert nicht die globale Übersicht.
+Weltwiki, Story/Einleitung, Regelwerk, Handouts und Spielverlauf sind verlinkt;
+ein Wiki-Link erscheint nur bei vorhandener Anbindung. Die optionale
+**Welteinleitung für die Game-Lounge** ist getrennt von der geheimen internen
+Weltbeschreibung. Die Lounge und Kampagnenkarten übernehmen die Universumsfarben.
+Einladungen lassen sich hier annehmen oder ablehnen; sie gewähren vorher keine
+internen Inhalte. Eigene Charaktere bleiben im Charakterprofil.
+
+Unter **Spielmodus wählen** führt **Mit Spielleiter** zum bestehenden Spieltisch.
+Solo- und Gruppenabenteuer werden anhand der freigegebenen Abenteuer angeboten.
+Eigene laufende Abenteuer besitzen direkte Fortsetzen-Links. Der Gruppenstart
+führt jetzt zum konkret angelegten Durchlauf, auch bei Aufrufen aus dem Backend.
+Eine getrennte Warte-Lobby und unabhängig geführte Spielleiterrunden derselben
+Kampagne sind noch nicht umgesetzt.
+
+Mitglieder können **Kampagne verlassen** ausdrücklich bestätigen. Das beendet
+auch ihre aktiven Gruppenteilnahmen und verwirft offene Gruppenvorschläge,
+ohne Charaktere oder bisherigen Fortschritt zu löschen. Der Kampagnenersteller
+bleibt verantwortlich und kann sich nicht selbst entfernen.
+Spielleiter können Charaktere für Mitglieder
 erstellen, bearbeiten und Anträge freigeben oder verwerfen. Es gelten dieselben
 Bearbeitungsrechte und Revisionsprüfungen wie im Backend. Nach dem Speichern
 bleibt man im Frontend. Zugang, Beitrittsanfragen, Hintergrundbild und Farben
@@ -225,7 +245,7 @@ Spielleiter auch Name, Beschreibung und Archivstatus ändern sowie bestehende
 Website-Benutzer als Spieler oder Spielleiter aufnehmen und entfernen.
 Das **Regelwerk** lässt sich durch die Spielleitung direkt am Spieltisch
 einrichten und bearbeiten; Spieler behalten die lesende Ansicht.
-Berechtigte können unter **Kampagnen** oder auf der Übersicht eine neue Runde
+Berechtigte können unter **Vorbereiten & verwalten → Kampagnen** eine neue Kampagne
 anlegen und anschließend direkt deren Regelwerk einrichten. Dafür ist kein
 Wechsel ins Backend erforderlich; die Erstellberechtigung vergibt weiterhin
 die Website-Administration.

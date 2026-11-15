@@ -11,6 +11,7 @@ function ps_pen_paper_handle_adventure_action( $operation ) {
 	}
 	$id = ps_pen_paper_posted_id( 'adventure_id' ); $revision = ps_pen_paper_posted_text( 'adventure_revision' );
 	if ( 'start_adventure' === $operation ) {
+		ps_pen_paper_fail( __( 'Beginne das Abenteuer über die Game-Lounge und wähle dort deinen Charakter.', 'ps-pen-paper' ) );
 		$result = ps_pen_paper_start_adventure_run( $campaign, $id, ps_pen_paper_posted_id( 'character_id' ), $revision, ps_pen_paper_posted_text( 'character_revision' ) );
 		$character_id = ps_pen_paper_posted_id( 'character_id' );
 		$url = ps_pen_paper_profile_return( $campaign_id, $character_id );
@@ -339,6 +340,9 @@ function ps_pen_paper_render_adventure_editor( $campaign, $page_id ) {
 function ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ) {
 	if ( ! $campaign || 'pspp_campaign' !== $campaign->post_type || ! ps_pen_paper_can_access_site() ||
 		! ps_pen_paper_get_character( $campaign, $character->ID ) ) { return; }
+	$round = ps_pen_paper_play_round( $campaign->ID );
+	if ( is_wp_error( $round ) ) { echo '<p role="alert">' . esc_html( $round->get_error_message() ) . '</p>'; return; }
+	if ( $round && 'solo' !== $round['mode'] ) { return; }
 	$adventures = ps_pen_paper_adventure_records( $campaign, false );
 	$runs = ps_pen_paper_adventure_run_records( $campaign, $character->ID );
 	$state = ps_pen_paper_character_state( $campaign, $character );
@@ -350,25 +354,19 @@ function ps_pen_paper_render_character_adventures( $campaign, $character, $page_
 	?>
 	<section id="pspp-adventures" class="pspp-solo-adventures"><h3><?php esc_html_e( 'Soloabenteuer', 'ps-pen-paper' ); ?></h3>
 	<?php $game_page = ps_pen_paper_find_frontend_page( $page_id ); ?>
-	<?php if ( $game_page ) : ?>
-		<p><a href="<?php echo esc_url( ps_pen_paper_game_url( $game_page->ID, $campaign->ID ) . '#pspp-group-adventures' ); ?>"><?php esc_html_e( 'Gemeinsam am Spieltisch spielen', 'ps-pen-paper' ); ?></a></p>
+	<?php if ( $game_page && ! $round ) : ?>
+		<p><a href="<?php echo esc_url( ps_pen_paper_play_url( $game_page->ID, $campaign->ID, 'solo' ) ); ?>"><?php esc_html_e( 'Neue Solo-Runde in der Game-Lounge auswählen', 'ps-pen-paper' ); ?></a></p>
+	<?php elseif ( $game_page ) : ?>
 	<?php else : ?><p role="alert"><?php esc_html_e( 'Es ist keine veröffentlichte Spielbereich-Seite eingerichtet. Bitte wende dich an den Website-Betreiber.', 'ps-pen-paper' ); ?></p><?php endif; ?>
-	<p><?php esc_html_e( 'Dein eigener, gespeicherter Durchlauf. Die gemeinsame Szene bleibt unverändert. Entscheidungen zeigen konfigurierte Kosten und Belohnungsregeln vor dem Versuch; Würfe, Verbrauch und tatsächliche Vergaben werden protokolliert.', 'ps-pen-paper' ); ?></p>
 	<?php if ( ! $adventures ) : ?><p><?php esc_html_e( 'Derzeit sind keine freigegebenen Soloabenteuer vorhanden.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 	<?php foreach ( $adventures as $adventure_id => $adventure ) :
+		if ( $round && $adventure_id !== $round['adventure_id'] ) { continue; }
 		$existing = isset( $by_adventure[ $adventure_id ] ) ? $by_adventure[ $adventure_id ] : null;
 		$access = $state['active'] ? ps_pen_paper_scenario_access( $campaign, $adventure_id, $adventure['published'], array( 'post' => $character, 'state' => $state ), 'solo' ) : ps_pen_paper_scenario_error();
 		$can_start = ! is_wp_error( $access ) && $access['met'] && ( ! $existing || ( 'completed' === $existing['state']['status'] && isset( $adventure['published']['scenario'] ) ) ); ?>
 		<article class="pspp-solo-adventure" data-adventure-id="<?php echo esc_attr( $adventure_id ); ?>">
 			<h4><?php echo esc_html( $adventure['published']['title'] ); ?></h4>
 			<?php if ( ! $existing || 'completed' === $existing['state']['status'] ) { ps_pen_paper_render_scenario_access( $adventure['published'], $access ); } ?>
-			<?php if ( $can_start && 'published' === $adventure['status'] && (int) $character->post_author === get_current_user_id() ) :
-				ps_pen_paper_form_start( 'start_adventure', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
-				<input type="hidden" name="character_id" value="<?php echo esc_attr( $character->ID ); ?>"><input type="hidden" name="character_revision" value="<?php echo esc_attr( $state['revision'] ); ?>">
-				<input type="hidden" name="adventure_id" value="<?php echo esc_attr( $adventure_id ); ?>"><input type="hidden" name="adventure_revision" value="<?php echo esc_attr( $adventure['revision'] ); ?>">
-				<button type="submit"><?php echo esc_html( $existing ? __( 'Szenario wiederholen', 'ps-pen-paper' ) : __( 'Solo starten', 'ps-pen-paper' ) ); ?></button>
-			</form>
-			<?php endif; ?>
 			<?php if ( $existing ) : ps_pen_paper_render_adventure_run( $campaign, $character, $page_id, $existing['id'], $existing['state'], $state ); ?>
 			<?php elseif ( 'published' !== $adventure['status'] ) : ?><p><?php esc_html_e( 'Neue Durchläufe sind pausiert. Laufende Durchläufe bleiben unabhängig fortsetzbar.', 'ps-pen-paper' ); ?></p>
 			<?php elseif ( (int) $character->post_author !== get_current_user_id() ) : ?><p><?php esc_html_e( 'Nur der Besitzer startet den eigenen Durchlauf.', 'ps-pen-paper' ); ?></p><?php endif; ?>
@@ -378,6 +376,7 @@ function ps_pen_paper_render_character_adventures( $campaign, $character, $page_
 }
 
 function ps_pen_paper_render_adventure_run( $campaign, $character, $page_id, $run_id, $run, $character_state ) {
+	$round = ps_pen_paper_play_round( $campaign->ID );
 	$snapshot = $run['snapshot']; $scene = $run['scene_id'] ? $snapshot['scenes'][ $run['scene_id'] ] : null;
 	echo '<div class="pspp-adventure-run" id="pspp-adventure-run-' . esc_attr( $run_id ) . '" data-run-id="' . esc_attr( $run_id ) . '">';
 	if ( isset( $run['scenario_attempt'] ) ) {
@@ -405,7 +404,7 @@ function ps_pen_paper_render_adventure_run( $campaign, $character, $page_id, $ru
 		$last = end( $run['history'] ); echo '<p>' . esc_html( $snapshot['title'] . ' · ' . __( 'Abenteuer beendet', 'ps-pen-paper' ) . ' · ' . $last['choice'] ) . '</p>';
 	}
 	if ( 'completed' === $run['status'] ) { echo '<p role="status">' . esc_html( __( 'Durchlauf abgeschlossen.', 'ps-pen-paper' ) . ' ' . ps_pen_paper_scenario_outcomes()[ ps_pen_paper_scenario_outcome( $snapshot, $run['history'] ) ] ) . '</p>'; }
-	elseif ( (int) $character->post_author === get_current_user_id() ) {
+	elseif ( (int) $character->post_author === get_current_user_id() && ( ! $round || 'active' === $round['status'] ) ) {
 		$choices = array_values( array_filter( $snapshot['edges'], function ( $edge ) use ( $run ) { return $edge['from_scene'] === $run['scene_id']; } ) );
 		$rules = ps_pen_paper_get_rules( $campaign->ID );
 		foreach ( $choices as $edge ) {

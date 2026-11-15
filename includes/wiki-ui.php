@@ -2,6 +2,14 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
+function ps_pen_paper_public_wiki_url( $universe ) {
+	$config = get_post_meta( $universe->ID, '_pspp_wiki', true );
+	if ( '' === $config ) { return ''; }
+	if ( ! ps_pen_paper_valid_wiki_config( $config ) ) { return ps_pen_paper_wiki_error(); }
+	if ( ! $config['revision'] || ! ps_pen_paper_wiki_available() ) { return ''; }
+	return get_term_link( $config['root_id'], 'psource_wiki_category' );
+}
+
 function ps_pen_paper_wiki_url( $universe, $page_id, $entry_id = 0 ) {
 	$url = add_query_arg( 'pspp_wiki', 1, ps_pen_paper_universe_url( $universe->ID, $page_id ) );
 	if ( $entry_id ) { $url = add_query_arg( 'pspp_wiki_entry', $entry_id, $url ); }

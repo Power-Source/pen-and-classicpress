@@ -222,12 +222,16 @@ function ps_pen_paper_render_story( $campaign, $page_id ) {
 	if ( ! $id ) { $draft['grid'] = 0; }
 	?>
 	<h2><?php esc_html_e( 'Abenteuer vorbereiten & leiten', 'ps-pen-paper' ); ?></h2>
-	<details class="pspp-fold"<?php if ( ! $id ) { echo ' open'; } ?>>
+	<p><?php esc_html_e( 'Für den Anfang reicht eine Szene: Titel und Text schreiben, speichern, die Spielervorschau prüfen und freigeben. Mit „Am Tisch anzeigen“ sehen alle Teilnehmer die Szene. Karten, Kapitel und automatische Abenteuerentscheidungen sind optional.', 'ps-pen-paper' ); ?></p>
+	<p><a class="button" href="<?php echo esc_url( $base_url . '#pspp-play' ); ?>"><?php esc_html_e( 'Zum Spieltisch', 'ps-pen-paper' ); ?></a></p>
+	<details class="pspp-fold"<?php if ( ! $id && $plan['scenes'] ) { echo ' open'; } ?>>
 		<summary><?php esc_html_e( 'Abenteuerplan und aktuelle Spielleitungsnotizen', 'ps-pen-paper' ); ?></summary>
 		<?php ps_pen_paper_render_adventure_plan( $campaign, $page_id, $plan ); ?>
 	</details>
 	<p><a href="<?php echo esc_url( $base_url . '#pspp-folio' ); ?>"><?php esc_html_e( 'Kapitel und Spielleitermappe öffnen', 'ps-pen-paper' ); ?></a></p>
-	<p><?php esc_html_e( 'Entwurf speichern → private Spielervorschau prüfen → freigeben → am Tisch anzeigen. Entwurfsänderungen verändern nie sofort die Spielersicht. Alle freigegebenen Marker sind für die Runde sichtbar; private Charakterwerte werden nicht übertragen.', 'ps-pen-paper' ); ?></p>
+	<details><summary><?php esc_html_e( 'Hinweise zu Freigaben', 'ps-pen-paper' ); ?></summary>
+	<p><?php esc_html_e( 'Entwurfsänderungen verändern nie sofort die Spielersicht. Alle freigegebenen Marker sind für die Runde sichtbar; private Charakterwerte werden nicht übertragen.', 'ps-pen-paper' ); ?></p>
+	</details>
 	<nav class="pspp-navigation"><a href="<?php echo esc_url( $base_url . '#pspp-story' ); ?>"><?php esc_html_e( 'Neue Szene', 'ps-pen-paper' ); ?></a>
 	<?php foreach ( $plan['scenes'] as $scene_id => $item ) :
 		?><a href="<?php echo esc_url( add_query_arg( 'pspp_scene', $scene_id, $base_url ) . '#pspp-story' ); ?>"><?php echo esc_html( $item['draft']['title'] ); ?></a>
@@ -276,6 +280,9 @@ function ps_pen_paper_render_story( $campaign, $page_id ) {
 		<input type="hidden" name="scene_complete" value="complete">
 		<button type="submit"><?php esc_html_e( 'Entwurf speichern', 'ps-pen-paper' ); ?></button>
 	</form>
-	<?php ps_pen_paper_render_adventure_editor( $campaign, $page_id ); ?>
+	<details class="pspp-fold"<?php if ( isset( $_GET['pspp_adventure'] ) ) { echo ' open'; } ?>>
+		<summary><?php esc_html_e( 'Optional: Abenteuer mit vorbereiteten Entscheidungen', 'ps-pen-paper' ); ?></summary>
+		<?php ps_pen_paper_render_adventure_editor( $campaign, $page_id ); ?>
+	</details>
 	<?php
 }

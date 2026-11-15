@@ -82,9 +82,20 @@ function ps_pen_paper_render_equipment_catalogue( $scope, $page_id ) {
 	<p><?php esc_html_e( 'Vorlagen sind keine Inventargegenstände. Ausgabe erfolgt ausdrücklich am Charakter. Universumsvorlagen stehen zugeordneten Kampagnen zur Verfügung; sie gewähren keine Teilnahme- oder Handelsrechte.', 'ps-pen-paper' ); ?></p>
 	<details class="pspp-fold"><summary><?php esc_html_e( 'Slots und Seltenheitsstufen konfigurieren', 'ps-pen-paper' ); ?></summary>
 	<?php ps_pen_paper_equipment_form_start( $scope, 'save_equipment_schema', $schema['revision'], $page_id ); ?>
-		<label><?php esc_html_e( 'Slots: Kennung | Bezeichnung | Gegenstandstyp, eine Zeile pro Slot', 'ps-pen-paper' ); ?><textarea name="equipment[slots]" rows="5" placeholder="kopf | Kopf | kopfbedeckung"><?php
-			$lines = array(); foreach ( $schema['slots'] as $id => $entry ) { $lines[] = $id . ' | ' . $entry['label'] . ' | ' . $entry['kind']; } echo esc_textarea( implode( "\n", $lines ) );
-		?></textarea></label>
+		<fieldset class="pspp-field"><legend><?php esc_html_e( 'Ausrüstungsslots', 'ps-pen-paper' ); ?></legend>
+			<?php foreach ( ps_pen_paper_equipment_display_slots( $schema ) as $id => $entry ) : ?>
+				<div class="pspp-slot-setting">
+					<label><?php echo esc_html( $entry['label'] ); ?><input type="text" name="equipment[slot_rows][<?php echo esc_attr( $id ); ?>][label]" value="<?php echo esc_attr( $entry['label'] ); ?>" maxlength="200" required></label>
+					<input type="hidden" name="equipment[slot_rows][<?php echo esc_attr( $id ); ?>][kind]" value="<?php echo esc_attr( $entry['kind'] ); ?>">
+					<label class="pspp-check"><input type="checkbox" name="equipment[hidden_slots][<?php echo esc_attr( $id ); ?>]" value="hidden" <?php checked( ! empty( $entry['hidden'] ) ); ?>><?php esc_html_e( 'Ausblenden', 'ps-pen-paper' ); ?></label>
+				</div>
+			<?php endforeach; ?>
+			<input type="hidden" name="equipment[slot_visibility_complete]" value="complete">
+			<p><?php esc_html_e( 'Namen ändern oder „Ausblenden“ auswählen. Ausgeblendete Slots bleiben gespeichert; bereits angelegte Gegenstände und Boni bleiben unverändert.', 'ps-pen-paper' ); ?></p>
+		</fieldset>
+		<details><summary><?php esc_html_e( 'Weitere eigene Slots hinzufügen', 'ps-pen-paper' ); ?></summary>
+			<label><?php esc_html_e( 'Kennung | Bezeichnung | Gegenstandstyp, eine Zeile pro neuem Slot', 'ps-pen-paper' ); ?><textarea name="equipment[new_slots]" rows="3" placeholder="ruecken | Rücken | rucksack"></textarea></label>
+		</details>
 		<label><?php esc_html_e( 'Seltenheiten: Kennung | Bezeichnung | #Farbe, eine Zeile pro Stufe', 'ps-pen-paper' ); ?><textarea name="equipment[rarities]" rows="4" placeholder="normal | Normal | #718096"><?php
 			$lines = array(); foreach ( $schema['rarities'] as $id => $entry ) { $lines[] = $id . ' | ' . $entry['label'] . ' | ' . $entry['color']; } echo esc_textarea( implode( "\n", $lines ) );
 		?></textarea></label>
@@ -118,8 +129,10 @@ function ps_pen_paper_render_item_form( $scope, $schema, $page_id, $id = 0, $sta
 			$lines = array(); foreach ( $item['properties'] as $key => $value ) { $lines[] = $key . ' | ' . $value; } echo esc_textarea( implode( "\n", $lines ) );
 		?></textarea></label>
 		<fieldset class="pspp-field"><legend><?php esc_html_e( 'Automatische additive Boni beim Anlegen', 'ps-pen-paper' ); ?></legend>
-		<?php foreach ( ps_pen_paper_get_rules( $scope->ID )['fields'] as $field ) :
-			if ( ! in_array( $field['type'], array( 'number', 'attribute' ), true ) ) { continue; } ?>
+		<?php $bonus_rules = ps_pen_paper_get_rules( $scope->ID );
+		foreach ( $bonus_rules['fields'] as $field ) :
+			if ( ! in_array( $field['type'], array( 'number', 'attribute' ), true ) ||
+				( ! empty( $bonus_rules['progression'] ) && in_array( $field['id'], array( $bonus_rules['progression']['experience_field'], $bonus_rules['progression']['level_field'] ), true ) ) ) { continue; } ?>
 			<label><?php echo esc_html( $field['label'] ); ?><input type="number" min="-1000000" max="1000000" step="1" name="equipment[bonuses][<?php echo esc_attr( $field['id'] ); ?>]" value="<?php echo esc_attr( isset( $item['bonuses'][ $field['id'] ] ) ? $item['bonuses'][ $field['id'] ] : 0 ); ?>"></label>
 		<?php endforeach; ?></fieldset>
 		<label><?php esc_html_e( 'Gegenstandsgrafik hochladen / ersetzen', 'ps-pen-paper' ); ?><input type="file" name="equipment_image" accept="image/png,image/jpeg,image/webp"></label>
@@ -129,14 +142,66 @@ function ps_pen_paper_render_item_form( $scope, $schema, $page_id, $id = 0, $sta
 	<?php
 }
 
-function ps_pen_paper_render_character_equipment( $campaign, $character, $page_id ) {
+function ps_pen_paper_render_character_loadout( $campaign, $character, $name ) {
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_get_character( $campaign, $character->ID ) ) {
+		echo '<p role="alert">' . esc_html__( 'Du darfst diesen Charakter nicht ansehen.', 'ps-pen-paper' ) . '</p>';
+		return;
+	}
+	if ( 'pspp_campaign' !== $campaign->post_type || ! ps_pen_paper_community_available() ) {
+		ps_pen_paper_render_portrait( $campaign, $character, $name );
+		return;
+	}
+	$gear = ps_pen_paper_gear_state( $character->ID );
+	$schema = ps_pen_paper_equipment_schema( $campaign );
+	if ( is_wp_error( $gear ) || is_wp_error( $schema ) ) {
+		echo '<p role="alert">' . esc_html( ( is_wp_error( $gear ) ? $gear : $schema )->get_error_message() ) . '</p>';
+		return;
+	}
+	$columns = array( 'left' => array(), 'right' => array() );
+	$index = 0;
+	foreach ( ps_pen_paper_equipment_display_slots( $schema ) as $id => $slot ) {
+		if ( ! empty( $slot['hidden'] ) ) { continue; }
+		$columns[ 0 === $index++ % 2 ? 'left' : 'right' ][ $id ] = $slot;
+	}
+	echo '<div class="pspp-character-loadout">';
+	foreach ( $columns as $side => $slots ) {
+		if ( 'right' === $side ) {
+			echo '<div class="pspp-loadout-character">';
+			$image = ps_pen_paper_portrait_image( $campaign, $character );
+			if ( is_wp_error( $image ) ) { echo '<p role="alert">' . esc_html( $image->get_error_message() ) . '</p>'; }
+			elseif ( $image ) { echo '<img class="pspp-loadout-avatar" src="' . esc_attr( $image ) . '" alt="' . esc_attr( $name ) . '">'; }
+			else { echo '<div class="pspp-loadout-avatar pspp-loadout-avatar-empty" aria-hidden="true">' . esc_html( wp_html_excerpt( $name, 1, '' ) ) . '</div><p>' . esc_html__( 'Noch kein Charakterbild', 'ps-pen-paper' ) . '</p>'; }
+			echo '<strong>' . esc_html( $name ) . '</strong></div>';
+		}
+		echo '<ul class="pspp-loadout-slots pspp-loadout-' . esc_attr( $side ) . '">';
+		foreach ( $slots as $id => $slot ) {
+			$instance_id = isset( $gear['active']['slots'][ $id ] ) ? $gear['active']['slots'][ $id ] : null;
+			$instance = $instance_id ? $gear['active']['items'][ $instance_id ] : null;
+			echo '<li class="pspp-loadout-slot" data-equipment-slot="' . esc_attr( $id ) . '"><strong>' . esc_html( $slot['label'] ) . '</strong>';
+			$image = '';
+			if ( $instance && $instance['item']['asset_id'] ) {
+				$source = ps_pen_paper_get_character_scope( $instance['scope_id'] );
+				$image = $source ? ps_pen_paper_private_image_data( $source, $instance['item']['asset_id'] ) : ps_pen_paper_equipment_error();
+			}
+			if ( is_wp_error( $image ) ) { echo '<p role="alert">' . esc_html( $image->get_error_message() ) . '</p>'; }
+			elseif ( $image ) { echo '<img class="pspp-loadout-icon" src="' . esc_attr( $image ) . '" alt="' . esc_attr( $instance['item']['name'] ) . '" loading="lazy">'; }
+			else { echo '<span class="pspp-loadout-icon pspp-loadout-icon-empty" aria-hidden="true"></span>'; }
+			echo '<span>' . esc_html( $instance ? $instance['item']['name'] : __( 'Leer', 'ps-pen-paper' ) ) . '</span></li>';
+		}
+		echo '</ul>';
+	}
+	echo '</div>';
+}
+
+function ps_pen_paper_render_character_equipment( $campaign, $character, $page_id, $include_adventures = true ) {
 	ps_pen_paper_render_wallet( $campaign, $character, $page_id );
 	if ( 'pspp_campaign' !== $campaign->post_type ) { return; }
 	if ( ! ps_pen_paper_community_available() ) {
 		echo '<p>' . esc_html__( 'Inventar, Guthaben und Ausrüstung sind ohne PS Community inaktiv; gespeicherte Bestände bleiben erhalten.', 'ps-pen-paper' ) . '</p>';
 		ps_pen_paper_render_character_trade( $campaign, $character, $page_id );
 		ps_pen_paper_render_character_transfers( $campaign, $character, $page_id );
-		ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); return;
+		if ( $include_adventures ) { ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); }
+		return;
 	}
 	$gear = ps_pen_paper_gear_state( $character->ID );
 	$schema = ps_pen_paper_equipment_schema( $campaign );
@@ -153,6 +218,10 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 		ps_pen_paper_equipment_form_start( $campaign, 'equip_items', $gear['revision'], $page_id, $character->ID );
 		$snapshot = null !== $gear['pending'] ? $gear['pending'] : $gear['active'];
 		foreach ( $schema['slots'] as $slot_id => $slot ) {
+			if ( ! empty( $slot['hidden'] ) ) {
+				echo '<input type="hidden" name="equipment[slots][' . esc_attr( $slot_id ) . ']" value="' . esc_attr( isset( $snapshot['slots'][ $slot_id ] ) ? $snapshot['slots'][ $slot_id ] : '' ) . '">';
+				continue;
+			}
 			echo '<label>' . esc_html( $slot['label'] ) . '<select name="equipment[slots][' . esc_attr( $slot_id ) . ']"><option value="">' . esc_html__( 'Leer', 'ps-pen-paper' ) . '</option>';
 			foreach ( $snapshot['items'] as $instance_id => $instance ) {
 				if ( $instance['item']['kind'] !== $slot['kind'] ) { continue; }
@@ -171,11 +240,12 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 	}
 	echo '<dl class="pspp-equipped">';
 	foreach ( $schema['slots'] as $id => $slot ) {
+		if ( ! empty( $slot['hidden'] ) ) { continue; }
 		$name = isset( $gear['active']['slots'][ $id ] ) ? $gear['active']['items'][ $gear['active']['slots'][ $id ] ]['item']['name'] : __( 'Leer', 'ps-pen-paper' );
 		echo '<dt>' . esc_html( $slot['label'] ) . '</dt><dd>' . esc_html( $name ) . '</dd>';
 	}
 	echo '</dl>';
-	ps_pen_paper_render_character_adventures( $campaign, $character, $page_id );
+	if ( $include_adventures ) { ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); }
 	ps_pen_paper_render_character_trade( $campaign, $character, $page_id );
 	if ( $is_gm ) {
 		if ( $gear['active']['items'] ) {

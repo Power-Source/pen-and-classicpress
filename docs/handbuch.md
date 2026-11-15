@@ -48,11 +48,11 @@ sind seit 0.13.0 enthalten.
 | Szenenentwürfe, getrennte Geheimnisse, NPCs und geordnete Begegnungsphasen | Automatische Kampf-Engine |
 | Private Inhaltsvorschau und geschützter Kartentisch | Nebel des Krieges und Zeichenwerkzeuge |
 | Frei benennbare Charakterfelder, Basisbögen und Freigaben | Grafischer, frei positionierbarer Slotdesigner |
-| Würfel, Attributwerte und geschützte Ergebnisse | Automatische Erfolgsbewertung oder komplexe Würfelmechaniken |
-| Änderungs- und Wurfprotokoll, Auswahlfelder und optional geprüfter Attributpunktepool | Separate feldweise Bearbeitungsrechte |
+| Würfelsummen, optionale Erfolgspools, höchster/niedrigster Einzelwürfel und geschützte Ergebnisse | Explodierende Würfel und Regelskripte |
+| Änderungs- und Wurfprotokoll, Auswahlfelder, Attributpunktepool und feldweise Bearbeitungsrechte | Ressourcenauflagen je Kampagne |
 | Spielleitermappe, geschützte Text-/Bild-/PDF-Handouts mit ausgewählten Empfängern | Weitere Dateiformate |
 | Private Porträts sowie Community-gebundene Inventare, Ausrüstung und kontrollierter Handel | Stapelmengen und automatische Gegenstandssynchronisierung |
-| Solo-, hybride und gemeinsame Gruppendurchläufe mit Gegenstandsbedingungen, Abenteuerzuständen, Kapitelzugang, Wiederholungsregeln und Verbrauch gemeinsamer Basisressourcen | Optionale XP-/Levelautomatismen |
+| Solo-, hybride und gemeinsame Gruppendurchläufe, Zugang, Wiederholungsregeln und optionale Erfahrungs-/Stufenschwellen | Automatische Klassenentwicklung |
 | Privater, versionierter Kampagnenexport und bestätigte Wiederherstellung neuer/bestehender Kampagnen | Erweiterte Plattform- und Wiederherstellungstestmatrix |
 
 Die Spielleitung kann Szenentexte und Karten vorbereiten und gezielt anzeigen.
@@ -313,8 +313,8 @@ verbundene Runden sehen denselben neuen Stand. Offene Basisanträge und veraltet
 Verbrauchsvorschauen sperren den Vorgang; Wiederholen zahlt nicht nochmals.
 
 Ressourcenauflagen und universumsweite Mitgliedschaften bleiben offen.
-Eine frei benannte numerische Stufe ist möglich, aber noch kein XP-System oder
-automatischer Stufenaufstieg. Eine fehlende gemeinsame Basis erzeugt einen
+Optionale Erfahrungs-/Stufenschwellen berechnen eine frei benannte numerische
+Stufe aus dem Erfahrungsstand. Eine fehlende gemeinsame Basis erzeugt einen
 sichtbaren Fehler statt eines veralteten Ersatzbogens.
 
 ### Später auf Englisch übersetzen
@@ -420,6 +420,64 @@ auswählen und eine Gesamtsumme festlegen. Diese Attribute müssen zusammen
 genau die konfigurierte Punktzahl ergeben; es sind keine zusätzlichen Punkte
 oberhalb ihrer Startwerte. Ohne aktivierte Punkteverteilung gilt kein Punktepool.
 
+### Bearbeitungsrechte je Feld
+
+Unter **Bearbeitungsrecht** wählt die Spielleitung je Feld **Spieler direkt**,
+**Mit Freigabe** oder **Nur Spielleitung**. **Vorgabe des Regelwerks** erhält
+die bisherige Kampagnenpolitik; diese gilt auch für den Charakternamen.
+So kann der Hintergrund direkt bearbeitbar sein, während Erfahrung eine
+Freigabe benötigt und Lebenspunkte ausschließlich die Leitung ändert.
+Geschützte Werte werden auch bei manipulierten Formularen serverseitig gesperrt.
+
+Direkte Änderungen werden im gültigen Stand und im bestehenden Antrag
+nachgeführt. Andere beantragte Werte bleiben offen; eine Ablehnung nimmt
+direkte Änderungen nicht zurück. Ein neuer Bogen mit Freigabefeldern benötigt
+eine vollständige Erstfreigabe. Gemeinsame Basisbögen bleiben leitungsverwaltet.
+Diese Rechte betreffen Charakterfelder, nicht die getrennt verwalteten Geldkonten.
+
+### Optionale Erfahrung und Stufen
+
+1. Zwei Zahlen-/Attributfelder für Erfahrung und Stufe anlegen und speichern.
+2. Unter **Optionale Erfahrung und Stufen** die Berechnung aktivieren und
+   diese beiden unterschiedlichen Felder auswählen.
+3. Schwellen als **Erfahrung : Stufe** eingeben, eine Zeile je Schwelle,
+   beispielsweise `0 : 1`, `100 : 2`, `300 : 3`.
+4. Bei vorhandenen Bögen zuerst die Änderungsvorschau prüfen und ausdrücklich
+   bestätigen. Gültiger Stand und Antrag werden getrennt angepasst.
+
+Die erste Schwelle beginnt beim Minimum des Erfahrungsfeldes. Erfahrung und
+Stufen müssen aufsteigend sein und innerhalb ihrer Feldgrenzen liegen.
+Punkteverteilungsfelder sind ausgeschlossen. Die Stufe entspricht der höchsten
+erreichten Schwelle des jeweiligen Erfahrungsstandes; sinkende Erfahrung kann
+auch die Stufe senken. Beantragte Erfahrung verändert nur die beantragte Stufe.
+Das Stufenfeld ist nicht manuell editierbar. Klassen und Attributboni werden
+nicht vergeben; Erfahrung und Stufe erhalten keine Ausrüstungsboni oder
+Kampagnenauflagen. Beim Ausschalten bleiben vorhandene Werte erhalten.
+
+### Zusätzliche Würfelmechaniken
+
+Unter **Erlaubte Würfelmechaniken** gibt die Leitung einzelne Varianten frei.
+Ohne neue Konfiguration bleibt die bisherige Würfelsumme erhalten.
+
+- **Würfelpool:** genau eine Gruppe, etwa `4W6`, und eine Erfolgsschwelle
+  zwischen 1 und der Seitenzahl. Jeder Würfel ab dieser Schwelle zählt einmal;
+  keine Modifikatoren oder Attributaddition.
+- **Bestes/schlechtestes Ergebnis:** höchster/niedrigster Einzelwürfel einer
+  Gruppe. Bei `2W20 + 2` wird nur einer der beiden Würfel verwendet, danach
+  werden Modifikator und gegebenenfalls der gewählte Attributwert addiert.
+
+Einzelwürfe, Mechanik und Poolschwelle bleiben im geschützten Wurfprotokoll
+gespeichert. Spätere Regeländerungen ändern alte Ergebnisse nicht.
+Diese Varianten gelten für die Würfelbühne; Abenteuerproben und Beutetabellen
+behalten ihre bisherige Würfelsumme.
+
+Die eigenständige Live-Demorunde **Regelprobe – Werkstatt von Nebelhafen**
+wurde mit demomann über echte Browserformulare eingerichtet und geprüft:
+100 Erfahrung ergaben zunächst Stufe 2; die bestätigte Schwellenmigration
+änderte sie auf Stufe 3. Der Reparaturpool `4W6` mit Schwelle 4 ergab aus
+3, 6, 4, 6 genau drei Erfolge. Höchster und niedrigster Würfel wurden ebenfalls
+mit Modifikator und Handwerkswert geprüft. Bestehende Demorunden blieben unverändert.
+
 ### Bestehende Regeln ändern
 
 - **Umbenennen** erhält die interne Feldkennung und vorhandene Werte.
@@ -443,11 +501,13 @@ Spieler öffnen ihre Kampagne im Spielbereich und erstellen dort ihren eigenen
 Charakter. Spielleiter können auch Charaktere für andere Mitglieder erstellen.
 Name und Felder werden serverseitig geprüft.
 
-Die Spielleitung wählt pro Kampagne:
+Die Spielleitung wählt die Vorgabe pro Kampagne; eigene Feldrechte können
+diese Vorgabe für einzelne Werte ersetzen:
 
 - **Mit Freigabe:** Spieleränderungen bleiben zunächst ein Antrag.
 - **Direkt:** Spieleränderungen werden unmittelbar gültig.
-- **Nur Spielleiter:** Spieler können ihre Bögen lesen, aber nicht bearbeiten.
+- **Nur Spielleiter:** Ohne ausdrücklich freigegebene Einzelfelder können
+  Spieler ihre Bögen lesen, aber nicht bearbeiten.
 
 Im Freigabemodus zeigt die Charakterseite **„Gültiger Stand“** und gegebenenfalls
 **„Offener Antrag“** getrennt. Spielleiter können **„Freigeben“** oder
@@ -461,7 +521,8 @@ verwendet werden.
 Der Antrag war gespeichert, aber noch kein Wert freigegeben. Die spätere
 Freigabe ist ein eigener Protokolleintrag.*
 
-Ein neuer Spielerantrag ersetzt den vorherigen Antrag. Eine direkte Speicherung
+Neue Eingaben ersetzen die entsprechenden beantragten Werte. Direkte
+Spieleränderungen genehmigen andere offene Werte nicht. Eine direkte Speicherung
 durch den Spielleiter übernimmt die Werte sofort und entfernt einen offenen
 Antrag. Ein Wechsel der Bearbeitungspolitik allein genehmigt keine Anträge.
 

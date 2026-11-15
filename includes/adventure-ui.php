@@ -349,7 +349,10 @@ function ps_pen_paper_render_character_adventures( $campaign, $character, $page_
 	ps_pen_paper_sort_scenarios( $adventures );
 	?>
 	<section id="pspp-adventures" class="pspp-solo-adventures"><h3><?php esc_html_e( 'Soloabenteuer', 'ps-pen-paper' ); ?></h3>
-	<p><a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-group-adventures' ); ?>"><?php esc_html_e( 'Gemeinsame Abenteuer am Spieltisch öffnen', 'ps-pen-paper' ); ?></a></p>
+	<?php $game_page = ps_pen_paper_find_frontend_page( $page_id ); ?>
+	<?php if ( $game_page ) : ?>
+		<p><a href="<?php echo esc_url( ps_pen_paper_game_url( $game_page->ID, $campaign->ID ) . '#pspp-group-adventures' ); ?>"><?php esc_html_e( 'Gemeinsam am Spieltisch spielen', 'ps-pen-paper' ); ?></a></p>
+	<?php else : ?><p role="alert"><?php esc_html_e( 'Es ist keine veröffentlichte Spielbereich-Seite eingerichtet. Bitte wende dich an den Website-Betreiber.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 	<p><?php esc_html_e( 'Dein eigener, gespeicherter Durchlauf. Die gemeinsame Szene bleibt unverändert. Entscheidungen zeigen konfigurierte Kosten und Belohnungsregeln vor dem Versuch; Würfe, Verbrauch und tatsächliche Vergaben werden protokolliert.', 'ps-pen-paper' ); ?></p>
 	<?php if ( ! $adventures ) : ?><p><?php esc_html_e( 'Derzeit sind keine freigegebenen Soloabenteuer vorhanden.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 	<?php foreach ( $adventures as $adventure_id => $adventure ) :

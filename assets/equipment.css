@@ -14,3 +14,20 @@
 .pspp-wallet-balance strong { font-size: 1.5em; }
 .pspp-wallet form > label, .pspp-currency-settings form > label { display: block; margin-block: .75rem; }
 .pspp-wallet input, .pspp-wallet textarea, .pspp-currency-settings input, .pspp-currency-settings select { max-width: 100%; box-sizing: border-box; }
+.pspp-character-loadout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(100px, 1.2fr) minmax(0, 1fr); gap: clamp(8px, 2vw, 24px); align-items: start; margin-block: 1.5rem; }
+.pspp-loadout-character { display: flex; flex-direction: column; align-items: center; gap: .75rem; text-align: center; min-width: 0; overflow-wrap: anywhere; }
+.pspp-loadout-avatar { display: block; width: 100%; max-width: 240px; max-height: 360px; object-fit: contain; border: 1px solid var(--pspp-border, #64748b); border-radius: .5rem; }
+.pspp-loadout-avatar-empty { display: grid; place-items: center; min-height: 180px; background: var(--pspp-surface, #fff); font-size: 4rem; }
+:is(.pspp-game, .pspp-admin) .pspp-loadout-slots { display: grid; gap: .75rem; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.pspp-loadout-slot { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: .65rem; border: 1px solid var(--pspp-border, #64748b); border-radius: .5rem; background: var(--pspp-surface, #fff); text-align: center; overflow-wrap: anywhere; }
+.pspp-loadout-icon { display: block; width: 64px; height: 64px; max-width: 100%; object-fit: contain; }
+.pspp-loadout-icon-empty { box-sizing: border-box; border: 1px dashed var(--pspp-border, #64748b); border-radius: .4rem; }
+.pspp-character-tab-nav { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: 1rem; }
+.pspp-character-tab-nav a { display: inline-flex; align-items: center; min-height: 44px; padding-inline: 1rem; border: 1px solid var(--pspp-border, #64748b); border-radius: .4rem; color: var(--pspp-text, inherit); text-decoration: none; }
+.pspp-character-tab-nav [aria-selected="true"] { background: var(--pspp-primary); color: var(--pspp-primary-text); }
+.pspp-character-level { font-size: 1.2rem; }
+@media (max-width: 420px) {
+	.pspp-character-loadout { grid-template-columns: minmax(0, 1fr) minmax(80px, 1fr) minmax(0, 1fr); gap: 6px; }
+	.pspp-loadout-slot { padding: .35rem; font-size: .8rem; }
+	.pspp-loadout-icon { width: 44px; height: 44px; }
+}

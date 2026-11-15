@@ -110,6 +110,10 @@ function ps_pen_paper_render_universes( $page_id = 0 ) {
 				<?php ps_pen_paper_render_universe_form( $universe->ID, $document, $page_id ); ?>
 			</details>
 			<details class="pspp-fold">
+				<summary><?php esc_html_e( 'UI-Farben des Universums (optional)', 'ps-pen-paper' ); ?></summary>
+				<?php ps_pen_paper_render_style_settings( $universe, $page_id ); ?>
+			</details>
+			<details class="pspp-fold">
 				<summary><?php esc_html_e( 'Änderungsverlauf des Universums', 'ps-pen-paper' ); ?></summary>
 				<?php $log = ps_pen_paper_get_events( $universe ); ?>
 				<?php if ( is_wp_error( $log ) ) : ?>

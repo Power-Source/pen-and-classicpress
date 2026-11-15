@@ -21,11 +21,11 @@ function ps_pen_paper_render_table_sheet( $campaign, $page_id ) {
 		<article class="pspp-sheet"<?php $sheet_style_result = ps_pen_paper_sheet_attributes( $campaign ); ?>>
 			<?php if ( is_wp_error( $sheet_style_result ) ) { echo '<p role="alert">' . esc_html( $sheet_style_result->get_error_message() ) . '</p>'; } ?>
 			<div class="pspp-sheet-heading">
-				<?php ps_pen_paper_render_portrait( $campaign, $character, $state['active'] ? $state['active']['name'] : __( 'Neu', 'ps-pen-paper' ) ); ?>
 				<div><span class="pspp-eyebrow"><?php esc_html_e( 'Charakterbogen', 'ps-pen-paper' ); ?></span>
 					<h3><?php echo esc_html( $state['active'] ? $state['active']['name'] : __( 'Noch nicht freigegeben', 'ps-pen-paper' ) ); ?></h3>
 				</div>
 			</div>
+			<?php ps_pen_paper_render_character_loadout( $campaign, $character, $state['active'] ? $state['active']['name'] : __( 'Neu', 'ps-pen-paper' ) ); ?>
 			<?php if ( $state['active'] ) : ?>
 				<?php foreach ( array(
 					__( 'Profil & Hintergrund', 'ps-pen-paper' ) => array( 'text', 'textarea' ),
@@ -104,15 +104,20 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 			<div class="pspp-turn-banner" data-table-turn><?php echo esc_html( $state['turn']['available'] ? ( $state['turn']['user_id'] ? $labels['turn'] . ' ' : '' ) . $state['turn']['name'] : $labels['unavailable'] ); ?></div>
 		</header>
 		<nav class="pspp-table-tools" aria-label="<?php esc_attr_e( 'Spieltisch', 'ps-pen-paper' ); ?>">
-			<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id ) ); ?>"><?php esc_html_e( 'Kampagnen wechseln', 'ps-pen-paper' ); ?></a>
+			<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id ) ); ?>"><?php esc_html_e( 'Spiele wechseln', 'ps-pen-paper' ); ?></a>
+			<?php if ( $character_id ) : ?><a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-play' ); ?>"><?php esc_html_e( 'Zurück zum Spieltisch', 'ps-pen-paper' ); ?></a><?php endif; ?>
+			<details data-table-management>
+			<summary><?php echo esc_html( $is_gm ? __( 'Vorbereiten & verwalten', 'ps-pen-paper' ) : __( 'Weitere Informationen', 'ps-pen-paper' ) ); ?></summary>
+			<div class="pspp-table-tools">
 			<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-log' ); ?>"><?php esc_html_e( 'Spielprotokoll', 'ps-pen-paper' ); ?></a>
 			<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-rulebook' ); ?>"><?php esc_html_e( 'Regelwerk', 'ps-pen-paper' ); ?></a>
 			<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-handouts' ); ?>"><?php esc_html_e( 'Handouts', 'ps-pen-paper' ); ?></a>
 			<?php if ( $is_gm ) : ?><a data-table-view="folio" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-folio' ); ?>"><?php esc_html_e( 'Spielleitermappe', 'ps-pen-paper' ); ?></a><?php endif; ?>
 			<?php if ( $is_gm ) : ?><a data-table-view="settings" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-settings' ); ?>"><?php esc_html_e( 'Rundeneinstellungen', 'ps-pen-paper' ); ?></a><?php endif; ?>
-			<?php if ( $is_gm ) : ?><a data-table-view="story" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-story' ); ?>"><?php esc_html_e( 'Abenteuer & Szenen', 'ps-pen-paper' ); ?></a><?php endif; ?>
+			<?php if ( $is_gm ) : ?><a data-table-view="story" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-story' ); ?>"><?php esc_html_e( 'Szenen, Karten & Abenteuer vorbereiten', 'ps-pen-paper' ); ?></a><?php endif; ?>
 			<?php if ( $is_gm && ps_pen_paper_community_available() ) : ?><a data-table-view="equipment" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-equipment' ); ?>"><?php esc_html_e( 'Gegenstände', 'ps-pen-paper' ); ?></a><?php endif; ?>
 			<?php if ( ps_pen_paper_community_url() ) : ?><a href="<?php echo esc_url( ps_pen_paper_community_url() ); ?>"><?php esc_html_e( 'Mein Charakterprofil', 'ps-pen-paper' ); ?></a><?php endif; ?>
+			</div></details>
 		</nav>
 		<?php ps_pen_paper_render_notice(); ?>
 		<?php if ( is_wp_error( $backdrop ) ) : ?><p role="alert"><?php echo esc_html( $backdrop->get_error_message() ); ?></p><?php endif; ?>
@@ -122,16 +127,15 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 		<?php else : ?>
 			<nav class="pspp-table-tabs" aria-label="<?php esc_attr_e( 'Spieltisch-Bereiche', 'ps-pen-paper' ); ?>">
 				<span class="pspp-mobile-turn" data-table-turn><?php echo esc_html( $state['turn']['available'] ? ( $state['turn']['user_id'] ? $labels['turn'] . ' ' : '' ) . $state['turn']['name'] : $labels['unavailable'] ); ?></span>
-				<a href="#pspp-play" data-table-view="play"><?php esc_html_e( 'Spiel', 'ps-pen-paper' ); ?></a>
+				<a href="#pspp-play" data-table-view="play"><?php esc_html_e( 'Spieltisch', 'ps-pen-paper' ); ?></a>
+				<a href="#pspp-group-adventures" data-table-view="adventures"><?php esc_html_e( 'Abenteuer spielen', 'ps-pen-paper' ); ?></a>
 				<a href="#pspp-sheet" data-table-view="sheet"><?php echo esc_html( $is_gm ? __( 'Bögen', 'ps-pen-paper' ) : __( 'Mein Bogen', 'ps-pen-paper' ) ); ?></a>
 				<a href="#pspp-dice" data-table-view="dice"><?php esc_html_e( 'Würfel', 'ps-pen-paper' ); ?></a>
-				<a href="#pspp-group" data-table-view="group"><?php esc_html_e( 'Gruppe', 'ps-pen-paper' ); ?></a>
-				<a href="#pspp-group-adventures" data-table-view="adventures"><?php esc_html_e( 'Abenteuer', 'ps-pen-paper' ); ?></a>
 			</nav>
 			<div class="pspp-table-layout">
 				<aside id="pspp-group" class="pspp-table-panel pspp-table-group" data-table-panel="group">
 					<div class="pspp-party-heading"><h2><?php esc_html_e( 'Am Spieltisch', 'ps-pen-paper' ); ?></h2>
-						<a href="#pspp-group" data-group-toggle><?php esc_html_e( 'Anwesenheit & Pause', 'ps-pen-paper' ); ?></a>
+						<a href="#pspp-group" data-group-toggle data-table-view="group"><?php esc_html_e( 'Anwesenheit & Pause', 'ps-pen-paper' ); ?></a>
 					</div>
 					<ul class="pspp-party" data-table-members>
 						<?php foreach ( $state['members'] as $member ) : ?>
@@ -168,6 +172,11 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 					</details>
 				</aside>
 				<section id="pspp-play" class="pspp-table-panel pspp-table-stage pspp-scene" data-table-panel="play"<?php if ( ! is_wp_error( $backdrop ) && $backdrop ) : ?> style="<?php echo esc_attr( '--pspp-table-image:url("' . $backdrop . '")' ); ?>"<?php endif; ?>>
+					<div class="pspp-table-prompts">
+						<a href="#pspp-group-adventures"><?php esc_html_e( 'Abenteuer starten / fortsetzen', 'ps-pen-paper' ); ?></a>
+						<a href="#pspp-dice"><?php esc_html_e( 'Würfeln', 'ps-pen-paper' ); ?></a>
+					</div>
+					<p class="description"><?php esc_html_e( 'Hier zeigt die Spielleitung die aktuelle Szene – mit Karte, wenn eine vorbereitet wurde. Für gespeicherte Abenteuerentscheidungen öffne „Abenteuer spielen“.', 'ps-pen-paper' ); ?></p>
 					<?php ps_pen_paper_render_map( $campaign, ps_pen_paper_map_state( $campaign ) ); ?>
 					<div class="pspp-scene-caption" data-map-fallback>
 					<span class="pspp-eyebrow"><?php esc_html_e( 'Eure Welt. Eure Geschichte.', 'ps-pen-paper' ); ?></span>

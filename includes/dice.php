@@ -230,7 +230,7 @@ function ps_pen_paper_get_roll( $campaign, $roll_id ) {
 	if ( ! is_array( $event ) || ! isset( $event['version'], $event['visibility'], $event['recipient_id'] ) || 1 !== $event['version'] || ! is_string( $event['visibility'] ) || ! array_key_exists( $event['visibility'], ps_pen_paper_roll_visibility_labels() ) ) {
 		return new WP_Error( 'invalid_roll', __( 'Ein gespeicherter Wurf ist beschädigt. Bitte informiere den Administrator.', 'ps-pen-paper' ) );
 	}
-	if ( array_key_exists( 'mechanic', $event ) && ! ps_pen_paper_prepare_import_validate_roll( $event ) ) {
+	if ( ( array_key_exists( 'mechanic', $event ) || array_key_exists( 'threshold', $event ) ) && ! ps_pen_paper_prepare_import_validate_roll( $event ) ) {
 		return new WP_Error( 'invalid_roll', __( 'Die gespeicherte Würfelmechanik oder ihr Ergebnis ist beschädigt. Bitte informiere den Administrator.', 'ps-pen-paper' ) );
 	}
 	if ( isset( $event['character'] ) && is_array( $event['character'] ) && array_key_exists( 'context', $event['character'] ) ) {

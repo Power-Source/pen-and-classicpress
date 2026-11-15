@@ -28,14 +28,15 @@ function ps_pen_paper_enqueue_admin_assets( $hook ) {
 	}
 	$url = plugin_dir_url( dirname( __DIR__ ) . '/ps-pen-paper.php' );
 	wp_enqueue_style( 'ps-pen-paper-admin', $url . 'assets/admin.css', array(), '0.7.0' );
-	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.1' );
+	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.2' );
 	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.26.0', true );
 	wp_enqueue_script( 'ps-pen-paper-style', $url . 'assets/styles.js', array(), '0.7.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
 	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.15.0' );
 	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array(), '0.13.0', true );
 	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.17.0' );
-	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.0' );
+	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.1' );
+	wp_enqueue_script( 'ps-pen-paper-character', $url . 'assets/character.js', array(), '0.1.0', true );
 }
 
 function ps_pen_paper_admin_url( $campaign_id = 0 ) {
@@ -99,6 +100,7 @@ function ps_pen_paper_handle_admin_action() {
 		}
 	}
 	if ( 'group_adventure' === $operation ) { ps_pen_paper_handle_adventure_group_action(); }
+	if ( 'save_universe_style' === $operation ) { ps_pen_paper_handle_universe_style_action(); }
 	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'save_adventure_world', 'save_adventure_scenario', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure', 'request_adventure_review', 'review_adventure_run', 'cancel_adventure_review' ), true ) ) { ps_pen_paper_handle_adventure_action( $operation ); }
 	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) ) { ps_pen_paper_handle_trade_action( $operation ); }
 	if ( 'transfer_campaign_assets' === $operation ) { ps_pen_paper_handle_transfer_action(); }
@@ -161,7 +163,7 @@ function ps_pen_paper_handle_admin_action() {
 			}
 			ps_pen_paper_fail( __( 'Die Kampagne konnte nicht vollständig gespeichert werden.', 'ps-pen-paper' ) );
 		}
-		ps_pen_paper_redirect( 'created', $campaign_id, $page_id, 'pspp-rulebook' );
+		ps_pen_paper_redirect( 'created', $campaign_id, $page_id, $page_id ? 'pspp-story' : 'pspp-rulebook' );
 	}
 
 	if ( 'creator_permission' === $operation ) {
@@ -459,6 +461,7 @@ function ps_pen_paper_render_campaign_create_form( $page_id = 0 ) {
 	if ( ! ps_pen_paper_can_create_campaign() ) { return; }
 	?>
 		<h2><?php esc_html_e( 'Neue Kampagne', 'ps-pen-paper' ); ?></h2>
+		<p><?php esc_html_e( 'Name eingeben und anlegen. Danach schreibst du die erste Szene; eine Karte ist optional. Regeln, Charaktere und weitere Einstellungen kannst du anschließend ergänzen.', 'ps-pen-paper' ); ?></p>
 		<?php ps_pen_paper_form_start( 'create', 'pspp_create', 0, $page_id ); ?>
 			<p><label for="pspp-new-title"><?php esc_html_e( 'Name', 'ps-pen-paper' ); ?></label><br>
 			<input id="pspp-new-title" name="title" type="text" class="regular-text" required></p>

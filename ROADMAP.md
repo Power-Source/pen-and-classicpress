@@ -180,7 +180,13 @@ einen endgültigen Funktionsumfang.
 - Konfigurierbare universumsweite Teilnahme und zusätzliche kampagnenbezogene
   Freigaben. Aktuell entscheidet weiterhin jede Kampagne über ihre Mitglieder;
   eine spätere Universumsmitgliedschaft darf keine Geschichten ungefragt öffnen.
-- Ressourcenauflagen, optionaler XP-/Levelautomatismus und getrennte Spielsitzungen.
+- [x] Feldweise Spielerrechte: direkt, mit Freigabe oder nur Spielleitung;
+  unveränderte Vorgabe für bestehende Felder und getrennte aktive/beantragte Werte.
+- [x] Optionale Erfahrungs-/Stufenschwellen mit frei gewählten Feldern,
+  bestätigter Migration und ohne Klassen oder automatische Attributboni.
+- [x] Optionale Würfelpools mit Erfolgszählung sowie höchster/niedrigster
+  Einzelwürfel auf der Würfelbühne; bestehende Summen bleiben unverändert.
+- Ressourcenauflagen und getrennte Spielsitzungen bleiben offen.
 
 ## Grundprinzipien
 
@@ -440,11 +446,12 @@ ist weiterhin kein Ziel.
 4. **Regeln und Universen — Grundlagen umgesetzt:** Strukturänderungen mit
    Vorschau und Konfliktauflösung, Rückverbindungen, Basisbogenanträge und
    Freigaben, Auswahlfelder, Punkteverteilung und gemeinsamer Ressourcenverbrauch.
-   Optionale XP-/Level-/Rangautomatismen bleiben spätere Erweiterungen.
+   Feldweise Rechte, optionale Erfahrungs-/Stufenschwellen und zusätzliche
+   Würfelmechaniken sind ergänzt. Ressourcenauflagen bleiben offen.
 5. **Spielwelt — beauftragte Grundlagen umgesetzt:** Mehrere Beuteempfänger,
    Gegenstandsgruppen, verschachtelte Tabellen einschließlich Wiederherstellung,
    Wiki-Verknüpfungen, geschützte PDF-/Text-Handouts, Empfängerkreise und
-   Einladungen. Universums-Beutekataloge sind ergänzt; weitere Würfelarten bleiben offen.
+   Einladungen. Universums-Beutekataloge sind ergänzt.
 6. **Qualität und Plattformprüfung begleitend:** Geänderte Abläufe live auf
    der Testseite und mit gezielten Regressionen prüfen. Unterstützte Versionen
    von WordPress, ClassicPress und PHP mit einer reproduzierbaren Testmatrix
@@ -1105,13 +1112,13 @@ Spielwelterweiterungen werden dadurch nicht wieder zurückgestellt:
   Vorlagen bewusst als anpassbare Kopien übernehmen, nicht automatisch
   synchronisieren. Versionierter Export und kontrollierter Import bilden
   dafür die Grundlage.
-- Erweiterte Würfelmechaniken wie Erfolgswürfe, Würfelpools oder explodierende
-  Würfel als optionale Regeln.
+- Würfelpools und höchster/niedrigster Einzelwürfel sind als optionale
+  Würfelbühnen-Regeln vorhanden. Explodierende Würfel sind nicht beauftragt.
 - Komfortfunktionen für den Vergleich von Regelversionen und die gebündelte
   Übernahme umfangreicher Änderungen. Die grundlegende Absicherung und
   Nachvollziehbarkeit von Regeländerungen gehört bereits in die frühen Phasen.
-- Optionales Level- oder Rangsystem, Erfahrungspunkte und weitere
-  Freigabeabläufe entsprechend dem gewählten Kampagnenregelwerk.
+- Optionale Erfahrungs-/Stufenschwellen sind vorhanden. Weiterführende
+  Rangregeln und Freigabeabläufe bleiben mögliche spätere Erweiterungen.
 - Sitzungsnotizen, Terminübersicht und Zusammenfassungen vergangener Sitzungen.
 - Import und Export eigener Kampagnen- oder Regelvorlagen mit klaren Optionen
   für private Inhalte und personenbezogene Daten.

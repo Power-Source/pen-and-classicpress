@@ -33,20 +33,7 @@ function ps_pen_paper_render_dashboard_navigation( $page_id = 0 ) {
 function ps_pen_paper_render_dashboard( $page_id = 0 ) {
 	?>
 	<h2><?php esc_html_e( 'Dein Spielbereich', 'ps-pen-paper' ); ?></h2>
-	<p><?php esc_html_e( 'Verwalte deine Runden und Charaktere hier. Der eigentliche Spieltisch öffnet sich erst, wenn du eine Kampagne auswählst.', 'ps-pen-paper' ); ?></p>
-	<div class="pspp-grid">
-		<?php foreach ( array(
-			'universes' => array( __( 'Universen', 'ps-pen-paper' ), __( 'Eigene Welten verwalten und Kampagnen bewusst zuordnen.', 'ps-pen-paper' ) ),
-			'campaigns' => array( __( 'Kampagnen', 'ps-pen-paper' ), __( 'Runde auswählen und den Spieltisch betreten.', 'ps-pen-paper' ) ),
-			'characters' => array( __( 'Charakterverwaltung', 'ps-pen-paper' ), __( 'Deine berechtigten Bögen finden und bearbeiten.', 'ps-pen-paper' ) ),
-			'settings' => array( __( 'Einstellungen', 'ps-pen-paper' ), __( 'Als Spielleitung Zugang, Anfragen, Bilder und Farben verwalten.', 'ps-pen-paper' ) ),
-		) as $section => $item ) : ?>
-			<article class="pspp-card">
-				<h3><a href="<?php echo esc_url( ps_pen_paper_dashboard_url( $section, $page_id ) ); ?>"><?php echo esc_html( $item[0] ); ?></a></h3>
-				<p><?php echo esc_html( $item[1] ); ?></p>
-			</article>
-		<?php endforeach; ?>
-	</div>
+	<p><?php esc_html_e( 'Wähle unten deine Kampagne und klicke „Spielen“. Du kommst direkt zum Spieltisch. Die Spielleitung findet ihre Werkzeuge getrennt unter „Vorbereiten & verwalten“.', 'ps-pen-paper' ); ?></p>
 	<details class="pspp-fold">
 		<summary><?php esc_html_e( 'Neu dabei? So kommst du zum Charakterbogen', 'ps-pen-paper' ); ?></summary>
 		<ol>

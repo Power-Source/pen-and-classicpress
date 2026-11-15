@@ -76,6 +76,37 @@ try {
 	wp_set_current_user( $users['player'] );
 	$check( isset( cpc_get_profile_tabs( $users['player'] )['pspp'] ) && ! isset( cpc_get_profile_tabs( $users['outsider'] )['pspp'] ), 'Own-profile tab visibility failed.' );
 	$check( false === strpos( cpc_render_profile_tab_content( $users['outsider'], 'pspp' ), 'PRIVATE_HERO' ), 'Forged profile tab exposed data.' );
+	wp_set_current_user( $users['gm'] );
+	foreach ( array( 'PROFILE_EMPTY_CAMPAIGN', 'PROFILE_FOREIGN_CHARACTERS' ) as $title ) {
+		$profile_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => $title ), true );
+		$check( is_int( $profile_id ) && $profile_id > 0, 'Profile campaign fixture failed.' );
+		$parents[] = $profile_id;
+		add_post_meta( $profile_id, '_pspp_player', (string) $users['player'] );
+	}
+	$foreign_rules = ps_pen_paper_save_rules( $profile_id, $input, '0' );
+	$check( ! is_wp_error( $foreign_rules ), 'Foreign profile rules fixture failed.' );
+	$foreign_values = array( 'name' => 'PROFILE_FOREIGN_HERO', 'values' => array( $foreign_rules['fields'][0]['id'] => '5' ) );
+	$check( is_int( ps_pen_paper_save_character( $profile_id, 0, $users['gm'], $foreign_values, '0', '1' ) ), 'Foreign profile character fixture failed.' );
+	wp_set_current_user( $users['player'] );
+	$profile_html = cpc_render_profile_tab_content( $users['player'], 'pspp' );
+	$check( false !== strpos( $profile_html, 'PRIVATE_HERO' ) && false !== strpos( $profile_html, 'Kampagne: Equipment fixture' ) &&
+		false === strpos( $profile_html, 'PROFILE_EMPTY_CAMPAIGN' ) && false === strpos( $profile_html, 'PROFILE_FOREIGN_CHARACTERS' ) &&
+		false === strpos( $profile_html, 'PROFILE_FOREIGN_HERO' ), 'Own profile displayed empty/foreign campaign headings or lost character association.' );
+	wp_set_current_user( $users['outsider'] );
+	$profile_html = cpc_render_profile_tab_content( $users['outsider'], 'pspp' );
+	$check( false !== strpos( $profile_html, 'Du hast noch keine eigenen Charaktere' ) &&
+		false === strpos( $profile_html, 'PRIVATE_HERO' ), 'Empty own profile did not show an explicit empty state.' );
+	wp_set_current_user( $users['player'] );
+	foreach ( array( '[ps_pen_paper]', '[cpc_profile]' ) as $content ) {
+		$page_id = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'Navigation fixture', 'post_content' => $content ), true );
+		$check( is_int( $page_id ) && $page_id > 0, 'Navigation page fixture failed.' );
+		$parents[] = $page_id;
+	}
+	$game_page = ps_pen_paper_find_frontend_page( $page_id );
+	$check( $game_page && $game_page->ID !== $page_id, 'Profile was selected as a game page.' );
+	ob_start(); ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); $adventure_html = ob_get_clean();
+	$check( false !== strpos( $adventure_html, esc_url( ps_pen_paper_game_url( $game_page->ID, $campaign->ID ) . '#pspp-group-adventures' ) ) &&
+		false === strpos( $adventure_html, esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-group-adventures' ) ), 'Profile adventure link did not reach the actual game page.' );
 	$check( is_wp_error( ps_pen_paper_item_catalogue( $campaign ) ) && is_wp_error( ps_pen_paper_save_gear( $campaign, $character_id, 'grant_item', array(), '1' ) ), 'Player accessed catalogue/issuance.' );
 	$check( is_wp_error( ps_pen_paper_save_gear( $campaign, $character_id, 'equip_items', array( 'slots' => array( 'kopf' => wp_generate_uuid4() ) ), '1' ) ), 'Forged item equipped.' );
 	$check( is_wp_error( ps_pen_paper_save_gear( $campaign, $character_id, 'equip_items', array( 'slots' => array( 'kopf' => $instance, 'hand' => $instance ) ), '1' ) ), 'Same instance equipped twice.' );

@@ -26,14 +26,15 @@
 	function showView(view) {
 		if (!panels.some(function (panel) { return panel.dataset.tablePanel === view; })) view = 'play';
 		const stage = view === 'group' ? 'play' : view;
+		const playing = ['play', 'adventures', 'sheet', 'dice', 'log', 'handouts', 'group'].includes(view);
 		panels.forEach(function (panel) {
 			const name = panel.dataset.tablePanel;
-			panel.hidden = name !== stage && name !== 'group';
+			panel.hidden = name !== stage && !(name === 'group' && playing);
 		});
-		if (view === 'group') {
-			const groupControls = table.querySelector('[data-group-controls]');
-			if (groupControls) groupControls.open = true;
-		}
+		const groupControls = table.querySelector('[data-group-controls]');
+		if (groupControls) groupControls.open = view === 'group';
+		const management = table.querySelector('[data-table-management]');
+		if (management && !playing) management.open = true;
 		tabs.forEach(function (tab) {
 			if (tab.dataset.tableView === view) tab.setAttribute('aria-current', 'page');
 			else tab.removeAttribute('aria-current');

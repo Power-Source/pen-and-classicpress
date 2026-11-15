@@ -18,6 +18,20 @@ function ps_pen_paper_register_item_type() {
 	) );
 }
 
+function ps_pen_paper_default_equipment_slots() {
+	$slots = array();
+	foreach ( array(
+		'kopf' => __( 'Kopf', 'ps-pen-paper' ), 'beine' => __( 'Beine', 'ps-pen-paper' ),
+		'fuesse' => __( 'Füße', 'ps-pen-paper' ), 'brust' => __( 'Brust', 'ps-pen-paper' ),
+		'arme' => __( 'Arme', 'ps-pen-paper' ), 'haende' => __( 'Hände', 'ps-pen-paper' ),
+	) as $id => $label ) { $slots[ $id ] = array( 'label' => $label, 'kind' => $id ); }
+	return $slots;
+}
+
+function ps_pen_paper_equipment_display_slots( $schema ) {
+	return 0 === $schema['revision'] ? ps_pen_paper_default_equipment_slots() : $schema['slots'];
+}
+
 function ps_pen_paper_equipment_schema( $scope ) {
 	$value = get_post_meta( $scope->ID, '_pspp_equipment_schema', true );
 	if ( '' === $value ) { return array( 'revision' => 0, 'slots' => array(), 'rarities' => array() ); }
@@ -29,7 +43,8 @@ function ps_pen_paper_equipment_schema( $scope ) {
 		foreach ( $value[ $key ] as $id => $entry ) {
 			if ( ! is_string( $id ) || ! preg_match( '/^[a-z][a-z0-9_-]{0,39}$/D', $id ) || ! is_array( $entry ) ||
 				! isset( $entry['label'] ) || ! is_string( $entry['label'] ) || '' === trim( $entry['label'] ) || strlen( $entry['label'] ) > 200 ||
-				( 'slots' === $key && ( ! isset( $entry['kind'] ) || ! is_string( $entry['kind'] ) || ! preg_match( '/^[a-z][a-z0-9_-]{0,39}$/D', $entry['kind'] ) ) ) ||
+				( 'slots' === $key && ( ! isset( $entry['kind'] ) || ! is_string( $entry['kind'] ) || ! preg_match( '/^[a-z][a-z0-9_-]{0,39}$/D', $entry['kind'] ) ||
+					( array_key_exists( 'hidden', $entry ) && ! is_bool( $entry['hidden'] ) ) ) ) ||
 				( 'rarities' === $key && ( ! isset( $entry['color'] ) || ! is_string( $entry['color'] ) || ! preg_match( '/^#[a-f0-9]{6}$/iD', $entry['color'] ) ) ) ) { return ps_pen_paper_equipment_error(); }
 		}
 	}
@@ -42,6 +57,19 @@ function ps_pen_paper_save_equipment_schema( $scope, $input, $revision ) {
 	$before = ps_pen_paper_equipment_schema( $scope );
 	if ( is_wp_error( $before ) ) { return $before; }
 	if ( ! is_string( $revision ) || (string) $before['revision'] !== $revision || ! is_array( $input ) ) { return ps_pen_paper_equipment_error(); }
+	if ( isset( $input['slot_rows'] ) ) {
+		if ( ! is_array( $input['slot_rows'] ) || count( $input['slot_rows'] ) > 30 ) { return ps_pen_paper_equipment_error(); }
+		$lines = array();
+		foreach ( $input['slot_rows'] as $id => $entry ) {
+			if ( ! is_string( $id ) || ! is_array( $entry ) || ! isset( $entry['label'], $entry['kind'] ) ||
+				! is_string( $entry['label'] ) || ! is_string( $entry['kind'] ) ||
+				false !== strpos( $entry['label'], '|' ) || false !== strpos( $entry['label'], "\n" ) ||
+				false !== strpos( $entry['label'], "\r" ) ) { return ps_pen_paper_equipment_error(); }
+			$lines[] = $id . ' | ' . $entry['label'] . ' | ' . $entry['kind'];
+		}
+		if ( isset( $input['new_slots'] ) && ( ! is_string( $input['new_slots'] ) || strlen( $input['new_slots'] ) > 10000 ) ) { return ps_pen_paper_equipment_error(); }
+		$input['slots'] = implode( "\n", $lines ) . ( isset( $input['new_slots'] ) ? "\n" . $input['new_slots'] : '' );
+	}
 	$after = array( 'revision' => $before['revision'] + 1, 'slots' => array(), 'rarities' => array() );
 	foreach ( array( 'slots', 'rarities' ) as $key ) {
 		if ( ! isset( $input[ $key ] ) || ! is_string( $input[ $key ] ) || strlen( $input[ $key ] ) > 10000 ) { return ps_pen_paper_equipment_error(); }
@@ -55,6 +83,18 @@ function ps_pen_paper_save_equipment_schema( $scope, $input, $revision ) {
 	foreach ( $after['slots'] as $entry ) {
 		if ( '' === $entry['label'] || strlen( $entry['label'] ) > 200 || ! preg_match( '/^[a-z][a-z0-9_-]{0,39}$/D', $entry['kind'] ) ) { return ps_pen_paper_equipment_error(); }
 	}
+	if ( isset( $input['hidden_slots'] ) && ! is_array( $input['hidden_slots'] ) ) { return ps_pen_paper_equipment_error(); }
+	if ( isset( $input['slot_visibility_complete'] ) && 'complete' !== $input['slot_visibility_complete'] ) { return ps_pen_paper_equipment_error(); }
+	foreach ( isset( $input['hidden_slots'] ) ? $input['hidden_slots'] : array() as $id => $hidden ) {
+		if ( ! isset( $after['slots'][ $id ] ) || 'hidden' !== $hidden ) { return ps_pen_paper_equipment_error(); }
+	}
+	foreach ( $after['slots'] as $id => &$entry ) {
+		$hidden = isset( $input['slot_visibility_complete'] )
+			? isset( $input['hidden_slots'][ $id ] )
+			: ! empty( $before['slots'][ $id ]['hidden'] );
+		if ( $hidden ) { $entry['hidden'] = true; }
+	}
+	unset( $entry );
 	foreach ( $after['rarities'] as $entry ) {
 		if ( '' === $entry['label'] || strlen( $entry['label'] ) > 200 || ! preg_match( '/^#[a-f0-9]{6}$/iD', $entry['color'] ) ) { return ps_pen_paper_equipment_error(); }
 	}
@@ -170,6 +210,9 @@ function ps_pen_paper_save_item_locked( $scope, $id, $input, $revision, $image_p
 	foreach ( isset( $input['bonuses'] ) ? $input['bonuses'] : array() as $field_id => $bonus ) {
 		if ( ! isset( $fields[ $field_id ] ) || ! in_array( $fields[ $field_id ]['type'], array( 'attribute', 'number' ), true ) ||
 			! is_string( $bonus ) || ! preg_match( '/^-?\d{1,7}$/D', $bonus ) || abs( (int) $bonus ) > 1000000 ) { return ps_pen_paper_equipment_error(); }
+		if ( 0 !== (int) $bonus && ! empty( $rules['progression'] ) && in_array( $field_id, array( $rules['progression']['experience_field'], $rules['progression']['level_field'] ), true ) ) {
+			return new WP_Error( 'progression_bonus', __( 'Erfahrung und berechnete Stufen dürfen keine Ausrüstungsboni erhalten.', 'ps-pen-paper' ) );
+		}
 		if ( 0 !== (int) $bonus ) { $item['bonuses'][ $field_id ] = (int) $bonus; }
 	}
 	if ( ! ps_pen_paper_validate_item( $item ) ) { return ps_pen_paper_equipment_error(); }
@@ -239,6 +282,9 @@ function ps_pen_paper_gear_bonus( $campaign, $snapshot, $character_snapshot ) {
 		if ( ! isset( $schema['slots'][ $slot_id ] ) || $schema['slots'][ $slot_id ]['kind'] !== $item['kind'] ) { return ps_pen_paper_equipment_error(); }
 		foreach ( $item['bonuses'] as $field_id => $bonus ) {
 			if ( ! isset( $fields[ $field_id ] ) || ! in_array( $fields[ $field_id ]['type'], array( 'attribute', 'number' ), true ) ) { return ps_pen_paper_equipment_error(); }
+			if ( ! empty( $rules['progression'] ) && in_array( $field_id, array( $rules['progression']['experience_field'], $rules['progression']['level_field'] ), true ) ) {
+				return new WP_Error( 'progression_bonus', __( 'Erfahrung und berechnete Stufen dürfen keine Ausrüstungsboni erhalten. Bitte lege diese Ausrüstung ab.', 'ps-pen-paper' ) );
+			}
 			$totals[ $field_id ] = ( isset( $totals[ $field_id ] ) ? $totals[ $field_id ] : 0 ) + $bonus;
 		}
 	}

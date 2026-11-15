@@ -9,6 +9,15 @@ function ps_pen_paper_frontend_page( $page_id ) {
 	return $page && 'page' === $page->post_type && 'publish' === $page->post_status && has_shortcode( $page->post_content, 'ps_pen_paper' ) ? $page : null;
 }
 
+function ps_pen_paper_find_frontend_page( $page_id = 0 ) {
+	$page = ps_pen_paper_frontend_page( $page_id );
+	if ( $page ) { return $page; }
+	foreach ( get_posts( array( 'post_type' => 'page', 'post_status' => 'publish', 's' => 'ps_pen_paper', 'posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'ASC' ) ) as $candidate ) {
+		if ( ps_pen_paper_frontend_page( $candidate->ID ) ) { return $candidate; }
+	}
+	return null;
+}
+
 function ps_pen_paper_is_frontend_page() {
 	return is_singular( 'page' ) && ! is_feed() && ! is_embed() && ! ( defined( 'REST_REQUEST' ) && REST_REQUEST ) && (bool) ps_pen_paper_frontend_page( get_queried_object_id() );
 }
@@ -63,12 +72,13 @@ function ps_pen_paper_enqueue_frontend() {
 		return;
 	}
 	$url = plugin_dir_url( dirname( __DIR__ ) . '/ps-pen-paper.php' );
-	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.1' );
+	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.2' );
 	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.26.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
-	wp_enqueue_script( 'ps-pen-paper-table', $url . 'assets/table.js', array(), '0.14.0', true );
+	wp_enqueue_script( 'ps-pen-paper-table', $url . 'assets/table.js', array(), '0.14.1', true );
 	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.17.0' );
-	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.0' );
+	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.1' );
+	wp_enqueue_script( 'ps-pen-paper-character', $url . 'assets/character.js', array(), '0.1.0', true );
 	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.15.0' );
 	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array( 'ps-pen-paper-table' ), '0.13.0', true );
 	wp_enqueue_script( 'ps-pen-paper-style', $url . 'assets/styles.js', array(), '0.7.0', true );
@@ -133,7 +143,7 @@ function ps_pen_paper_frontend_shortcode() {
 	if ( $character_id && ! ps_pen_paper_get_character( $campaign, $character_id ) ) {
 		return ps_pen_paper_frontend_message( __( 'Dieser Charakter ist für dich nicht verfügbar.', 'ps-pen-paper' ) );
 	}
-	$style = $campaign ? ps_pen_paper_get_style( $campaign_id ) : array( 'colors' => ps_pen_paper_style_defaults() );
+	$style = $campaign ? ps_pen_paper_effective_style( $campaign_id ) : array( 'colors' => ps_pen_paper_style_defaults() );
 	if ( is_wp_error( $style ) ) {
 		return ps_pen_paper_frontend_message( $style->get_error_message() );
 	}
@@ -144,7 +154,9 @@ function ps_pen_paper_frontend_shortcode() {
 	<div class="pspp-game<?php echo $campaign ? ' pspp-workspace' : ''; ?>" style="<?php echo esc_attr( ps_pen_paper_style_variables( $style['colors'] ) ); ?>">
 		<?php if ( ! $campaign ) : ?>
 			<?php ps_pen_paper_render_notice(); ?>
+			<?php if ( 'overview' === $view ) : ?><details class="pspp-fold"><summary><?php esc_html_e( 'Vorbereiten & verwalten', 'ps-pen-paper' ); ?></summary><?php endif; ?>
 			<?php ps_pen_paper_render_dashboard_navigation( $page_id ); ?>
+			<?php if ( 'overview' === $view ) : ?></details><?php endif; ?>
 			<?php if ( 'universes' === $view ) : ?>
 				<?php ps_pen_paper_render_universes( $page_id ); ?>
 			<?php elseif ( 'characters' === $view ) : ?>
@@ -168,7 +180,9 @@ function ps_pen_paper_frontend_shortcode() {
 						<?php if ( ! ps_pen_paper_can_view_campaign( $item ) ) { continue; } ?>
 						<article class="pspp-card">
 							<h3><a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $item->ID ) ); ?>"><?php echo esc_html( $item->post_title ); ?></a></h3>
-							<p class="pspp-multiline"><?php echo esc_html( $item->post_content ); ?></p>
+							<p class="pspp-multiline"><?php echo esc_html( wp_html_excerpt( $item->post_content, 220, '…' ) ); ?></p>
+							<a class="button button-primary" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $item->ID ) . '#pspp-play' ); ?>"><?php esc_html_e( 'Spielen', 'ps-pen-paper' ); ?></a>
+							<?php if ( ps_pen_paper_can_manage_campaign( $item ) ) : ?><a class="button" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $item->ID ) . '#pspp-story' ); ?>"><?php esc_html_e( 'Vorbereiten', 'ps-pen-paper' ); ?></a><?php endif; ?>
 							<?php if ( '1' === get_post_meta( $item->ID, '_pspp_archived', true ) ) : ?>
 								<p><?php esc_html_e( 'Archiviert', 'ps-pen-paper' ); ?></p>
 							<?php endif; ?>

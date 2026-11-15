@@ -94,6 +94,18 @@ Seit 0.28.0 prüft die Vorschau zusätzlich unterstützte Regel-, Charakter-,
 Story- und Wirtschaftsdokumente mit den vorhandenen Fachvalidatoren.
 Ungültige Werte werden als Konflikte angezeigt, nicht still korrigiert.
 
+Der Regelwerkseditor ergänzt **Bearbeitungsrechte je Charakterfeld**:
+Spieler direkt, mit Freigabe oder nur Spielleitung. Ohne eigene Auswahl gilt
+die bisherige Bearbeitungspolitik; gemeinsame Basisbögen bleiben leitungsverwaltet.
+Direkte Änderungen bleiben auch bei Ablehnung eines parallel offenen Antrags erhalten.
+Optionale **Erfahrungs-/Stufenregeln** verbinden zwei frei benannte Zahlenfelder
+mit aufsteigenden Schwellen. Stufen folgen dem jeweiligen Erfahrungsstand,
+ohne vorgegebene Klassen oder automatische Attributboni. Vorhandene Bögen
+werden nur über die bestätigte Änderungsvorschau angepasst.
+Die Würfelbühne bietet nach ausdrücklicher Freigabe **Erfolgspools** sowie
+**höchsten oder niedrigsten Einzelwürfel**. Würfelsummen bleiben Standard;
+Abenteuerproben und Beutetabellen ändern ihre bisherige Berechnung nicht.
+
 ## Kampagnenexport seit Version 0.26.0
 
 Unter **Rundeneinstellungen → Kampagne sichern** können Spielleitungen

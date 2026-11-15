@@ -453,6 +453,9 @@ function ps_pen_paper_character_allocation_valid( $snapshot, $rules ) {
 					if ( ! isset( $fields[ $field_id ] ) || ! in_array( $fields[ $field_id ]['type'], array( 'attribute', 'number' ), true ) || ! is_int( $bonus ) ) {
 						return new WP_Error( 'equipment_conflict', __( 'Ein Ausrüstungsbonus verweist auf ein entferntes oder inkompatibles Feld. Passe die Ausrüstung zuerst an.', 'ps-pen-paper' ) );
 					}
+					if ( ! empty( $rules['progression'] ) && in_array( $field_id, array( $rules['progression']['experience_field'], $rules['progression']['level_field'] ), true ) ) {
+						return new WP_Error( 'progression_bonus', __( 'Lege Ausrüstung mit Erfahrungs- oder Stufenboni vor dem Aktivieren der Stufenregeln ab.', 'ps-pen-paper' ) );
+					}
 					$bonuses[ $field_id ] = ( isset( $bonuses[ $field_id ] ) ? $bonuses[ $field_id ] : 0 ) + $bonus;
 				}
 			}

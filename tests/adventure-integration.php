@@ -871,6 +871,18 @@ try {
 	wp_set_current_user( $users['gm'] );
 	add_post_meta( $hybrid_id, '_pspp_player', (string) $users['other'] );
 	add_post_meta( $hybrid_id, '_pspp_player', (string) $users['outsider'] );
+	ob_start(); ps_pen_paper_render_adventure_groups( $hybrid, 0 ); $group_start_html = ob_get_clean();
+	$document = new DOMDocument(); @$document->loadHTML( '<?xml encoding="UTF-8">' . $group_start_html );
+	$xpath = new DOMXPath( $document );
+	$form = $xpath->query( '//form[input[@name="group_operation" and @value="create"] and input[@name="adventure_id" and @value="' . $hybrid_adventure . '"]]' )->item( 0 );
+	$check( null !== $form, 'Published adventure has no group start form.' );
+	$default_group = ps_pen_paper_write_adventure_group( $hybrid, 0, '0', 'create', array(
+		'title' => $xpath->query( './/input[@name="group_title"]', $form )->item( 0 )->getAttribute( 'value' ),
+		'rule' => $xpath->query( './/select[@name="group_rule"]/option[@selected]', $form )->item( 0 )->getAttribute( 'value' ),
+		'adventure_id' => (int) $xpath->query( './/input[@name="adventure_id"]', $form )->item( 0 )->getAttribute( 'value' ),
+		'adventure_revision' => $xpath->query( './/input[@name="adventure_revision"]', $form )->item( 0 )->getAttribute( 'value' ),
+	) );
+	$check( is_int( $default_group ), 'Group could not start with unchanged optional form fields.' );
 	foreach ( array( 'any', 'majority', 'unanimous', 'gm' ) as $group_rule ) {
 		$group_chars = array();
 		foreach ( array( 'player', 'other', 'outsider' ) as $owner ) {

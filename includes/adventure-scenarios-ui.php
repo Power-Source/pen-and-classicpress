@@ -98,12 +98,13 @@ function ps_pen_paper_render_scenario_access( $snapshot, $access ) {
 }
 
 function ps_pen_paper_render_scenario_character_links( $campaign, $page_id ) {
-	echo '<h3>' . esc_html__( 'Abenteuer starten oder fortsetzen', 'ps-pen-paper' ) . '</h3>';
+	$heading_shown = false;
 	foreach ( ps_pen_paper_get_characters( $campaign ) as $character ) {
 		if ( (int) $character->post_author !== get_current_user_id() ) { continue; }
 		$state = ps_pen_paper_character_state( $campaign, $character );
 		if ( is_wp_error( $state ) ) { echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p>'; continue; }
 		if ( ! $state['active'] ) { continue; }
+		if ( ! $heading_shown ) { echo '<h3>' . esc_html__( 'Allein spielen', 'ps-pen-paper' ) . '</h3>'; $heading_shown = true; }
 		/* translators: %s: player's approved character name. */
 		$label = sprintf( __( 'Mit %s spielen', 'ps-pen-paper' ), $state['active']['name'] );
 		echo '<p><a href="' . esc_url( ps_pen_paper_character_url( $campaign->ID, $character->ID, $page_id ) . '#pspp-adventures' ) . '">' .

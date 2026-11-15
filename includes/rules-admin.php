@@ -269,9 +269,13 @@ function ps_pen_paper_render_rules_migration_preview( $campaign, $preview, $page
 			<input type="hidden" name="rules[name]" value="<?php echo esc_attr( $rules['name'] ); ?>">
 			<input type="hidden" name="rules[description]" value="<?php echo esc_attr( $rules['description'] ); ?>">
 			<input type="hidden" name="rules[character_mode]" value="<?php echo esc_attr( ps_pen_paper_character_mode( $rules ) ); ?>">
-			<input type="hidden" name="rules[dice_mechanics_present]" value="1">
-			<?php foreach ( ps_pen_paper_allowed_dice_mechanics( $rules ) as $mechanic ) : ?><input type="hidden" name="rules[dice_mechanics][]" value="<?php echo esc_attr( $mechanic ); ?>"><?php endforeach; ?>
-			<input type="hidden" name="rules[progression_mode]" value="<?php echo esc_attr( empty( $rules['progression'] ) ? 'none' : 'configured' ); ?>">
+			<?php if ( array_key_exists( 'dice_mechanics', $rules ) ) : ?>
+				<input type="hidden" name="rules[dice_mechanics_present]" value="1">
+				<?php foreach ( ps_pen_paper_allowed_dice_mechanics( $rules ) as $mechanic ) : ?><input type="hidden" name="rules[dice_mechanics][]" value="<?php echo esc_attr( $mechanic ); ?>"><?php endforeach; ?>
+			<?php endif; ?>
+			<?php if ( array_key_exists( 'progression', $rules ) ) : ?>
+				<input type="hidden" name="rules[progression_mode]" value="<?php echo esc_attr( empty( $rules['progression'] ) ? 'none' : 'configured' ); ?>">
+			<?php endif; ?>
 			<?php if ( ! empty( $rules['progression'] ) ) : ?>
 				<input type="hidden" name="rules[progression][experience_field]" value="<?php echo esc_attr( $rules['progression']['experience_field'] ); ?>">
 				<input type="hidden" name="rules[progression][level_field]" value="<?php echo esc_attr( $rules['progression']['level_field'] ); ?>">

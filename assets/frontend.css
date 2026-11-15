@@ -69,6 +69,17 @@
 	min-height: 44px;
 }
 
+.pspp-table-tools summary {
+	display: list-item;
+	padding-block: 12px;
+	cursor: pointer;
+}
+
+.pspp-table-tools .pspp-table-tools {
+	padding: 0;
+	border: 0;
+}
+
 .pspp-table-tools {
 	margin: 0;
 	padding: 0 24px;

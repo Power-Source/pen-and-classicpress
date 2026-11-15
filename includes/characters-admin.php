@@ -177,11 +177,31 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 			?>
 			<p class="pspp-navigation"><a href="<?php echo esc_url( $overview_url ? $overview_url : ( 'pspp_universe' === $campaign->post_type ? ps_pen_paper_universe_url( $campaign->ID, $page_id ) : ( $page_id ? ps_pen_paper_game_url( $page_id, $campaign->ID ) : ps_pen_paper_admin_url( $campaign->ID ) ) ) ); ?>"><?php esc_html_e( 'Zur Bogenübersicht', 'ps-pen-paper' ); ?></a></p>
 			<p><strong><?php esc_html_e( 'Besitzer:', 'ps-pen-paper' ); ?></strong> <?php echo esc_html( $owner ? $owner->display_name : __( 'Gelöschter Benutzer', 'ps-pen-paper' ) ); ?></p>
-			<div class="pspp-grid">
+			<?php $tab_id = 'pspp-character-' . $character->ID; ?>
+			<div class="pspp-character-tabs" data-character-tabs>
+			<nav class="pspp-character-tab-nav" aria-label="<?php esc_attr_e( 'Charakterbereiche', 'ps-pen-paper' ); ?>">
+				<?php foreach ( array(
+					'overview' => __( 'Charakter', 'ps-pen-paper' ), 'stats' => __( 'Werte', 'ps-pen-paper' ),
+					'inventory' => __( 'Inventar', 'ps-pen-paper' ), 'adventures' => __( 'Abenteuer', 'ps-pen-paper' ),
+					'edit' => __( 'Bearbeiten', 'ps-pen-paper' ),
+				) as $tab => $label ) : ?>
+					<a id="<?php echo esc_attr( $tab_id . '-tab-' . $tab ); ?>" href="#<?php echo esc_attr( $tab_id . '-' . $tab ); ?>" data-character-tab="<?php echo esc_attr( $tab ); ?>"><?php echo esc_html( $label ); ?></a>
+				<?php endforeach; ?>
+			</nav>
+			<section id="<?php echo esc_attr( $tab_id . '-overview' ); ?>" data-character-panel="overview">
+				<h3><?php echo esc_html( $state['active'] ? $state['active']['name'] : __( 'Noch nicht freigegeben', 'ps-pen-paper' ) ); ?></h3>
+				<?php if ( $state['active'] && ! empty( $rules['progression'] ) ) :
+					$level_id = $rules['progression']['level_field'];
+					$fields = array_column( $rules['fields'], null, 'id' ); ?>
+					<p class="pspp-character-level"><strong><?php echo esc_html( $fields[ $level_id ]['label'] . ': ' . $state['active']['values'][ $level_id ] ); ?></strong></p>
+				<?php endif; ?>
+				<?php if ( $state['pending'] ) : ?><p><?php esc_html_e( 'Freigabe ausstehend – die gültigen Werte bleiben unverändert.', 'ps-pen-paper' ); ?></p><?php endif; ?>
+				<?php ps_pen_paper_render_character_loadout( $campaign, $character, $state['active'] ? $state['active']['name'] : __( 'Neu', 'ps-pen-paper' ) ); ?>
+			</section>
+			<div id="<?php echo esc_attr( $tab_id . '-stats' ); ?>" class="pspp-grid" data-character-panel="stats">
 				<section class="pspp-snapshot pspp-sheet"<?php $sheet_style_result = 'pspp_campaign' === $campaign->post_type ? ps_pen_paper_sheet_attributes( $campaign ) : true; ?>>
 					<?php if ( is_wp_error( $sheet_style_result ) ) { echo '<p role="alert">' . esc_html( $sheet_style_result->get_error_message() ) . '</p>'; } ?>
 					<h3><?php esc_html_e( 'Gültiger Stand', 'ps-pen-paper' ); ?></h3>
-					<?php ps_pen_paper_render_portrait( $campaign, $character, $state['active'] ? $state['active']['name'] : __( 'Neu', 'ps-pen-paper' ) ); ?>
 					<?php ps_pen_paper_render_character_snapshot( $state['active'], $rules, $campaign ); ?>
 					<?php if ( isset( $state['equipment'] ) && $state['equipment']['bonuses'] ) : ?><p><?php esc_html_e( 'Angezeigte Werte enthalten freigegebene Ausrüstungsboni.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 				</section>
@@ -206,8 +226,14 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 					</section>
 				<?php endif; ?>
 			</div>
+			<section id="<?php echo esc_attr( $tab_id . '-inventory' ); ?>" data-character-panel="inventory">
+				<?php ps_pen_paper_render_character_equipment( $campaign, $character, $page_id, false ); ?>
+			</section>
+			<section id="<?php echo esc_attr( $tab_id . '-adventures' ); ?>" data-character-panel="adventures">
+				<?php ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); ?>
+			</section>
+			<section id="<?php echo esc_attr( $tab_id . '-edit' ); ?>" data-character-panel="edit">
 			<?php ps_pen_paper_render_portrait_form( $campaign, $character, $page_id ); ?>
-			<?php ps_pen_paper_render_character_equipment( $campaign, $character, $page_id ); ?>
 			<?php if ( 'pspp_campaign' === $campaign->post_type ) { ps_pen_paper_render_character_context( $campaign, $character, $state, $page_id ); } ?>
 			<?php if ( isset( $state['context'] ) && 'shared' === $state['context']['mode'] ) : ?>
 				<p><?php esc_html_e( 'Dieser Bogen folgt dem freigegebenen Basisstand. Grundwerte ändert nur die Universumsleitung; die Kampagnenleitung kann getrennte Auflagen setzen.', 'ps-pen-paper' ); ?></p>
@@ -219,6 +245,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 				<?php ps_pen_paper_render_character_form( $campaign, $rules, $character, $page_id ); ?>
 				<?php if ( $page_id || $overview_url ) : ?></details><?php endif; ?>
 			<?php endif; ?>
+			</section></div>
 		<?php else : ?>
 			<?php $characters = ps_pen_paper_get_characters( $campaign ); ?>
 			<?php if ( ! $characters ) : ?>

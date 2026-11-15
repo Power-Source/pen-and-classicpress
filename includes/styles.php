@@ -41,10 +41,29 @@ function ps_pen_paper_get_style( $campaign_id ) {
 	return is_wp_error( $colors ) ? $colors : $style;
 }
 
+function ps_pen_paper_effective_style( $scope_id ) {
+	$scope = ps_pen_paper_get_character_scope( $scope_id );
+	if ( ! $scope ) { return new WP_Error( 'invalid_style', __( 'Die Welt für diese Gestaltung ist nicht verfügbar.', 'ps-pen-paper' ) ); }
+	if ( 'pspp_campaign' === $scope->post_type ) {
+		$link = ps_pen_paper_get_universe_link( $scope_id );
+		if ( is_wp_error( $link ) ) { return $link; }
+		if ( $link['universe_id'] ) {
+			if ( ! ps_pen_paper_get_universe( $link['universe_id'] ) ) { return new WP_Error( 'invalid_style', __( 'Das zugeordnete Universum ist nicht verfügbar.', 'ps-pen-paper' ) ); }
+			$scope_id = $link['universe_id'];
+		}
+	}
+	return ps_pen_paper_get_style( $scope_id );
+}
+
 function ps_pen_paper_save_style( $campaign_id, $colors, $revision ) {
-	$campaign = ps_pen_paper_get_campaign( $campaign_id );
-	if ( ! current_user_can( 'read' ) || ! $campaign || ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
-		return new WP_Error( 'forbidden', __( 'Nur Spielleiter dürfen die Kampagnenfarben ändern.', 'ps-pen-paper' ) );
+	$campaign = ps_pen_paper_get_character_scope( $campaign_id );
+	if ( ! ps_pen_paper_can_access_site() || ! $campaign || ! ps_pen_paper_can_manage_character_scope( $campaign ) ) {
+		return new WP_Error( 'forbidden', __( 'Nur die zuständige Spielleitung darf die Farben ändern.', 'ps-pen-paper' ) );
+	}
+	if ( 'pspp_campaign' === $campaign->post_type ) {
+		$link = ps_pen_paper_get_universe_link( $campaign_id );
+		if ( is_wp_error( $link ) ) { return $link; }
+		if ( $link['universe_id'] ) { return new WP_Error( 'universe_style', __( 'Die Farben dieser Kampagne werden im zugeordneten Universum eingestellt.', 'ps-pen-paper' ) ); }
 	}
 	$previous = ps_pen_paper_get_style( $campaign_id );
 	if ( is_wp_error( $previous ) ) {
@@ -93,6 +112,18 @@ function ps_pen_paper_style_variables( $colors ) {
 }
 
 function ps_pen_paper_render_style_settings( $campaign, $page_id = 0 ) {
+	if ( 'pspp_campaign' === $campaign->post_type ) {
+		$link = ps_pen_paper_get_universe_link( $campaign->ID );
+		if ( is_wp_error( $link ) ) { echo '<p role="alert">' . esc_html( $link->get_error_message() ) . '</p>'; return; }
+		if ( $link['universe_id'] ) {
+			echo '<p>' . esc_html__( 'Diese Kampagne übernimmt die UI-Farben ihres Universums. Änderungen nimmt die Universumsleitung dort vor.', 'ps-pen-paper' ) . '</p>';
+			$universe = ps_pen_paper_get_universe( $link['universe_id'] );
+			if ( $universe && ps_pen_paper_can_manage_universe( $universe ) ) {
+				echo '<p><a href="' . esc_url( ps_pen_paper_dashboard_url( 'universes', $page_id ) ) . '">' . esc_html__( 'Universumsfarben einstellen', 'ps-pen-paper' ) . '</a></p>';
+			}
+			return;
+		}
+	}
 	$style = ps_pen_paper_get_style( $campaign->ID );
 	if ( is_wp_error( $style ) ) {
 		ps_pen_paper_fail( $style->get_error_message() );
@@ -108,8 +139,8 @@ function ps_pen_paper_render_style_settings( $campaign, $page_id = 0 ) {
 	?>
 	<section id="pspp-style" class="pspp-rules" aria-labelledby="pspp-style-heading">
 		<h2 id="pspp-style-heading"><?php esc_html_e( 'Style / Frontend-Farben', 'ps-pen-paper' ); ?></h2>
-		<p><?php esc_html_e( 'Diese Farben gelten nur im Spielbereich dieser Kampagne, nicht für das Theme oder andere Kampagnen. Änderungen werden erst beim Speichern übernommen.', 'ps-pen-paper' ); ?></p>
-		<?php ps_pen_paper_form_start( 'save_style', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
+		<p><?php echo esc_html( 'pspp_universe' === $campaign->post_type ? __( 'Optional: Diese Farben gelten für die Kampagnen und Charakteransichten dieses Universums, auch im Profil. Ohne eigene Auswahl gelten die Standardfarben.', 'ps-pen-paper' ) : __( 'Diese Farben gelten für diese noch nicht zugeordnete Kampagne. Nach der Universumszuordnung werden die Universumsfarben verwendet.', 'ps-pen-paper' ) ); ?></p>
+		<?php ps_pen_paper_form_start( 'pspp_universe' === $campaign->post_type ? 'save_universe_style' : 'save_style', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 			<div data-style-editor>
 				<input type="hidden" name="style_revision" value="<?php echo esc_attr( $style['revision'] ); ?>">
 				<div class="pspp-grid">
@@ -157,4 +188,17 @@ function ps_pen_paper_render_style_settings( $campaign, $page_id = 0 ) {
 		</form>
 	</section>
 	<?php
+}
+
+function ps_pen_paper_handle_universe_style_action() {
+	$id = ps_pen_paper_posted_id( 'campaign_id' );
+	$page_id = ps_pen_paper_posted_id( 'pspp_frontend_page' );
+	check_admin_referer( 'pspp_campaign_' . $id );
+	if ( ! ps_pen_paper_get_universe( $id ) || ( isset( $_POST['pspp_frontend_page'] ) && ! ps_pen_paper_frontend_page( $page_id ) ) ) {
+		ps_pen_paper_fail( __( 'Diese Universumsverwaltung ist nicht verfügbar.', 'ps-pen-paper' ) );
+	}
+	$result = ps_pen_paper_save_style( $id, isset( $_POST['colors'] ) ? wp_unslash( $_POST['colors'] ) : null, ps_pen_paper_posted_text( 'style_revision' ) );
+	if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
+	wp_safe_redirect( add_query_arg( 'pspp_notice', 'style_saved', ps_pen_paper_dashboard_url( 'universes', $page_id ) ) );
+	exit;
 }

@@ -7,13 +7,14 @@ function ps_pen_paper_adventure_world_error() {
 }
 
 function ps_pen_paper_adventure_graph_keys( $graph, $keys ) {
-	foreach ( array( 'states', 'encounters' ) as $key ) {
+	foreach ( array( 'states', 'encounters', 'scenario' ) as $key ) {
 		if ( is_array( $graph ) && array_key_exists( $key, $graph ) ) { $keys[] = $key; }
 	}
 	return $keys;
 }
 
 function ps_pen_paper_valid_adventure_world( $graph ) {
+	if ( array_key_exists( 'scenario', $graph ) && ! ps_pen_paper_valid_scenario( $graph['scenario'] ) ) { return false; }
 	$states = $graph['states'] ?? array();
 	if ( ! is_array( $states ) || array_values( $states ) !== $states || count( $states ) > 30 ) { return false; }
 	$ids = array();
@@ -268,6 +269,9 @@ function ps_pen_paper_save_adventure_world( $campaign, $id, $input, $revision ) 
 				$encounters[] = array( 'id' => wp_generate_uuid4(), 'title' => sanitize_text_field( $new['title'] ), 'phases' => $phases, 'npcs' => $npcs );
 			} elseif ( $phases || $npcs ) { return ps_pen_paper_adventure_world_error(); }
 			$after = $before; $after['draft']['states'] = $states; $after['draft']['encounters'] = $encounters; $after['status'] = 'draft';
+			if ( isset( $after['draft']['scenario'] ) ) {
+				$scenario = $after['draft']['scenario']; unset( $after['draft']['scenario'] ); $after['draft']['scenario'] = $scenario;
+			}
 			if ( ! ps_pen_paper_valid_adventure_world( $after['draft'] ) ) { return ps_pen_paper_adventure_world_error(); }
 			return ps_pen_paper_write_adventure_event( $fresh, $id, $before, $after, 'adventure_saved' );
 		} );

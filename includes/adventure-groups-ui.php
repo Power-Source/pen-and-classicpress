@@ -50,7 +50,7 @@ function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 		$adventures = ps_pen_paper_adventure_records( $campaign, false );
 		if ( is_wp_error( $adventures ) ) : echo '<p role="alert">' . esc_html( $adventures->get_error_message() ) . '</p>';
 		else : foreach ( $adventures as $adventure_id => $adventure ) :
-			if ( 'published' !== $adventure['status'] ) { continue; } ?>
+			if ( 'published' !== $adventure['status'] || ( isset( $adventure['published']['scenario'] ) && 'solo' === $adventure['published']['scenario']['mode'] ) ) { continue; } ?>
 			<details><summary><?php echo esc_html( __( 'Gruppendurchlauf anlegen:', 'ps-pen-paper' ) . ' ' . $adventure['published']['title'] ); ?></summary>
 				<?php ps_pen_paper_adventure_group_form( $campaign, $page_id, 0, 0, 'create' ); ?>
 				<input type="hidden" name="adventure_id" value="<?php echo esc_attr( $adventure_id ); ?>"><input type="hidden" name="adventure_revision" value="<?php echo esc_attr( $adventure['revision'] ); ?>">
@@ -68,11 +68,21 @@ function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 			<?php $member = $group ? ps_pen_paper_adventure_group_member( $campaign, $group, get_current_user_id() ) : null;
 			if ( ! $member && 'completed' !== $record['status'] ) :
 				if ( $own_characters ) :
+					$raw_group = $group ?? get_post_meta( $id, '_pspp_adventure_group', true );
+					$available = array();
+					foreach ( $own_characters as $character_id => $name ) {
+						$context = ps_pen_paper_adventure_character( $campaign, $character_id, true );
+						$enrolled = in_array( get_current_user_id(), array_column( $raw_group['participants'], 'owner_id' ), true );
+						$access = is_wp_error( $context ) ? $context : ps_pen_paper_scenario_access( $campaign, $raw_group['adventure_id'], $raw_group['snapshot'], $context, 'group', $enrolled ? $id : 0 );
+						ps_pen_paper_render_scenario_access( $raw_group['snapshot'], $access );
+						if ( ! is_wp_error( $access ) && $access['met'] ) { $available[ $character_id ] = $name; }
+					}
+					if ( $available ) :
 					ps_pen_paper_adventure_group_form( $campaign, $page_id, $id, $record['revision'], 'join' ); ?>
 					<label><?php esc_html_e( 'Mit eigenem freigegebenem Charakter teilnehmen', 'ps-pen-paper' ); ?><select name="character_id">
-						<?php foreach ( $own_characters as $character_id => $name ) : ?><option value="<?php echo esc_attr( $character_id ); ?>"><?php echo esc_html( $name ); ?></option><?php endforeach; ?>
+						<?php foreach ( $available as $character_id => $name ) : ?><option value="<?php echo esc_attr( $character_id ); ?>"><?php echo esc_html( $name ); ?></option><?php endforeach; ?>
 					</select></label><button type="submit"><?php esc_html_e( 'Teilnehmen / wieder einsteigen', 'ps-pen-paper' ); ?></button></form>
-				<?php else : ?><p><?php esc_html_e( 'Erstelle oder lasse zuerst einen eigenen Charakter freigeben.', 'ps-pen-paper' ); ?></p><?php endif;
+				<?php endif; else : ?><p><?php esc_html_e( 'Erstelle oder lasse zuerst einen eigenen Charakter freigeben.', 'ps-pen-paper' ); ?></p><?php endif;
 			endif; ?>
 			<?php if ( ! $group ) : ?><p><?php esc_html_e( 'Szenen und Verlauf sind erst nach eigener Teilnahme sichtbar.', 'ps-pen-paper' ); ?></p></article><?php continue; endif; ?>
 			<p><?php echo esc_html( ps_pen_paper_adventure_group_rules()[ $group['rule'] ] ); ?></p>
@@ -89,6 +99,7 @@ function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 				<h5><?php echo esc_html( $scene['title'] ); ?></h5><p class="pspp-multiline"><?php echo esc_html( $scene['text'] ); ?></p>
 			<?php endif; ?>
 			<?php ps_pen_paper_render_adventure_world_progress( $group['snapshot'], $group['scene_id'], array_column( $group['history'], 'decision' ) ); ?>
+			<?php if ( 'completed' === $group['status'] ) : ?><p role="status"><?php echo esc_html( ps_pen_paper_scenario_outcomes()[ ps_pen_paper_scenario_outcome( $group['snapshot'], array_column( $group['history'], 'decision' ) ) ] ); ?></p><?php endif; ?>
 			<?php if ( $group['scene_id'] ) { ps_pen_paper_render_wiki_target_link( $campaign, 'scene:' . $group['scene_id'] ); } ?>
 			<?php if ( $gm && 'completed' !== $group['status'] ) :
 				ps_pen_paper_adventure_group_form( $campaign, $page_id, $id, $record['revision'], 'active' === $group['status'] ? 'pause' : 'resume' ); ?>
@@ -138,10 +149,11 @@ function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 								/* translators: 1: resource name, 2: cost, 3: available points, 4: cost timing. */
 								__( 'Kosten: %1$s %2$d; verfügbar %3$d. %4$s.', 'ps-pen-paper' ), $cost['label'], $cost['amount'], $cost['before'],
 								ps_pen_paper_adventure_cost_timings()[ $edge['resource_cost']['timing'] ] ) ) . '</p>'; }
-							$reward = isset( $edge['reward'] ) ? ps_pen_paper_adventure_reward_context( $campaign, $character['post'], $edge['reward'] ) : null;
+							$effective_reward = ps_pen_paper_scenario_reward( $group['snapshot'], $edge, $member['scenario_attempt'] ?? 0 );
+							$reward = $effective_reward ? ps_pen_paper_adventure_reward_context( $campaign, $character['post'], $effective_reward ) : null;
 							$items = isset( $edge['items'] ) ? ps_pen_paper_adventure_items_result( $edge['items'], (int) $character['post']->ID ) : null;
 							if ( $items ) { echo '<p>' . esc_html( is_wp_error( $items ) ? $items->get_error_message() : ps_pen_paper_adventure_items_label( $items ) ) . '</p>'; }
-							if ( $reward ) { echo '<p>' . esc_html( is_wp_error( $reward ) ? $reward->get_error_message() : ps_pen_paper_adventure_reward_label( $edge['reward'] ) ) . '</p>'; }
+							if ( $reward ) { echo '<p>' . esc_html( is_wp_error( $reward ) ? $reward->get_error_message() : ps_pen_paper_adventure_reward_label( $effective_reward ) ) . '</p>'; }
 							$ready = $ready && ! is_wp_error( $requirement ) && ( ! $requirement || $requirement['value'] >= $requirement['minimum'] ) &&
 								! is_wp_error( $conditions ) && ( ! $conditions || $conditions['met'] ) && ! is_wp_error( $cost ) && ( ! $cost || $cost['after'] >= $cost['minimum'] ) && ! is_wp_error( $reward ) &&
 								! is_wp_error( $items ) && ( ! $items || $items['met'] );
@@ -151,12 +163,13 @@ function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 					endif; ?>
 				<?php elseif ( $member ) : foreach ( $group['snapshot']['edges'] as $edge ) :
 					if ( $edge['from_scene'] !== $group['scene_id'] ) { continue; }
+					$effective_reward = ps_pen_paper_scenario_reward( $group['snapshot'], $edge, $member['scenario_attempt'] ?? 0 );
 					ps_pen_paper_adventure_group_form( $campaign, $page_id, $id, $record['revision'], 'propose' ); ?>
 					<input type="hidden" name="character_id" value="<?php echo esc_attr( $member['character_id'] ); ?>"><input type="hidden" name="adventure_edge" value="<?php echo esc_attr( $edge['id'] ); ?>">
 					<button type="submit"><?php echo esc_html( __( 'Vorschlagen:', 'ps-pen-paper' ) . ' ' . $edge['choice'] ); ?></button>
 					<?php if ( $edge['expression'] ) : ?><p><?php echo esc_html( __( 'Serverprobe:', 'ps-pen-paper' ) . ' ' . $edge['expression'] . ' · ' . __( 'Erfolg ab', 'ps-pen-paper' ) . ' ' . $edge['threshold'] ); ?></p><?php endif; ?>
 					<?php if ( isset( $edge['resource_cost'] ) ) : ?><p><?php echo esc_html( __( 'Persönliche Ressourcenkosten:', 'ps-pen-paper' ) . ' ' . $edge['resource_cost']['amount'] . ' · ' . ps_pen_paper_adventure_cost_timings()[ $edge['resource_cost']['timing'] ] ); ?></p><?php endif; ?>
-					<?php if ( isset( $edge['reward'] ) ) : ?><p><?php echo esc_html( ps_pen_paper_adventure_reward_label( $edge['reward'] ) . ' · ' . ps_pen_paper_adventure_reward_timings()[ $edge['reward']['timing'] ] ); ?></p><?php endif; ?>
+					<?php if ( $effective_reward ) : ?><p><?php echo esc_html( ps_pen_paper_adventure_reward_label( $effective_reward ) . ' · ' . ps_pen_paper_adventure_reward_timings()[ $effective_reward['timing'] ] ); ?></p><?php endif; ?>
 					</form>
 				<?php endforeach; endif;
 			endif; ?>

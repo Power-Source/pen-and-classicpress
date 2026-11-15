@@ -126,7 +126,7 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 				<a href="#pspp-sheet" data-table-view="sheet"><?php echo esc_html( $is_gm ? __( 'Bögen', 'ps-pen-paper' ) : __( 'Mein Bogen', 'ps-pen-paper' ) ); ?></a>
 				<a href="#pspp-dice" data-table-view="dice"><?php esc_html_e( 'Würfel', 'ps-pen-paper' ); ?></a>
 				<a href="#pspp-group" data-table-view="group"><?php esc_html_e( 'Gruppe', 'ps-pen-paper' ); ?></a>
-				<a href="#pspp-group-adventures" data-table-view="adventures"><?php esc_html_e( 'Gemeinsame Abenteuer', 'ps-pen-paper' ); ?></a>
+				<a href="#pspp-group-adventures" data-table-view="adventures"><?php esc_html_e( 'Abenteuer', 'ps-pen-paper' ); ?></a>
 			</nav>
 			<div class="pspp-table-layout">
 				<aside id="pspp-group" class="pspp-table-panel pspp-table-group" data-table-panel="group">
@@ -189,7 +189,7 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 					</div>
 				</section>
 				<section id="pspp-sheet" class="pspp-table-panel pspp-table-character" data-table-panel="sheet"><?php ps_pen_paper_render_table_sheet( $campaign, $page_id ); ?></section>
-				<section id="pspp-group-adventures" class="pspp-table-panel pspp-table-stage" data-table-panel="adventures"><?php ps_pen_paper_render_adventure_groups( $campaign, $page_id ); ?></section>
+				<section id="pspp-group-adventures" class="pspp-table-panel pspp-table-stage" data-table-panel="adventures"><?php ps_pen_paper_render_scenario_character_links( $campaign, $page_id ); ps_pen_paper_render_adventure_groups( $campaign, $page_id ); ?></section>
 				<div class="pspp-table-panel pspp-table-stage" data-table-panel="dice"><?php ps_pen_paper_render_dice( $campaign, $page_id, false ); ?></div>
 				<section class="pspp-table-panel pspp-table-stage" data-table-panel="log"><?php ps_pen_paper_render_journal( $campaign, $page_id ); ?></section>
 				<section id="pspp-rulebook" class="pspp-table-panel pspp-table-stage" data-table-panel="rules"><?php ps_pen_paper_render_rules( $campaign, $is_gm, $page_id ); ?></section>

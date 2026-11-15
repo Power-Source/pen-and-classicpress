@@ -45,14 +45,14 @@ sind seit 0.13.0 enthalten.
 | Bereits nutzbar | Noch nicht vorhanden |
 |---|---|
 | Getrennte Kampagnen, Mitgliedschaften und Kapitel mit Szenenfolge | Sitzungsplanung und öffentliche Zusammenfassungen |
-| Szenenentwürfe, getrennte Geheimnisse und bewusste Freigaben | Umfangreiche NPC-Verwaltung und Begegnungen |
+| Szenenentwürfe, getrennte Geheimnisse, NPCs und geordnete Begegnungsphasen | Automatische Kampf-Engine |
 | Private Inhaltsvorschau und geschützter Kartentisch | Nebel des Krieges und Zeichenwerkzeuge |
 | Frei benennbare Charakterfelder, Basisbögen und Freigaben | Grafischer, frei positionierbarer Slotdesigner |
 | Würfel, Attributwerte und geschützte Ergebnisse | Automatische Erfolgsbewertung oder komplexe Würfelmechaniken |
-| Änderungs- und Wurfprotokoll | Automatisch geprüfter Punktepool |
-| Spielleitermappe, geschützte Text-/Bild-Handouts und responsive Bedienung | Strukturierte NPC-Werte und private PDF-Dateien |
+| Änderungs- und Wurfprotokoll, Auswahlfelder und optional geprüfter Attributpunktepool | Separate feldweise Bearbeitungsrechte |
+| Spielleitermappe, geschützte Text-/Bild-/PDF-Handouts mit ausgewählten Empfängern | Weitere Dateiformate |
 | Private Porträts sowie Community-gebundene Inventare, Ausrüstung und kontrollierter Handel | Stapelmengen und automatische Gegenstandssynchronisierung |
-| Solo-, hybride und gemeinsame Gruppendurchläufe mit freigegebenen Szenen, Zahlen-/Text-/Fortschrittsbedingungen, Proben, persönlichen Kosten und Belohnungen sowie konfigurierbaren Entscheidungen und Spielleiterfreigaben | Gegenstandsbedingungen und Verbrauch gemeinsamer Basisressourcen |
+| Solo-, hybride und gemeinsame Gruppendurchläufe mit Gegenstandsbedingungen, Abenteuerzuständen, Kapitelzugang, Wiederholungsregeln und Verbrauch gemeinsamer Basisressourcen | Optionale XP-/Levelautomatismen |
 | Privater, versionierter Kampagnenexport und bestätigte Wiederherstellung neuer/bestehender Kampagnen | Erweiterte Plattform- und Wiederherstellungstestmatrix |
 
 Die Spielleitung kann Szenentexte und Karten vorbereiten und gezielt anzeigen.
@@ -285,8 +285,34 @@ Nach dem Ablösen aller gemeinsamen Bögen kann die Universumszuordnung geänder
 oder gelöst werden; die bestehenden Währungs- und Kontenschutzregeln gelten
 weiterhin.
 
-Ressourcenauflagen, Rückverbindungen von Kopien,
-Spieleranträge für Basisbögen sowie universumsweite Mitgliedschaften fehlen noch.
+### Eigene Universumsbögen beantragen und freigeben
+
+Ein aufgenommenes Kampagnenmitglied öffnet bei den Charakteren
+**Neuen eigenen Universumsbogen beantragen**, füllt die Universumsvorlage aus
+und reicht sie ein. Das ist auch ohne bereits vorhandenen Basisbogen möglich.
+Der neue Bogen bleibt bis zur Freigabe ohne gültigen Stand.
+
+Die Universumsleitung öffnet den Antrag unter **Universen → Regelwerk &
+Basischaraktere** und genehmigt oder verwirft ihn. Kampagnenleitung allein
+genügt dafür nicht. Erst ein freigegebener eigener Basisbogen kann anschließend
+für eine Kampagne beantragt oder durch deren Leitung übernommen werden.
+Die beiden Freigaben gewähren keine Teilnahme an anderen Kampagnen.
+
+### Eine unabhängige Kopie wieder verbinden
+
+Unter **Kampagnenkontext → Mit dem aktuellen Basisbogen wieder verbinden**
+zeigt die Vorschau abweichende Werte. Für jeden Konflikt eine Lösung wählen:
+den Basiswert übernehmen oder bei Zahlen und Attributen den Kopiewert als
+Kampagnenauflage erhalten. Andere abweichende Werte müssen ausdrücklich durch
+den Basiswert ersetzt werden. Inventar und Ausrüstung bleiben erhalten.
+Die Rückverbindung erfolgt nur nach Bestätigung, nie automatisch.
+
+Bei kostenpflichtigen Abenteuerentscheidungen wird eine gemeinsame
+Basisressource einmalig am Universumsbasisbogen verbraucht. Andere damit
+verbundene Runden sehen denselben neuen Stand. Offene Basisanträge und veraltete
+Verbrauchsvorschauen sperren den Vorgang; Wiederholen zahlt nicht nochmals.
+
+Ressourcenauflagen und universumsweite Mitgliedschaften bleiben offen.
 Eine frei benannte numerische Stufe ist möglich, aber noch kein XP-System oder
 automatischer Stufenaufstieg. Eine fehlende gemeinsame Basis erzeugt einen
 sichtbaren Fehler statt eines veralteten Ersatzbogens.
@@ -378,6 +404,7 @@ Bis zu 30 Felder sind möglich:
 |---|---|
 | Kurzer Text | Herkunft, Beruf oder andere frei benannte Angaben |
 | Langer Text | Hintergrundgeschichte und ausführliche Notizen |
+| Auswahl | Eine der ausdrücklich konfigurierten Optionen |
 | Zahl | Ganzzahliger Wert mit Grenzen und Startwert |
 | Attribut | Ganzzahliger Wert, auch zum Addieren bei Würfen |
 | Ressource | Aktueller Wert und persönliches Maximum |
@@ -386,16 +413,27 @@ Bezeichnungen, Erläuterungen und Reihenfolge sind frei. Bei Zahlenfeldern
 liegen Minimum, Maximum und Startwert zwischen −1000000 und 1000000.
 Felder werden über Schaltflächen hinzugefügt, verschoben und entfernt.
 
+Auswahlfelder erhalten unter **Auswahlmöglichkeiten (eine pro Zeile)** ihre
+zulässigen Werte. Ein anderer Wert wird beim Speichern abgelehnt.
+Unter **Optionale Attribut-Punkteverteilung** kann die Spielleitung Attribute
+auswählen und eine Gesamtsumme festlegen. Diese Attribute müssen zusammen
+genau die konfigurierte Punktzahl ergeben; es sind keine zusätzlichen Punkte
+oberhalb ihrer Startwerte. Ohne aktivierte Punkteverteilung gilt kein Punktepool.
+
 ### Bestehende Regeln ändern
 
 - **Umbenennen** erhält die interne Feldkennung und vorhandene Werte.
 - **Neue Startwerte** überschreiben keine bestehenden Charakterwerte.
-- Sobald Charaktere existieren, sind Änderungen an Feldliste, Typen,
-  Pflichtstatus und Wertebereichen vorläufig gesperrt.
+- Änderungen an verwendeten Feldlisten, Typen, Pflichtstatus und Wertebereichen
+  benötigen eine Vorschau für gültige Charakterstände und offene Anträge.
+  Die Vorschau zeigt unverträgliche Werte und die vorgesehene Konfliktlösung.
+  Passt diese nicht, zuerst den Entwurf ändern und eine neue Vorschau öffnen.
+  Erst die ausdrückliche Bestätigung **Vorschau migrieren und Regelwerk speichern**
+  übernimmt den angezeigten Stand.
 - Neue Regeländerungen werden mit Vorher-/Nachher-Ständen protokolliert.
 - Bei einem Konflikt die Seite neu laden und die Änderung erneut prüfen.
 
-Eine automatische Übernahme struktureller Regeländerungen gibt es noch nicht.
+Strukturelle Änderungen werden niemals ohne Bestätigung übernommen.
 In der Demo wurde „Dampf“ nach dem Spielen zu „Kesseldruck“ umbenannt:
 Die Ressource blieb erhalten.
 
@@ -601,7 +639,7 @@ Seit 0.25.0 lassen sich mehrere Wertebedingungen mit UND oder ODER verknüpfen.
 Text- und Fortschrittsbedingungen sowie hybride Spielleiterfreigaben für
 Einzeldurchläufe sind ergänzt. Gemeinsame Gruppendurchläufe mit konfigurierbaren
 Entscheidungen, Teilnahme und Wiedereinstieg sind ebenfalls vorhanden.
-Gegenstandsbedingungen bleiben ein weiterer Ausbauschritt;
+Gegenstandsbedingungen, frei gesetzte Abenteuerzustände und Begegnungsphasen sind ergänzt;
 Details stehen in Abschnitt 21.
 Der **Story-Builder** mit Szenen, getrennten Geheimnissen, Inhaltsvorschau,
 Freigabe, Rücknahme und Protokollierung ist vorhanden.
@@ -973,8 +1011,21 @@ Schema- und Vorlagenänderungen stehen privat im Spielleiterprotokoll;
 Inventar- und Porträtänderungen sind nur für Besitzer und aktuelle
 Spielleitung sichtbar. Das ist keine Datenbanksicherung.
 
-**Noch offen:** Stapelmengen, Mehrfachslot-Gegenstände, Entzug/
-Entfernen von Exemplaren und ein frei positionierbarer grafischer Slotdesigner.
+### Gegenstände entziehen / entfernen
+
+Die Spielleitung öffnet den Charakterbogen und wählt im Bereich
+**Gegenstände entziehen / entfernen** die konkreten Exemplare aus.
+Die Entfernung ausdrücklich bestätigen und absenden.
+Auch gebundene und ausgerüstete Exemplare dürfen entfernt werden.
+Aktives Inventar, Ausrüstungsantrag und zugehörige Slotbelegungen werden
+gemeinsam bereinigt; eine spätere Freigabe holt die Exemplare nicht zurück.
+Die bisherigen Vergaben und der Vorher-/Nachher-Nachweis bleiben gespeichert.
+Handelsreservierte Exemplare zuerst durch Zurückziehen oder Ablehnen
+des Angebots freigeben. Spieler können Gegenstände nicht selbst entziehen.
+
+**Noch offen:** Stapelmengen, Mehrfachslot-Gegenstände und ein frei
+positionierbarer grafischer Slotdesigner. Mengenhandel erfolgt bereits
+durch Mehrfachauswahl konkreter Exemplare.
 Die aktuelle Oberfläche verwendet zugängliche Auswahlfelder, kein Drag-and-drop.
 
 ## 16. Währung, Guthaben und Gegenstandsbindung
@@ -1221,11 +1272,30 @@ Charakterbesitzer sehen ihre erhaltenen Gegenstände und Guthabenbuchungen,
 nicht die geheime Tabelle. Ohne aktives PS Community bleiben gespeicherte
 Tabellen und Vorgänge erhalten; Änderungen sind gesperrt.
 
-Noch nicht enthalten sind Gegenstandsgruppen, verschachtelte Tabellen,
-universumsweite Beutekataloge, Aufteilung auf mehrere Empfänger und
-automatische Vergaben. In der Demo ist **Dock 3 – Fundkiste** mit der
+Universumsweite Beutekataloge bleiben offen. Automatische Vergaben können
+für freigegebene Abenteuerentscheidungen ausdrücklich eingerichtet werden.
+In der Demo ist **Dock 3 – Fundkiste** mit der
 Zollwache verknüpft. Der gespeicherte W6-Wurf **2** ergab **1 Dockmark**
 für Jorin: Sein Guthaben stieg von **8 auf 9 DM**.
+
+### Gegenstandsgruppen, Untertabellen und mehrere Empfänger
+
+Ein Ausgang kann unter **Weitere Gegenstände** zusätzliche Vorlagen und Mengen
+enthalten. **Untertabelle (ein zusätzlicher Wurf)** ergänzt einen weiteren
+gespeicherten Tabellenwurf. Zyklen und überlange Verschachtelungen werden
+abgelehnt; alle beteiligten Tabellenstände und Würfe bleiben eingefroren.
+
+Bei der bestätigten Vergabe lassen sich die Mengen je Gegenstandskomponente
+und der Geldbetrag auf mehrere Kampagnencharaktere verschiedener
+Teilnehmer aufteilen. Alle ermittelten Mengen und Beträge müssen vollständig
+zugeordnet werden. Die gesamte Aufteilung wird gemeinsam gespeichert oder
+bei einem Fehler vollständig zurückgenommen.
+
+Kampagnensicherungen erhalten auch diese Tabellen, Vorschläge und Aufteilungen.
+Die Wiederherstellung ordnet Tabellen, Gegenstandsspeicher und Empfänger neu
+zu, ohne Würfe zu wiederholen oder bereits vergebene Beute nochmals auszuzahlen.
+Ein noch offener Vorschlag kann nach der Wiederherstellung ausdrücklich
+vergeben werden. Die ursprüngliche Kampagne bleibt dabei unverändert.
 
 ## 19. Öffentliches Weltlexikon mit PS Wiki
 
@@ -1339,7 +1409,8 @@ Die Regeln legt die Spielleitung fest, nicht das Plugin für jede Runde gleich.
 - **Mit Universum:** Die Universumsleitung öffnet **Universen → Regelwerk &
   Basischaraktere → Handelsregeln**. Kampagnen übernehmen diese Regeln
   unverändert und können sie nicht lokal überschreiben.
-- **Geschenk**, **Verkauf** und **Tausch** einzeln erlauben oder ausschalten.
+- **Geschenk**, **Verkauf**, **Tausch** und **Geldgeschenk** einzeln erlauben
+  oder ausschalten. Geldgeschenke werden nicht automatisch mit aktiviert.
 - Unter **Nach Zustimmung beider Besitzer** zusätzliche Spielleiterfreigabe
   verlangen oder den direkten Abschluss wählen.
 - **Handelsregeln speichern**.
@@ -1351,20 +1422,23 @@ Diese Angebote zuerst zurückziehen oder ablehnen und bei Bedarf neu erstellen.
 
 ![Unabhängig aktivierte Handelsarten und zusätzliche Spielleiterfreigabe in der Demo](images/33-handelsregeln.png)
 
-### Ein konkretes Exemplar anbieten
+### Exemplare oder Geld anbieten
 
 1. Im Spielbereich den **eigenen Charakterbogen** öffnen, alternativ den
    eigenen privaten **Pen-&-Paper-Profilbereich**.
 2. Unter **Handel → Neues Angebot** die erlaubte Handelsart wählen.
-3. Ein eigenes **handelbares, abgelegtes Exemplar** auswählen. Gebundene,
+3. Eigene **handelbare, abgelegte Exemplare** auswählen, höchstens 100.
+   Beim **Geldgeschenk** keine Exemplare auswählen. Gebundene,
    bereits reservierte oder aktiv/in einem Ausrüstungsantrag angelegte
    Exemplare können nicht angeboten werden.
 4. Einen freigegebenen Charakter eines **anderen Besitzers derselben
    Kampagne** wählen. Nur dessen freigegebener Name wird zur Auswahl gezeigt,
    nicht Bogenwerte, Inventar oder Guthaben.
-5. Beim **Verkauf** einen ganzen Preis ab 1 eintragen; Geschenk und Tausch
-   verwenden **0**. Der Käufer zahlt in der konfigurierten Währung.
-6. Exemplar und Bedingungen bestätigen und **Handelsangebot erstellen** wählen.
+5. Beim **Verkauf** einen ganzen **Gesamtpreis für alle ausgewählten
+   Exemplare** ab 1 eintragen. Beim **Geldgeschenk** einen ganzen Betrag ab 1
+   eintragen; der Anbieter zahlt an den Empfänger. Gegenstandsgeschenk und
+   Tausch verwenden **0**. Es gilt die konfigurierte Währung.
+6. Angebot und Bedingungen bestätigen und **Handelsangebot erstellen** wählen.
 
 Angebotene Exemplare sind bis zum Abschluss oder zur Ablehnung reserviert
 und können nicht angelegt oder nochmals angeboten werden. **Geld wird nicht
@@ -1372,10 +1446,11 @@ reserviert:** Das tatsächliche Guthaben wird erst beim Abschluss geprüft.
 
 ### Zustimmen und abschließen
 
-- **Geschenk/Verkauf:** Der Empfänger öffnet den eigenen Bogen, prüft das
-  gespeicherte Exemplar und gegebenenfalls den Preis und nimmt verbindlich an.
-- **Tausch:** Der Empfänger wählt zunächst ein eigenes zulässiges
-  Gegenexemplar und bestätigt dieses Gegenangebot. Anschließend muss der
+- **Geschenk/Verkauf/Geldgeschenk:** Der Empfänger öffnet den eigenen Bogen,
+  prüft die gespeicherten Exemplare beziehungsweise den Betrag und nimmt
+  verbindlich an.
+- **Tausch:** Der Empfänger wählt zunächst seine eigenen zulässigen
+  Gegenexemplare und bestätigt dieses Gegenangebot. Anschließend muss der
   ursprüngliche Anbieter den jetzt vollständig bestimmten Tausch bestätigen.
 - Ist zusätzliche Spielleiterfreigabe eingestellt, bleibt der Vorgang
   **Wartet auf Spielleiterfreigabe**. Erst die Spielleitung bestätigt am
@@ -1390,7 +1465,7 @@ Mitgliedschaft oder geänderte Bedingungen führen zu einem ausdrücklichen Fehl
 Die Gegenstands-UUID und der eingefrorene Stand bleiben erhalten; auch offene
 Ausrüstungsanträge werden angepasst, damit eine spätere Freigabe nichts
 verdoppelt oder zurückholt. Empfangene Exemplare bleiben abgelegt.
-Verkäufe verwenden je nach Kontomodell getrennte Kampagnenkonten oder die
+Verkäufe und Geldgeschenke verwenden je nach Kontomodell getrennte Kampagnenkonten oder die
 ausdrücklich eingebundenen gemeinsamen Basisguthaben, keine Ersatzkonten.
 
 Besitzer sehen ihre betreffenden Angebote und Abschlüsse; die Spielleitung
@@ -1407,9 +1482,9 @@ Ohne Community bleiben Angebote und Nachweise gespeichert und im Spielbereich
 lesbar; alle wirtschaftlichen Änderungen einschließlich Handelsentscheidungen
 sind inaktiv.
 
-Zunächst gilt **ein Exemplar je Seite, dieselbe Kampagne, unterschiedliche
-Besitzer**. Pakete, Mengen, reine Geldgeschenke, Übertragungen eigener Figuren
-untereinander und kampagnenübergreifender Handel fehlen noch.
+Es gilt **höchstens 100 konkrete Exemplare je Seite, dieselbe Kampagne,
+unterschiedliche Besitzer**. Übertragungen eigener Figuren untereinander und
+kampagnenübergreifende Übertragungen bleiben offen.
 
 In der Nebelhafen-Demo verkauft Mara den **Messingkompass vom Dock** für
 **3 DM** an Jorin. Beide Besitzer stimmen zu; die Demo-Spielleitung gibt frei.
@@ -1519,7 +1594,7 @@ Gruppendurchläufe beachten dieselbe ausdrücklich konfigurierte Freigabepflicht
 1. Bereite das Abenteuer wie oben unter **Abenteuer & Szenen → Soloabenteuer**
    vor und gib es frei. Diese Szenen- und Entscheidungsdefinition wird auch
    für Gruppen verwendet; ein bestehender Solodurchlauf wird nicht umgewandelt.
-2. Öffne **Gemeinsame Abenteuer → Gruppendurchlauf anlegen**, vergib einen Namen
+2. Öffne **Abenteuer → Gruppendurchlauf anlegen**, vergib einen Namen
    und wähle die Entscheidungsregel: ein Teilnehmer, Mehrheit der aktiven
    Teilnehmer, alle aktiven Teilnehmer oder ausdrückliche Spielleiterfreigabe.
 3. Jeder Besitzer wählt eine eigene freigegebene Figur und betätigt
@@ -1562,7 +1637,8 @@ Teilnahmen werden abgewiesen. Nach der Übernahme zählen die aktuellen Rechte
 der örtlichen Spielleitung und tatsächlichen Besitzer.
 
 Kosten und Belohnungen betreffen ausschließlich die jeweils ausführende Figur.
-Gegenstandsbedingungen bleiben ein weiterer Ausbauschritt.
+Gegenstandsbedingungen, frei gesetzte Abenteuerzustände und Begegnungsphasen
+ergänzen die vorbereiteten Entscheidungen.
 
 ### Abenteuer ohne Dateiübernahme spielen
 
@@ -1571,6 +1647,49 @@ bereit und legt Regeln, Spielmodus, Teilnahme und Freigaben fest.
 Spieler öffnen ihre Kampagne und nutzen die dort freigegebenen Abenteuer mit
 ihrem Charakter. Eine separate Paketbibliothek und Abenteuerdatei-Importe oder
 -Downloads gehören nicht zum Spielablauf.
+
+### Kapitel, Zugang und Wiederholungsbelohnungen
+
+Unter **Abenteuer & Szenen → Abenteuer und Szenarien vorbereiten** legt die
+Spielleitung die Szenarioeinstellungen fest und gibt den gespeicherten Entwurf
+anschließend ausdrücklich frei.
+
+- **Lose Szenarien:** Kapitel und Vorgänger leer lassen. Die Anzeigeordnung
+  sortiert nur die Liste und erzwingt keinen Spielablauf.
+- **Kapitelgeschichte:** Optional ein Kapitel der Spielleitermappe zuordnen.
+  Für Kapitel 2 beispielsweise Kapitel 1 als Voraussetzung mit **gewonnen**
+  auswählen. **Abgeschlossen** akzeptiert auch ein verlorenes oder neutrales
+  Ende. Nur der ausgewählte Kapiteltitel wird für Spieler sichtbar, nicht
+  der private Kapiteltext.
+- **Mindestwert:** Ein eigenes Zahlen- oder Attributfeld, etwa Stufe oder Rang,
+  und dessen Mindestwert wählen. Es gibt kein fest eingebautes Levelsystem.
+- **Spielweise:** Einzelspiel, Gruppenspiel oder beides zulassen. Die vorhandene
+  Spielleiterfreigabe bleibt für hybride Entscheidungen verfügbar.
+- **Wiederholung:** Erlauben oder sperren. Belohnungen nur im ersten Durchlauf,
+  in jedem Durchlauf gleich oder ab Wiederholung anders vergeben. Für den
+  letzten Fall pro Entscheidung eine alternative Belohnung einrichten;
+  ohne Alternative gibt es dort ab dem zweiten Durchlauf keine Belohnung.
+
+Bei einer Entscheidung bestimmt die Spielleitung das Ergebnis für Erfolg
+und Misserfolg getrennt: gewonnen, verloren oder neutral. Es zählt erst, wenn
+der Durchlauf endet; ein bestandener Würfelwurf allein ist kein Szenariosieg.
+Spieler sehen Voraussetzungen und die tatsächlich vorgesehene Belohnung vor
+dem Versuch. Am Spieltisch führt **Abenteuer** zum eigenen Charakterdurchlauf
+oder zu den gemeinsamen Durchläufen.
+
+**Wichtig:** Der erste gestartete beziehungsweise erstmals beigetretene
+Durchlauf zählt je Spielerkonto und Szenario, nicht je Figur. Auch ein verlorener
+erster Durchlauf verbraucht die Erstbelohnungsberechtigung. Ein anderer Charakter,
+ein Wechsel zwischen Einzel- und Gruppenspiel oder erneutes Veröffentlichen
+setzt den Zähler nicht zurück. Ein Wiedereinstieg in dieselbe Gruppe zählt nicht
+nochmals. Die Belohnungsrichtlinie gilt für alle Entscheidungen des jeweiligen
+Durchlaufs; sie ersetzt nicht die bestehende Vergaberegel pro Entscheidung.
+Gemeinsame Belohnungen erhält weiterhin nur die ausführende Figur.
+
+Neue über den Editor angelegte Szenarien beginnen ohne Wiederholung und mit
+Erstbelohnung. Bestehende Abenteuer behalten ihr bisheriges Verhalten, bis die
+Spielleitung Szenarioeinstellungen ausdrücklich speichert und veröffentlicht.
+Neue Fassungen verändern weder laufende Durchläufe noch frühere Vergaben.
 
 ### Mehrere Wertebedingungen mit UND oder ODER
 

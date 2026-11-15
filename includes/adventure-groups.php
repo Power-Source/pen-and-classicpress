@@ -59,7 +59,10 @@ function ps_pen_paper_valid_adventure_group( $group ) {
 		$group['revision'] < count( $group['history'] ) + 1 ) { return false; }
 	$characters = array(); $owners = array(); $active = array();
 	foreach ( $group['participants'] as $participant ) {
-		if ( ! is_array( $participant ) || array( 'character_id', 'owner_id', 'active' ) !== array_keys( $participant ) ||
+		$keys = array( 'character_id', 'owner_id', 'active' );
+		if ( isset( $group['snapshot']['scenario'] ) ) { $keys[] = 'scenario_attempt'; }
+		if ( ! is_array( $participant ) || $keys !== array_keys( $participant ) ||
+			( isset( $group['snapshot']['scenario'] ) && ( ! is_int( $participant['scenario_attempt'] ) || $participant['scenario_attempt'] < 1 ) ) ||
 			! is_int( $participant['character_id'] ) || $participant['character_id'] < 1 || isset( $characters[ $participant['character_id'] ] ) ||
 			! is_int( $participant['owner_id'] ) || $participant['owner_id'] < 1 || ! is_bool( $participant['active'] ) ||
 			( $participant['active'] && in_array( $participant['owner_id'], $active, true ) ) ) { return false; }
@@ -86,6 +89,7 @@ function ps_pen_paper_valid_adventure_group( $group ) {
 		$run = array( 'revision' => 2, 'status' => $target && $next ? 'active' : 'completed', 'adventure_id' => $group['adventure_id'],
 			'adventure_publication' => $snapshot['publication'], 'character_id' => $entry['character_id'], 'owner_id' => $entry['owner_id'],
 			'scene_id' => $target, 'snapshot' => $snapshot, 'history' => array( $entry['decision'] ) );
+		if ( isset( $group['snapshot']['scenario'] ) ) { $run['scenario_attempt'] = $characters[ $entry['character_id'] ]['scenario_attempt']; }
 		if ( ! empty( $edge['gm_review'] ) ) { $run['revision'] += 2; $run['reviews'] = 2; $run['approval'] = null; }
 		if ( ! ps_pen_paper_valid_adventure_run( $run, $history ) ) { return false; }
 		$history[] = $entry['decision']; $scene_id = $target;
@@ -151,7 +155,9 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 		if ( 'execute' === $operation ) {
 			if ( ! isset( $initial['proposal'] ) ) { return ps_pen_paper_adventure_group_error(); }
 			$edge = ps_pen_paper_adventure_group_edge( $initial, $initial['proposal']['edge_id'] );
-			$action_locks = ps_pen_paper_adventure_action_locks( $campaign, $initial['proposal']['character_id'], $edge );
+			$attempt = 0;
+			foreach ( $initial['participants'] as $participant ) { if ( $participant['character_id'] === $initial['proposal']['character_id'] ) { $attempt = $participant['scenario_attempt'] ?? 0; } }
+			$action_locks = ps_pen_paper_adventure_action_locks( $campaign, $initial['proposal']['character_id'], $edge, $initial['snapshot'], $attempt );
 			if ( is_wp_error( $action_locks ) ) { return $action_locks; }
 			$locks = array_merge( $locks, $action_locks );
 		}
@@ -172,6 +178,7 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 				if ( 'create' === $operation ) {
 					$adventure = ps_pen_paper_get_adventure( $campaign, $input['adventure_id'] );
 					if ( ! $gm || is_wp_error( $adventure ) || 'published' !== $adventure['status'] ||
+						( isset( $adventure['published']['scenario'] ) && 'solo' === $adventure['published']['scenario']['mode'] ) ||
 						! isset( $input['adventure_revision'], $input['title'], $input['rule'] ) ||
 						! is_string( $input['adventure_revision'] ) || (string) $adventure['revision'] !== $input['adventure_revision'] ||
 						! is_string( $input['title'] ) || ! is_string( $input['rule'] ) ) { return ps_pen_paper_adventure_group_error(); }
@@ -193,6 +200,13 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 					} elseif ( 'join' === $operation ) {
 						$character = ps_pen_paper_adventure_character( $campaign, $input['character_id'], true );
 						if ( $member || 'completed' === $before['status'] || is_wp_error( $character ) ) { return ps_pen_paper_adventure_group_error(); }
+						$enrolled = false; $attempt = 0;
+						foreach ( $before['participants'] as $participant ) {
+							if ( $participant['owner_id'] === $user_id ) { $enrolled = true; $attempt = $participant['scenario_attempt'] ?? 0; }
+						}
+						$access = ps_pen_paper_scenario_access( $campaign, $before['adventure_id'], $before['snapshot'], $character, 'group', $enrolled ? $id : 0 );
+						if ( is_wp_error( $access ) ) { return $access; }
+						if ( ! $access['met'] ) { return ps_pen_paper_scenario_access_error( $access ); }
 						$found = false;
 						foreach ( $after['participants'] as &$participant ) {
 							if ( $participant['character_id'] !== $input['character_id'] ) { continue; }
@@ -200,7 +214,11 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 							$participant['active'] = true; $found = true;
 						}
 						unset( $participant );
-						if ( ! $found ) { $after['participants'][] = array( 'character_id' => $input['character_id'], 'owner_id' => $user_id, 'active' => true ); }
+						if ( ! $found ) {
+							$participant = array( 'character_id' => $input['character_id'], 'owner_id' => $user_id, 'active' => true );
+							if ( isset( $before['snapshot']['scenario'] ) ) { $participant['scenario_attempt'] = $enrolled ? $attempt : $access['attempt']; }
+							$after['participants'][] = $participant;
+						}
 						$after['proposal'] = null;
 					} elseif ( 'leave' === $operation ) {
 						$found = false;
@@ -242,7 +260,7 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 							if ( is_wp_error( $character ) ) { return $character; }
 							$review = ! empty( $edge['gm_review'] ) ? array( 'edge_id' => $edge['id'], 'status' => 'approved', 'requester_id' => $user_id, 'reviewer_id' => $proposal['reviewer_id'] ) : null;
 							$history = array_column( $before['history'], 'decision' );
-							$decision = ps_pen_paper_execute_adventure_edge( $campaign, $character, $before['snapshot'], $edge, $history, $locks, $id, $review );
+							$decision = ps_pen_paper_execute_adventure_edge( $campaign, $character, $before['snapshot'], $edge, $history, $locks, $id, $review, $member['scenario_attempt'] ?? 0 );
 							if ( is_wp_error( $decision ) ) { return $decision; }
 							$after['history'][] = array( 'character_id' => $proposal['character_id'], 'owner_id' => $user_id, 'rule' => $before['rule'],
 								'electorate' => $electorate, 'votes' => $proposal['votes'], 'reviewer_id' => $proposal['reviewer_id'], 'decision' => $decision );

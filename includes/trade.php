@@ -8,7 +8,8 @@ function ps_pen_paper_register_trade_type() {
 }
 
 function ps_pen_paper_trade_kinds() {
-	return array( 'gift' => __( 'Geschenk', 'ps-pen-paper' ), 'sale' => __( 'Verkauf', 'ps-pen-paper' ), 'swap' => __( 'Tausch', 'ps-pen-paper' ) );
+	return array( 'gift' => __( 'Geschenk', 'ps-pen-paper' ), 'sale' => __( 'Verkauf', 'ps-pen-paper' ), 'swap' => __( 'Tausch', 'ps-pen-paper' ),
+		'money_gift' => __( 'Geldgeschenk', 'ps-pen-paper' ) );
 }
 
 function ps_pen_paper_trade_statuses() {
@@ -89,17 +90,46 @@ function ps_pen_paper_valid_trade( $state ) {
 		if ( ! isset( $o[ $key ] ) || ! is_int( $o[ $key ] ) || $o[ $key ] < ( 'amount' === $key ? 0 : 1 ) ) { return false; }
 	}
 	if ( $o['from'] === $o['to'] || $o['from_owner'] === $o['to_owner'] || $o['amount'] > 999999999 ||
-		! isset( $o['kind'], $o['token'], $o['request_hash'], $o['from_name'], $o['to_name'], $o['give_uuid'], $o['give'], $o['take_uuid'] ) ||
+		! isset( $o['kind'], $o['token'], $o['request_hash'], $o['from_name'], $o['to_name'], $o['give_uuid'], $o['take_uuid'] ) ||
 		! is_string( $o['kind'] ) || ! isset( ps_pen_paper_trade_kinds()[ $o['kind'] ] ) || ! is_string( $o['token'] ) || ! wp_is_uuid( $o['token'] ) ||
 		! is_string( $o['request_hash'] ) || ! preg_match( '/^[a-f0-9]{64}$/D', $o['request_hash'] ) ||
-		! is_string( $o['from_name'] ) || ! is_string( $o['to_name'] ) || ! is_string( $o['give_uuid'] ) || ! wp_is_uuid( $o['give_uuid'] ) ||
-		! ps_pen_paper_valid_item_instance( $o['give'] ) || 'tradeable' !== ps_pen_paper_item_binding( $o['give']['item'] ) ||
+		! is_string( $o['from_name'] ) || ! is_string( $o['to_name'] ) || ! is_string( $o['give_uuid'] ) || ! array_key_exists( 'give', $o ) ||
 		! is_string( $o['take_uuid'] ) || ! array_key_exists( 'take', $o ) || ! array_key_exists( 'currency', $o ) ) { return false; }
+	if ( 'money_gift' === $o['kind'] ) {
+		if ( '' !== $o['give_uuid'] || null !== $o['give'] ) { return false; }
+	} elseif ( ! wp_is_uuid( $o['give_uuid'] ) || ! ps_pen_paper_valid_item_instance( $o['give'] ) ||
+		'tradeable' !== ps_pen_paper_item_binding( $o['give']['item'] ) ) { return false; }
 	if ( '' !== $o['take_uuid'] && ( ! wp_is_uuid( $o['take_uuid'] ) || ! ps_pen_paper_valid_item_instance( $o['take'] ) || 'swap' !== $o['kind'] ||
 		'tradeable' !== ps_pen_paper_item_binding( $o['take']['item'] ) ) ) { return false; }
 	if ( '' === $o['take_uuid'] && null !== $o['take'] ) { return false; }
-	return 'sale' === $o['kind'] ? $o['amount'] > 0 && ps_pen_paper_valid_currency( $o['currency'] ) && $o['currency']['revision'] > 0
+	foreach ( array( 'give', 'take' ) as $side ) {
+		if ( ! array_key_exists( $side . '_more', $o ) ) { continue; }
+		$more = $o[ $side . '_more' ];
+		if ( ! is_array( $more ) || count( $more ) > 99 || 'money_gift' === $o['kind'] ||
+			( 'take' === $side && ( 'swap' !== $o['kind'] || '' === $o['take_uuid'] ) ) ) { return false; }
+		foreach ( $more as $uuid => $instance ) {
+			if ( ! is_string( $uuid ) || ! wp_is_uuid( $uuid ) || $uuid === $o[ $side . '_uuid' ] ||
+				! ps_pen_paper_valid_item_instance( $instance ) || 'tradeable' !== ps_pen_paper_item_binding( $instance['item'] ) ) { return false; }
+		}
+	}
+	return in_array( $o['kind'], array( 'sale', 'money_gift' ), true ) ? $o['amount'] > 0 && ps_pen_paper_valid_currency( $o['currency'] ) && $o['currency']['revision'] > 0
 		: 0 === $o['amount'] && null === $o['currency'];
+}
+
+function ps_pen_paper_trade_items( $offer, $side ) {
+	$items = $offer[ $side . '_uuid' ] ? array( $offer[ $side . '_uuid' ] => $offer[ $side ] ) : array();
+	return $items + ( $offer[ $side . '_more' ] ?? array() );
+}
+
+function ps_pen_paper_trade_selection( $input, $money = false ) {
+	$ids = is_array( $input ) ? $input : ( '' === $input ? array() : array( $input ) );
+	if ( array_values( $ids ) !== $ids || count( $ids ) > 100 || ( $money ? count( $ids ) > 0 : ! $ids ) ) { return ps_pen_paper_trade_error(); }
+	$seen = array();
+	foreach ( $ids as $id ) {
+		if ( ! is_string( $id ) || ! wp_is_uuid( $id ) || isset( $seen[ $id ] ) ) { return ps_pen_paper_trade_error(); }
+		$seen[ $id ] = true;
+	}
+	return $ids;
 }
 
 function ps_pen_paper_trade_open( $state ) {
@@ -136,8 +166,8 @@ function ps_pen_paper_reserved_trade_items( $campaign, $character_id, $except = 
 	foreach ( $records as $id => $state ) {
 		if ( $id === $except || ! ps_pen_paper_trade_open( $state ) ) { continue; }
 		$o = $state['offer'];
-		if ( $o['from'] === $character_id ) { $ids[] = $o['give_uuid']; }
-		if ( $o['to'] === $character_id && $o['take_uuid'] ) { $ids[] = $o['take_uuid']; }
+		if ( $o['from'] === $character_id ) { $ids = array_merge( $ids, array_keys( ps_pen_paper_trade_items( $o, 'give' ) ) ); }
+		if ( $o['to'] === $character_id ) { $ids = array_merge( $ids, array_keys( ps_pen_paper_trade_items( $o, 'take' ) ) ); }
 	}
 	return $ids;
 }
@@ -217,7 +247,9 @@ function ps_pen_paper_offer_trade( $campaign, $from, $to, $kind, $uuid, $amount,
 		! is_int( $from ) || ! is_int( $to ) || $from < 1 || $to < 1 || $from === $to || ! is_string( $kind ) || ! isset( ps_pen_paper_trade_kinds()[ $kind ] ) ||
 		! is_string( $amount ) || ! preg_match( '/^(0|[1-9]\d{0,8})$/D', $amount ) || ! is_string( $token ) || ! wp_is_uuid( $token ) ) { return ps_pen_paper_trade_error(); }
 	$id = 0; $hash = hash( 'sha256', serialize( array( $from, $to, $kind, $uuid, $amount, $gear_revision, $policy_revision ) ) );
-	$result = ps_pen_paper_trade_transaction( $campaign, $from, $to, 'sale' === $kind, function ( $campaign, $policy ) use ( $from, $to, $kind, $uuid, $amount, $gear_revision, $policy_revision, $token, $hash, &$id ) {
+	$selection = ps_pen_paper_trade_selection( $uuid, 'money_gift' === $kind );
+	if ( is_wp_error( $selection ) ) { return $selection; }
+	$result = ps_pen_paper_trade_transaction( $campaign, $from, $to, in_array( $kind, array( 'sale', 'money_gift' ), true ), function ( $campaign, $policy ) use ( $from, $to, $kind, $selection, $amount, $gear_revision, $policy_revision, $token, $hash, &$id ) {
 		$a = ps_pen_paper_trade_party( $campaign, $from ); $b = ps_pen_paper_trade_party( $campaign, $to );
 		if ( is_wp_error( $a ) || is_wp_error( $b ) || (int) $a['post']->post_author !== get_current_user_id() || $a['post']->post_author === $b['post']->post_author ) { return ps_pen_paper_trade_error(); }
 		$records = ps_pen_paper_trade_records( $campaign ); if ( is_wp_error( $records ) ) { return $records; }
@@ -227,19 +259,25 @@ function ps_pen_paper_offer_trade( $campaign, $from, $to, $kind, $uuid, $amount,
 				$id = $record_id; return 0;
 			}
 		}
-		$gear = ps_pen_paper_gear_state( $from ); $item = ps_pen_paper_trade_item( $campaign, $from, $uuid );
-		if ( is_wp_error( $gear ) || is_wp_error( $item ) || ! is_string( $gear_revision ) || (string) $gear['revision'] !== $gear_revision ||
+		$gear = ps_pen_paper_gear_state( $from ); $items = array();
+		foreach ( $selection as $uuid ) {
+			$item = ps_pen_paper_trade_item( $campaign, $from, $uuid );
+			if ( is_wp_error( $item ) ) { return $item; }
+			$items[ $uuid ] = $item;
+		}
+		if ( is_wp_error( $gear ) || ! is_string( $gear_revision ) || (string) $gear['revision'] !== $gear_revision ||
 			! is_string( $policy_revision ) || (string) $policy['policy']['revision'] !== $policy_revision || ! in_array( $kind, $policy['policy']['kinds'], true ) ||
-			( 'sale' === $kind ? (int) $amount < 1 : '0' !== $amount ) ) { return ps_pen_paper_trade_error(); }
-		$currency = 'sale' === $kind ? ps_pen_paper_currency_document( $policy['scope']->ID ) : null;
+			( in_array( $kind, array( 'sale', 'money_gift' ), true ) ? (int) $amount < 1 : '0' !== $amount ) ) { return ps_pen_paper_trade_error(); }
+		$currency = in_array( $kind, array( 'sale', 'money_gift' ), true ) ? ps_pen_paper_currency_document( $policy['scope']->ID ) : null;
 		if ( is_wp_error( $currency ) || ( $currency && ! $currency['revision'] ) ) { return ps_pen_paper_trade_error(); }
 		$before = array( 'revision' => 0, 'offer' => null );
 		$after = array( 'revision' => 0, 'status' => 'offered', 'history' => array(), 'offer' => array(
 			'from' => $from, 'to' => $to, 'from_owner' => (int) $a['post']->post_author, 'to_owner' => (int) $b['post']->post_author,
 			'from_name' => $a['name'], 'to_name' => $b['name'], 'kind' => $kind, 'amount' => (int) $amount, 'currency' => $currency,
 			'policy_scope' => (int) $policy['scope']->ID, 'policy_revision' => $policy['policy']['revision'], 'token' => $token, 'request_hash' => $hash,
-			'give_uuid' => $uuid, 'give' => $item, 'take_uuid' => '', 'take' => null,
+			'give_uuid' => $items ? array_key_first( $items ) : '', 'give' => $items ? reset( $items ) : null, 'take_uuid' => '', 'take' => null,
 		) );
+		if ( count( $items ) > 1 ) { $after['offer']['give_more'] = array_slice( $items, 1, null, true ); }
 		return ps_pen_paper_write_trade( $campaign, $id, $before, $after, 'offer' );
 	} );
 	if ( is_int( $id ) && $id ) { clean_post_cache( $id ); }
@@ -252,7 +290,7 @@ function ps_pen_paper_change_trade( $campaign, $id, $action, $revision, $confirm
 	if ( is_wp_error( $records ) || ! isset( $records[ $id ] ) || ! ps_pen_paper_can_read_trade( $campaign, $records[ $id ] ) || 'confirmed' !== $confirmation ) { return ps_pen_paper_trade_error(); }
 	$initial = $records[ $id ]['offer'];
 	$cancelling = in_array( $action, array( 'cancel', 'decline', 'reject' ), true );
-	$result = ps_pen_paper_trade_transaction( $campaign, $initial['from'], $initial['to'], ! $cancelling && 'sale' === $initial['kind'], function ( $campaign, $policy ) use ( $id, $action, $revision, $uuid, $cancelling ) {
+	$result = ps_pen_paper_trade_transaction( $campaign, $initial['from'], $initial['to'], ! $cancelling && in_array( $initial['kind'], array( 'sale', 'money_gift' ), true ), function ( $campaign, $policy ) use ( $id, $action, $revision, $uuid, $cancelling ) {
 		clean_post_cache( $id ); $before = get_post_meta( $id, '_pspp_trade', true );
 		if ( ! ps_pen_paper_valid_trade( $before ) || ! ps_pen_paper_trade_open( $before ) || ! ps_pen_paper_can_read_trade( $campaign, $before ) ||
 			! is_string( $revision ) || (string) $before['revision'] !== $revision ) { return ps_pen_paper_trade_error(); }
@@ -264,12 +302,22 @@ function ps_pen_paper_change_trade( $campaign, $id, $action, $revision, $confirm
 			if ( $o['policy_scope'] !== (int) $policy['scope']->ID || $o['policy_revision'] !== $policy['policy']['revision'] || ! in_array( $o['kind'], $policy['policy']['kinds'], true ) ) { return ps_pen_paper_trade_error(); }
 			$a = ps_pen_paper_trade_party( $campaign, $o['from'] ); $b = ps_pen_paper_trade_party( $campaign, $o['to'] );
 			if ( is_wp_error( $a ) || is_wp_error( $b ) || (int) $a['post']->post_author !== $o['from_owner'] || (int) $b['post']->post_author !== $o['to_owner'] ) { return ps_pen_paper_trade_error(); }
-			$give = ps_pen_paper_trade_item( $campaign, $o['from'], $o['give_uuid'], $id );
-			if ( is_wp_error( $give ) || $give !== $o['give'] ) { return ps_pen_paper_trade_error(); }
+			foreach ( ps_pen_paper_trade_items( $o, 'give' ) as $item_id => $instance ) {
+				$give = ps_pen_paper_trade_item( $campaign, $o['from'], $item_id, $id );
+				if ( is_wp_error( $give ) || $give !== $instance ) { return ps_pen_paper_trade_error(); }
+			}
 			if ( 'counter' === $action && 'swap' === $o['kind'] && 'offered' === $before['status'] && $actor === $o['to_owner'] ) {
-				$take = ps_pen_paper_trade_item( $campaign, $o['to'], $uuid, $id );
-				if ( is_wp_error( $take ) ) { return $take; }
-				$after['offer']['take_uuid'] = $uuid; $after['offer']['take'] = $take; $after['status'] = 'countered';
+				$selection = ps_pen_paper_trade_selection( $uuid );
+				if ( is_wp_error( $selection ) ) { return $selection; }
+				$items = array();
+				foreach ( $selection as $item_id ) {
+					$take = ps_pen_paper_trade_item( $campaign, $o['to'], $item_id, $id );
+					if ( is_wp_error( $take ) ) { return $take; }
+					$items[ $item_id ] = $take;
+				}
+				$after['offer']['take_uuid'] = array_key_first( $items ); $after['offer']['take'] = reset( $items );
+				if ( count( $items ) > 1 ) { $after['offer']['take_more'] = array_slice( $items, 1, null, true ); }
+				$after['status'] = 'countered';
 			} elseif ( 'accept' === $action && ( ( 'offered' === $before['status'] && 'swap' !== $o['kind'] && $actor === $o['to_owner'] ) ||
 				( 'countered' === $before['status'] && 'swap' === $o['kind'] && $actor === $o['from_owner'] ) ) ) {
 				$after['status'] = $policy['policy']['approval'] ? 'accepted' : 'completed';
@@ -277,18 +325,25 @@ function ps_pen_paper_change_trade( $campaign, $id, $action, $revision, $confirm
 			else { return ps_pen_paper_trade_error(); }
 			if ( 'completed' === $after['status'] ) {
 				if ( 'swap' === $o['kind'] ) {
-					$take = ps_pen_paper_trade_item( $campaign, $o['to'], $o['take_uuid'], $id );
-					if ( is_wp_error( $take ) || $take !== $o['take'] ) { return ps_pen_paper_trade_error(); }
+					foreach ( ps_pen_paper_trade_items( $o, 'take' ) as $item_id => $instance ) {
+						$take = ps_pen_paper_trade_item( $campaign, $o['to'], $item_id, $id );
+						if ( is_wp_error( $take ) || $take !== $instance ) { return ps_pen_paper_trade_error(); }
+					}
 				}
-				if ( 'sale' === $o['kind'] ) {
-					$payer = ps_pen_paper_resolve_wallet_context( $campaign, $b['post'] ); $payee = ps_pen_paper_resolve_wallet_context( $campaign, $a['post'] );
+				if ( in_array( $o['kind'], array( 'sale', 'money_gift' ), true ) ) {
+					$payer = ps_pen_paper_resolve_wallet_context( $campaign, 'money_gift' === $o['kind'] ? $a['post'] : $b['post'] );
+					$payee = ps_pen_paper_resolve_wallet_context( $campaign, 'money_gift' === $o['kind'] ? $b['post'] : $a['post'] );
 					if ( is_wp_error( $payer ) || is_wp_error( $payee ) || (int) $payer['currency_scope']->ID !== $o['policy_scope'] ||
 						$payer['currency']['currency_id'] !== $o['currency']['currency_id'] ) { return ps_pen_paper_trade_error(); }
 					$paid = ps_pen_paper_write_wallet_transfer( $payer, $payee, $o['amount'], __( 'Bestätigter Handel', 'ps-pen-paper' ) . ' #' . $id );
 					if ( is_wp_error( $paid ) ) { return $paid; }
 				}
-				$transfer = ps_pen_paper_write_item_exchange( $campaign, array( $a['post'], $b['post'] ), array( $o['give_uuid'], $o['take_uuid'] ), array( $o['give'], $o['take'] ) );
-				if ( is_wp_error( $transfer ) ) { return $transfer; }
+				if ( 'money_gift' !== $o['kind'] ) {
+					$transfer = ps_pen_paper_write_item_exchange( $campaign, array( $a['post'], $b['post'] ),
+						array( array_keys( ps_pen_paper_trade_items( $o, 'give' ) ), array_keys( ps_pen_paper_trade_items( $o, 'take' ) ) ),
+						array( ps_pen_paper_trade_items( $o, 'give' ), ps_pen_paper_trade_items( $o, 'take' ) ) );
+					if ( is_wp_error( $transfer ) ) { return $transfer; }
+				}
 			}
 		}
 		return ps_pen_paper_write_trade( $campaign, $id, $before, $after, $action );

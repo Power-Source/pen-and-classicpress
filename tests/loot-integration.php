@@ -6,7 +6,7 @@ require_once ABSPATH . 'wp-admin/includes/user.php';
 if ( is_multisite() ) { require_once ABSPATH . 'wp-admin/includes/ms.php'; }
 foreach ( array( 'campaign', 'universe', 'character', 'npc', 'event', 'item' ) as $type ) { call_user_func( 'ps_pen_paper_register_' . $type . '_type' ); }
 ps_pen_paper_register_loot_types();
-$original_user = get_current_user_id(); $users = array(); $parents = array();
+$original_user = get_current_user_id(); $users = array(); $parents = array(); $tokens = array();
 $check = function ( $condition, $message ) { if ( ! $condition ) { throw new RuntimeException( $message ); } };
 try {
 	foreach ( array( 'gm', 'player', 'world' ) as $role ) {
@@ -128,6 +128,82 @@ try {
 		count( ps_pen_paper_loot_snapshot_items( $mapped ) ) === 3, 'Recursive item/currency/table mapping failed.' );
 	$rejected_map = ps_pen_paper_loot_snapshot_map( $group_table, function ( &$instance ) { $instance['source_id'] = 0; return true; } );
 	$check( is_wp_error( $rejected_map ) && $group_table === $group_state['proposal']['table'], 'Invalid mapping succeeded or mutated the source snapshot.' );
+	wp_get_current_user()->add_cap( 'ps_pen_paper_create_campaigns' );
+	$pending_run = ps_pen_paper_roll_loot( $campaign, $group, '1', '1', 'Pending nested restoration', wp_generate_uuid4() );
+	$check( is_int( $pending_run ), 'Pending nested restoration fixture failed.' );
+	$source_awarded = ps_pen_paper_get_loot_run( $campaign, $group_run );
+	$source_pending = ps_pen_paper_get_loot_run( $campaign, $pending_run );
+	$source_wallets = array(); $source_counts = array();
+	foreach ( array( $char, $char2 ) as $recipient ) {
+		$source_wallets[] = ps_pen_paper_wallet_context( $campaign, $recipient )['wallet']['balance'];
+		$source_counts[] = count( ps_pen_paper_gear_state( $recipient )['active']['items'] );
+	}
+	$archive = ps_pen_paper_export_campaign( $campaign->ID, 'local' );
+	$check( ! is_wp_error( $archive ), 'Nested loot export failed.' );
+	$json = wp_json_encode( $archive, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+	$parsed = ps_pen_paper_parse_import( $json );
+	$check( ! is_wp_error( $parsed ), 'Nested loot archive did not parse.' );
+	$token = ps_pen_paper_create_import_preview( $json );
+	$check( is_string( $token ), 'Nested loot preview failed: ' . ( is_wp_error( $token ) ? $token->get_error_message() : '' ) ); $tokens[] = $token;
+	$options = array( 'operation' => 'copy', 'target_id' => 0, 'universe_mode' => 'none', 'universe_id' => 0, 'users' => array(), 'bases' => array() );
+	foreach ( $parsed['users'] as $owner => $requirement ) { $options['users'][ $owner ] = $owner === $users['gm'] ? $users['world'] : $owner; }
+	$preview = ps_pen_paper_get_import_preview( $token );
+	$check( ! is_wp_error( $preview ), 'Nested loot preview disappeared.' ); $preview['options'] = $options;
+	$check( set_transient( ps_pen_paper_import_preview_key( $token ), $preview, $preview['expires'] - time() ), 'Nested loot preview configuration failed.' );
+	$plan = ps_pen_paper_import_configuration( $parsed, $options );
+	$check( ! is_wp_error( $plan ), 'Nested loot import configuration failed.' );
+	$fingerprint = ps_pen_paper_restore_fingerprint( $parsed, $options, $plan );
+	$restored = ps_pen_paper_restore_campaign( $token, $fingerprint, false, 'private' );
+	$check( ! is_wp_error( $restored ), 'Nested loot restoration failed: ' . ( is_wp_error( $restored ) ? $restored->get_error_message() : '' ) );
+	$parents[] = $restored['campaign_id']; $restored_campaign = ps_pen_paper_get_campaign( $restored['campaign_id'] );
+	$restored_runs = array();
+	foreach ( get_posts( array( 'post_type' => 'pspp_loot_run', 'post_status' => 'private',
+		'post_parent' => $restored_campaign->ID, 'posts_per_page' => -1 ) ) as $copied_run ) {
+		$state = get_post_meta( $copied_run->ID, '_pspp_loot_run', true );
+		$check( ps_pen_paper_valid_loot_run( $state ), 'Restored loot run is invalid.' );
+		$restored_runs[ $state['proposal']['token'] ] = array( 'id' => $copied_run->ID, 'state' => $state );
+	}
+	$copied_awarded = $restored_runs[ $source_awarded['proposal']['token'] ];
+	$copied_pending = $restored_runs[ $source_pending['proposal']['token'] ];
+	$node = $copied_awarded['state']['proposal'];
+	$check( $node['table_id'] !== $group && $node['nested']['table_id'] !== $child &&
+		$node['nested']['table_id'] === $node['table']['table']['rows'][0]['nested']['table_id'] &&
+		$source_awarded['proposal']['roll'] === $node['roll'] &&
+		$source_awarded['proposal']['nested']['roll'] === $node['nested']['roll'] &&
+		$users['world'] === $node['actor_id'] && $users['world'] === $copied_awarded['state']['award']['actor_id'],
+		'Restoration lost nested references, original dice or mapped actors.' );
+	foreach ( ps_pen_paper_loot_snapshot_items( $node['table'] ) as $snapshot_item ) {
+		$check( $snapshot_item['scope_id'] === $restored_campaign->ID, 'Restoration left an item-group or nested item in the original scope.' );
+	}
+	$check( 7 === ps_pen_paper_loot_components( $node )['money'] &&
+		$restored_campaign->ID === $node['nested']['table']['table']['currency']['scope_id'], 'Nested currency or total changed during restoration.' );
+	wp_set_current_user( $users['world'] );
+	$check( ! is_wp_error( ps_pen_paper_get_loot_table( $restored_campaign, $node['table_id'] ) ) &&
+		! is_wp_error( ps_pen_paper_get_events( $restored_campaign ) ), 'Restored catalog or split history cannot be read.' );
+	$restored_split = array();
+	foreach ( $copied_awarded['state']['award']['allocations'] as $index => $allocation ) {
+		$recipient = $allocation['character_id'];
+		$recipient_wallet = ps_pen_paper_wallet_context( $restored_campaign, $recipient );
+		$recipient_gear = ps_pen_paper_gear_state( $recipient );
+		$check( ! in_array( $recipient, array( $char, $char2 ), true ) && (int) get_post( $recipient )->post_parent === $restored_campaign->ID &&
+			$source_wallets[ $index ] === $recipient_wallet['wallet']['balance'] &&
+			$source_counts[ $index ] === count( $recipient_gear['active']['items'] ), 'Restoration retained old recipients or replayed an award.' );
+		$restored_split[ $recipient ] = array( 'gear_revision' => (string) $recipient_gear['revision'],
+			'wallet_revision' => (string) $recipient_wallet['wallet']['revision'], 'currency_revision' => (string) $recipient_wallet['currency']['revision'],
+			'items' => array_map( 'strval', $allocation['items'] ), 'money' => (string) $allocation['money'] );
+	}
+	$check( is_wp_error( ps_pen_paper_award_loot_split( $restored_campaign, $copied_awarded['id'], $restored_split, 'confirmed' ) ) &&
+		true === ps_pen_paper_award_loot_split( $restored_campaign, $copied_pending['id'], $restored_split, 'confirmed' ),
+		'Restored completed loot paid again or a pending nested proposal could not be awarded.' );
+	foreach ( array_keys( $restored_split ) as $index => $recipient ) {
+		$check( $source_wallets[ $index ] + (int) $restored_split[ $recipient ]['money'] === ps_pen_paper_wallet_context( $restored_campaign, $recipient )['wallet']['balance'] &&
+			$source_counts[ $index ] + array_sum( $restored_split[ $recipient ]['items'] ) === count( ps_pen_paper_gear_state( $recipient )['active']['items'] ),
+			'Restored pending distribution did not pay the exact assigned amounts.' );
+	}
+	wp_set_current_user( $users['gm'] );
+	$check( $source_awarded === ps_pen_paper_get_loot_run( $campaign, $group_run ) &&
+		$source_pending === ps_pen_paper_get_loot_run( $campaign, $pending_run ) &&
+		$archive['payload_sha256'] === ps_pen_paper_export_campaign( $campaign->ID, 'local' )['payload_sha256'], 'Restored play changed the original campaign.' );
 	$alternatives = $group_table; $first = $alternatives['table']['rows'][0]; $first['to'] = 3;
 	$second = $first; $second['from'] = 4; $second['to'] = 6; $second['quantity'] = '50'; $second['money'] = '0'; $second['items'] = array(); $second['nested'] = null;
 	$alternatives['table']['rows'] = array( $first, $second );
@@ -189,9 +265,10 @@ try {
 	$check( is_int( $sr ) && is_wp_error( ps_pen_paper_award_loot( $shared, $sr, $alias, '0', '0', '1', 'confirmed' ) ) && '' === get_post_meta( $base, '_pspp_wallet', true ), 'Local GM bypassed shared-account authority.' );
 	wp_set_current_user( $users['world'] );
 	$check( true === ps_pen_paper_award_loot( $shared, $sr, $alias, '0', '0', '1', 'confirmed' ) && 2 === get_post_meta( $base, '_pspp_wallet', true )['balance'] && '' === get_post_meta( $alias, '_pspp_wallet', true ), 'Shared award did not reach the base wallet.' );
-	WP_CLI::success( 'Complete ranges, dice bounds, frozen rolls/items, replay protection, confirmed exactly-once grants, full-inventory and event rollback, private history and shared-account authority passed.' );
+	WP_CLI::success( 'Complete ranges, grouped/nested restoration, mapped recipients, pending continuation, frozen rolls/items, replay protection, full-inventory and event rollback, private history and shared-account authority passed.' );
 } finally {
 	wp_set_current_user( $original_user );
+	foreach ( $tokens as $token ) { delete_transient( ps_pen_paper_import_preview_key( $token ) ); }
 	foreach ( $parents as $parent ) {
 		foreach ( get_posts( array( 'post_type' => array( 'pspp_loot_table', 'pspp_loot_run', 'pspp_character', 'pspp_npc', 'pspp_item', 'pspp_event' ), 'post_status' => array( 'private', 'draft' ), 'post_parent' => $parent, 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $child ) { wp_delete_post( $child, true ); }
 		wp_delete_post( $parent, true );

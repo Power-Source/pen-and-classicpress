@@ -293,6 +293,27 @@ function ps_pen_paper_save_gear_locked( $campaign, $character_id, $operation, $i
 		$instance['item']['binding'] = ps_pen_paper_item_binding( $source['item'] );
 		$after = ps_pen_paper_append_item_instances( $before, $instance, 1 );
 		if ( is_wp_error( $after ) ) { return $after; }
+	} elseif ( 'remove_items' === $operation ) {
+		if ( ! $is_gm || ! isset( $input['ids'], $input['confirmation'] ) || 'confirmed' !== $input['confirmation'] ||
+			! is_array( $input['ids'] ) || ! $input['ids'] || array_values( $input['ids'] ) !== $input['ids'] ||
+			count( $input['ids'] ) > 100 ) { return ps_pen_paper_equipment_error( 'forbidden' ); }
+		$reserved = ps_pen_paper_reserved_trade_items( $campaign, $character_id );
+		if ( is_wp_error( $reserved ) ) { return $reserved; }
+		$seen = array();
+		foreach ( $input['ids'] as $uuid ) {
+			if ( ! is_string( $uuid ) || ! wp_is_uuid( $uuid ) || isset( $seen[ $uuid ] ) ||
+				! isset( $before['active']['items'][ $uuid ] ) || in_array( $uuid, $reserved, true ) ) {
+				return new WP_Error( 'item_unavailable', __( 'Ein ausgewähltes Exemplar fehlt oder ist für einen Handel reserviert. Ziehe das Angebot zuerst zurück und lade neu.', 'ps-pen-paper' ) );
+			}
+			$seen[ $uuid ] = true;
+			foreach ( array( 'active', 'pending' ) as $key ) {
+				if ( null === $after[ $key ] ) { continue; }
+				unset( $after[ $key ]['items'][ $uuid ] );
+				$after[ $key ]['slots'] = array_diff( $after[ $key ]['slots'], array( $uuid ) );
+			}
+		}
+		$validate[] = $after['active'];
+		if ( null !== $after['pending'] ) { $validate[] = $after['pending']; }
 	} elseif ( 'review_gear' === $operation ) {
 		if ( ! $is_gm || null === $before['pending'] || ! isset( $input['decision'] ) || ! in_array( $input['decision'], array( 'approve', 'reject' ), true ) ) { return ps_pen_paper_equipment_error(); }
 		if ( 'approve' === $input['decision'] ) { $after['active'] = $before['pending']; $validate[] = $after['active']; }
@@ -334,6 +355,12 @@ function ps_pen_paper_save_gear_locked( $campaign, $character_id, $operation, $i
 
 // Internal writer: both inventories are locked and the trade is authorized.
 function ps_pen_paper_write_item_exchange( $campaign, $characters, $uuids, $instances ) {
+	foreach ( array( 0, 1 ) as $i ) {
+		if ( is_string( $uuids[ $i ] ) ) {
+			$instances[ $i ] = $uuids[ $i ] ? array( $uuids[ $i ] => $instances[ $i ] ) : array();
+			$uuids[ $i ] = array_keys( $instances[ $i ] );
+		}
+	}
 	$states = array();
 	foreach ( $characters as $i => $character ) {
 		$before = ps_pen_paper_gear_state( $character->ID );
@@ -341,15 +368,17 @@ function ps_pen_paper_write_item_exchange( $campaign, $characters, $uuids, $inst
 		$out = $uuids[ $i ]; $in = $uuids[ 1 - $i ];
 		foreach ( array( $before['active'], $before['pending'] ) as $snapshot ) {
 			if ( null === $snapshot ) { continue; }
-			if ( $out && ( ! isset( $snapshot['items'][ $out ] ) || $snapshot['items'][ $out ] !== $instances[ $i ] ||
-				in_array( $out, $snapshot['slots'], true ) || 'tradeable' !== ps_pen_paper_item_binding( $snapshot['items'][ $out ]['item'] ) ) ) { return ps_pen_paper_equipment_error(); }
-			if ( $in && isset( $snapshot['items'][ $in ] ) ) { return ps_pen_paper_equipment_error(); }
+			foreach ( $out as $uuid ) {
+				if ( ! isset( $snapshot['items'][ $uuid ], $instances[ $i ][ $uuid ] ) || $snapshot['items'][ $uuid ] !== $instances[ $i ][ $uuid ] ||
+					in_array( $uuid, $snapshot['slots'], true ) || 'tradeable' !== ps_pen_paper_item_binding( $snapshot['items'][ $uuid ]['item'] ) ) { return ps_pen_paper_equipment_error(); }
+			}
+			foreach ( $in as $uuid ) { if ( isset( $snapshot['items'][ $uuid ] ) ) { return ps_pen_paper_equipment_error(); } }
 		}
 		$after = $before; $after['revision']++;
 		foreach ( array( 'active', 'pending' ) as $key ) {
 			if ( null === $after[ $key ] ) { continue; }
-			if ( $out ) { unset( $after[ $key ]['items'][ $out ] ); }
-			if ( $in ) { $after[ $key ]['items'][ $in ] = $instances[ 1 - $i ]; }
+			foreach ( $out as $uuid ) { unset( $after[ $key ]['items'][ $uuid ] ); }
+			foreach ( $in as $uuid ) { $after[ $key ]['items'][ $uuid ] = $instances[ 1 - $i ][ $uuid ]; }
 			if ( count( $after[ $key ]['items'] ) > 100 ) { return new WP_Error( 'inventory_full', __( 'Das Zielinventar ist voll. Der Handel wurde nicht ausgeführt.', 'ps-pen-paper' ) ); }
 		}
 		$states[ $i ] = array( $before, $after );

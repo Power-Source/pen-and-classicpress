@@ -14,6 +14,7 @@ ps_pen_paper_register_event_type();
 ps_pen_paper_register_adventure_types();
 ps_pen_paper_register_item_type();
 ps_pen_paper_register_loot_types();
+ps_pen_paper_register_folio_type();
 
 $original_user = get_current_user_id();
 $users = array();
@@ -1041,11 +1042,214 @@ try {
 	wp_set_current_user( $users['outsider'] );
 	$check( is_wp_error( ps_pen_paper_start_adventure_run( $campaign, $adventure_id, $characters['player'], (string) $published['revision'], '1' ) ), 'Nonmember started an adventure run.' );
 	$check_world_foundations();
+	$check_scenarios = function () use ( $check, $users, &$parents ) {
+		wp_set_current_user( $users['gm'] );
+		$scope_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => 'Scenario integration fixture' ), true );
+		$check( is_int( $scope_id ), 'Scenario scope failed.' ); $parents[] = $scope_id;
+		add_post_meta( $scope_id, '_pspp_gm', (string) $users['gm'] );
+		foreach ( array( 'player', 'other' ) as $owner ) { add_post_meta( $scope_id, '_pspp_player', (string) $users[ $owner ] ); }
+		$scope = ps_pen_paper_get_campaign( $scope_id );
+		$rules = ps_pen_paper_save_rules( $scope_id, array( 'name' => 'Scenario rules', 'description' => '', 'dice' => array( '6' ),
+			'fields' => array( array( 'id' => '', 'label' => 'Stufe', 'type' => 'number', 'description' => '', 'min' => '0', 'max' => '20', 'start' => '2' ) ) ), '0' );
+		$check( ! is_wp_error( $rules ), 'Scenario rules failed.' ); $level = $rules['fields'][0]['id'];
+		$chars = array();
+		foreach ( array( 'player', 'other' ) as $owner ) {
+			$chars[ $owner ] = ps_pen_paper_save_character( $scope_id, 0, $users[ $owner ], array( 'name' => $owner, 'values' => array( $level => '2' ) ), '0', '1' );
+			$check( is_int( $chars[ $owner ] ), 'Scenario character failed.' );
+		}
+		$scene_ids = array();
+		foreach ( array( 'Opening', 'Victory', 'Defeat' ) as $title ) {
+			$id = ps_pen_paper_save_scene( $scope, 0, array( 'title' => $title, 'text' => '', 'secret' => '', 'grid' => '0' ), '0' );
+			$check( is_int( $id ) && true === ps_pen_paper_publish_scene( $scope, $id, '1', 'confirmed' ), 'Scenario scene failed.' );
+			$scene_ids[] = $id;
+		}
+		$chapter = ps_pen_paper_save_folio( $scope, 0, array( 'type' => 'chapter', 'title' => 'Chapter One', 'text' => 'PRIVATE_CHAPTER_TEXT',
+			'secret' => 'PRIVATE_CHAPTER_SECRET', 'order' => '1', 'chapter_id' => '0', 'scene_id' => '0' ), '0' );
+		$check( is_int( $chapter ), 'Scenario chapter failed.' );
+		$check( true === ps_pen_paper_save_currency( $scope, array( 'name' => 'Scenario gold', 'symbol' => 'SG', 'wallet_mode' => 'campaign' ), '0' ) &&
+			true === ps_pen_paper_save_equipment_schema( $scope, array( 'slots' => '', 'rarities' => 'normal | Normal | #abcdef' ), '0' ), 'Scenario economy failed.' );
+		$item = ps_pen_paper_save_item( $scope, 0, array( 'name' => 'First reward', 'description' => '', 'kind' => 'tool', 'rarity' => 'normal', 'properties' => '', 'binding' => 'tradeable' ), '0' );
+		$check( is_int( $item ), 'Scenario reward item failed.' );
+		$policy = array( 'chapter_id' => (string) $chapter, 'order' => '1', 'mode' => 'both', 'repeat' => '1', 'rewards' => 'once',
+			'minimum_field' => '', 'minimum_value' => '0', 'prerequisites' => array() );
+		$edge = array( 'from_scene' => (string) $scene_ids[0], 'choice' => 'Win scenario', 'expression' => 'W6+100', 'attribute' => '',
+			'threshold' => '10', 'success_scene' => (string) $scene_ids[1], 'failure_scene' => (string) $scene_ids[2],
+			'outcomes' => array( 'success' => 'success', 'failure' => 'failure' ) );
+		$create = function ( $title, $settings, $rewarded = false ) use ( $check, $scope, $scene_ids, $edge, $item ) {
+			$id = ps_pen_paper_save_adventure( $scope, 0, $title, (string) $scene_ids[0], '0' );
+			$check( is_int( $id ) && true === ps_pen_paper_save_adventure_scenario( $scope, $id, $settings, '1' ), 'Scenario settings failed: ' . $title );
+			$input = $edge;
+			if ( $rewarded ) {
+				$input['reward'] = array( 'kind' => 'fixed', 'timing' => 'decision', 'table_id' => '0', 'item_id' => (string) $item, 'quantity' => '1', 'money' => '10' );
+				$input['repeat_reward'] = array( 'kind' => 'fixed', 'timing' => 'decision', 'table_id' => '0', 'item_id' => '0', 'quantity' => '0', 'money' => '2' );
+			}
+			$check( true === ps_pen_paper_save_adventure_edge( $scope, $id, $input, '2' ) &&
+				true === ps_pen_paper_publish_adventure( $scope, $id, '3', 'confirmed' ), 'Scenario publication failed: ' . $title );
+			return $id;
+		};
+		$start = function ( $id, $owner = 'player', $character = null ) use ( $scope, $chars, $users ) {
+			wp_set_current_user( $users[ $owner ] ); $character = $character ?? $chars[ $owner ];
+			return ps_pen_paper_start_adventure_run( $scope, $id, $character, (string) ps_pen_paper_get_adventure( $scope, $id )['revision'],
+				(string) ps_pen_paper_character_state( $scope, get_post( $character ) )['revision'] );
+		};
+		$finish = function ( $run_id ) use ( $check, $scope ) {
+			$before = get_post_meta( $run_id, '_pspp_adventure_run', true );
+			$check( true === ps_pen_paper_advance_adventure_run( $scope, $run_id, $before['snapshot']['edges'][0]['id'], '1' ), 'Scenario advance failed.' );
+			$after = get_post_meta( $run_id, '_pspp_adventure_run', true );
+			$check( ps_pen_paper_valid_adventure_run( $after ) && 'completed' === $after['status'], 'Scenario completion proof failed.' );
+			return $after;
+		};
+		$first = null;
+		foreach ( array( 'once' => 0, 'always' => 10, 'alternate' => 2 ) as $mode => $expected ) {
+			wp_set_current_user( $users['gm'] ); $settings = $policy; $settings['rewards'] = $mode;
+			$id = $create( 'Reward mode ' . $mode, $settings, true );
+			if ( null === $first ) { $first = $id; }
+			$run = $start( $id ); $check( is_int( $run ) && $run === $start( $id ), 'Start replay duplicated an active scenario.' );
+			$receipt = $finish( $run );
+			$check( 1 === $receipt['scenario_attempt'] && 10 === $receipt['history'][0]['reward']['money_roll']['total'], 'First scenario reward incorrect.' );
+			wp_set_current_user( $users['gm'] );
+			$check( true === ps_pen_paper_save_adventure_scenario( $scope, $id, $settings, '4' ) &&
+				true === ps_pen_paper_publish_adventure( $scope, $id, '5', 'confirmed' ), 'Scenario re-publication failed.' );
+			$again = $start( $id ); $check( is_int( $again ) && $again !== $run, 'Allowed repetition did not create an independent run.' );
+			$before_money = ps_pen_paper_wallet_context( $scope, $chars['player'] )['wallet'];
+			$before_gear = ps_pen_paper_gear_state( $chars['player'] );
+			$repeat = $finish( $again ); $reward = $repeat['history'][0]['reward'];
+			$check( 2 === $repeat['scenario_attempt'] && ( 0 === $expected ? null === $reward : $expected === $reward['money_roll']['total'] ), 'Repeat reward policy or publication counter failed.' );
+			if ( 'once' === $mode ) {
+				$check( $before_money === ps_pen_paper_wallet_context( $scope, $chars['player'] )['wallet'] &&
+					$before_gear === ps_pen_paper_gear_state( $chars['player'] ), 'Once-only repetition changed money or inventory.' );
+			}
+			$forged = $repeat; $forged['scenario_attempt'] = 1;
+			$check( ! ps_pen_paper_valid_adventure_run( $forged ), 'Forged first-attempt receipt was accepted.' );
+			wp_set_current_user( $users['gm'] );
+			$group = ps_pen_paper_write_adventure_group( $scope, 0, '0', 'create', array( 'adventure_id' => $id, 'adventure_revision' => '6', 'title' => 'Repeat group', 'rule' => 'any' ) );
+			$check( is_int( $group ), 'Scenario group creation failed.' );
+			wp_set_current_user( $users['player'] );
+			$group_action = function ( $operation, $input = array() ) use ( $scope, $group ) {
+				return ps_pen_paper_write_adventure_group( $scope, $group, (string) get_post_meta( $group, '_pspp_adventure_group', true )['revision'], $operation, $input );
+			};
+			$check( true === $group_action( 'join', array( 'character_id' => $chars['player'] ) ) &&
+				true === $group_action( 'leave', array( 'character_id' => $chars['player'] ) ) &&
+				true === $group_action( 'join', array( 'character_id' => $chars['player'] ) ), 'Group re-entry failed.' );
+			$group_state = get_post_meta( $group, '_pspp_adventure_group', true );
+			$check( 3 === $group_state['participants'][0]['scenario_attempt'], 'Solo/group counter or re-entry protection failed.' );
+			$check( true === $group_action( 'propose', array( 'character_id' => $chars['player'], 'edge_id' => $group_state['snapshot']['edges'][0]['id'] ) ) &&
+				true === $group_action( 'execute' ), 'Scenario group execution failed.' );
+			$group_state = get_post_meta( $group, '_pspp_adventure_group', true );
+			$reward = $group_state['history'][0]['decision']['reward'];
+			$check( ps_pen_paper_valid_adventure_group( $group_state ) &&
+				( 0 === $expected ? null === $reward : $expected === $reward['money_roll']['total'] ), 'Group bypassed repetition reward policy.' );
+			if ( 'alternate' === $mode ) {
+				$retry = $start( $id ); $retry_state = get_post_meta( $retry, '_pspp_adventure_run', true );
+				$wallet_before = ps_pen_paper_wallet_context( $scope, $chars['player'] )['wallet'];
+				$fail_event = static function ( $check, $object, $key, $value ) {
+					return '_pspp_event' === $key && ( $value['kind'] ?? '' ) === 'adventure_run' ? false : $check;
+				};
+				add_filter( 'update_post_metadata', $fail_event, 10, 4 );
+				try { $check( is_wp_error( ps_pen_paper_advance_adventure_run( $scope, $retry, $retry_state['snapshot']['edges'][0]['id'], '1' ) ), 'Failed repeat event was reported as successful.' ); }
+				finally { remove_filter( 'update_post_metadata', $fail_event, 10 ); }
+				$check( $wallet_before === ps_pen_paper_wallet_context( $scope, $chars['player'] )['wallet'] &&
+					$retry_state === get_post_meta( $retry, '_pspp_adventure_run', true ), 'Failed repeat event left partial reward or progress.' );
+				$finish( $retry );
+			}
+		}
+		wp_set_current_user( $users['gm'] );
+		$blocked = $policy; $blocked['repeat'] = '0'; $blocked['minimum_field'] = $level; $blocked['minimum_value'] = '3';
+		$blocked['prerequisites'] = array( array( 'adventure_id' => (string) $first, 'result' => 'success' ) );
+		$next = $create( 'Chapter Two', $blocked );
+		$check( is_wp_error( $start( $next ) ) && is_wp_error( $start( $next, 'other' ) ), 'Minimum value or missing predecessor did not block entry.' );
+		wp_set_current_user( $users['gm'] );
+		$check( $chars['player'] === ps_pen_paper_save_character( $scope_id, $chars['player'], $users['player'],
+			array( 'name' => 'player', 'values' => array( $level => '3' ) ), '1', '1' ), 'Scenario minimum adjustment failed.' );
+		$check( is_int( $start( $next ) ), 'Won predecessor and minimum did not unlock next chapter.' );
+		$progress = ps_pen_paper_scenario_progress( $scope, $users['player'] );
+		$check( $progress[ $first ]['success'], 'Scenario victory was not retained.' );
+		wp_set_current_user( $users['gm'] );
+		$cycle = $policy; $cycle['prerequisites'] = array( array( 'adventure_id' => (string) $next, 'result' => 'completed' ) );
+		$check( is_wp_error( ps_pen_paper_save_adventure_scenario( $scope, $first, $cycle, '6' ) ), 'Cyclic scenario prerequisites were accepted.' );
+		$check( is_wp_error( ps_pen_paper_save_adventure_scenario( $scope, $next, $blocked, '1' ) ), 'Stale scenario settings overwrote newer state.' );
+		wp_set_current_user( $users['player'] ); $finish( $start( $next ) );
+		wp_set_current_user( $users['gm'] );
+		$copy = ps_pen_paper_save_character( $scope_id, 0, $users['player'], array( 'name' => 'Another figure', 'values' => array( $level => '3' ) ), '0', '1' );
+		$check( is_int( $copy ) && is_wp_error( $start( $next, 'player', $copy ) ), 'Another figure bypassed repeat prohibition.' );
+		$another = $finish( $start( $first, 'player', $copy ) );
+		$check( 4 === $another['scenario_attempt'] && null === $another['history'][0]['reward'], 'Another figure received the same first reward again.' );
+		$check( is_wp_error( ps_pen_paper_save_adventure_scenario( $scope, $next, $blocked, '4' ) ), 'Player changed scenario policy.' );
+		wp_set_current_user( $users['gm'] );
+		$forbidden_group = ps_pen_paper_write_adventure_group( $scope, 0, '0', 'create',
+			array( 'adventure_id' => $next, 'adventure_revision' => '4', 'title' => 'Forbidden repetition', 'rule' => 'any' ) );
+		$check( is_int( $forbidden_group ), 'Repeat-prohibition group fixture failed.' );
+		wp_set_current_user( $users['player'] );
+		$check( is_wp_error( ps_pen_paper_write_adventure_group( $scope, $forbidden_group, '1', 'join', array( 'character_id' => $copy ) ) ), 'Group entry bypassed repeat prohibition.' );
+		wp_set_current_user( $users['gm'] );
+		$losing = $create( 'Defeat scenario', $policy );
+		$losing_state = ps_pen_paper_get_adventure( $scope, $losing );
+		$lose = $edge; $lose['expression'] = 'W6-100';
+		$check( true === ps_pen_paper_save_adventure_edge( $scope, $losing, array(), '4', $losing_state['draft']['edges'][0]['id'] ) &&
+			true === ps_pen_paper_save_adventure_edge( $scope, $losing, $lose, '5' ) &&
+			true === ps_pen_paper_publish_adventure( $scope, $losing, '6', 'confirmed' ), 'Defeat path failed.' );
+		$defeat = $finish( $start( $losing ) );
+		$check( 'failure' === ps_pen_paper_scenario_outcome( $defeat['snapshot'], $defeat['history'] ), 'Completed defeat counted as victory.' );
+		wp_set_current_user( $users['gm'] );
+		$require_loss = $policy; $require_loss['prerequisites'] = array( array( 'adventure_id' => (string) $losing, 'result' => 'success' ) );
+		$won_only = $create( 'Victory required', $require_loss );
+		$require_loss['prerequisites'][0]['result'] = 'completed'; $completed_only = $create( 'Completion required', $require_loss );
+		$check( is_wp_error( $start( $won_only ) ) && is_int( $start( $completed_only ) ), 'Won/completed prerequisites were not distinguished.' );
+		wp_set_current_user( $users['gm'] );
+		$solo = $policy; $solo['mode'] = 'solo'; $solo_id = $create( 'Solo only', $solo );
+		$check( is_wp_error( ps_pen_paper_write_adventure_group( $scope, 0, '0', 'create',
+			array( 'adventure_id' => $solo_id, 'adventure_revision' => '4', 'title' => 'Invalid group', 'rule' => 'any' ) ) ), 'Solo-only scenario allowed group creation.' );
+		$solo['mode'] = 'group'; $group_only = $create( 'Group only', $solo );
+		$check( is_wp_error( $start( $group_only ) ), 'Group-only scenario allowed solo entry.' );
+		ob_start(); ps_pen_paper_render_character_adventures( $scope, get_post( $chars['player'] ), 0 ); $html = ob_get_clean();
+		$check( false !== strpos( $html, 'Chapter One' ) && false !== strpos( $html, 'Szenario wiederholen' ) &&
+			false === strpos( $html, 'PRIVATE_CHAPTER_' ), 'Chapter/continue UI missing or private chapter content leaked.' );
+		wp_set_current_user( $users['gm'] );
+		ob_start(); ps_pen_paper_render_scenario_editor( $scope, $next, ps_pen_paper_get_adventure( $scope, $next ),
+			ps_pen_paper_adventure_records( $scope ), $rules, 0 ); $html = ob_get_clean();
+		$check( false !== strpos( $html, 'name="adventure_scenario[minimum_field]"' ) &&
+			false !== strpos( $html, 'name="adventure_scenario[prerequisites][0][adventure_id]"' ), 'Scenario editor lost configuration controls.' );
+		$cycle_a = $create( 'Live cycle A', $policy );
+		$cycle_policy = $policy; $cycle_policy['prerequisites'] = array( array( 'adventure_id' => (string) $cycle_a, 'result' => 'completed' ) );
+		$cycle_b = $create( 'Live cycle B', $cycle_policy );
+		$check( true === ps_pen_paper_save_adventure_scenario( $scope, $cycle_b, $policy, '4' ), 'Could not prepare removal of live predecessor.' );
+		$cycle_policy['prerequisites'][0]['adventure_id'] = (string) $cycle_b;
+		$check( true === ps_pen_paper_save_adventure_scenario( $scope, $cycle_a, $cycle_policy, '4' ) &&
+			is_wp_error( ps_pen_paper_publish_adventure( $scope, $cycle_a, '5', 'confirmed' ) ), 'Unpublished predecessor edit concealed a live cycle.' );
+		$check( true === ps_pen_paper_publish_adventure( $scope, $cycle_b, '5', 'confirmed' ) &&
+			true === ps_pen_paper_publish_adventure( $scope, $cycle_a, '5', 'confirmed' ), 'Removing a published cycle dependency did not permit publication.' );
+		$sorted = array(
+			2 => array( 'published' => array( 'scenario' => array( 'order' => 2, 'chapter_id' => 0 ) ) ),
+			1 => array( 'published' => array( 'scenario' => array( 'order' => 1, 'chapter_id' => $chapter ) ) ),
+		);
+		ps_pen_paper_sort_scenarios( $sorted );
+		$check( array( 1, 2 ) === array_keys( $sorted ), 'Loose scenarios overrode configured chapter order.' );
+		$records = array(); $map = array(); $archive = array( 'references' => array(), 'warnings' => array() );
+		foreach ( array_merge( array( get_post( $scope_id ) ), get_posts( array( 'post_type' => array( 'pspp_scene', 'pspp_adventure', 'pspp_folio', 'pspp_item' ),
+			'post_status' => 'private', 'post_parent' => $scope_id, 'posts_per_page' => -1 ) ) ) as $post ) {
+			$records[ $post->ID ] = array( 'id' => $post->ID, 'type' => $post->post_type, 'status' => $post->post_status, 'parent_id' => (int) $post->post_parent );
+			$map[ $post->ID ] = $post->ID + 1000000;
+		}
+		$options = array( 'users' => array( $users['gm'] => $users['other'] ), 'universe_mode' => 'copy' );
+		foreach ( array( $first, $next ) as $id ) {
+			$graph = ps_pen_paper_get_adventure( $scope, $id )['published'];
+			$check( true === ps_pen_paper_prepare_import_adventure_snapshot( $graph, $scope_id, $records, $map, $options, $archive, 'scenario' ) &&
+				ps_pen_paper_valid_adventure_publication( $graph ) && $graph['scenario']['chapter_id'] === $map[ $chapter ], 'Native import broke scenario chapter or publication.' );
+			if ( $id === $next ) {
+				$check( $graph['scenario']['prerequisites'][0]['adventure_id'] === $map[ $first ] &&
+					$graph['scenario']['minimum']['field'] === $level, 'Native import broke predecessor or stable rule field.' );
+			} else {
+				$check( $graph['edges'][0]['repeat_reward']['authorizer_id'] === $users['other'] &&
+					$graph['edges'][0]['repeat_reward']['source']['currency']['scope_id'] === $map[ $scope_id ], 'Native import did not remap repeat reward authority and currency.' );
+			}
+		}
+	};
+	$check_scenarios();
 	echo "Adventure integration checks passed.\n";
 } finally {
 	wp_set_current_user( $original_user );
 	$errors = array();
-	$children = $parents ? get_posts( array( 'post_type' => array( 'pspp_character', 'pspp_scene', 'pspp_adventure', 'pspp_adventure_run', 'pspp_adventure_group', 'pspp_item', 'pspp_loot_table', 'pspp_event' ),
+	$children = $parents ? get_posts( array( 'post_type' => array( 'pspp_character', 'pspp_scene', 'pspp_folio', 'pspp_adventure', 'pspp_adventure_run', 'pspp_adventure_group', 'pspp_item', 'pspp_loot_table', 'pspp_event' ),
 		'post_status' => array( 'private', 'draft' ), 'post_parent__in' => $parents, 'posts_per_page' => -1, 'fields' => 'ids' ) ) : array();
 	foreach ( array_merge( $children, $parents ) as $id ) { if ( ! wp_delete_post( $id, true ) ) { $errors[] = 'Cannot remove adventure fixture ' . $id; } }
 	foreach ( $users as $id ) { if ( ! ( is_multisite() ? wpmu_delete_user( $id ) : wp_delete_user( $id ) ) ) { $errors[] = 'Cannot remove fixture account ' . $id; } }

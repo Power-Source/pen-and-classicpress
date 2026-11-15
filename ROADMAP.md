@@ -163,18 +163,23 @@ einen endgültigen Funktionsumfang.
 - Geschichten, Teilnehmer, Chat und Protokolle bleiben kampagnengetrennt.
   Universumsbesitz oder Bogenbesitz gewährt keine zusätzliche Teilnahme.
 
-### Weitere strukturelle Schritte
+### Struktureller Ausbau und verbleibende Schritte
 
-- Kontrollierte Migration bestehender Kampagnen mit Vorschau, eindeutiger
-  Zuordnung und Konfliktauflösung; keine stillschweigende Zusammenführung.
-- Kontrollierte Rückverbindung unabhängiger Kopien mit Vorschau und
+- [x] Verwendete Feldstrukturen mit Vorschau und ausdrücklicher
+  Konfliktauflösung ändern; bestehende Werte und offene Anträge nicht
+  stillschweigend umschreiben.
+- [x] Auswahlfelder und optional konfigurierbare Attribut-Punkteverteilung.
+- [x] Kontrollierte Rückverbindung unabhängiger Kopien mit Vorschau und
   Konfliktauflösung. Noch gemeinsame Bögen sperren einen Universumswechsel;
   das ausdrückliche Ablösen ist bereits möglich, sofern keine gemeinsamen
   Universumskonten daran gebunden sind.
+- [x] Eigene Universumsbasisbögen als Spieler beantragen; Freigabe durch
+  die Universumsleitung und anschließende Kampagnenaufnahme getrennt halten.
+- [x] Gemeinsame Basisressourcen bei Abenteuerentscheidungen einmalig am
+  maßgeblichen Basisbogen verbrauchen; veraltete Anträge und Wiederholungen sperren.
 - Konfigurierbare universumsweite Teilnahme und zusätzliche kampagnenbezogene
   Freigaben. Aktuell entscheidet weiterhin jede Kampagne über ihre Mitglieder;
   eine spätere Universumsmitgliedschaft darf keine Geschichten ungefragt öffnen.
-- Spielerbearbeitung von Basisbögen mit passendem Antrags- und Freigabemodell.
 - Ressourcenauflagen, optionaler XP-/Levelautomatismus und getrennte Spielsitzungen.
 
 ## Grundprinzipien
@@ -239,7 +244,8 @@ Seit Version 0.12.0 ist der erste durchgängige Szenenablauf vorhanden:
 Szene vorbereiten, Inhaltsvorschau prüfen, freigeben, am Spieltisch anzeigen und
 zurücknehmen. Seit 0.13.0 sind Kapitel mit Szenenfolge, eine kleine private
 Spielleitermappe und geschützte Text-/Bild-Handouts vorhanden. Redaktioneller
-Komfort, weitere Dateiformate und differenzierte Handoutempfänger bleiben offen.
+Komfort und weitere Dateiformate bleiben offen. Geschützte PDF-/Textdateien
+und ausgewählte Handoutempfänger sind ergänzt.
 
 - Spielertext und Spielleitergeheimnisse klar getrennt bearbeiten und speichern.
 - Entwurf, Veröffentlichung und Rücknahme bewusst unterscheiden; Änderungen
@@ -424,21 +430,21 @@ ist weiterhin kein Ziel.
    Gruppendurchläufe mit wählbaren Entscheidungsregeln, persönlichen Kosten und
    Belohnungen, Teilnahme, Pausen und Wiedereinstieg sind ergänzt; Import/Export
    erhält den gemeinsamen Fortschritt samt Stimmen und Freigaben.
-   Noch offen sind Gegenstandsvoraussetzungen, weitere Ereignisarten,
-   Begegnungsabläufe.
+   Gegenstandsvoraussetzungen, frei gesetzte Abenteuerzustände,
+   Entscheidungsfolgen und geordnete Begegnungsphasen sind ergänzt und geprüft.
+   Kapitelzugang, Szenarioergebnisse, Wiederholungen und Belohnungsrichtlinien
+   sind ebenfalls umgesetzt.
    Spielleitung/Admin stellt Universen, Kampagnen und Abenteuer direkt bereit.
    Spieler nutzen die freigegebenen Abläufe mit ihrem Charakter, ohne
    Paketverwaltung oder Dateiübernahme.
-4. **Regeln und Universen flexibilisieren:** Verwendete Feldstrukturen
-   kontrolliert ändern, Kampagnenmigration mit Vorschau und Konfliktauflösung,
-   Gemeinsame Basisbögen können bereits ausdrücklich unabhängig weitergeführt
-   werden. Rückverbindungen und Spielerbearbeitung von Basisbögen mit Freigaben
-   ermöglichen. Auswahlfelder, optionale Punkteverteilung
-   und konfigurierbare XP-/Level-/Rangregeln ergänzen.
-5. **Spielwelt und Integrationen vervollständigen:** Beute auf mehrere
-   Empfänger aufteilen, Gegenstandsgruppen und verschachtelte Tabellen,
-   weitere Würfelarten, Wiki-Verknüpfungen, geschützte Handoutformate und
-   Empfängerkreise sowie Einladungen ergänzen.
+4. **Regeln und Universen — Grundlagen umgesetzt:** Strukturänderungen mit
+   Vorschau und Konfliktauflösung, Rückverbindungen, Basisbogenanträge und
+   Freigaben, Auswahlfelder, Punkteverteilung und gemeinsamer Ressourcenverbrauch.
+   Optionale XP-/Level-/Rangautomatismen bleiben spätere Erweiterungen.
+5. **Spielwelt — beauftragte Grundlagen umgesetzt:** Mehrere Beuteempfänger,
+   Gegenstandsgruppen, verschachtelte Tabellen einschließlich Wiederherstellung,
+   Wiki-Verknüpfungen, geschützte PDF-/Text-Handouts, Empfängerkreise und
+   Einladungen. Weitere Würfelarten und Universums-Beutekataloge bleiben offen.
 6. **Qualität und Plattformprüfung begleitend:** Geänderte Abläufe live auf
    der Testseite und mit gezielten Regressionen prüfen. Unterstützte Versionen
    von WordPress, ClassicPress und PHP mit einer reproduzierbaren Testmatrix
@@ -715,8 +721,9 @@ werden standardmäßig übernommen; eine ausdrücklich lokale Wirtschaftszuordnu
 erhält stattdessen die Kampagnenregeln. Zunächst ist nur
 Handel derselben Kampagne zwischen unterschiedlichen Besitzern möglich.
 Freundschaften dürfen höchstens die Auswahl unterstützen, nicht Kampagnen-
-oder Handelsrechte ersetzen. Außerdem fehlen Entzug/Entfernen von Exemplaren,
-Mengen und ein grafischer, frei positionierbarer Slotdesigner.
+oder Handelsrechte ersetzen. Entzug/Entfernen, Mehrfachauswahl konkreter Exemplare
+und reine Geldgeschenke sind ergänzt. Ein grafischer, frei positionierbarer
+Slotdesigner fehlt weiterhin.
 Die weiteren Grundlagen stehen in Phase 6, vorbereitete automatische
 Abenteuerabläufe in Phase 7.
 
@@ -727,7 +734,7 @@ Kategorien, Suche, Frontend-Bearbeitung und Revisionen. Es ist derzeit kein
 privates Kampagnen-Wiki. Die Integration verwaltet ausschließlich separat
 gewählte öffentliche Titel/Texte; Spielregeln und Werte bleiben im Kern.
 
-- [ ] Wiki-Seiten mit einer Kampagne, einem Charakterfeld oder einer Szene
+- [x] Wiki-Seiten mit einer Kampagne, einem Charakterfeld oder einer Szene
   verknüpfen, damit die passenden Erläuterungen schnell erreichbar sind.
 - [x] Pro Universum bewusst ein Lexikon aktivieren. Zusätzlich vorhandene
   native Wiki-Veröffentlichungs- und Kategorienrechte verlangen; danach
@@ -842,15 +849,22 @@ Kampagnen ohne Universum konfigurieren ihre Währung lokal.
   behandeln. Bei fehlendem PS Community keine wirtschaftlichen Änderungen
   oder unvollständigen Übertragungen ausführen; vorhandene Daten erhalten.
 
-**Erste Grenze:** Je ein Exemplar pro Seite innerhalb derselben Kampagne,
+- [x] Bis zu 100 konkrete Exemplare je Angebots-/Gegenangebotsseite gemeinsam
+  übertragen; ein Verkaufspreis gilt für die gesamte Auswahl.
+- [x] Reine Geldgeschenke gesondert erlauben, mit Besitzerzustimmung und
+  optionaler Spielleiterfreigabe; keine Inventaränderung oder Ersatzkonten.
+- [x] Spielleitung kann nach Bestätigung Exemplare aus aktiven und beantragten
+  Beständen und Slotbelegungen entfernen. Reservierte Exemplare sperren;
+  Vorher/Nachher protokollieren und Fehler vollständig zurückrollen.
+
+**Aktuelle Grenze:** Bis zu 100 Exemplare pro Seite innerhalb derselben Kampagne,
 zwischen unterschiedlichen Besitzern. UUID und eingefrorener Stand bleiben
 erhalten; auch offene Ausrüstungsanträge werden angepasst, nichts wird
 automatisch angelegt. Regeländerungen sperren den Abschluss alter Angebote,
-nicht deren Zurückziehen/Ablehnen. Gemeinsame Basisguthaben sind bei Verkäufen
+nicht deren Zurückziehen/Ablehnen. Gemeinsame Basisguthaben sind bei Verkäufen und Geldgeschenken
 ausdrücklich eingebunden, ohne neue lokale Ersatzkonten zu erzeugen.
 
-**Noch offen:** Pakete, Mengen, reine Geldgeschenke, kampagnenübergreifende
-Übertragungen und mögliche spätere lokale Abweichungen von Universumsregeln.
+**Noch offen:** Kampagnenübergreifende Übertragungen.
 Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
 
 ### Gegner, NPCs und Universumsvorlagen seit 0.17.0
@@ -872,7 +886,7 @@ Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
 - [x] Private Figurenhistorie und atomare Speicherung mit Ereignis.
   Gegnerverwaltung funktioniert ohne PS Community oder PS Wiki.
 - [x] Optionale lokale Beutetabellen an Gegnern/NPCs verknüpfen.
-- [ ] Begegnungsabläufe ergänzen. Keine fest vorgeschriebenen Attribute,
+- [x] Begegnungsabläufe ergänzen. Keine fest vorgeschriebenen Attribute,
   Gegnerklassen oder Kampfabläufe.
 - [x] Freigegebene Lexikonbeschreibungen über die optionale PS-Wiki-Anbindung
   zugänglich machen; geheime Werte und Beuteinformationen bleiben geschützt.
@@ -896,9 +910,11 @@ Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
   zurücknehmen. Derselbe Vorgang kann nicht zweimal auszahlen.
 - [x] Tabellen, Chancen, Anlässe und Vorschläge privat halten.
   Besitzer sehen lediglich tatsächliche Gegenstands- und Guthabenänderungen.
-- [ ] Gegenstandsgruppen, Aufteilung auf mehrere Empfänger und ausdrücklich
-  verwaltete Universums-Beutekataloge ergänzen.
-- [ ] Begrenzte Verweise auf weitere Tabellen ohne Zyklen ergänzen.
+- [x] Gegenstandsgruppen und Aufteilung auf mehrere Empfänger ergänzen.
+  Kampagnensicherungen erhalten Tabellen, gespeicherte Würfe und Vergaben;
+  offene Vorschläge bleiben ausführbar, abgeschlossene Vergaben zahlen nicht erneut.
+- [ ] Ausdrücklich verwaltete Universums-Beutekataloge ergänzen.
+- [x] Begrenzte Verweise auf weitere Tabellen ohne Zyklen ergänzen.
 - [ ] Weitere Würfelarten wie `W3` gesondert unterstützen; derzeit sind nur
   die vorhandenen Standardwürfel zulässig.
 - [x] Seit 0.24.0 automatische Vergabe im ausdrücklich freigegebenen
@@ -979,7 +995,7 @@ sie werden nicht pauschal hinter eine abschließende Stabilisierungsphase zurüc
   Anfrage/Vorschlag und Zustimmung verbrauchen nichts; der echte Besitzer führt
   nach erneuter Rechteprüfung aus. Entzogene Freigaben lassen sich zurücknehmen
   und durch eine aktuelle Entscheidung der Spielleitung ersetzen.
-- [ ] Gegenstandsbedingungen, weitere Ereignisse und gesetzte Abenteuerzustände ergänzen.
+- [x] Gegenstandsbedingungen, Entscheidungsfolgen und gesetzte Abenteuerzustände ergänzen.
 
 Abenteuerautor und ausführende Spielleitung sind getrennte Zuständigkeiten.
 Vorbereitete Abenteuer können von anderen Personen übernommen und ohne
@@ -997,7 +1013,7 @@ Administration beziehungsweise Spielleitung wählt den Modus innerhalb ihrer Rec
   Erfolgs-/Misserfolgsfolgen und erlaubte Übergänge zwischen freigegebenen
   Szenen. Mindestwerte stehen seit 0.22.0 bereit; mehrere Wertebedingungen mit
   UND/ODER seit 0.25.0. Text- und Fortschrittsbedingungen sind ergänzt;
-  Gegenstandsbedingungen folgen später.
+  Gegenstandsbedingungen und frei gesetzte Abenteuerzustände sind ergänzt.
 - Vorbereitete Komplikationen statt automatisch erfundener Ergebnisse
   verwenden. Beispiel: Ein Schloss untersuchen, eine Verstandprobe ausführen
   und je Ergebnis eine freigegebene Folgeszene öffnen.
@@ -1036,14 +1052,35 @@ Administration beziehungsweise Spielleitung wählt den Modus innerhalb ihrer Rec
 
 Spielleitung/Admin stellt Universen, Kampagnen und Abenteuer direkt auf der
 Website bereit und bestimmt Regeln, Spielmodus, Teilnahme und Freigaben.
-Spieler öffnen ihre Kampagne und spielen die freigegebenen Abenteuer mit
-ihrem Charakter. Es gibt keine Paketbibliothek, keinen JSON-Abenteuerimport
-und keine Übernahme in selbst angelegte Zielkampagnen.
+Sie entscheidet, ob Szenarien eine zusammenhängende Geschichte von Kapitel
+zu Kapitel bilden, lose spielbar sind oder beide Formen kombiniert werden.
+Keine Reihenfolge und kein festes Levelsystem werden vom Plugin erzwungen.
+Spieler öffnen ihre Kampagne und starten oder setzen die freigegebenen
+Abenteuer mit ihrem Charakter fort. Es gibt keine Paketbibliothek, keinen
+JSON-Abenteuerimport und keine Übernahme in selbst angelegte Zielkampagnen.
 
 Abenteuerdefinitionen und persönliche Durchläufe bleiben getrennt.
 Änderungen an der Vorbereitung verändern keine bereits laufenden Durchläufe.
 Die vorhandenen Solo-, Gruppen- und hybriden Abläufe verwenden dieselbe
 Regel-, Charakter-, Rechte- und Speicherbasis.
+
+**Aktueller Umsetzungsblock:**
+
+- [x] Szenarien optional bestehenden Kapiteln zuordnen und für Spieler ordnen.
+  Lose Szenarien benötigen weder Kapitel noch Vorgänger.
+- [x] Spielleitung wählt Einzel- und/oder Gruppendurchläufe; vorhandene
+  Spielleiterfreigaben ermöglichen weiterhin hybride Abläufe.
+- [x] Zugang an abgeschlossene oder gewonnene andere Szenarien und einen
+  Mindestwert eines frei gewählten Zahlenfelds (z. B. Level oder Rang) binden.
+- [x] Enden ausdrücklich als Erfolg, Niederlage oder neutral kennzeichnen.
+  Ein bestandener Würfelwurf allein bedeutet keinen Szenariosieg.
+- [x] Wiederholungen erlauben oder sperren; Belohnungen nur im ersten
+  Durchlauf, in jedem Durchlauf oder ab Wiederholung anders konfigurieren.
+- [x] Wiederholungen je Spielerkonto und Szenario über Einzel- und
+  Gruppendurchläufe hinweg nachhalten. Andere Figuren, erneute Freigaben und
+  Mehrfachklicks setzen den ersten Durchlauf nicht zurück.
+- [x] Voraussetzungen und Belohnungshinweise im Frontend anzeigen und
+  serverseitig prüfen; Fortschritt, Kosten und Vergaben atomar speichern.
 
 ## Phase 8: Mögliche spätere Erweiterungen
 
@@ -1095,16 +1132,17 @@ Optionen bereit, statt eine einzige globale Spielweise festzulegen.
 1. Welche Versionen von WordPress, ClassicPress und PHP sollen mindestens
    unterstützt werden?
 2. Administratoren und ausdrücklich berechtigte Benutzer dürfen Kampagnen
-   erstellen. Aufnahme und Beitrittsanfragen sind vorhanden; konfigurierbare
-   Einladungen fehlen noch.
+   erstellen. Aufnahme, Beitrittsanfragen und widerrufbare persönliche
+   Einladungen sind vorhanden.
 3. Charakterfreigaben und Würfelsichtbarkeit sind bereits pro Kampagne
-   konfigurierbar. Weitere Bearbeitungs-/Freigaberechte für Basisbögen ergänzen.
-4. Wie sollen Änderungen an bereits verwendeten Feldern und Regeln bestehende
-   Charaktere und offene Freigaben beeinflussen?
+   konfigurierbar. Universumsbasisbögen besitzen Spieleranträge und getrennte
+   Freigaben durch die Universumsleitung.
+4. Änderungen verwendeter Feldstrukturen benötigen eine Vorschau und
+   ausdrückliche Konfliktlösungen für bestehende Charaktere und offene Anträge.
 5. Welche Wiki- und Chat-Zugriffsrechte sind bereits vorhanden, und wo werden
    gegebenenfalls Erweiterungen der anderen Plugins benötigt?
-6. Welche weiteren Handoutformate und Empfängerkreise werden neben den
-   geschützten Text-/Bild-Handouts für die gesamte Runde benötigt?
+6. Geschützte PDF-/Textdateien und ausgewählte Handoutempfänger sind ergänzt.
+   Weitere Dateiformate bleiben mögliche spätere Erweiterungen.
 7. Handelsarten und zusätzliche Freigaben sind konfigurierbar. Bei der
    Universumszuordnung wählt die zuständige Person Universumseinstellungen
    oder ausdrücklich beibehaltene lokale Währungs-/Handelsregeln.

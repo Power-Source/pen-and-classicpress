@@ -1,6 +1,7 @@
 <?php
 /**
  * Run with WP-CLI against a disposable development site.
+ * Set PSPP_TEST_HTTP=1 to also check real frontend request and approval POSTs.
  */
 if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) { exit( "Run this test with WP-CLI.\n" ); }
 require_once dirname( __DIR__ ) . '/ps-pen-paper.php';
@@ -375,7 +376,55 @@ try {
 	$check( is_wp_error( ps_pen_paper_request_universe_character( $campaigns[0]->ID, $universe_id, $base_input, '1' ) ) &&
 		is_wp_error( ps_pen_paper_request_universe_character( $campaigns[3]->ID, $universe_id, $base_input, '0' ) ),
 		'Universe onboarding accepted a foreign campaign or stale template.' );
-	$new_base_id = ps_pen_paper_request_universe_character( $campaigns[3]->ID, $universe_id, $base_input, '1' );
+	$page_id = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_author' => $users['gm'],
+		'post_title' => 'Universe request frontend fixture', 'post_content' => '[ps_pen_paper]' ), true );
+	$check( is_int( $page_id ), 'Frontend request page fixture failed.' ); $parents[] = $page_id;
+	$submit_frontend = static function ( $fields ) use ( $page_id, $check ) {
+		global $wp_query;
+		$old_query = $wp_query; $old_post = $_POST; $old_request = $_REQUEST;
+		$old_method = $_SERVER['REQUEST_METHOD'] ?? null; $location = null;
+		$redirect = static function ( $url ) { throw new RuntimeException( 'universe-form-redirect:' . $url ); };
+		$die_handler = static function () {
+			return static function ( $message ) { throw new RuntimeException( 'universe-form-failure:' . $message ); };
+		};
+		add_filter( 'wp_redirect', $redirect, 1 ); add_filter( 'wp_die_handler', $die_handler, 1000 );
+		try {
+			$scope = (int) $fields['campaign_id'];
+			$_POST = array_merge( array( 'action' => 'ps_pen_paper', 'pspp_frontend_page' => (string) $page_id,
+				'pspp_scope_epoch' => ps_pen_paper_scope_epoch( $scope ), '_wpnonce' => wp_create_nonce( 'pspp_campaign_' . $scope ) ), $fields );
+			$_REQUEST = $_POST; $_SERVER['REQUEST_METHOD'] = 'POST';
+			$wp_query = new WP_Query( array( 'page_id' => $page_id ) );
+			try { ps_pen_paper_handle_frontend_action(); }
+			catch ( RuntimeException $error ) {
+				if ( 0 !== strpos( $error->getMessage(), 'universe-form-redirect:' ) ) { throw $error; }
+				$location = substr( $error->getMessage(), strlen( 'universe-form-redirect:' ) );
+			}
+		} finally {
+			remove_filter( 'wp_redirect', $redirect, 1 ); remove_filter( 'wp_die_handler', $die_handler, 1000 );
+			$wp_query = $old_query; $_POST = $old_post; $_REQUEST = $old_request;
+			if ( null === $old_method ) { unset( $_SERVER['REQUEST_METHOD'] ); } else { $_SERVER['REQUEST_METHOD'] = $old_method; }
+		}
+		$check( null !== $location, 'Frontend context action did not redirect after saving.' );
+		return $location;
+	};
+	$request_fields = array( 'pspp_operation' => 'request_universe_character', 'campaign_id' => (string) $campaigns[3]->ID,
+		'universe_id' => (string) $universe_id, 'universe_epoch' => ps_pen_paper_scope_epoch( $universe_id ),
+		'character_complete' => 'complete', 'character_rules_revision' => '1', 'character' => $base_input );
+	foreach ( array( array( '_wpnonce' => 'invalid' ), array( 'universe_epoch' => 'obsolete' ) ) as $invalid ) {
+		$rejected = false;
+		try { $submit_frontend( array_merge( $request_fields, $invalid ) ); }
+		catch ( RuntimeException $error ) {
+			if ( 0 !== strpos( $error->getMessage(), 'universe-form-failure:' ) ) { throw $error; }
+			$rejected = true;
+		}
+		$check( $rejected && ! get_posts( array( 'post_type' => 'pspp_character', 'post_status' => 'private',
+			'post_parent' => $universe_id, 'author' => $users['newcomer'] ) ), 'Invalid frontend request created a universe sheet.' );
+	}
+	$submit_frontend( $request_fields );
+	$new_bases = get_posts( array( 'post_type' => 'pspp_character', 'post_status' => 'private', 'post_parent' => $universe_id,
+		'author' => $users['newcomer'], 'posts_per_page' => -1, 'fields' => 'ids' ) );
+	$check( 1 === count( $new_bases ), 'Frontend onboarding did not create exactly one own universe sheet.' );
+	$new_base_id = (int) $new_bases[0];
 	$check( is_int( $new_base_id ) && $new_base_id > 0, 'New universe-sheet onboarding failed: ' .
 		( is_wp_error( $new_base_id ) ? $new_base_id->get_error_code() . ': ' . $new_base_id->get_error_message() :
 			gettype( $new_base_id ) . ' ' . wp_json_encode( $new_base_id ) ) );
@@ -394,25 +443,51 @@ try {
 	$check( false !== strpos( $base_review_html, 'name="pspp_operation" value="review_base_character"' ) &&
 		false === strpos( $base_review_html, 'name="pspp_operation" value="review_character"' ),
 		'Universe approval posted to the campaign-only review action.' );
-	$original_post = $_POST;
-	$original_request = $_REQUEST;
-	$redirected = false;
-	$intercept_redirect = static function ( $location ) { throw new RuntimeException( 'universe-review-redirect:' . $location ); };
-	add_filter( 'wp_redirect', $intercept_redirect );
-	try {
-		$_POST = array( 'campaign_id' => (string) $universe_id, 'character_id' => (string) $new_base_id,
-			'character_revision' => '1', 'decision' => 'approve', '_wpnonce' => wp_create_nonce( 'pspp_campaign_' . $universe_id ) );
-		$_REQUEST = $_POST;
-		try { ps_pen_paper_handle_character_context_action( 'review_base_character' ); }
-		catch ( RuntimeException $error ) { $redirected = 0 === strpos( $error->getMessage(), 'universe-review-redirect:' ); if ( ! $redirected ) { throw $error; } }
-	} finally {
-		remove_filter( 'wp_redirect', $intercept_redirect );
-		$_POST = $original_post;
-		$_REQUEST = $original_request;
-	}
-	$check( $redirected && $new_base_state['pending'] === ps_pen_paper_raw_character_state( $new_base_id )['active'] &&
+	$review_url = $submit_frontend( array( 'pspp_operation' => 'review_base_character', 'campaign_id' => (string) $universe_id,
+		'character_id' => (string) $new_base_id, 'character_revision' => '1', 'decision' => 'approve' ) );
+	$check( false !== strpos( $review_url, 'pspp_base_character=' . $new_base_id ) &&
+		$new_base_state['pending'] === ps_pen_paper_raw_character_state( $new_base_id )['active'] &&
 		null === ps_pen_paper_raw_character_state( $new_base_id )['pending'],
 		'The universe approval UI controller did not approve the pending new sheet.' );
+	if ( '1' === getenv( 'PSPP_TEST_HTTP' ) ) {
+		$http_user = wp_insert_user( array( 'user_login' => 'pspp-context-http-' . wp_generate_password( 12, false ),
+			'user_pass' => wp_generate_password( 40 ), 'role' => 'subscriber' ) );
+		$check( is_int( $http_user ), 'HTTP request user fixture failed.' ); $users['http_player'] = $http_user;
+		add_post_meta( $campaigns[3]->ID, '_pspp_player', (string) $http_user );
+		$old_cookie = $_COOKIE[LOGGED_IN_COOKIE] ?? null;
+		$http_post = static function ( $actor, $fields ) use ( $page_id ) {
+			wp_set_current_user( $actor );
+			$expires = time() + 300;
+			$session = WP_Session_Tokens::get_instance( $actor )->create( $expires );
+			$_COOKIE[LOGGED_IN_COOKIE] = wp_generate_auth_cookie( $actor, $expires, 'logged_in', $session );
+			$cookie = LOGGED_IN_COOKIE . '=' . $_COOKIE[LOGGED_IN_COOKIE] . '; ' . AUTH_COOKIE . '=' .
+				wp_generate_auth_cookie( $actor, $expires, 'auth', $session ) . '; ' .
+				( is_multisite() ? 'wdeb_on_site_' . get_current_blog_id() : 'wdeb_on' ) . '=1';
+			$fields = array_merge( array( 'action' => 'ps_pen_paper', 'pspp_frontend_page' => (string) $page_id,
+				'pspp_scope_epoch' => ps_pen_paper_scope_epoch( (int) $fields['campaign_id'] ),
+				'_wpnonce' => wp_create_nonce( 'pspp_campaign_' . $fields['campaign_id'] ) ), $fields );
+			try {
+				return wp_remote_post( get_permalink( $page_id ), array( 'timeout' => 30, 'redirection' => 0,
+					'headers' => array( 'Cookie' => $cookie ), 'body' => $fields ) );
+			} finally { WP_Session_Tokens::get_instance( $actor )->destroy( $session ); }
+		};
+		try {
+			$response = $http_post( $http_user, $request_fields );
+			$check( ! is_wp_error( $response ) && 302 === wp_remote_retrieve_response_code( $response ), 'Real HTTP universe request failed.' );
+			$http_bases = get_posts( array( 'post_type' => 'pspp_character', 'post_status' => 'private', 'post_parent' => $universe_id,
+				'author' => $http_user, 'posts_per_page' => -1, 'fields' => 'ids' ) );
+			$check( 1 === count( $http_bases ), 'Real HTTP request did not persist exactly one pending base.' );
+			$http_base = (int) $http_bases[0]; $http_pending = ps_pen_paper_raw_character_state( $http_base );
+			$check( null === $http_pending['active'] && null !== $http_pending['pending'], 'Real HTTP request activated an unapproved base.' );
+			$response = $http_post( $users['gm'], array( 'pspp_operation' => 'review_base_character', 'campaign_id' => (string) $universe_id,
+				'character_id' => (string) $http_base, 'character_revision' => '1', 'decision' => 'approve' ) );
+			clean_post_cache( $http_base );
+			$check( ! is_wp_error( $response ) && 302 === wp_remote_retrieve_response_code( $response ) &&
+				$http_pending['pending'] === ps_pen_paper_raw_character_state( $http_base )['active'], 'Real HTTP universe approval did not persist.' );
+		} finally {
+			if ( null === $old_cookie ) { unset( $_COOKIE[LOGGED_IN_COOKIE] ); } else { $_COOKIE[LOGGED_IN_COOKIE] = $old_cookie; }
+		}
+	}
 	delete_post_meta( $campaigns[0]->ID, '_pspp_player', (string) $users['player'] );
 	wp_set_current_user( $users['player'] );
 	$check( null === ps_pen_paper_get_character( $campaigns[0], $ids[0] ) && is_wp_error( ps_pen_paper_roll_dice( $campaigns[0]->ID, $roll_input, '1' ) ), 'Removed member retained contextual access.' );

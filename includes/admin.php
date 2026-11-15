@@ -99,7 +99,7 @@ function ps_pen_paper_handle_admin_action() {
 		}
 	}
 	if ( 'group_adventure' === $operation ) { ps_pen_paper_handle_adventure_group_action(); }
-	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'save_adventure_world', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure', 'request_adventure_review', 'review_adventure_run', 'cancel_adventure_review' ), true ) ) { ps_pen_paper_handle_adventure_action( $operation ); }
+	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'save_adventure_world', 'save_adventure_scenario', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure', 'request_adventure_review', 'review_adventure_run', 'cancel_adventure_review' ), true ) ) { ps_pen_paper_handle_adventure_action( $operation ); }
 	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) ) { ps_pen_paper_handle_trade_action( $operation ); }
 	if ( 'save_wiki_link' === $operation ) { ps_pen_paper_handle_wiki_link_action(); }
 	if ( in_array( $operation, array( 'configure_wiki', 'prepare_wiki', 'publish_wiki' ), true ) ) { ps_pen_paper_handle_wiki_action( $operation ); }
@@ -110,7 +110,7 @@ function ps_pen_paper_handle_admin_action() {
 	if ( in_array( $operation, array( 'save_currency', 'change_wallet' ), true ) ) {
 		ps_pen_paper_handle_economy_action( $operation );
 	}
-	if ( in_array( $operation, array( 'save_equipment_schema', 'save_item', 'grant_item', 'equip_items', 'review_gear', 'save_portrait', 'save_sheet_style' ), true ) ) {
+	if ( in_array( $operation, array( 'save_equipment_schema', 'save_item', 'grant_item', 'remove_items', 'equip_items', 'review_gear', 'save_portrait', 'save_sheet_style' ), true ) ) {
 		ps_pen_paper_handle_equipment_action( $operation );
 	}
 	if ( in_array( $operation, array( 'save_folio', 'publish_folio', 'withdraw_folio' ), true ) ) {
@@ -119,7 +119,7 @@ function ps_pen_paper_handle_admin_action() {
 	if ( in_array( $operation, array( 'save_scene', 'publish_scene', 'withdraw_scene', 'select_scene' ), true ) ) {
 		ps_pen_paper_handle_scene_action( $operation );
 	}
-	if ( in_array( $operation, array( 'save_universe_rules', 'save_base_character', 'adopt_universe_rules', 'attach_base_character', 'save_character_context', 'copy_shared_character', 'request_base_character', 'reattach_character' ), true ) ) {
+	if ( in_array( $operation, array( 'save_universe_rules', 'save_base_character', 'request_universe_character', 'review_base_character', 'adopt_universe_rules', 'attach_base_character', 'save_character_context', 'copy_shared_character', 'request_base_character', 'reattach_character' ), true ) ) {
 		ps_pen_paper_handle_character_context_action( $operation );
 	}
 	if ( in_array( $operation, array( 'save_universe', 'link_universe' ), true ) ) {

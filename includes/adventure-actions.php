@@ -2,7 +2,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-function ps_pen_paper_adventure_action_locks( $campaign, $character_id, $edge ) {
+function ps_pen_paper_adventure_action_locks( $campaign, $character_id, $edge, $snapshot = array(), $attempt = 0 ) {
 	$locks = array( (int) $campaign->ID, (int) $character_id );
 	if ( isset( $edge['resource_cost'] ) ) {
 		$character = ps_pen_paper_get_character( $campaign, $character_id );
@@ -12,7 +12,8 @@ function ps_pen_paper_adventure_action_locks( $campaign, $character_id, $edge ) 
 		$resource_locks = ps_pen_paper_character_resource_lock_ids( $campaign, $character, $cost );
 		$locks = array_merge( $locks, $resource_locks['character_ids'], $resource_locks['scope_ids'] );
 	}
-	if ( isset( $edge['reward'] ) && ps_pen_paper_adventure_reward_currency( $edge['reward'] ) ) {
+	$reward = ps_pen_paper_scenario_reward( $snapshot, $edge, $attempt );
+	if ( $reward && ps_pen_paper_adventure_reward_currency( $reward ) ) {
 		$wallet = ps_pen_paper_wallet_context( $campaign, $character_id );
 		if ( is_wp_error( $wallet ) ) { return $wallet; }
 		$locks[] = (int) $wallet['character']->ID; $locks[] = (int) $wallet['currency_scope']->ID;
@@ -53,7 +54,7 @@ function ps_pen_paper_adventure_action_transaction( $campaign, $locks, $object_i
 	} );
 }
 
-function ps_pen_paper_execute_adventure_edge( $campaign, $character, $snapshot, $edge, $history, $locks, $event_id, $review = null ) {
+function ps_pen_paper_execute_adventure_edge( $campaign, $character, $snapshot, $edge, $history, $locks, $event_id, $review = null, $attempt = 0 ) {
 	if ( (int) $character['post']->post_author !== get_current_user_id() || ! ps_pen_paper_can_access_site() ||
 		! ps_pen_paper_can_view_campaign( $campaign ) ) { return ps_pen_paper_adventure_error(); }
 	if ( ! empty( $edge['gm_review'] ) && ( ! ps_pen_paper_valid_adventure_review( $review, get_current_user_id() ) ||
@@ -88,7 +89,8 @@ function ps_pen_paper_execute_adventure_edge( $campaign, $character, $snapshot, 
 			return new WP_Error( 'resource_cost_shared_conflict', __( 'Die Verbindung zum Basisbogen wurde inzwischen geändert. Bitte lade den Charakterbogen neu; es wurde nichts übernommen.', 'ps-pen-paper' ) );
 		}
 	}
-	$reward_context = isset( $edge['reward'] ) ? ps_pen_paper_adventure_reward_context( $campaign, $character['post'], $edge['reward'] ) : null;
+	$effective_reward = ps_pen_paper_scenario_reward( $snapshot, $edge, $attempt );
+	$reward_context = $effective_reward ? ps_pen_paper_adventure_reward_context( $campaign, $character['post'], $effective_reward ) : null;
 	if ( is_wp_error( $reward_context ) ) { return $reward_context; }
 	if ( $reward_context && $reward_context['wallet'] &&
 		( ! in_array( (int) $reward_context['wallet']['character']->ID, $locks, true ) ||
@@ -123,11 +125,12 @@ function ps_pen_paper_execute_adventure_edge( $campaign, $character, $snapshot, 
 		if ( is_wp_error( $spent ) ) { return $spent; }
 	}
 	if ( $reward_context ) {
-		$grant = 'decision' === $edge['reward']['timing'] || null === $roll || $roll['success'];
-		$reward = $grant ? ps_pen_paper_write_adventure_reward( $campaign, $character['post'], $edge['reward'], $reward_context, (int) $event_id ) : null;
+		$grant = 'decision' === $effective_reward['timing'] || null === $roll || $roll['success'];
+		$reward = $grant ? ps_pen_paper_write_adventure_reward( $campaign, $character['post'], $effective_reward, $reward_context, (int) $event_id ) : null;
 		if ( is_wp_error( $reward ) ) { return $reward; }
 		$entry['reward'] = $reward;
 	}
+	elseif ( isset( $edge['reward'] ) || isset( $edge['repeat_reward'] ) ) { $entry['reward'] = null; }
 	if ( $conditions ) { $entry['conditions'] = $conditions; }
 	if ( ! empty( $edge['gm_review'] ) ) { $entry['review'] = $review; }
 	if ( $items ) { $entry['items'] = $items; }
@@ -135,5 +138,6 @@ function ps_pen_paper_execute_adventure_edge( $campaign, $character, $snapshot, 
 		$entry['effects'] = ps_pen_paper_adventure_effects_result( $edge, $snapshot, $history, $roll );
 		if ( is_wp_error( $entry['effects'] ) ) { return $entry['effects']; }
 	}
+	if ( isset( $snapshot['scenario'] ) ) { $entry['scenario_attempt'] = $attempt; }
 	return $entry;
 }

@@ -16,9 +16,10 @@ function ps_pen_paper_handle_trade_action( $operation ) {
 		$url .= '#pspp-settings';
 	} else {
 		if ( 'pspp_campaign' !== $scope->post_type || ! ps_pen_paper_get_character( $scope, $character_id ) || 'confirmed' !== ps_pen_paper_posted_text( 'trade_confirmation' ) ) { ps_pen_paper_fail( ps_pen_paper_trade_error()->get_error_message() ); }
+		$items = isset( $_POST['trade_items'] ) ? wp_unslash( $_POST['trade_items'] ) : ps_pen_paper_posted_text( 'trade_item' );
 		$result = 'offer_trade' === $operation
-			? ps_pen_paper_offer_trade( $scope, $character_id, ps_pen_paper_posted_id( 'trade_target' ), ps_pen_paper_posted_text( 'trade_kind' ), ps_pen_paper_posted_text( 'trade_item' ), ps_pen_paper_posted_text( 'trade_amount' ), ps_pen_paper_posted_text( 'trade_gear_revision' ), ps_pen_paper_posted_text( 'trade_policy_revision' ), ps_pen_paper_posted_text( 'trade_token' ) )
-			: ps_pen_paper_change_trade( $scope, ps_pen_paper_posted_id( 'trade_id' ), ps_pen_paper_posted_text( 'trade_action' ), ps_pen_paper_posted_text( 'trade_revision' ), ps_pen_paper_posted_text( 'trade_confirmation' ), ps_pen_paper_posted_text( 'trade_item' ) );
+			? ps_pen_paper_offer_trade( $scope, $character_id, ps_pen_paper_posted_id( 'trade_target' ), ps_pen_paper_posted_text( 'trade_kind' ), $items, ps_pen_paper_posted_text( 'trade_amount' ), ps_pen_paper_posted_text( 'trade_gear_revision' ), ps_pen_paper_posted_text( 'trade_policy_revision' ), ps_pen_paper_posted_text( 'trade_token' ) )
+			: ps_pen_paper_change_trade( $scope, ps_pen_paper_posted_id( 'trade_id' ), ps_pen_paper_posted_text( 'trade_action' ), ps_pen_paper_posted_text( 'trade_revision' ), ps_pen_paper_posted_text( 'trade_confirmation' ), $items );
 		$url = ps_pen_paper_profile_return( $id, $character_id );
 		if ( ! $url ) { $url = ps_pen_paper_character_url( $id, $character_id, $page_id ) . '#pspp-trade-' . $character_id; }
 	}
@@ -57,15 +58,16 @@ function ps_pen_paper_render_trade_snapshot( $state ) {
 	$o = $state['offer'];
 	echo '<h4>' . esc_html( ps_pen_paper_trade_kinds()[ $o['kind'] ] . ' · ' . $o['from_name'] . ' → ' . $o['to_name'] ) . '</h4>';
 	foreach ( array( 'give', 'take' ) as $key ) {
-		if ( ! $o[ $key ] ) { continue; }
-		echo '<p><strong>' . esc_html( ( 'give' === $key ? __( 'Angeboten:', 'ps-pen-paper' ) : __( 'Gegenangebot:', 'ps-pen-paper' ) ) . ' ' . $o[ $key ]['item']['name'] . ' · ' . $o[ $key . '_uuid' ] ) . '</strong></p>';
-		echo '<p class="pspp-multiline">' . esc_html( $o[ $key ]['item']['description'] ) . '</p>';
-		echo '<p>' . esc_html( $o[ $key ]['item']['kind'] . ' · ' . $o[ $key ]['item']['rarity_label'] ) . '</p><dl>';
-		foreach ( $o[ $key ]['item']['properties'] as $label => $value ) { echo '<dt>' . esc_html( $label ) . '</dt><dd>' . esc_html( $value ) . '</dd>'; }
-		foreach ( $o[ $key ]['item']['bonuses'] as $field => $value ) { echo '<dt>' . esc_html( $field ) . '</dt><dd>' . esc_html( $value ) . '</dd>'; }
-		echo '</dl>';
+		foreach ( ps_pen_paper_trade_items( $o, $key ) as $uuid => $instance ) {
+			echo '<p><strong>' . esc_html( ( 'give' === $key ? __( 'Angeboten:', 'ps-pen-paper' ) : __( 'Gegenangebot:', 'ps-pen-paper' ) ) . ' ' . $instance['item']['name'] . ' · ' . $uuid ) . '</strong></p>';
+			echo '<p class="pspp-multiline">' . esc_html( $instance['item']['description'] ) . '</p>';
+			echo '<p>' . esc_html( $instance['item']['kind'] . ' · ' . $instance['item']['rarity_label'] ) . '</p><dl>';
+			foreach ( $instance['item']['properties'] as $label => $value ) { echo '<dt>' . esc_html( $label ) . '</dt><dd>' . esc_html( $value ) . '</dd>'; }
+			foreach ( $instance['item']['bonuses'] as $field => $value ) { echo '<dt>' . esc_html( $field ) . '</dt><dd>' . esc_html( $value ) . '</dd>'; }
+			echo '</dl>';
+		}
 	}
-	if ( $o['amount'] ) { echo '<p><strong>' . esc_html( __( 'Käufer zahlt an Anbieter:', 'ps-pen-paper' ) . ' ' . $o['amount'] . ' ' . $o['currency']['symbol'] ) . '</strong></p>'; }
+	if ( $o['amount'] ) { echo '<p><strong>' . esc_html( ( 'money_gift' === $o['kind'] ? __( 'Anbieter schenkt dem Empfänger:', 'ps-pen-paper' ) : __( 'Käufer zahlt an Anbieter:', 'ps-pen-paper' ) ) . ' ' . $o['amount'] . ' ' . $o['currency']['symbol'] ) . '</strong></p>'; }
 	echo '<p><strong>' . esc_html( ps_pen_paper_trade_statuses()[ $state['status'] ] ) . '</strong></p>';
 	echo '<ul>'; foreach ( $state['history'] as $entry ) { echo '<li>' . esc_html( $entry['date'] . ' UTC · ' . ps_pen_paper_trade_actions()[ $entry['action'] ] . ' · #' . $entry['actor_id'] ) . '</li>'; } echo '</ul>';
 }
@@ -73,16 +75,16 @@ function ps_pen_paper_render_trade_snapshot( $state ) {
 function ps_pen_paper_render_trade_items( $campaign, $character_id ) {
 	$gear = ps_pen_paper_gear_state( $character_id );
 	if ( is_wp_error( $gear ) ) { echo '<p role="alert">' . esc_html( $gear->get_error_message() ) . '</p>'; return; }
-	echo '<label>' . esc_html__( 'Eigenes handelbares, abgelegtes Exemplar', 'ps-pen-paper' ) . '<select name="trade_item" required><option value="">' . esc_html__( 'Exemplar auswählen', 'ps-pen-paper' ) . '</option>';
+	echo '<fieldset><legend>' . esc_html__( 'Eigene handelbare, abgelegte Exemplare', 'ps-pen-paper' ) . '</legend>';
 	foreach ( $gear['active']['items'] as $uuid => $instance ) {
 		$available = ps_pen_paper_trade_item( $campaign, $character_id, $uuid );
 		if ( is_wp_error( $available ) ) {
 			if ( 'item_unavailable' === $available->get_error_code() ) { continue; }
-			echo '</select></label><p role="alert">' . esc_html( $available->get_error_message() ) . '</p>'; return;
+			echo '</fieldset><p role="alert">' . esc_html( $available->get_error_message() ) . '</p>'; return;
 		}
-		echo '<option value="' . esc_attr( $uuid ) . '">' . esc_html( $instance['item']['name'] . ' · ' . substr( $uuid, 0, 8 ) ) . '</option>';
+		echo '<label class="pspp-check"><input type="checkbox" name="trade_items[]" value="' . esc_attr( $uuid ) . '">' . esc_html( $instance['item']['name'] . ' · ' . substr( $uuid, 0, 8 ) ) . '</label>';
 	}
-	echo '</select></label>';
+	echo '</fieldset>';
 }
 
 function ps_pen_paper_render_character_trade( $campaign, $character, $page_id ) {
@@ -92,7 +94,7 @@ function ps_pen_paper_render_character_trade( $campaign, $character, $page_id ) 
 	$actor = get_current_user_id(); $gm = ps_pen_paper_can_manage_campaign( $campaign ); $p = $policy['policy'];
 	?>
 	<section id="pspp-trade-<?php echo esc_attr( $character->ID ); ?>" data-character-trade="<?php echo esc_attr( $character->ID ); ?>"><h3><?php esc_html_e( 'Handel', 'ps-pen-paper' ); ?></h3>
-	<p><?php esc_html_e( 'Nur handelbare, weder aktiv noch in einem Antrag angelegte Exemplare. Angebote reservieren Gegenstände, nicht Geld. Fremde Inventare und Guthaben bleiben privat. Bei einem Tausch wählt die Gegenseite ihr Exemplar; erst danach bestätigt der Anbieter die konkreten Bedingungen.', 'ps-pen-paper' ); ?></p>
+	<p><?php esc_html_e( 'Nur handelbare, weder aktiv noch in einem Antrag angelegte Exemplare. Angebote reservieren Gegenstände, nicht Geld. Fremde Inventare und Guthaben bleiben privat. Bei einem Tausch wählt die Gegenseite ihre Exemplare; erst danach bestätigt der Anbieter die konkreten Bedingungen.', 'ps-pen-paper' ); ?></p>
 	<?php foreach ( $records as $id => $state ) : $o = $state['offer']; if ( ! in_array( (int) $character->ID, array( $o['from'], $o['to'] ), true ) ) { continue; } ?>
 		<article data-trade-id="<?php echo esc_attr( $id ); ?>">
 		<?php ps_pen_paper_render_trade_snapshot( $state );
@@ -133,9 +135,10 @@ function ps_pen_paper_render_character_trade( $campaign, $character, $page_id ) 
 			$party = ps_pen_paper_trade_party( $campaign, $candidate->ID ); if ( is_wp_error( $party ) ) { continue; } ?>
 			<option value="<?php echo esc_attr( $candidate->ID ); ?>"><?php echo esc_html( $party['name'] ); ?></option>
 		<?php endforeach; ?></select></label>
-		<label><?php esc_html_e( 'Preis: beim Verkauf ganze Einheiten, bei Geschenk/Tausch 0', 'ps-pen-paper' ); ?><input type="number" name="trade_amount" min="0" max="999999999" step="1" value="0" required></label>
+		<label><?php esc_html_e( 'Gesamtpreis oder Geldgeschenk; bei Gegenstandsgeschenk/Tausch 0', 'ps-pen-paper' ); ?><input type="number" name="trade_amount" min="0" max="999999999" step="1" value="0" required></label>
+		<p><?php esc_html_e( 'Mehrere Exemplare gemeinsam auswählen. Bei einem reinen Geldgeschenk keine Exemplare auswählen. Der Verkaufspreis gilt für das gesamte Angebot.', 'ps-pen-paper' ); ?></p>
 		<p><?php echo esc_html( $p['approval'] ? __( 'Nach beiderseitiger Zustimmung bestätigt zusätzlich die Spielleitung.', 'ps-pen-paper' ) : __( 'Nach beiderseitiger Zustimmung wird direkt übertragen.', 'ps-pen-paper' ) ); ?></p>
-		<label class="pspp-check"><input type="checkbox" name="trade_confirmation" value="confirmed" required><?php esc_html_e( 'Dieses Exemplar zu diesen Bedingungen anbieten und reservieren.', 'ps-pen-paper' ); ?></label>
+		<label class="pspp-check"><input type="checkbox" name="trade_confirmation" value="confirmed" required><?php esc_html_e( 'Dieses Angebot zu den angegebenen Bedingungen bestätigen; ausgewählte Exemplare reservieren.', 'ps-pen-paper' ); ?></label>
 		<button type="submit"><?php esc_html_e( 'Handelsangebot erstellen', 'ps-pen-paper' ); ?></button>
 	</form>
 	<?php endif; ?></section>

@@ -226,15 +226,16 @@ Zugriffsprüfung.
 ## Konfigurierbarer Handel seit Version 0.20.0
 
 Mit aktivem PS Community stellt die zuständige Spielleitung unter
-**Handelsregeln** Geschenk, Verkauf und Tausch unabhängig voneinander ein.
+**Handelsregeln** Gegenstandsgeschenk, Verkauf, Tausch und Geldgeschenk
+unabhängig voneinander ein.
 Standardmäßig ist keine Art aktiviert; eine zusätzliche Spielleiterfreigabe
 ist voreingestellt. Universumsregeln werden unverändert übernommen,
 eigenständige Kampagnen konfigurieren ihre Regeln lokal.
 
 Besitzer bieten am eigenen Charakter ein handelbares, aktiv wie beantragt
-abgelegtes Exemplar einem anderen Besitzer derselben Kampagne an.
-Ein Verkauf vereinbart einen positiven ganzzahligen Preis; beim Tausch
-wählt der Empfänger sein konkretes Gegenexemplar, bevor der Anbieter den
+abgelegte Exemplare einem anderen Besitzer derselben Kampagne an
+(höchstens 100 je Seite). Ein Verkauf vereinbart einen positiven ganzzahligen
+Gesamtpreis; beim Tausch wählt der Empfänger seine konkreten Gegenexemplare, bevor der Anbieter den
 exakten Tausch bestätigt. Die Spielleitung ersetzt keine Besitzerzustimmung.
 Empfänger werden nur mit freigegebenem Charakternamen angeboten; fremde Bögen,
 weitere Inventargegenstände und Guthaben bleiben privat.
@@ -246,12 +247,21 @@ Geldbuchungen und Pflichtereignisse werden gemeinsam gespeichert oder
 zurückgenommen. UUID und eingefrorener Gegenstandsstand bleiben erhalten;
 empfangene Gegenstände werden nicht automatisch ausgerüstet. Verkäufe können
 auch die ausdrücklich eingebundenen gemeinsamen Basisguthaben verwenden.
+Beim **Geldgeschenk** werden keine Exemplare ausgewählt: Der Anbieter bezahlt
+den positiven ganzzahligen Betrag an den zustimmenden Empfänger.
+Inventare bleiben unverändert; gemeinsame Basisguthaben werden ebenfalls unterstützt.
+
+Die Spielleitung kann unter **Gegenstände entziehen / entfernen** konkrete
+Exemplare nach ausdrücklicher Bestätigung entfernen, auch gebundene oder
+ausgerüstete. Aktive und beantragte Bestände und Slotbelegungen werden gemeinsam
+bereinigt; das Protokoll bleibt erhalten. Handelsreservierte Exemplare können
+erst nach dem Zurückziehen oder Ablehnen des Angebots entfernt werden.
 
 Zurückziehen, Ablehnen und Spielleiterablehnung geben Reservierungen frei.
 Neue Handelsregeln sperren den Abschluss alter Angebote; deren Ablehnung
 bleibt möglich. Ohne Community bleiben Daten und lesbare Handelsnachweise
-erhalten, wirtschaftliche Änderungen jedoch gesperrt. Pakete, Mengen,
-reine Geldgeschenke und kampagnenübergreifender Handel fehlen noch.
+erhalten, wirtschaftliche Änderungen jedoch gesperrt.
+Kampagnenübergreifende Übertragungen bleiben offen.
 
 ## Soloabenteuer seit Version 0.21.0
 
@@ -285,7 +295,8 @@ Entscheidungen bleiben sichtbar und gesperrt; bei ODER genügt eine erfüllte
 Bedingung. Zusätzlich unterstützen Textfelder gleich/ungleich und
 enthält/enthält nicht; vorherige Entscheidungen lassen sich für denselben
 Durchlauf mit 0 (nicht ausgeführt) oder 1 (ausgeführt) prüfen.
-Gegenstandsbedingungen sind noch offen.
+Gegenstandsbedingungen, frei gesetzte Abenteuerzustände und
+Entscheidungsfolgen sowie geordnete Begegnungsphasen sind ergänzt.
 
 Für hybride Einzeldurchläufe kann die Spielleitung je Entscheidung eine
 **ausdrückliche Spielleiterfreigabe** verlangen. Der Besitzer fragt an;
@@ -310,7 +321,7 @@ Vergaberechte blockieren die Entscheidung ausdrücklich, ohne Teilvergaben.
 
 ## Gemeinsame und hybride Gruppenabenteuer
 
-Unter **Gemeinsame Abenteuer** legt die Spielleitung einen Gruppendurchlauf
+Unter **Abenteuer → Gruppendurchlauf anlegen** legt die Spielleitung einen Gruppendurchlauf
 aus einem freigegebenen Abenteuer an. Je Gruppe wählt sie Einzelentscheidung,
 Mehrheit, Einstimmigkeit oder Spielleiterfreigabe. Jeder Besitzer tritt mit
 einer eigenen freigegebenen Figur bei; pro Benutzer ist eine Figur gleichzeitig
@@ -331,7 +342,24 @@ bereit. Spieler öffnen ihre Kampagne und spielen die freigegebenen Abenteuer
 mit ihrem Charakter nach den dort festgelegten Regeln. Es gibt keine separate
 Paketbibliothek und keinen Abenteuerdatei-Import oder -Download.
 
-Gegenstandsbedingungen bleiben ein weiterer Ausbauschritt.
+### Kapitelgeschichten und frei spielbare Szenarien
+
+Im Abenteuereditor bestimmt die Spielleitung optional Kapitel und Anzeigeordnung,
+Einzel- oder Gruppenspiel, Voraussetzungen und Wiederholungen. Ohne Vorgänger
+bleiben Szenarien unabhängig spielbar. Für eine Kapitelgeschichte kann das nächste
+Szenario einen Abschluss oder Sieg im vorherigen Szenario voraussetzen; zusätzlich
+ist ein Mindestwert eines frei gewählten Zahlenfelds möglich.
+
+Enden werden als gewonnen, verloren oder neutral gekennzeichnet. Belohnungen
+gelten nur im ersten Durchlauf, bei jeder Wiederholung gleich oder ab der
+Wiederholung anders. Der erste gestartete oder beigetretene Durchlauf zählt je
+Spielerkonto und Szenario, auch bei Niederlage. Andere Figuren und erneute
+Veröffentlichungen setzen diesen Zähler nicht zurück. Bereits laufende
+Durchläufe behalten ihre eingefrorenen Einstellungen.
+
+Gemeinsame Basisressourcen werden bei kostenpflichtigen Entscheidungen
+am maßgeblichen Universumsbasisbogen verbraucht, nicht an einer unabhängigen
+Schattenkopie.
 
 ## Öffentliches Weltlexikon seit Version 0.19.0
 
@@ -753,9 +781,14 @@ Bei einer fehlenden Basis erscheint ein Fehler; es werden keine veralteten
 Ersatzwerte verwendet.
 Unabhängige Kopien können ohne das ursprüngliche Universum und dessen Basisbogen
 importiert werden; deren Kennungen bleiben reine historische Herkunftsnachweise.
-Noch offen sind automatische Migrationen bestehender Kampagnen, Rückverbindungen,
-universumsweite Mitgliedschaften, Spielerbearbeitung der Basis, Ressourcenauflagen
-und ein XP-/Levelautomatismus. Ein numerisches Stufenfeld ist kein solches System.
+Unabhängige Kopien können ausdrücklich mit dem aktuellen Basisbogen
+wieder verbunden werden. Die Vorschau verlangt eine Lösung für abweichende
+Werte; Zahlen und Attribute können als lokale Auflagen erhalten bleiben.
+Spieler können in einer zugeordneten Kampagne einen eigenen Universumsbasisbogen
+beantragen. Die Universumsleitung prüft diesen Antrag; die Aufnahme des
+freigegebenen Bogens in eine Kampagne bleibt ein eigener Vorgang.
+Universumsweite Mitgliedschaften, Ressourcenauflagen und ein
+XP-/Levelautomatismus bleiben offen. Ein numerisches Stufenfeld ist kein solches System.
 
 Die Spielleitung kann einen Teilnehmer als **am Zug** markieren oder
 **Freies Spiel** wählen. Änderungen sind revisionsgeschützt und werden mit
@@ -952,7 +985,8 @@ Ein Wechsel des Bearbeitungsmodus genehmigt oder verwirft offene Anträge nicht
 automatisch. Die aktuell gespeicherte Option wird bei jedem Schreibzugriff
 serverseitig geprüft. Veraltete Charakterstände und veraltete Regelwerksstände
 werden beim Speichern abgelehnt. Neue Änderungen werden im Ereignisprotokoll
-festgehalten. Punktepool und feldweise Rechte sind noch nicht implementiert.
+festgehalten. Ein optionaler Attributpunktepool ist verfügbar; separate
+feldweise Bearbeitungsrechte sind noch nicht implementiert.
 
 ## Regelwerk und mobile Bedienung
 
@@ -962,20 +996,19 @@ Konfigurierbar sind:
 
 - Name und Beschreibung des Regelwerks sowie erlaubte Würfel
   (W4, W6, W8, W10, W12, W20, W100); keine Auswahl erlaubt würfellose Systeme.
-- Bis zu 30 Charakterfelder: kurze und lange Texte, Zahlen, Attribute und
+- Bis zu 30 Charakterfelder: kurze und lange Texte, Auswahlfelder, Zahlen, Attribute und
   Ressourcen, jeweils mit eigener Bezeichnung, Erläuterung und Pflichtfeldstatus.
 - Ganzzahlige Minima, Maxima und Startwerte für numerische Felder.
 - Reihenfolge der Felder; Kennungen bleiben beim Umbenennen und Umsortieren
   erhalten.
 
-Punktepool und komplexe Würfelmechaniken folgen später. Neue Regeländerungen
-sind mit Vorher-/Nachher-Ständen im Ereignisprotokoll nachvollziehbar.
-Sobald Charaktere existieren, sind Änderungen
-an Feldliste, Typen, Pflichtstatus und Wertebereichen vorläufig gesperrt, damit
-gültige Stände und offene Anträge nicht unbemerkt ungültig werden. Bezeichnungen,
-Reihenfolge, Startwerte für neue Charaktere und Bearbeitungsmodus bleiben
-änderbar. Eine kontrollierte Übernahme struktureller Regeländerungen folgt
-später. Veraltete Speichervorgänge werden anhand einer Revisionsnummer abgelehnt.
+Die optionale Attribut-Punkteverteilung prüft die genaue Summe der ausgewählten
+Attribute. Auswahlfelder erlauben nur die konfigurierten Optionen.
+Verwendete Feldlisten, Typen, Pflichtstatus und Wertebereiche lassen sich nach
+Änderungsvorschau und ausdrücklicher Konfliktauflösung migrieren. Gültige Stände
+und offene Anträge werden nicht stillschweigend angepasst. Vorher-/Nachher-
+Stände bleiben nachvollziehbar; veraltete Vorschauen und Speichervorgänge
+werden abgelehnt. Komplexe Würfelmechaniken bleiben spätere Erweiterungen.
 
 Die Verwaltungsoberfläche verwendet responsives CSS und Vanilla JavaScript
 ohne zusätzliche Bibliotheken. Felder werden per Schaltfläche hinzugefügt,

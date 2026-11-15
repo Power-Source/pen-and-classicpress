@@ -177,6 +177,18 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 	ps_pen_paper_render_character_adventures( $campaign, $character, $page_id );
 	ps_pen_paper_render_character_trade( $campaign, $character, $page_id );
 	if ( $is_gm ) {
+		if ( $gear['active']['items'] ) {
+			echo '<details class="pspp-fold"><summary>' . esc_html__( 'Gegenstände entziehen / entfernen', 'ps-pen-paper' ) . '</summary>';
+			ps_pen_paper_equipment_form_start( $campaign, 'remove_items', $gear['revision'], $page_id, $character->ID );
+			foreach ( $gear['active']['items'] as $uuid => $instance ) {
+				echo '<label class="pspp-check"><input type="checkbox" name="equipment[ids][]" value="' . esc_attr( $uuid ) . '">' .
+					esc_html( $instance['item']['name'] . ' · ' . substr( $uuid, 0, 8 ) ) . '</label>';
+			}
+			echo '<p>' . esc_html__( 'Entfernt ausgewählte Exemplare aus Inventar, wirksamer Ausrüstung und offenem Ausrüstungsantrag. Reservierte Handelsgegenstände bleiben gesperrt. Frühere Vergaben bleiben im Protokoll erhalten.', 'ps-pen-paper' ) . '</p>';
+			echo '<label class="pspp-check"><input type="checkbox" name="equipment[confirmation]" value="confirmed" required>' .
+				esc_html__( 'Diese Exemplare verbindlich entfernen.', 'ps-pen-paper' ) . '</label><button type="submit">' .
+				esc_html__( 'Ausgewählte Exemplare entfernen', 'ps-pen-paper' ) . '</button></form></details>';
+		}
 		$catalogue = ps_pen_paper_item_catalogue( $campaign );
 		if ( is_wp_error( $catalogue ) ) { echo '<p role="alert">' . esc_html( $catalogue->get_error_message() ) . '</p>'; return; }
 		foreach ( $catalogue as $id => $entry ) {

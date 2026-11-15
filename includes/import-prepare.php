@@ -175,6 +175,19 @@ function ps_pen_paper_prepare_import_remap_adventure_graph( &$graph, $scope_id, 
 	$start = ps_pen_paper_prepare_import_scene( (int) $graph['start_scene'], $scope_id, $records, $id_map );
 	if ( is_wp_error( $start ) ) { return $start; }
 	$graph['start_scene'] = $start;
+	if ( isset( $graph['scenario'] ) ) {
+		if ( $graph['scenario']['chapter_id'] ) {
+			$mapped = ps_pen_paper_prepare_import_id( $graph['scenario']['chapter_id'], 'pspp_folio', $records, $id_map, $scope_id );
+			if ( is_wp_error( $mapped ) ) { return $mapped; }
+			$graph['scenario']['chapter_id'] = $mapped;
+		}
+		foreach ( $graph['scenario']['prerequisites'] as &$row ) {
+			$mapped = ps_pen_paper_prepare_import_id( $row['adventure_id'], 'pspp_adventure', $records, $id_map, $scope_id );
+			if ( is_wp_error( $mapped ) ) { return $mapped; }
+			$row['adventure_id'] = $mapped;
+		}
+		unset( $row );
+	}
 	foreach ( $graph['encounters'] ?? array() as $index => $encounter ) {
 		foreach ( $encounter['phases'] as $phase => $id ) {
 			$mapped = ps_pen_paper_prepare_import_scene( $id, $scope_id, $records, $id_map );
@@ -749,13 +762,15 @@ function ps_pen_paper_prepare_import_adventure_snapshot( &$snapshot, $scope, $re
 	foreach ( $snapshot['edges'] as &$edge ) {
 		$result = ps_pen_paper_prepare_import_adventure_items( $edge, $records, $id_map, $options, $archive, $path . '.edges.' . $edge['id'] );
 		if ( is_wp_error( $result ) ) { return $result; }
-		if ( ! isset( $edge['reward'] ) ) { continue; }
-		$user = ps_pen_paper_prepare_import_mapped_user( $edge['reward']['authorizer_id'], $options );
-		if ( is_wp_error( $user ) ) { return $user; }
-		$edge['reward']['authorizer_id'] = $user;
-		$result = ps_pen_paper_prepare_import_remap_reward( $edge['reward'], $scope, $records, $id_map, $options, $archive,
-			$path . '.edges.' . $edge['id'] . '.reward' );
-		if ( is_wp_error( $result ) ) { return $result; }
+		foreach ( array( 'reward', 'repeat_reward' ) as $reward_key ) {
+			if ( ! isset( $edge[ $reward_key ] ) ) { continue; }
+			$user = ps_pen_paper_prepare_import_mapped_user( $edge[ $reward_key ]['authorizer_id'], $options );
+			if ( is_wp_error( $user ) ) { return $user; }
+			$edge[ $reward_key ]['authorizer_id'] = $user;
+			$result = ps_pen_paper_prepare_import_remap_reward( $edge[ $reward_key ], $scope, $records, $id_map, $options, $archive,
+				$path . '.edges.' . $edge['id'] . '.' . $reward_key );
+			if ( is_wp_error( $result ) ) { return $result; }
+		}
 	}
 	unset( $edge );
 	return true;
@@ -999,35 +1014,14 @@ function ps_pen_paper_prepare_import_remap_value( $key, &$value, $record, $parse
 			}
 			return true;
 		case '_pspp_loot_table':
-			if ( null !== $value['table']['currency'] ) {
-				$currency = ps_pen_paper_prepare_import_remap_item_provenance_currency( $value['table']['currency'], $records, $id_map );
-				if ( is_wp_error( $currency ) ) { return $currency; }
-			}
-			foreach ( $value['table']['rows'] as &$row ) {
-				if ( null === $row['item'] ) { continue; }
-				$result = ps_pen_paper_prepare_import_remap_item_snapshot( $row['item'], $records, $id_map, $options, $archive,
-					$key . '.table.rows.' . $row['from'] . '.item' );
-				if ( is_wp_error( $result ) ) { return $result; }
-				// Item source/scope IDs identify the immutable source snapshot, not an active catalog lookup.
-			}
-			unset( $row );
+			$mapped = ps_pen_paper_prepare_import_loot_snapshot( $value, $record['parent_id'], $records, $id_map, $options, $archive, $key );
+			if ( is_wp_error( $mapped ) ) { return $mapped; }
+			$value = $mapped;
 			return true;
 		case '_pspp_loot_run':
 			$proposal =& $value['proposal'];
-			$table = ps_pen_paper_prepare_import_id( $proposal['table_id'], 'pspp_loot_table', $records, $id_map, $record['parent_id'] );
-			if ( is_wp_error( $table ) ) { return $table; }
-			$proposal['table_id'] = $table;
-			if ( null !== $proposal['table']['table']['currency'] ) {
-				$currency = ps_pen_paper_prepare_import_remap_item_provenance_currency( $proposal['table']['table']['currency'], $records, $id_map );
-				if ( is_wp_error( $currency ) ) { return $currency; }
-			}
-			foreach ( $proposal['table']['table']['rows'] as &$row ) {
-				if ( null === $row['item'] ) { continue; }
-				$result = ps_pen_paper_prepare_import_remap_item_snapshot( $row['item'], $records, $id_map, $options, $archive,
-					$key . '.proposal.table.rows.' . $row['from'] . '.item' );
-				if ( is_wp_error( $result ) ) { return $result; }
-			}
-			unset( $row );
+			$result = ps_pen_paper_prepare_import_loot_node( $proposal, $record['parent_id'], $records, $id_map, $options, $archive, $key . '.proposal' );
+			if ( is_wp_error( $result ) ) { return $result; }
 			$actor = ps_pen_paper_prepare_import_historical_snapshot_user( $proposal['actor_id'], $options, $archive,
 				$key . '.proposal.actor_id' );
 			if ( is_wp_error( $actor ) ) { return $actor; }
@@ -1038,7 +1032,14 @@ function ps_pen_paper_prepare_import_remap_value( $key, &$value, $record, $parse
 				if ( is_wp_error( $award_actor ) ) { return $award_actor; }
 				$value['award']['actor_id'] = $award_actor;
 			}
-			if ( null !== $value['award'] && $value['award']['character_id'] ) {
+			if ( isset( $value['award']['allocations'] ) ) {
+				foreach ( $value['award']['allocations'] as &$allocation ) {
+					$character = ps_pen_paper_prepare_import_id( $allocation['character_id'], 'pspp_character', $records, $id_map, $record['parent_id'] );
+					if ( is_wp_error( $character ) ) { return $character; }
+					$allocation['character_id'] = $character;
+				}
+				unset( $allocation );
+			} elseif ( null !== $value['award'] && $value['award']['character_id'] ) {
 				$character = ps_pen_paper_prepare_import_id( $value['award']['character_id'], 'pspp_character', $records, $id_map, $record['parent_id'] );
 				if ( is_wp_error( $character ) ) { return $character; }
 				$value['award']['character_id'] = $character;
@@ -1063,15 +1064,21 @@ function ps_pen_paper_prepare_import_remap_value( $key, &$value, $record, $parse
 					! isset( $id_map[ $policy_scope ] ) ) { return ps_pen_paper_prepare_import_error(); }
 				$offer['policy_scope'] = $id_map[ $policy_scope ];
 			}
-			$result = ps_pen_paper_prepare_import_remap_item_snapshot( $offer['give'], $records, $id_map, $options, $archive, $key . '.offer.give' );
-			if ( is_wp_error( $result ) ) { return $result; }
-			if ( null !== $offer['take'] ) {
-				$result = ps_pen_paper_prepare_import_remap_item_snapshot( $offer['take'], $records, $id_map, $options, $archive, $key . '.offer.take' );
-				if ( is_wp_error( $result ) ) { return $result; }
+			foreach ( array( 'give', 'take' ) as $side ) {
+				if ( null !== $offer[ $side ] ) {
+					$result = ps_pen_paper_prepare_import_remap_item_snapshot( $offer[ $side ], $records, $id_map, $options, $archive, $key . '.offer.' . $side );
+					if ( is_wp_error( $result ) ) { return $result; }
+				}
+				foreach ( $offer[ $side . '_more' ] ?? array() as $uuid => $instance ) {
+					$result = ps_pen_paper_prepare_import_remap_item_snapshot( $instance, $records, $id_map, $options, $archive, $key . '.offer.' . $side . '_more.' . $uuid );
+					if ( is_wp_error( $result ) ) { return $result; }
+					$offer[ $side . '_more' ][ $uuid ] = $instance;
+				}
 			}
 			if ( is_array( $offer['currency'] ) ) {
-				$currency = ps_pen_paper_prepare_import_remap_item_provenance_currency( array( 'scope_id' => $offer['policy_scope'], 'document' => $offer['currency'] ), $records, $id_map );
-				if ( is_wp_error( $currency ) ) { return $currency; }
+				$currency = array( 'scope_id' => $policy_scope, 'document' => $offer['currency'] );
+				$result = ps_pen_paper_prepare_import_remap_item_provenance_currency( $currency, $records, $id_map );
+				if ( is_wp_error( $result ) ) { return $result; }
 				$offer['currency'] = $currency['document'];
 			}
 			foreach ( $value['history'] as $history_index => &$entry ) {
@@ -1084,39 +1091,11 @@ function ps_pen_paper_prepare_import_remap_value( $key, &$value, $record, $parse
 			return true;
 		case '_pspp_adventure':
 			$state =& $value;
-			$result = ps_pen_paper_prepare_import_remap_adventure_graph( $state['draft'], $record['parent_id'], $records, $id_map );
+			$result = ps_pen_paper_prepare_import_adventure_snapshot( $state['draft'], $record['parent_id'], $records, $id_map, $options, $archive, $key . '.draft' );
 			if ( is_wp_error( $result ) ) { return $result; }
-			foreach ( $state['draft']['edges'] as &$edge ) {
-				$result = ps_pen_paper_prepare_import_adventure_items( $edge, $records, $id_map, $options, $archive, $key . '.draft.edges.' . $edge['id'] );
-				if ( is_wp_error( $result ) ) { return $result; }
-				if ( isset( $edge['reward'] ) ) {
-					if ( null !== $edge['reward'] && isset( $edge['reward']['authorizer_id'] ) ) {
-						$user = ps_pen_paper_prepare_import_mapped_user( $edge['reward']['authorizer_id'], $options );
-						if ( is_wp_error( $user ) ) { return $user; }
-						$edge['reward']['authorizer_id'] = $user;
-					}
-					$result = ps_pen_paper_prepare_import_remap_reward( $edge['reward'], $record['parent_id'], $records, $id_map, $options, $archive,
-						$key . '.draft.edges.' . $edge['id'] . '.reward' );
-					if ( is_wp_error( $result ) ) { return $result; }
-				}
-			}
-			unset( $edge );
 			if ( null !== $state['published'] ) {
-				$result = ps_pen_paper_prepare_import_remap_adventure_graph( $state['published'], $record['parent_id'], $records, $id_map );
+				$result = ps_pen_paper_prepare_import_adventure_snapshot( $state['published'], $record['parent_id'], $records, $id_map, $options, $archive, $key . '.published' );
 				if ( is_wp_error( $result ) ) { return $result; }
-				foreach ( $state['published']['edges'] as &$edge ) {
-					$result = ps_pen_paper_prepare_import_adventure_items( $edge, $records, $id_map, $options, $archive, $key . '.published.edges.' . $edge['id'] );
-					if ( is_wp_error( $result ) ) { return $result; }
-					if ( isset( $edge['reward'] ) && null !== $edge['reward'] ) {
-						$user = ps_pen_paper_prepare_import_mapped_user( $edge['reward']['authorizer_id'], $options );
-						if ( is_wp_error( $user ) ) { return $user; }
-						$edge['reward']['authorizer_id'] = $user;
-						$result = ps_pen_paper_prepare_import_remap_reward( $edge['reward'], $record['parent_id'], $records, $id_map, $options, $archive,
-							$key . '.published.edges.' . $edge['id'] . '.reward' );
-						if ( is_wp_error( $result ) ) { return $result; }
-					}
-				}
-				unset( $edge );
 			}
 			unset( $state );
 			return true;

@@ -44,6 +44,8 @@ require_once __DIR__ . '/includes/trade.php';
 require_once __DIR__ . '/includes/trade-ui.php';
 require_once __DIR__ . '/includes/adventure.php';
 require_once __DIR__ . '/includes/adventure-world.php';
+require_once __DIR__ . '/includes/adventure-scenarios.php';
+require_once __DIR__ . '/includes/adventure-scenarios-ui.php';
 require_once __DIR__ . '/includes/adventure-world-ui.php';
 require_once __DIR__ . '/includes/adventure-actions.php';
 require_once __DIR__ . '/includes/adventure-review.php';

@@ -7,6 +7,7 @@ require_once dirname( __DIR__ ) . '/ps-pen-paper.php';
 require_once ABSPATH . 'wp-admin/includes/user.php';
 if ( is_multisite() ) { require_once ABSPATH . 'wp-admin/includes/ms.php'; }
 ps_pen_paper_register_campaign_type();
+ps_pen_paper_register_universe_type();
 ps_pen_paper_register_character_type();
 ps_pen_paper_register_scene_type();
 ps_pen_paper_register_event_type();
@@ -179,6 +180,270 @@ try {
 	$invalid_run['history'][0]['roll']['groups'][0]['rolls'] = array( 1 => $success_run['history'][0]['roll']['groups'][0]['rolls'][0] );
 	$check( ! ps_pen_paper_valid_adventure_run( $invalid_run ), 'Sparse die results were accepted.' );
 
+	wp_set_current_user( $users['gm'] );
+	$required_adventure = ps_pen_paper_save_adventure( $campaign, 0, 'Minimum route', (string) $scenes['START_ORIGINAL'], '0' );
+	$check( is_int( $required_adventure ), 'Requirement adventure fixture failed.' );
+	$required_edge = array( 'from_scene' => (string) $scenes['START_ORIGINAL'], 'choice' => 'MINIMUM_CHOICE', 'expression' => '',
+		'attribute' => '', 'threshold' => '0', 'success_scene' => (string) $scenes['SUCCESS_SCENE'], 'failure_scene' => '0',
+		'requirement_attribute' => $attribute, 'requirement_minimum' => '6' );
+	$invalid_edge = $required_edge;
+	$invalid_edge['requirement_attribute'] = $resource;
+	$check( is_wp_error( ps_pen_paper_save_adventure_edge( $campaign, $required_adventure, $invalid_edge, '1' ) ), 'Resource field was accepted as a numeric prerequisite.' );
+	$invalid_edge = $required_edge;
+	$invalid_edge['requirement_minimum'] = '1000001';
+	$check( is_wp_error( ps_pen_paper_save_adventure_edge( $campaign, $required_adventure, $invalid_edge, '1' ) ), 'Out-of-range prerequisite was accepted.' );
+	$invalid_edge['requirement_minimum'] = '6.5';
+	$check( is_wp_error( ps_pen_paper_save_adventure_edge( $campaign, $required_adventure, $invalid_edge, '1' ) ), 'Fractional prerequisite was accepted.' );
+	unset( $invalid_edge['requirement_minimum'] );
+	$check( is_wp_error( ps_pen_paper_save_adventure_edge( $campaign, $required_adventure, $invalid_edge, '1' ) ), 'Incomplete prerequisite was silently removed.' );
+	$check( true === ps_pen_paper_save_adventure_edge( $campaign, $required_adventure, $required_edge, '1' ) &&
+		true === ps_pen_paper_publish_adventure( $campaign, $required_adventure, '2', 'confirmed' ), 'Numeric prerequisite could not be published.' );
+
+	wp_set_current_user( $users['player'] );
+	$required_run_id = ps_pen_paper_start_adventure_run( $campaign, $required_adventure, $characters['player'], '3', '1' );
+	$check( is_int( $required_run_id ), 'Prerequisite run could not start.' );
+	$required_run = get_post_meta( $required_run_id, '_pspp_adventure_run', true );
+	$required_edge_id = $required_run['snapshot']['edges'][0]['id'];
+	wp_set_current_user( $users['gm'] );
+	$check( true === ps_pen_paper_save_adventure_edge( $campaign, $required_adventure, array(), '3', $required_edge_id ), 'Prerequisite draft edge could not be replaced.' );
+	$revised_edge = $required_edge;
+	$revised_edge['requirement_minimum'] = '8';
+	$check( true === ps_pen_paper_save_adventure_edge( $campaign, $required_adventure, $revised_edge, '4' ) &&
+		true === ps_pen_paper_publish_adventure( $campaign, $required_adventure, '5', 'confirmed' ) &&
+		$required_run === get_post_meta( $required_run_id, '_pspp_adventure_run', true ), 'Republication changed the running prerequisite snapshot.' );
+	wp_set_current_user( $users['player'] );
+	$before_requirement_events = ps_pen_paper_get_events( $campaign );
+	$result = ps_pen_paper_advance_adventure_run( $campaign, $required_run_id, $required_edge_id, '1' );
+	$check( is_wp_error( $result ) && 'adventure_requirement_unmet' === $result->get_error_code() &&
+		$required_run === get_post_meta( $required_run_id, '_pspp_adventure_run', true ) &&
+		$before_requirement_events === ps_pen_paper_get_events( $campaign ), 'Unmet prerequisite advanced or wrote an event.' );
+	ob_start();
+	ps_pen_paper_render_character_adventures( $campaign, get_post( $characters['player'] ), 0 );
+	$blocked_html = ob_get_clean();
+	$check( preg_match( '/<button[^>]*disabled[^>]*>MINIMUM_CHOICE<\/button>/', $blocked_html ) &&
+		false !== strpos( $blocked_html, 'freigegeben 5, mindestens 6' ), 'Unmet decision was hidden, enabled or lacked an explanation.' );
+
+	$requirement_character = array( 'name' => 'Player', 'values' => array( $attribute => '7', $resource => array( 'current' => '7', 'maximum' => '20' ) ) );
+	$check( $characters['player'] === ps_pen_paper_save_character( $campaign_id, $characters['player'], $users['player'],
+		$requirement_character, '1', (string) $changed_rules['revision'] ), 'Pending prerequisite value could not be proposed.' );
+	$result = ps_pen_paper_advance_adventure_run( $campaign, $required_run_id, $required_edge_id, '1' );
+	$check( is_wp_error( $result ) && 'adventure_requirement_unmet' === $result->get_error_code(), 'Pending value satisfied the prerequisite before approval.' );
+	wp_set_current_user( $users['gm'] );
+	$check( true === ps_pen_paper_review_character( $campaign_id, $characters['player'], 'approve', '2' ), 'Prerequisite value could not be approved.' );
+	wp_set_current_user( $users['player'] );
+	ob_start();
+	ps_pen_paper_render_character_adventures( $campaign, get_post( $characters['player'] ), 0 );
+	$enabled_html = ob_get_clean();
+	$check( preg_match( '/<button(?![^>]*disabled)[^>]*>MINIMUM_CHOICE<\/button>/', $enabled_html ), 'Approved value did not enable the decision.' );
+	wp_set_current_user( $users['gm'] );
+	$requirement_character['values'][ $attribute ] = '5';
+	$check( $characters['player'] === ps_pen_paper_save_character( $campaign_id, $characters['player'], $users['player'],
+		$requirement_character, '3', (string) $changed_rules['revision'] ), 'Concurrent prerequisite correction failed.' );
+	wp_set_current_user( $users['player'] );
+	$result = ps_pen_paper_advance_adventure_run( $campaign, $required_run_id, $required_edge_id, '1' );
+	$check( is_wp_error( $result ) && 'adventure_requirement_unmet' === $result->get_error_code(), 'Previously enabled form bypassed the current prerequisite.' );
+	wp_set_current_user( $users['gm'] );
+	$requirement_character['values'][ $attribute ] = '6';
+	$check( $characters['player'] === ps_pen_paper_save_character( $campaign_id, $characters['player'], $users['player'],
+		$requirement_character, '4', (string) $changed_rules['revision'] ), 'Exact minimum correction failed.' );
+	wp_set_current_user( $users['player'] );
+	$before_requirement_events = ps_pen_paper_get_events( $campaign );
+	add_filter( 'wp_insert_post_data', $fail_publish );
+	try {
+		$check( is_wp_error( ps_pen_paper_advance_adventure_run( $campaign, $required_run_id, $required_edge_id, '1' ) ), 'Prerequisite transition reported success without its event.' );
+	} finally { remove_filter( 'wp_insert_post_data', $fail_publish ); }
+	$check( $required_run === get_post_meta( $required_run_id, '_pspp_adventure_run', true ) &&
+		$before_requirement_events === ps_pen_paper_get_events( $campaign ), 'Failed prerequisite event retained partial progress.' );
+	$before_requirement_character = ps_pen_paper_character_state( $campaign, get_post( $characters['player'] ) );
+	$check( true === ps_pen_paper_advance_adventure_run( $campaign, $required_run_id, $required_edge_id, '1' ), 'Exact minimum did not satisfy the prerequisite.' );
+	$completed_requirement = get_post_meta( $required_run_id, '_pspp_adventure_run', true );
+	$check( ps_pen_paper_valid_adventure_run( $completed_requirement ) && 'completed' === $completed_requirement['status'] &&
+		6 === $completed_requirement['history'][0]['requirement']['value'] &&
+		6 === $completed_requirement['history'][0]['requirement']['minimum'] &&
+		$before_requirement_character === ps_pen_paper_character_state( $campaign, get_post( $characters['player'] ) ) &&
+		$baseline_scene === ps_pen_paper_map_state( $campaign ), 'Prerequisite evidence was missing or character/shared scene changed.' );
+	$requirement_event = ps_pen_paper_get_events( $campaign )['events'][0];
+	$check( 'adventure_run' === $requirement_event['kind'] && $completed_requirement === $requirement_event['after'], 'Central event omitted the prerequisite evidence.' );
+	ob_start();
+	ps_pen_paper_render_event_details( $requirement_event, $campaign );
+	$requirement_event_html = ob_get_clean();
+	$check( false !== strpos( $requirement_event_html, 'freigegeben 6, mindestens 6' ), 'Private event omitted the historical prerequisite value.' );
+	$invalid_run = $completed_requirement;
+	unset( $invalid_run['history'][0]['requirement'] );
+	$check( ! ps_pen_paper_valid_adventure_run( $invalid_run ), 'Required historical evidence could be removed.' );
+	$invalid_run = $completed_requirement;
+	$invalid_run['history'][0]['requirement']['value'] = 5;
+	$check( ! ps_pen_paper_valid_adventure_run( $invalid_run ), 'Historical prerequisite below minimum was accepted.' );
+	$check( is_wp_error( ps_pen_paper_advance_adventure_run( $campaign, $required_run_id, $required_edge_id, '1' ) ), 'Prerequisite transition was replayed.' );
+	$check( $success_run === get_post_meta( $runs['other']['id'], '_pspp_adventure_run', true ) && ps_pen_paper_valid_adventure_run( $success_run ),
+		'Legacy run without prerequisites was rewritten or rejected.' );
+
+	$cost_cases = array(
+		array( 'name' => 'ATTEMPT_FAILURE', 'timing' => 'attempt', 'expression' => 'W6-1000000', 'amount' => '2', 'remaining' => 5 ),
+		array( 'name' => 'SUCCESS_FAILURE', 'timing' => 'success', 'expression' => 'W6-1000000', 'amount' => '2', 'remaining' => 5 ),
+		array( 'name' => 'SUCCESS_SUCCESS', 'timing' => 'success', 'expression' => 'W6+999990', 'amount' => '2', 'remaining' => 3 ),
+		array( 'name' => 'SUCCESS_WITHOUT_ROLL', 'timing' => 'success', 'expression' => '', 'amount' => '3', 'remaining' => 0 ),
+		array( 'name' => 'INSUFFICIENT_COST', 'timing' => 'attempt', 'expression' => '', 'amount' => '2', 'remaining' => 0 ),
+		array( 'name' => 'INSUFFICIENT_SUCCESS', 'timing' => 'success', 'expression' => 'W6-1000000', 'amount' => '2', 'remaining' => 0 ),
+	);
+	foreach ( $cost_cases as $case_index => $case ) {
+		wp_set_current_user( $users['gm'] );
+		$cost_adventure = ps_pen_paper_save_adventure( $campaign, 0, $case['name'], (string) $scenes['START_ORIGINAL'], '0' );
+		$check( is_int( $cost_adventure ), 'Cost adventure creation failed.' );
+		$cost_edge_input = array( 'from_scene' => (string) $scenes['START_ORIGINAL'], 'choice' => $case['name'],
+			'expression' => $case['expression'], 'attribute' => '', 'threshold' => '0',
+			'success_scene' => (string) $scenes['SUCCESS_SCENE'], 'failure_scene' => '0',
+			'cost_resource' => $resource, 'cost_amount' => $case['amount'], 'cost_timing' => $case['timing'] );
+		if ( 0 === $case_index ) {
+			$invalid_cost = $cost_edge_input; $invalid_cost['cost_resource'] = $attribute;
+			$check( is_wp_error( ps_pen_paper_save_adventure_edge( $campaign, $cost_adventure, $invalid_cost, '1' ) ), 'Attribute accepted as a consumable resource.' );
+			$invalid_cost = $cost_edge_input; $invalid_cost['cost_amount'] = '0';
+			$check( is_wp_error( ps_pen_paper_save_adventure_edge( $campaign, $cost_adventure, $invalid_cost, '1' ) ), 'Zero cost with a resource was accepted.' );
+			$invalid_cost['cost_amount'] = '1000001';
+			$check( is_wp_error( ps_pen_paper_save_adventure_edge( $campaign, $cost_adventure, $invalid_cost, '1' ) ), 'Unbounded resource cost was accepted.' );
+			$invalid_cost = $cost_edge_input; $invalid_cost['cost_timing'] = 'sometimes';
+			$check( is_wp_error( ps_pen_paper_save_adventure_edge( $campaign, $cost_adventure, $invalid_cost, '1' ) ), 'Unknown cost timing was accepted.' );
+		}
+		$check( true === ps_pen_paper_save_adventure_edge( $campaign, $cost_adventure, $cost_edge_input, '1' ) &&
+			true === ps_pen_paper_publish_adventure( $campaign, $cost_adventure, '2', 'confirmed' ), 'Cost rule publication failed.' );
+		wp_set_current_user( $users['player'] );
+		$cost_character_before = ps_pen_paper_raw_character_state( $characters['player'] );
+		$cost_run_id = ps_pen_paper_start_adventure_run( $campaign, $cost_adventure, $characters['player'], '3', (string) $cost_character_before['revision'] );
+		$check( is_int( $cost_run_id ), 'Cost run creation failed.' );
+		$cost_run_before = get_post_meta( $cost_run_id, '_pspp_adventure_run', true );
+		$cost_edge_id = $cost_run_before['snapshot']['edges'][0]['id'];
+		if ( 0 === $case_index ) {
+			$pending_cost_input = $requirement_character;
+			$pending_cost_input['values'][ $resource ]['current'] = '20';
+			$check( $characters['player'] === ps_pen_paper_save_character( $campaign_id, $characters['player'], $users['player'],
+				$pending_cost_input, (string) $cost_character_before['revision'], (string) $changed_rules['revision'] ), 'Pending cost fixture failed.' );
+			$pending_before = ps_pen_paper_raw_character_state( $characters['player'] );
+			$result = ps_pen_paper_advance_adventure_run( $campaign, $cost_run_id, $cost_edge_id, '1' );
+			$check( is_wp_error( $result ) && 'resource_cost_pending' === $result->get_error_code() &&
+				$pending_before === ps_pen_paper_raw_character_state( $characters['player'] ), 'Open value request was overwritten or used for spending.' );
+			wp_set_current_user( $users['gm'] );
+			$check( true === ps_pen_paper_review_character( $campaign_id, $characters['player'], 'reject', (string) $pending_before['revision'] ), 'Pending cost fixture could not be rejected.' );
+			wp_set_current_user( $users['player'] );
+			$cost_character_before = ps_pen_paper_raw_character_state( $characters['player'] );
+			foreach ( array( 'character_write', 'character_resource_spent', 'adventure_run' ) as $failed_kind ) {
+				$cost_events_before = ps_pen_paper_get_events( $campaign );
+				$fail_cost_event = static function ( $check, $id, $key, $value ) use ( $failed_kind ) {
+					if ( 'character_write' === $failed_kind && '_pspp_character' === $key ) { return false; }
+					return '_pspp_event' === $key && isset( $value['kind'] ) && $failed_kind === $value['kind'] ? false : $check;
+				};
+				add_filter( 'update_post_metadata', $fail_cost_event, 10, 4 );
+				try {
+					$check( is_wp_error( ps_pen_paper_advance_adventure_run( $campaign, $cost_run_id, $cost_edge_id, '1' ) ), 'Cost transition succeeded despite a failed mandatory event.' );
+				} finally { remove_filter( 'update_post_metadata', $fail_cost_event, 10 ); }
+				$check( $cost_character_before === ps_pen_paper_raw_character_state( $characters['player'] ) &&
+					$cost_run_before === get_post_meta( $cost_run_id, '_pspp_adventure_run', true ) &&
+					$cost_events_before === ps_pen_paper_get_events( $campaign ), 'Cost/event failure left partial spending or progress.' );
+			}
+		}
+		if ( in_array( $case['name'], array( 'INSUFFICIENT_COST', 'INSUFFICIENT_SUCCESS' ), true ) ) {
+			$cost_events_before = ps_pen_paper_get_events( $campaign );
+			$result = ps_pen_paper_advance_adventure_run( $campaign, $cost_run_id, $cost_edge_id, '1' );
+			$check( is_wp_error( $result ) && 'adventure_resource_insufficient' === $result->get_error_code() &&
+				$cost_character_before === ps_pen_paper_raw_character_state( $characters['player'] ) &&
+				$cost_run_before === get_post_meta( $cost_run_id, '_pspp_adventure_run', true ) &&
+				$cost_events_before === ps_pen_paper_get_events( $campaign ), 'Insufficient cost overdrew resources or advanced.' );
+			ob_start();
+			ps_pen_paper_render_character_adventures( $campaign, get_post( $characters['player'] ), 0 );
+			$cost_html = ob_get_clean();
+			$check( preg_match( '/<button[^>]*disabled[^>]*>' . $case['name'] . '<\/button>/', $cost_html ) &&
+				false !== strpos( $cost_html, 'verfügbar 0' ), 'Unaffordable decision was hidden, enabled or unexplained.' );
+			continue;
+		}
+		$check( true === ps_pen_paper_advance_adventure_run( $campaign, $cost_run_id, $cost_edge_id, '1' ), 'Configured cost transition failed.' );
+		$cost_character_after = ps_pen_paper_raw_character_state( $characters['player'] );
+		$cost_run_after = get_post_meta( $cost_run_id, '_pspp_adventure_run', true );
+		$expected_character = $cost_character_before;
+		if ( $case['remaining'] !== $cost_character_before['active']['values'][ $resource ]['current'] ) {
+			$expected_character['revision']++;
+			$expected_character['active']['values'][ $resource ]['current'] = $case['remaining'];
+			$check( ps_pen_paper_valid_character_resource_cost( $cost_run_after['history'][0]['resource_cost'] ), 'Paid cost evidence is invalid.' );
+			$cost_event = ps_pen_paper_get_events( $campaign )['events'][1];
+			$check( 'character_resource_spent' === $cost_event['kind'] && $cost_character_before === $cost_event['before'] &&
+				$cost_character_after === $cost_event['after'], 'Resource event does not match the actual character change.' );
+			wp_set_current_user( $users['other'] );
+			$check( is_wp_error( ps_pen_paper_get_event( $campaign, $cost_event['id'] ) ), 'Another owner read a private resource event.' );
+			wp_set_current_user( $users['player'] );
+			$invalid_run = $cost_run_after;
+			$invalid_run['history'][0]['resource_cost']['after']++;
+			$check( ! ps_pen_paper_valid_adventure_run( $invalid_run ), 'Wrong cost arithmetic was accepted.' );
+		} else {
+			$check( array_key_exists( 'resource_cost', $cost_run_after['history'][0] ) &&
+				null === $cost_run_after['history'][0]['resource_cost'], 'Failed success-only probe invented paid cost evidence.' );
+		}
+		$check( $expected_character === $cost_character_after && ps_pen_paper_valid_adventure_run( $cost_run_after ) &&
+			'completed' === $cost_run_after['status'] && $baseline_scene === ps_pen_paper_map_state( $campaign ), 'Cost timing, revision, other values or shared scene were incorrect.' );
+		$check( is_wp_error( ps_pen_paper_advance_adventure_run( $campaign, $cost_run_id, $cost_edge_id, '1' ) ) &&
+			$cost_character_after === ps_pen_paper_raw_character_state( $characters['player'] ), 'Replayed cost was charged again.' );
+	}
+
+	wp_set_current_user( $users['gm'] );
+	wp_get_current_user()->add_cap( 'ps_pen_paper_create_campaigns' );
+	$cost_universe_id = ps_pen_paper_save_universe( 0, array( 'name' => 'Resource universe fixture', 'description' => '' ), '0' );
+	$check( is_int( $cost_universe_id ), 'Cost universe fixture failed.' );
+	$parents[] = $cost_universe_id;
+	$cost_base_rules = ps_pen_paper_save_rules( $cost_universe_id, array( 'name' => 'Resource base rules', 'description' => '', 'dice' => array( '6' ),
+		'fields' => array( array( 'id' => '', 'label' => 'Mana', 'type' => 'resource', 'description' => '', 'min' => '2', 'max' => '10', 'start' => '4' ) ) ), '0' );
+	$check( ! is_wp_error( $cost_base_rules ), 'Cost base rules fixture failed.' );
+	$base_resource = $cost_base_rules['fields'][0]['id'];
+	$cost_base_id = ps_pen_paper_save_character( $cost_universe_id, 0, $users['player'],
+		array( 'name' => 'Resource base', 'values' => array( $base_resource => array( 'current' => '4', 'maximum' => '10' ) ) ), '0', '1' );
+	$check( is_int( $cost_base_id ), 'Cost base character fixture failed.' );
+	$cost_base_before = ps_pen_paper_raw_character_state( $cost_base_id );
+	foreach ( array( 'shared', 'copy' ) as $context_mode ) {
+		wp_set_current_user( $users['gm'] );
+		$context_campaign_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => 'Cost context fixture' ), true );
+		$check( is_int( $context_campaign_id ), 'Cost context campaign fixture failed.' );
+		$parents[] = $context_campaign_id;
+		add_post_meta( $context_campaign_id, '_pspp_gm', (string) $users['gm'] );
+		add_post_meta( $context_campaign_id, '_pspp_player', (string) $users['player'] );
+		$context_campaign = ps_pen_paper_get_campaign( $context_campaign_id );
+		$check( ! is_wp_error( ps_pen_paper_save_universe_link( $context_campaign_id, $cost_universe_id, '0', '1', 'confirmed' ) ) &&
+			! is_wp_error( ps_pen_paper_adopt_universe_rules( $context_campaign_id, '1', 'confirmed' ) ), 'Cost context universe association failed.' );
+		$context_character_id = ps_pen_paper_attach_base_character( $context_campaign_id, $cost_base_id, '1', '1', $context_mode, 'confirmed' );
+		$check( is_int( $context_character_id ), 'Cost context attachment failed.' );
+		$context_scene_id = ps_pen_paper_save_scene( $context_campaign, 0, array( 'title' => 'Resource scene', 'text' => '', 'secret' => '', 'grid' => '0' ), '0' );
+		$check( is_int( $context_scene_id ) && true === ps_pen_paper_publish_scene( $context_campaign, $context_scene_id, '1', 'confirmed' ), 'Cost context scene fixture failed.' );
+		$context_adventure_id = ps_pen_paper_save_adventure( $context_campaign, 0, 'Resource context adventure', (string) $context_scene_id, '0' );
+		$context_edge = array( 'from_scene' => (string) $context_scene_id, 'choice' => 'CONTEXT_COST', 'expression' => '', 'attribute' => '', 'threshold' => '0',
+			'success_scene' => '0', 'failure_scene' => '0', 'cost_resource' => $base_resource, 'cost_amount' => '2', 'cost_timing' => 'attempt' );
+		$check( is_int( $context_adventure_id ) && true === ps_pen_paper_save_adventure_edge( $context_campaign, $context_adventure_id, $context_edge, '1' ), 'Cost context edge fixture failed.' );
+		$free_context_edge = $context_edge; $free_context_edge['choice'] = 'CONTEXT_FREE'; $free_context_edge['cost_resource'] = ''; $free_context_edge['cost_amount'] = '0';
+		$check( true === ps_pen_paper_save_adventure_edge( $context_campaign, $context_adventure_id, $free_context_edge, '2' ), 'Free context alternative fixture failed.' );
+		$bound_context_edge = $context_edge; $bound_context_edge['choice'] = 'CONTEXT_BELOW_MINIMUM'; $bound_context_edge['cost_amount'] = '3';
+		$check( true === ps_pen_paper_save_adventure_edge( $context_campaign, $context_adventure_id, $bound_context_edge, '3' ) &&
+			true === ps_pen_paper_publish_adventure( $context_campaign, $context_adventure_id, '4', 'confirmed' ), 'Resource lower-bound fixture failed.' );
+		wp_set_current_user( $users['player'] );
+		$context_run_id = ps_pen_paper_start_adventure_run( $context_campaign, $context_adventure_id, $context_character_id, '5', '1' );
+		$check( is_int( $context_run_id ), 'Cost context run fixture failed.' );
+		$context_before = ps_pen_paper_raw_character_state( $context_character_id );
+		$context_run = get_post_meta( $context_run_id, '_pspp_adventure_run', true );
+		if ( 'copy' === $context_mode ) {
+			$result = ps_pen_paper_advance_adventure_run( $context_campaign, $context_run_id, $context_run['snapshot']['edges'][2]['id'], '1' );
+			$check( is_wp_error( $result ) && 'adventure_resource_insufficient' === $result->get_error_code() &&
+				$context_before === ps_pen_paper_raw_character_state( $context_character_id ) &&
+				$context_run === get_post_meta( $context_run_id, '_pspp_adventure_run', true ), 'Cost crossed the configured positive lower bound.' );
+		}
+		$result = ps_pen_paper_advance_adventure_run( $context_campaign, $context_run_id, $context_run['snapshot']['edges'][0]['id'], '1' );
+		if ( 'shared' === $context_mode ) {
+			$check( is_wp_error( $result ) && 'resource_cost_shared' === $result->get_error_code() &&
+				$context_before === ps_pen_paper_raw_character_state( $context_character_id ) &&
+				$context_run === get_post_meta( $context_run_id, '_pspp_adventure_run', true ), 'Shared basis was spent through a local adventure.' );
+			$check( true === ps_pen_paper_advance_adventure_run( $context_campaign, $context_run_id, $context_run['snapshot']['edges'][1]['id'], '1' ) &&
+				$context_before === ps_pen_paper_raw_character_state( $context_character_id ),
+				'Shared basis could not take a cost-free alternative.' );
+		} else {
+			$context_after = ps_pen_paper_raw_character_state( $context_character_id );
+			$expected_context = $context_before; $expected_context['revision']++; $expected_context['active']['values'][ $base_resource ]['current'] = 2;
+			$check( true === $result && $expected_context === $context_after, 'Independent copy did not spend locally down to its minimum.' );
+		}
+		$check( $cost_base_before === ps_pen_paper_raw_character_state( $cost_base_id ), 'Local cost changed the universe base character.' );
+	}
+
 	wp_set_current_user( $users['outsider'] );
 	$check( is_wp_error( ps_pen_paper_start_adventure_run( $campaign, $adventure_id, $characters['player'], (string) $published['revision'], '1' ) ), 'Nonmember started an adventure run.' );
 	echo "Adventure integration checks passed.\n";
@@ -188,6 +453,6 @@ try {
 	$children = $parents ? get_posts( array( 'post_type' => array( 'pspp_character', 'pspp_scene', 'pspp_adventure', 'pspp_adventure_run', 'pspp_event' ),
 		'post_status' => array( 'private', 'draft' ), 'post_parent__in' => $parents, 'posts_per_page' => -1, 'fields' => 'ids' ) ) : array();
 	foreach ( array_merge( $children, $parents ) as $id ) { if ( ! wp_delete_post( $id, true ) ) { $errors[] = 'Cannot remove adventure fixture ' . $id; } }
-	foreach ( $users as $id ) { if ( ! wp_delete_user( $id ) ) { $errors[] = 'Cannot remove fixture account ' . $id; } }
+	foreach ( $users as $id ) { if ( ! ( is_multisite() ? wpmu_delete_user( $id ) : wp_delete_user( $id ) ) ) { $errors[] = 'Cannot remove fixture account ' . $id; } }
 	if ( $errors ) { throw new RuntimeException( implode( '; ', $errors ) ); }
 }

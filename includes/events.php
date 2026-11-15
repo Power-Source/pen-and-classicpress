@@ -14,6 +14,7 @@ function ps_pen_paper_event_labels() {
 		'universe_linked'     => __( 'Universumszuordnung geändert', 'ps-pen-paper' ),
 		'character_created'   => __( 'Charakter angelegt', 'ps-pen-paper' ),
 		'character_saved'     => __( 'Charakter gespeichert', 'ps-pen-paper' ),
+		'character_resource_spent' => __( 'Abenteuer-Ressource verbraucht', 'ps-pen-paper' ),
 		'character_requested' => __( 'Charakteränderung beantragt', 'ps-pen-paper' ),
 		'character_approved'  => __( 'Charakteränderung freigegeben', 'ps-pen-paper' ),
 		'character_rejected'  => __( 'Charakteränderung abgelehnt', 'ps-pen-paper' ),
@@ -232,6 +233,17 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 		return $error;
 	}
 	$event['id'] = $post->ID;
+	if ( 'character_resource_spent' === $event['kind'] ) {
+		$cost = isset( $event['resource_cost'] ) ? $event['resource_cost'] : null;
+		if ( 'owner' !== $event['visibility'] || ! ps_pen_paper_valid_character_resource_cost( $cost ) ||
+			! isset( $event['before']['revision'], $event['after']['revision'], $event['before']['active'], $event['after']['active'] ) ||
+			$event['before']['revision'] !== $cost['character_revision'] || $event['after']['revision'] !== $cost['character_revision'] + 1 ||
+			! isset( $event['before']['active']['values'][ $cost['id'] ]['current'], $event['after']['active']['values'][ $cost['id'] ]['current'] ) ||
+			$event['before']['active']['values'][ $cost['id'] ]['current'] !== $cost['before'] ||
+			$event['after']['active']['values'][ $cost['id'] ]['current'] !== $cost['after'] ) {
+			return new WP_Error( 'invalid_event', __( 'Der Ressourcenverbrauch im Protokoll ist beschädigt. Bitte informiere den Administrator.', 'ps-pen-paper' ) );
+		}
+	}
 	if ( in_array( $event['kind'], array( 'trade_policy', 'trade_changed' ), true ) ) {
 		$validate = 'trade_policy' === $event['kind'] ? 'ps_pen_paper_valid_trade_policy' : 'ps_pen_paper_valid_trade';
 		if ( 'gm' !== $event['visibility'] || ! $validate( $event['before'] ) || ! $validate( $event['after'] ) ) {

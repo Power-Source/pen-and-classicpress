@@ -105,6 +105,14 @@ einen endgültigen Funktionsumfang.
   freigegebene Szenen, Entscheidungen, optionale Serverproben und private,
   revisionsgeschützte Einzeldurchläufe. Kampagnenszene, Charakterwerte,
   Ressourcen und Beute werden dabei nicht verändert.
+- Version 0.22.0 ergänzt optionale Mindestwerte für Soloentscheidungen:
+  Nicht erfüllte Voraussetzungen bleiben sichtbar und sperren die Auswahl.
+  Der Server prüft freigegebene Zahlen-/Attributwerte erneut und protokolliert
+  den verwendeten Wert zusammen mit dem Fortschritt.
+- Version 0.23.0 ergänzt optionale Ressourcenkosten je Soloentscheidung:
+  Ressource, Betrag und Kostenzeitpunkt sind ausdrücklich konfigurierbar.
+  Verbrauch und Fortschritt werden atomar protokolliert; lokale Bögen und
+  unabhängige Kopien sind unterstützt, gemeinsame Basisbögen noch nicht.
 
 ### Universum vor Kampagne: Grundmodell seit Version 0.11.0
 
@@ -769,21 +777,34 @@ Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
 ## Phase 7: Geleitete, hybride und automatisierte Abenteuer
 
 **Erster Solo-Schritt seit 0.21.0 umgesetzt.** Die bestehende Spielleitung
-behält die Kontrolle über Vorbereitung und Freigabe. Gruppenabläufe,
-automatische Ressourcenänderungen und Belohnungen sind weiterhin nicht
-implementiert.
+behält die Kontrolle über Vorbereitung und Freigabe. Mindestwerte und
+optionale Ressourcenkosten ergänzen den Ablauf seit 0.22.0 beziehungsweise
+0.23.0. Gruppenabläufe und automatische Belohnungen sind noch nicht implementiert.
 
 - [x] Pro Charakter einen eigenen Durchlauf aus einem ausdrücklich
   freigegebenen Szenenstand speichern; der Durchlauf friert Szenen und
-  Entscheidungen samt Regelrevision ein und verändert weder Gruppenszene noch Werte.
+  Entscheidungen samt Regelrevision ein. Die Gruppenszene bleibt unverändert;
+  Charakterwerte ändern sich nur durch ausdrücklich konfigurierte Kosten.
 - [x] Entscheidungen und optionale serverseitige Würfel-/Attributproben
   auswerten, den gewählten Pfad revisionsgeschützt protokollieren und
   wiederholte oder veraltete Aktionen ablehnen.
 - [x] Neue Durchläufe pausieren oder wieder erlauben, ohne laufende Durchläufe
   oder historische Würfe umzuschreiben.
+- [x] Seit 0.22.0 eine optionale Mindestwert-Voraussetzung je Entscheidung
+  für ein Zahlen- oder Attributfeld anbieten. Aktuelle freigegebene Werte
+  einschließlich wirksamer Ausrüstung prüfen; unerfüllte Entscheidungen
+  sichtbar sperren. Voraussetzung und tatsächlichen Wert im privaten Verlauf
+  speichern, ohne Charakterwerte zu verändern.
+- [x] Seit 0.23.0 eine optionale Ressource mit ganzzahligen Kosten je
+  Entscheidung anbieten. Zeitpunkt je Entscheidung wählen: jeden Versuch
+  bezahlen oder nur bei Erfolg; ohne Probe immer. Ausreichenden freigegebenen
+  Bestand vor jedem Versuch prüfen, Untergrenzen erhalten und Verbrauch,
+  Fortschritt sowie private Pflichtereignisse gemeinsam speichern.
+  Kostenpflichtige Versuche vorläufig auf lokale Bögen und unabhängige Kopien
+  ohne offenen Werteantrag begrenzen; kostenfreie Alternativen bleiben möglich.
 - [ ] Teamdurchläufe, gemeinsame Entscheidungen, Wiedereinstieg und
   Teilnahmeverhalten ausdrücklich entwerfen.
-- [ ] Voraussetzungen, Ressourcenverbrauch und erlaubte Belohnungen erst als
+- [ ] Weitere Voraussetzungen und erlaubte Belohnungen erst als
   getrennte, ausdrücklich konfigurierte Erweiterung planen.
 
 Die Spielleitung bleibt Abenteuerautor und bestimmt je Kampagne den Modus:
@@ -797,7 +818,8 @@ Die Spielleitung bleibt Abenteuerautor und bestimmt je Kampagne den Modus:
 - Den vorhandenen kleinen Szenen- und Entscheidungsablauf ausbauen: Die
   Spielleitung definiert Auswahlmöglichkeiten, optionale Proben,
   Erfolgs-/Misserfolgsfolgen und erlaubte Übergänge zwischen freigegebenen
-  Szenen. Voraussetzungen jenseits der begrenzten Zahlenprobe folgen später.
+  Szenen. Mindestwerte stehen seit 0.22.0 bereit; weitere Voraussetzungstypen
+  folgen später.
 - Vorbereitete Komplikationen statt automatisch erfundener Ergebnisse
   verwenden. Beispiel: Ein Schloss untersuchen, eine Verstandprobe ausführen
   und je Ergebnis eine freigegebene Folgeszene öffnen.

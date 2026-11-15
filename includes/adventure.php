@@ -20,7 +20,16 @@ function ps_pen_paper_adventure_default() {
 }
 
 function ps_pen_paper_valid_adventure_edge( $edge ) {
-	if ( ! is_array( $edge ) || array( 'id', 'from_scene', 'choice', 'expression', 'attribute', 'threshold', 'success_scene', 'failure_scene' ) !== array_keys( $edge ) ||
+	$keys = array( 'id', 'from_scene', 'choice', 'expression', 'attribute', 'threshold', 'success_scene', 'failure_scene' );
+	if ( is_array( $edge ) && array_key_exists( 'requirement', $edge ) ) {
+		$keys[] = 'requirement';
+		if ( ! ps_pen_paper_valid_adventure_requirement( $edge['requirement'] ) ) { return false; }
+	}
+	if ( is_array( $edge ) && array_key_exists( 'resource_cost', $edge ) ) {
+		$keys[] = 'resource_cost';
+		if ( ! ps_pen_paper_valid_adventure_resource_cost( $edge['resource_cost'] ) ) { return false; }
+	}
+	if ( ! is_array( $edge ) || $keys !== array_keys( $edge ) ||
 		! is_string( $edge['id'] ) || ! wp_is_uuid( $edge['id'] ) ||
 		! is_int( $edge['from_scene'] ) || $edge['from_scene'] < 1 ||
 		! is_string( $edge['choice'] ) || '' === trim( $edge['choice'] ) || strlen( $edge['choice'] ) > 480 ||
@@ -34,6 +43,32 @@ function ps_pen_paper_valid_adventure_edge( $edge ) {
 	}
 	return ! ( 0 === $edge['success_scene'] && 0 === $edge['failure_scene'] ) &&
 		( '' === $edge['attribute'] || wp_is_uuid( $edge['attribute'] ) );
+}
+
+function ps_pen_paper_valid_adventure_requirement( $requirement ) {
+	return null === $requirement || ( is_array( $requirement ) && array( 'attribute', 'minimum' ) === array_keys( $requirement ) &&
+		is_string( $requirement['attribute'] ) && wp_is_uuid( $requirement['attribute'] ) &&
+		is_int( $requirement['minimum'] ) && abs( $requirement['minimum'] ) <= 1000000 );
+}
+
+function ps_pen_paper_valid_adventure_resource_cost( $cost ) {
+	return null === $cost || ( is_array( $cost ) && array( 'resource', 'amount', 'timing' ) === array_keys( $cost ) &&
+		is_string( $cost['resource'] ) && wp_is_uuid( $cost['resource'] ) &&
+		is_int( $cost['amount'] ) && $cost['amount'] > 0 && $cost['amount'] <= 1000000 &&
+		in_array( $cost['timing'], array( 'attempt', 'success' ), true ) );
+}
+
+function ps_pen_paper_adventure_requirement_value( $edge, $rules, $state ) {
+	if ( ! isset( $edge['requirement'] ) ) { return null; }
+	$requirement = $edge['requirement'];
+	foreach ( $rules['fields'] as $field ) {
+		if ( $field['id'] === $requirement['attribute'] && in_array( $field['type'], array( 'attribute', 'number' ), true ) &&
+			isset( $state['active']['values'][ $field['id'] ] ) && is_int( $state['active']['values'][ $field['id'] ] ) ) {
+			return array( 'id' => $field['id'], 'label' => $field['label'], 'value' => $state['active']['values'][ $field['id'] ],
+				'minimum' => $requirement['minimum'] );
+		}
+	}
+	return ps_pen_paper_adventure_error();
 }
 
 function ps_pen_paper_valid_adventure_publication( $published ) {
@@ -108,6 +143,20 @@ function ps_pen_paper_adventure_validate_draft( $campaign, $draft, $rules ) {
 		$key = strtolower( $edge['choice'] );
 		if ( isset( $choices[ $edge['from_scene'] ][ $key ] ) ) { return ps_pen_paper_adventure_error(); }
 		$choices[ $edge['from_scene'] ][ $key ] = true; $scene_ids[ $edge['from_scene'] ] = true;
+		if ( isset( $edge['requirement'] ) ) {
+			$field = null;
+			foreach ( $rules['fields'] as $candidate ) {
+				if ( $candidate['id'] === $edge['requirement']['attribute'] && in_array( $candidate['type'], array( 'attribute', 'number' ), true ) ) { $field = $candidate; break; }
+			}
+			if ( ! $field ) { return ps_pen_paper_adventure_error(); }
+		}
+		if ( isset( $edge['resource_cost'] ) ) {
+			$field = null;
+			foreach ( $rules['fields'] as $candidate ) {
+				if ( $candidate['id'] === $edge['resource_cost']['resource'] && 'resource' === $candidate['type'] ) { $field = $candidate; break; }
+			}
+			if ( ! $field ) { return ps_pen_paper_adventure_error(); }
+		}
 		if ( '' !== $edge['expression'] ) {
 			$parsed = ps_pen_paper_parse_dice( $edge['expression'], $rules['dice'] );
 			if ( is_wp_error( $parsed ) || $parsed['expression'] !== $edge['expression'] ) { return ps_pen_paper_adventure_error(); }
@@ -232,6 +281,25 @@ function ps_pen_paper_save_adventure_edge( $campaign, $id, $input, $revision, $r
 			$edge = array( 'id' => wp_generate_uuid4(), 'from_scene' => (int) $input['from_scene'], 'choice' => sanitize_text_field( $input['choice'] ),
 				'expression' => $expression, 'attribute' => $input['attribute'],
 				'threshold' => (int) $input['threshold'], 'success_scene' => (int) $input['success_scene'], 'failure_scene' => (int) $input['failure_scene'] );
+			if ( array_key_exists( 'requirement_attribute', $input ) || array_key_exists( 'requirement_minimum', $input ) ) {
+				if ( ! isset( $input['requirement_attribute'], $input['requirement_minimum'] ) ||
+					! is_string( $input['requirement_attribute'] ) || ! is_string( $input['requirement_minimum'] ) ||
+					! preg_match( '/^-?\d{1,7}$/D', $input['requirement_minimum'] ) ||
+					(string) (int) $input['requirement_minimum'] !== $input['requirement_minimum'] ||
+					abs( (int) $input['requirement_minimum'] ) > 1000000 ) { return ps_pen_paper_adventure_error(); }
+				$edge['requirement'] = '' === $input['requirement_attribute'] ? null :
+					array( 'attribute' => $input['requirement_attribute'], 'minimum' => (int) $input['requirement_minimum'] );
+			}
+			if ( array_key_exists( 'cost_resource', $input ) || array_key_exists( 'cost_amount', $input ) || array_key_exists( 'cost_timing', $input ) ) {
+				if ( ! isset( $input['cost_resource'], $input['cost_amount'], $input['cost_timing'] ) ||
+					! is_string( $input['cost_resource'] ) || ! is_string( $input['cost_amount'] ) ||
+					! is_string( $input['cost_timing'] ) || ! in_array( $input['cost_timing'], array( 'attempt', 'success' ), true ) ||
+					! preg_match( '/^(?:0|[1-9]\d{0,6})$/D', $input['cost_amount'] ) ||
+					(int) $input['cost_amount'] > 1000000 ||
+					( '' === $input['cost_resource'] ) !== ( '0' === $input['cost_amount'] ) ) { return ps_pen_paper_adventure_error(); }
+				$edge['resource_cost'] = '' === $input['cost_resource'] ? null :
+					array( 'resource' => $input['cost_resource'], 'amount' => (int) $input['cost_amount'], 'timing' => $input['cost_timing'] );
+			}
 			if ( ! ps_pen_paper_valid_adventure_edge( $edge ) ) { return ps_pen_paper_adventure_error(); }
 			$after['draft']['edges'][] = $edge;
 		}
@@ -311,7 +379,10 @@ function ps_pen_paper_valid_adventure_run( $run ) {
 		! is_array( $run['history'] ) ) { return false; }
 	$scene_id = $run['snapshot']['start_scene'];
 	foreach ( $run['history'] as $entry ) {
-		if ( ! is_array( $entry ) || array( 'edge_id', 'source_scene', 'choice', 'roll', 'target_scene', 'date' ) !== array_keys( $entry ) ||
+		$keys = array( 'edge_id', 'source_scene', 'choice', 'roll', 'target_scene', 'date' );
+		if ( is_array( $entry ) && array_key_exists( 'requirement', $entry ) ) { $keys[] = 'requirement'; }
+		if ( is_array( $entry ) && array_key_exists( 'resource_cost', $entry ) ) { $keys[] = 'resource_cost'; }
+		if ( ! is_array( $entry ) || $keys !== array_keys( $entry ) ||
 			! is_string( $entry['edge_id'] ) || ! wp_is_uuid( $entry['edge_id'] ) || ! is_int( $entry['source_scene'] ) ||
 			! is_string( $entry['choice'] ) || ! ( null === $entry['roll'] || ( is_array( $entry['roll'] ) && isset( $entry['roll']['total'], $entry['roll']['threshold'], $entry['roll']['success'] ) &&
 				is_int( $entry['roll']['total'] ) && is_int( $entry['roll']['threshold'] ) && is_bool( $entry['roll']['success'] ) ) ) ||
@@ -323,6 +394,13 @@ function ps_pen_paper_valid_adventure_run( $run ) {
 			if ( $candidate['id'] === $entry['edge_id'] && $candidate['from_scene'] === $scene_id ) { $edge = $candidate; break; }
 		}
 		if ( ! $edge || $edge['choice'] !== $entry['choice'] ) { return false; }
+		if ( isset( $edge['requirement'] ) ) {
+			if ( ! isset( $entry['requirement'] ) || ! is_array( $entry['requirement'] ) ||
+				array( 'id', 'label', 'value', 'minimum' ) !== array_keys( $entry['requirement'] ) ||
+				$entry['requirement']['id'] !== $edge['requirement']['attribute'] || ! is_string( $entry['requirement']['label'] ) ||
+				! is_int( $entry['requirement']['value'] ) || $entry['requirement']['minimum'] !== $edge['requirement']['minimum'] ||
+				$entry['requirement']['value'] < $entry['requirement']['minimum'] ) { return false; }
+		} elseif ( isset( $entry['requirement'] ) ) { return false; }
 		if ( '' === $edge['expression'] ) {
 			if ( null !== $entry['roll'] || $edge['success_scene'] !== $entry['target_scene'] ) { return false; }
 		} else {
@@ -354,6 +432,14 @@ function ps_pen_paper_valid_adventure_run( $run ) {
 			$target = $roll['success'] ? $edge['success_scene'] : $edge['failure_scene'];
 			if ( $target !== $entry['target_scene'] ) { return false; }
 		}
+		if ( isset( $edge['resource_cost'] ) ) {
+			$charge = 'attempt' === $edge['resource_cost']['timing'] || null === $entry['roll'] || $entry['roll']['success'];
+			if ( ! array_key_exists( 'resource_cost', $entry ) ||
+				( $charge && ( ! ps_pen_paper_valid_character_resource_cost( $entry['resource_cost'] ) ||
+					$entry['resource_cost']['id'] !== $edge['resource_cost']['resource'] ||
+					$entry['resource_cost']['amount'] !== $edge['resource_cost']['amount'] ) ) ||
+				( ! $charge && null !== $entry['resource_cost'] ) ) { return false; }
+		} elseif ( isset( $entry['resource_cost'] ) ) { return false; }
 		$scene_id = $entry['target_scene'];
 	}
 	$next_edges = array_filter( $run['snapshot']['edges'], function ( $edge ) use ( $scene_id ) { return $scene_id && $edge['from_scene'] === $scene_id; } );
@@ -436,9 +522,22 @@ function ps_pen_paper_advance_adventure_run( $campaign, $run_id, $edge_id, $revi
 			$edge = null;
 			foreach ( $before['snapshot']['edges'] as $candidate ) { if ( $candidate['id'] === $edge_id && $candidate['from_scene'] === $before['scene_id'] ) { $edge = $candidate; break; } }
 			if ( ! $edge ) { return ps_pen_paper_adventure_error(); }
+			$rules = ps_pen_paper_get_rules( $campaign->ID );
+			$requirement = ps_pen_paper_adventure_requirement_value( $edge, $rules, $character['state'] );
+			if ( is_wp_error( $requirement ) ) { return $requirement; }
+			if ( $requirement && $requirement['value'] < $requirement['minimum'] ) {
+				return new WP_Error( 'adventure_requirement_unmet', __( 'Die Voraussetzung für diese Entscheidung ist nicht erfüllt. Lade den Charakterbogen neu. Es wurde kein Fortschritt gespeichert.', 'ps-pen-paper' ) );
+			}
+			$cost = null;
+			if ( isset( $edge['resource_cost'] ) ) {
+				$cost = ps_pen_paper_character_resource_cost( $campaign, $character['post'], $edge['resource_cost']['resource'], $edge['resource_cost']['amount'] );
+				if ( is_wp_error( $cost ) ) { return $cost; }
+				if ( $cost['after'] < $cost['minimum'] ) {
+					return new WP_Error( 'adventure_resource_insufficient', __( 'Für diesen Versuch reicht die freigegebene Ressource nicht aus. Es wurden weder Kosten noch Fortschritt gespeichert.', 'ps-pen-paper' ) );
+				}
+			}
 			$roll = null; $target = $edge['success_scene'];
 			if ( '' !== $edge['expression'] ) {
-				$rules = ps_pen_paper_get_rules( $campaign->ID );
 				$parsed = ps_pen_paper_parse_dice( $edge['expression'], array( '4', '6', '8', '10', '12', '20', '100' ) );
 				if ( is_wp_error( $parsed ) ) { return $parsed; }
 				$attribute = null;
@@ -462,7 +561,14 @@ function ps_pen_paper_advance_adventure_run( $campaign, $run_id, $edge_id, $revi
 			if ( ! $target || ! $next_edges ) { $after['status'] = 'completed'; }
 			$after['history'][] = array( 'edge_id' => $edge['id'], 'source_scene' => $before['scene_id'], 'choice' => $edge['choice'],
 				'roll' => $roll, 'target_scene' => $target, 'date' => current_time( 'mysql', true ) );
+			if ( $requirement ) { $after['history'][ count( $after['history'] ) - 1 ]['requirement'] = $requirement; }
+			$charge = $cost && ( 'attempt' === $edge['resource_cost']['timing'] || null === $roll || $roll['success'] );
+			if ( $cost ) { $after['history'][ count( $after['history'] ) - 1 ]['resource_cost'] = $charge ? $cost : null; }
 			if ( ! ps_pen_paper_valid_adventure_run( $after ) ) { return ps_pen_paper_adventure_error(); }
+			if ( $charge ) {
+				$spent = ps_pen_paper_write_character_resource_cost( $campaign, $character['post'], $cost );
+				if ( is_wp_error( $spent ) ) { return $spent; }
+			}
 			return ps_pen_paper_write_adventure_event( $campaign, $run_id, $before, $after, 'adventure_run', 'owner', $before['owner_id'] );
 		} );
 	} );

@@ -33,6 +33,7 @@ function ps_pen_paper_render_rule_snapshot( $rules ) {
 
 function ps_pen_paper_render_event_details( $event, $scope = null ) {
 	?>
+	<?php if ( 'character_resource_spent' === $event['kind'] ) : ?><p><?php echo esc_html( ps_pen_paper_adventure_cost_label( $event['resource_cost'] ) ); ?></p><?php endif; ?>
 	<?php if ( 'wallet_saved' === $event['kind'] ) : ?><p class="pspp-multiline"><?php echo esc_html( $event['reason'] ); ?></p><?php endif; ?>
 	<?php if ( ! in_array( $event['kind'], array( 'universe_saved', 'universe_linked', 'membership_saved' ), true ) ) : ?>
 		<p><?php echo esc_html( sprintf( __( 'Objekt #%1$d · Regelrevision %2$d', 'ps-pen-paper' ), $event['object_id'], $event['rules_revision'] ) ); ?></p>
@@ -60,6 +61,8 @@ function ps_pen_paper_render_event_details( $event, $scope = null ) {
 					if ( $run['history'] ) {
 						$step = end( $run['history'] );
 						echo '<p>' . esc_html( $step['choice'] . ( $step['roll'] ? ' · ' . $step['roll']['total'] . ' / ' . $step['roll']['threshold'] : '' ) ) . '</p>';
+						if ( isset( $step['requirement'] ) ) { echo '<p>' . esc_html( ps_pen_paper_adventure_requirement_label( $step['requirement'] ) ) . '</p>'; }
+						if ( array_key_exists( 'resource_cost', $step ) ) { echo '<p>' . esc_html( $step['resource_cost'] ? ps_pen_paper_adventure_cost_label( $step['resource_cost'] ) : __( 'Bei Misserfolg keine Kosten', 'ps-pen-paper' ) ) . '</p>'; }
 					}
 					}
 					?>

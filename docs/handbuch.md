@@ -1,6 +1,6 @@
 # PS Pen & Paper – Pluginhandbuch
 
-Stand: Version 0.21.0 · 15. November 2026.
+Stand: Version 0.23.0 · 15. November 2026.
 
 Dieses Handbuch beschreibt den vorhandenen Funktionsumfang, nicht die gesamte
 Roadmap. Die Abbildungen zur Demorunde stammen aus der tatsächlich angelegten
@@ -51,7 +51,7 @@ sind seit 0.13.0 enthalten.
 | Änderungs- und Wurfprotokoll | Automatisch geprüfter Punktepool |
 | Spielleitermappe, geschützte Text-/Bild-Handouts und responsive Bedienung | Strukturierte NPC-Werte und private PDF-Dateien |
 | Private Porträts sowie Community-gebundene Inventare, Ausrüstung und kontrollierter Handel | Stapelmengen und automatische Gegenstandssynchronisierung |
-| Soloabenteuer mit freigegebenen Szenen, Entscheidungen, optionalen Proben und privaten Einzeldurchläufen | Gruppenabenteuer, Ressourcenverbrauch und automatische Belohnungen |
+| Soloabenteuer mit freigegebenen Szenen, Entscheidungen, Mindestwerten, optionalen Proben und Ressourcenkosten sowie privaten Einzeldurchläufen | Gruppenabenteuer, Verbrauch gemeinsamer Basisressourcen und automatische Belohnungen |
 
 Die Spielleitung kann Szenentexte und Karten vorbereiten und gezielt anzeigen.
 Die Kampagnenbeschreibung eignet sich weiter für eine gemeinsame Einleitung,
@@ -448,6 +448,9 @@ persönliche Maximum sein.
 
 Eine Ressource wird über den Charakterbogen verändert. Im Freigabemodus wird
 auch ein Verbrauch zunächst beantragt. Würfeln zieht nicht automatisch etwas ab.
+Eine Ausnahme sind seit 0.23.0 ausdrücklich konfigurierte Kosten im
+[Soloabenteuer](#ressourcenkosten-pro-entscheidung): Sie werden ohne zusätzlichen
+Werteantrag nach der von der Spielleitung freigegebenen Entscheidung abgezogen.
 
 ![Freigabe des Ressourcenverbrauchs von vier auf drei](images/08-ressourcenfreigabe.png)
 
@@ -554,8 +557,9 @@ Audit-System.
 
 Der erste **Soloabenteuer-Ablauf** ist seit Version 0.21.0 vorhanden. Er
 ergänzt den Story-Builder um private Einzeldurchläufe, freigegebene
-Szenenpfade, Entscheidungen und optionale Zahlenproben. Gruppenabenteuer,
-gemeinsame Entscheidungen, Ressourcenverbrauch und automatische Belohnungen
+Szenenpfade, Entscheidungen und optionale Zahlenproben. Seit 0.22.0 ergänzen
+Mindestwerte und seit 0.23.0 optionale Ressourcenkosten diesen Ablauf.
+Gruppenabenteuer, gemeinsame Entscheidungen und automatische Belohnungen
 fehlen weiterhin; Details stehen in Abschnitt 21.
 Der **Story-Builder** mit Szenen, getrennten Geheimnissen, Inhaltsvorschau,
 Freigabe, Rücknahme und Protokollierung ist vorhanden.
@@ -1387,7 +1391,7 @@ gemeinsam geleiteten Spieltisch, kein automatisches Regelwerk und keine
    verweisen, die regulär freigegeben sind.
 2. Unter **Soloabenteuer** einen Titel und eine freigegebene Startszene
    auswählen und den privaten Entwurf speichern.
-3. Für jede Entscheidung einen sichtbaren Titel, eine Beschreibung und eine
+3. Für jede Entscheidung einen sichtbaren Entscheidungstext und eine
    freigegebene Folgeszene festlegen. Alternativ kann die Entscheidung den
    Durchlauf beenden.
 4. Optional eine Probe mit einem im Kampagnenregelwerk erlaubten
@@ -1402,10 +1406,83 @@ gemeinsam geleiteten Spieltisch, kein automatisches Regelwerk und keine
    erlaubten Würfel später geändert werden.
 
 Die aktuelle Umsetzung ist absichtlich begrenzt: höchstens 30 Szenen und
-100 Entscheidungen pro Abenteuer, ohne Zyklen. Pro Szene sind bis zu 10
-Entscheidungen möglich. Proben werten nur die gespeicherten erlaubten
+100 Entscheidungen pro Abenteuer, ohne Zyklen. Proben werten nur die gespeicherten erlaubten
 Würfelgruppen und Zahlenattribute aus. Es gibt keine freie Skriptsprache,
-keine automatischen Effekte und keine Belastung von Ressourcen oder Inventar.
+keine frei programmierten Effekte und keine Belastung des Inventars.
+Ressourcen werden nur durch ausdrücklich konfigurierte Kosten verändert.
+
+### Mindestwerte für Entscheidungen
+
+Seit **0.22.0** kann eine Entscheidung zusätzlich eine Voraussetzung besitzen:
+
+1. Unter **Entscheidung oder Probe ergänzen** ein Zahlen- oder Attributfeld
+   bei **Optionale Voraussetzung** wählen.
+2. Einen ganzzahligen **Mindestwert** zwischen −1000000 und 1000000 eintragen.
+   **Keine Voraussetzung** lässt die Entscheidung ohne Mindestwert zu.
+   Für eine Entscheidung ohne Würfelprobe den Würfelausdruck und das
+   Probe-Attribut leer lassen, den Erfolgszielwert auf 0 lassen und bei
+   Misserfolg **Abenteuer beenden** wählen.
+3. Entscheidung speichern und den Abenteuerentwurf ausdrücklich freigeben.
+   Begonnene Durchläufe behalten ihre bisherigen Entscheidungen.
+
+Die Voraussetzung ist unabhängig von der optionalen Würfelprobe. Beispiel:
+**Tür aufbrechen** erfordert Stärke mindestens 5; erst dann darf die
+Entscheidung gewählt und gegebenenfalls gewürfelt werden.
+Der aktuelle freigegebene Charakterwert einschließlich wirksamer Ausrüstung
+zählt, nicht ein offener Änderungsantrag. Ressourcenfelder sind nicht
+auswählbar; es wird nichts verbraucht.
+
+Bei einem zu niedrigen Wert bleiben Entscheidung, Voraussetzung und aktueller
+Wert sichtbar, aber die Schaltfläche ist gesperrt. Nach einer Wertefreigabe
+den Bogen neu laden. Auch ein zuvor geöffnetes, noch auswählbares Formular
+wird serverseitig abgewiesen, wenn der Wert inzwischen zu niedrig ist.
+Sind alle Entscheidungen gesperrt, bleibt der Durchlauf stehen; das Plugin
+erfindet keine Ausweichentscheidung und senkt keine Mindestwerte.
+
+Eine erfolgreiche Entscheidung speichert Feld, damaligen Wert und Mindestwert
+gemeinsam mit dem Fortschritt und Pflichtereignis. Spätere Werteänderungen
+schreiben diesen privaten Nachweis nicht um. Ältere Abenteuer, Durchläufe
+und Ereignisse ohne Voraussetzungen bleiben lesbar und unverändert.
+
+### Ressourcenkosten pro Entscheidung
+
+Seit **0.23.0** können Entscheidungen unabhängig von Mindestwerten und Proben
+optionale Kosten erhalten. Die Spielleitung legt die Spielregel je Entscheidung
+fest; keine Ressource oder feste Verbrauchsregel wird vorgegeben.
+
+1. Unter **Entscheidung oder Probe ergänzen** bei **Optionale Ressourcenkosten**
+   ein Ressourcenfeld wählen, beispielsweise Mana, Ausdauer oder Vorräte.
+2. Positive ganzzahlige Kosten bis 1000000 angeben. Ohne Ressource den Betrag
+   auf **0** lassen; dann verändert die Entscheidung keine Ressourcen.
+3. Unter **Wann werden Kosten abgezogen?** wählen:
+   - **Bei jedem ausgeführten Versuch, auch bei Misserfolg**: Eine misslungene
+     Probe kostet genauso viel wie eine erfolgreiche.
+   - **Nur bei Erfolg; ohne Würfelprobe immer**: Eine misslungene Probe
+     verbraucht nichts. Eine Entscheidung ohne Probe bezahlt die Kosten immer.
+4. Entscheidung speichern und den Abenteuerentwurf ausdrücklich freigeben.
+   Bereits begonnene Durchläufe behalten ihren gespeicherten Kostenstand.
+
+Die Ressource muss **vor jedem Versuch** reichen, auch bei erfolgsabhängigen
+Kosten. Es gibt keine Überziehung: Der Rest darf weder unter 0 noch unter
+die konfigurierte positive Ressourcen-Untergrenze fallen. Zu teure
+Entscheidungen bleiben mit Betrag, Bestand und Kostenzeitpunkt sichtbar,
+aber gesperrt; auch veraltete Formulare werden serverseitig erneut geprüft.
+
+Der erste Ausbau unterstützt **eigenständige lokale Bögen und unabhängige
+Kampagnenkopien**. Eine Kopie verbraucht nur ihren eigenen Bestand, nicht den
+Universums-Basisbogen. Kostenpflichtige Versuche mit gemeinsamen Basisbögen
+sind vorläufig gesperrt; kostenfreie Alternativen bleiben spielbar.
+Ein offener Werteantrag muss vor einem kostenpflichtigen Versuch freigegeben
+oder abgelehnt werden, damit er bereits abgezogene Kosten nicht später ersetzt.
+
+Verbrauch verändert nur den aktuellen Wert der gewählten Ressource und die
+Charakterrevision. Maximum, übrige Werte, Inventar und Basisverbindung bleiben
+unverändert. Verbrauch, Durchlauf und private Pflichtereignisse werden gemeinsam
+gespeichert: Scheitert eine Pflichtänderung, werden weder Kosten noch Fortschritt
+übernommen. Wiederholtes Absenden zieht nichts ein zweites Mal ab.
+Der Verlauf hält die damaligen Kosten und Vorher-/Nachherwerte fest; bei einer
+misslungenen erfolgsabhängigen Probe zeigt er ausdrücklich den Nichtverbrauch.
+Ältere kostenfreie Abenteuer und Durchläufe bleiben unverändert nutzbar.
 
 ### Solo spielen
 
@@ -1429,12 +1506,13 @@ Abenteuer kann weitergespielt werden. Der Spielstand speichert keinen
 separaten Charakterbogen: Zahlenproben verwenden den bei der Entscheidung
 aktuellen, freigegebenen Zahlenwert des Charakters.
 
-**Keine Gruppen- oder Charakteränderung:** Ein Soloabenteuer verändert weder
-die aktive Kampagnenszene noch Attribute, Lebenspunkte, andere Ressourcen,
-Inventar, Guthaben oder Beute. Es benötigt keine Gruppenentscheidung und
+**Keine ungefragten Änderungen:** Ein Soloabenteuer verändert weder
+die aktive Kampagnenszene noch Inventar, Guthaben oder Beute. Charakterwerte
+bleiben unverändert, außer dem Verbrauch ausdrücklich konfigurierter
+Ressourcen. Es benötigt keine Gruppenentscheidung und
 funktioniert unabhängig von PS Community. Teamdurchläufe, Rücksetzen,
-Voraussetzungen jenseits der beschriebenen Zahlenproben, automatische
-Ressourcenänderungen und Belohnungen bleiben spätere, getrennt zu planende
+Voraussetzungen jenseits der beschriebenen Mindestwerte, automatische
+Ressourcenregeneration und Belohnungen bleiben spätere, getrennt zu planende
 Erweiterungen.
 
 In der Nebelhafen-Demo ist **Die Wetterkapsel vor dem Ablegen** als

@@ -59,6 +59,17 @@ zusätzlicher Spielleiterfreigabe.
 Version 0.21.0 ergänzt den ersten Soloabenteuer-Ablauf mit freigegebenen
 Szenen, Entscheidungen, optionalen Serverproben und getrennten privaten
 Durchläufen. Gruppenabläufe und automatische Belohnungen sind nicht enthalten.
+Version 0.22.0 ergänzt optionale Mindestwerte für Soloentscheidungen.
+Nicht erfüllte Voraussetzungen bleiben sichtbar, aber gesperrt. Der aktuelle
+freigegebene Wert wird serverseitig geprüft und mit dem Fortschritt protokolliert.
+Version 0.23.0 ergänzt optionale Ressourcenkosten je Soloentscheidung.
+Die Spielleitung wählt Ressource, Betrag und Kostenzeitpunkt: jeden Versuch
+bezahlen oder nur erfolgreiche Proben (ohne Probe immer).
+Verbrauch und Fortschritt werden gemeinsam mit privaten Pflichtereignissen
+gespeichert. Ohne konfigurierte Kosten bleibt der Charakter unverändert.
+Der erste Ausbau unterstützt lokale Bögen und unabhängige Kampagnenkopien;
+gemeinsame Basisbögen und offene Werteanträge sperren kostenpflichtige Versuche.
+Die Ressource muss auch bei erfolgsabhängigen Kosten vor dem Versuch reichen.
 
 ## Geschützter Spielbereich im Frontend
 
@@ -131,11 +142,21 @@ geprüft und pro Charakter als privater Durchlauf gespeichert. Eine ausdrücklic
 freigegebene Fassung bleibt für jeden begonnenen Durchlauf unverändert.
 
 Soloentscheidungen verändern weder die gemeinsame Kampagnenszene noch
-Charakterwerte, Ressourcen, Inventar oder Beute. Ein Durchlauf gehört genau
+Inventar oder Beute. Ohne ausdrücklich konfigurierte Ressourcenkosten bleiben
+auch Charakterwerte unverändert. Ein Durchlauf gehört genau
 einem Charakter und kann derzeit nicht zurückgesetzt oder gemeinsam gespielt
 werden. Die Spielleitung kann neue Starts pausieren, ohne bestehende Durchläufe
 zu löschen. Details und Grenzen stehen im
 [Pluginhandbuch](docs/handbuch.md#21-soloabenteuer).
+
+Seit **0.22.0** kann jede Entscheidung zusätzlich einen Mindestwert für ein
+Zahlen- oder Attributfeld verlangen, unabhängig von einer Würfelprobe.
+Maßgeblich ist der aktuelle freigegebene Wert einschließlich wirksamer
+Ausrüstungsboni, nicht ein offener Änderungsantrag. Gesperrte Entscheidungen
+bleiben mit Voraussetzung und aktuellem Wert sichtbar. Wiederholte oder
+veraltete Formulare umgehen die Serverprüfung nicht. Der private Verlauf
+speichert den tatsächlich verwendeten Wert; ältere Durchläufe ohne
+Voraussetzungen bleiben unverändert. Mindestwerte allein verbrauchen keine Ressourcen.
 
 ## Öffentliches Weltlexikon seit Version 0.19.0
 

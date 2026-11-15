@@ -1262,7 +1262,7 @@ zuständige Universumsrecht. Veraltete Empfänger-/Guthabenstände werden nicht
 
 ### Verknüpfung, Sichtbarkeit und Grenzen
 
-Im Gegner-/NPC-Editor kann eine lokale Beutetabelle ausgewählt werden.
+Im Gegner-/NPC-Editor kann eine Kampagnen- oder Universumstabelle ausgewählt werden.
 Der Link öffnet die Tabelle für die Spielleitung; er startet keinen Wurf und
 keine automatische Auszahlung. Universumsvorlagen und daraus erstellte
 Kampagnenkopien übernehmen diese lokale Tabellenreferenz nicht.
@@ -1272,7 +1272,20 @@ Charakterbesitzer sehen ihre erhaltenen Gegenstände und Guthabenbuchungen,
 nicht die geheime Tabelle. Ohne aktives PS Community bleiben gespeicherte
 Tabellen und Vorgänge erhalten; Änderungen sind gesperrt.
 
-Universumsweite Beutekataloge bleiben offen. Automatische Vergaben können
+Die Universumsleitung pflegt gemeinsame **Beutetabellen** unter
+**Universen → Regelwerk & Basischaraktere**.
+Angeschlossene Kampagnen finden sie in ihrer Beuteverwaltung mit dem Hinweis
+**Universumstabelle**. Die Kampagnenleitung kann diese Tabellen auswürfeln
+und als Untertabellen oder Abenteuerbelohnungen verwenden, aber nicht
+überschreiben. Eigene Kampagnentabellen bleiben separat bearbeitbar.
+Im Universum selbst werden keine Vergaben an Kampagnencharaktere ausgeführt.
+Bestehende Vorschläge behalten ihren eingefrorenen Stand, wenn die
+Universumsleitung später Chancen oder Belohnungen ändert.
+Es gibt keine automatische Währungsumrechnung; die bisherigen Kontorechte
+gelten weiterhin. Vollständige Kampagnensicherungen enthalten auch den
+Universumskatalog mit seinen verschachtelten Tabellen und gespeicherten Würfen.
+
+Automatische Vergaben können
 für freigegebene Abenteuerentscheidungen ausdrücklich eingerichtet werden.
 In der Demo ist **Dock 3 – Fundkiste** mit der
 Zollwache verknüpft. Der gespeicherte W6-Wurf **2** ergab **1 Dockmark**
@@ -1483,8 +1496,7 @@ lesbar; alle wirtschaftlichen Änderungen einschließlich Handelsentscheidungen
 sind inaktiv.
 
 Es gilt **höchstens 100 konkrete Exemplare je Seite, dieselbe Kampagne,
-unterschiedliche Besitzer**. Übertragungen eigener Figuren untereinander und
-kampagnenübergreifende Übertragungen bleiben offen.
+unterschiedliche Besitzer** für den Spielerhandel.
 
 In der Nebelhafen-Demo verkauft Mara den **Messingkompass vom Dock** für
 **3 DM** an Jorin. Beide Besitzer stimmen zu; die Demo-Spielleitung gibt frei.
@@ -1496,6 +1508,46 @@ Beschreibungstext des ausgegebenen Kompasses bleibt bewusst unverändert.
 
 Weiterlesen: [Demorunde mit Ergebnissen und Prüfbericht](demokampagne.md) ·
 [Technischer Überblick](../README.md) · [Roadmap](../ROADMAP.md).
+
+### Kontrollierte Übertragungen innerhalb eines Universums
+
+1. Die Universumsleitung öffnet **Universen → Regelwerk & Basischaraktere →
+   Handelsregeln** und aktiviert **Kontrollierte Übertragungen zwischen
+   Kampagnen dieses Universums erlauben**. Einstellungen speichern.
+   Standardmäßig ist diese Freigabe ausgeschaltet.
+2. Als für **beide Kampagnen** berechtigte Spielleitung oder Administration
+   den Quellcharakter öffnen.
+3. Unter **In eine andere Kampagne dieses Universums übertragen** konkrete
+   handelbare, abgelegte Exemplare auswählen. Gebundene, reservierte oder
+   wirksam/beantragt angelegte Exemplare sind gesperrt.
+4. **Zielkampagne und Empfänger** wählen. Auch eigene Figuren in einer
+   anderen Kampagne desselben Universums sind zulässig.
+5. Den **Geldbetrag** eintragen: **0** für reine Gegenstandsübertragung.
+   Für reine Geldübertragung keine Exemplare auswählen.
+6. Auswahl, Betrag und Empfänger ausdrücklich bestätigen und
+   **Übertragung bestätigen** wählen.
+
+Die Formulare zeigen nur Ziele, die ebenfalls von dir verwaltet werden und
+zum selben Universum gehören. Eine allein für die Quellkampagne berechtigte
+Spielleitung kann nicht einseitig in fremde Kampagnen übertragen.
+Spieler können diesen Verwaltungsweg nicht selbst auslösen.
+
+Gegenstandsidentitäten und eingefrorene Werte bleiben erhalten. Lokale
+geschützte Bilder werden in die Zielkampagne kopiert. Auch offene
+Ausrüstungsanträge werden angepasst, damit Freigaben nichts zurückholen oder
+verdoppeln. Enthaltene Bonusfelder müssen zu den Zielregeln passen.
+
+Geldübertragungen verwenden ausschließlich dieselbe Universumswährung und
+die bisherigen Kontorechte, auch bei tatsächlichen Basisguthaben.
+Lokale Währungen werden nicht umgerechnet. Zwei Bögen desselben gemeinsamen
+Basiskontos brauchen keine Übertragung: Ein solcher Geldvorgang wird abgewiesen,
+nicht als zweites Guthaben ausgezahlt.
+
+Inventare, Geld und Protokolle werden vollständig zusammen gespeichert oder
+zurückgerollt. Reine Geldübertragungen ändern keine Inventare. Veraltete
+Formulare und geänderte Freigaben werden abgewiesen; erneutes Absenden zahlt
+nicht doppelt. Der Wiederholungsschutz bleibt in nativen Sicherungen erhalten.
+**Übertragungen zwischen getrennten Universen sind ausgeschlossen.**
 
 ## 21. Soloabenteuer
 

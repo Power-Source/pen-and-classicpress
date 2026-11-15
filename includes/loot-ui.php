@@ -3,18 +3,21 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 function ps_pen_paper_loot_url( $campaign, $page_id, $table_id = 0, $run_id = 0 ) {
-	$url = $page_id ? ps_pen_paper_game_url( $page_id, $campaign->ID ) : ps_pen_paper_admin_url( $campaign->ID );
+	$url = 'pspp_universe' === $campaign->post_type ? ps_pen_paper_universe_url( $campaign->ID, $page_id )
+		: ( $page_id ? ps_pen_paper_game_url( $page_id, $campaign->ID ) : ps_pen_paper_admin_url( $campaign->ID ) );
 	$args = array( 'pspp_loot' => 1 );
 	if ( $table_id ) { $args['pspp_loot_table'] = $table_id; }
 	if ( $run_id ) { $args['pspp_loot_run'] = $run_id; }
-	return add_query_arg( $args, $url ) . '#pspp-folio';
+	return add_query_arg( $args, $url ) . ( 'pspp_universe' === $campaign->post_type ? '#pspp-loot' : '#pspp-folio' );
 }
 
 function ps_pen_paper_handle_loot_action( $operation ) {
 	$campaign_id = ps_pen_paper_posted_id( 'campaign_id' ); $page_id = ps_pen_paper_posted_id( 'pspp_frontend_page' );
 	check_admin_referer( 'pspp_campaign_' . $campaign_id );
-	$campaign = ps_pen_paper_get_campaign( $campaign_id );
-	if ( ! ps_pen_paper_can_manage_loot( $campaign ) || ( isset( $_POST['pspp_frontend_page'] ) && ! ps_pen_paper_frontend_page( $page_id ) ) ) { ps_pen_paper_fail( __( 'Diese Beuteverwaltung ist nicht verfügbar.', 'ps-pen-paper' ) ); }
+	$campaign = ps_pen_paper_get_character_scope( $campaign_id );
+	if ( is_wp_error( ps_pen_paper_loot_scopes( $campaign ) ) ||
+		( 'save_loot_table' !== $operation && ! ps_pen_paper_can_manage_loot( $campaign ) ) ||
+		( isset( $_POST['pspp_frontend_page'] ) && ! ps_pen_paper_frontend_page( $page_id ) ) ) { ps_pen_paper_fail( __( 'Diese Beuteverwaltung ist nicht verfügbar.', 'ps-pen-paper' ) ); }
 	$table_id = ps_pen_paper_posted_id( 'loot_table_id' ); $run_id = ps_pen_paper_posted_id( 'loot_run_id' );
 	if ( 'save_loot_table' === $operation ) {
 		if ( 'complete' !== ps_pen_paper_posted_text( 'loot_complete' ) ) { ps_pen_paper_fail( __( 'Die Beutetabelle wurde nicht vollständig übertragen.', 'ps-pen-paper' ) ); }
@@ -123,7 +126,7 @@ function ps_pen_paper_render_loot_row( $index, $row, $catalogue, $tables = array
 }
 
 function ps_pen_paper_render_loot( $campaign, $page_id ) {
-	if ( ! ps_pen_paper_can_manage_loot( $campaign ) ) { return; }
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_character_scope( $campaign ) ) { return; }
 	$tables = ps_pen_paper_loot_tables( $campaign ); $table_id = ps_pen_paper_frontend_id( 'pspp_loot_table' ); $run_id = ps_pen_paper_frontend_id( 'pspp_loot_run' );
 	$open = ps_pen_paper_frontend_id( 'pspp_loot' );
 	if ( is_wp_error( $tables ) || is_wp_error( $table_id ) || is_wp_error( $run_id ) || is_wp_error( $open ) ) { echo '<p role="alert">' . esc_html__( 'Die Beuteverwaltung konnte nicht geladen werden.', 'ps-pen-paper' ) . '</p>'; return; }
@@ -132,13 +135,17 @@ function ps_pen_paper_render_loot( $campaign, $page_id ) {
 	<details class="pspp-fold"<?php if ( $open || $table_id || $run_id ) { echo ' open'; } ?>><summary><?php esc_html_e( 'Beute vorbereiten, auswürfeln und bestätigen', 'ps-pen-paper' ); ?></summary>
 	<p><?php esc_html_e( 'Nur Spielleitung. Ein Wurf speichert zunächst einen unveränderten Vorschlag; erst die bestätigte Vergabe verändert Inventar oder Guthaben. Ein Vorgang wird höchstens einmal vergeben.', 'ps-pen-paper' ); ?></p>
 	<p><a href="<?php echo esc_url( ps_pen_paper_loot_url( $campaign, $page_id ) ); ?>"><?php esc_html_e( 'Neue Beutetabelle', 'ps-pen-paper' ); ?></a></p>
-	<ul><?php foreach ( $tables as $record_id => $record ) : ?><li><a href="<?php echo esc_url( ps_pen_paper_loot_url( $campaign, $page_id, $record_id ) ); ?>"><?php echo esc_html( $record['table']['name'] ); ?></a></li><?php endforeach; ?></ul>
+	<p><?php esc_html_e( 'Universumstabellen werden von der Universumsleitung gepflegt. Angeschlossene Kampagnen können sie verwenden, aber nicht hier überschreiben. Jeder Beutevorgang speichert seinen eigenen unveränderlichen Tabellenstand.', 'ps-pen-paper' ); ?></p>
+	<ul><?php foreach ( $tables as $record_id => $record ) : ?><li><a href="<?php echo esc_url( ps_pen_paper_loot_url( $campaign, $page_id, $record_id ) ); ?>"><?php echo esc_html( $record['table']['name'] ); ?></a>
+		<?php if ( (int) get_post_field( 'post_parent', $record_id ) !== (int) $campaign->ID ) { echo ' · ' . esc_html__( 'Universumstabelle', 'ps-pen-paper' ); } ?></li><?php endforeach; ?></ul>
+	<?php if ( 'pspp_campaign' === $campaign->post_type ) : ?>
 	<h3><?php esc_html_e( 'Letzte Beutevorgänge', 'ps-pen-paper' ); ?></h3><ul>
 	<?php foreach ( get_posts( array( 'post_type' => 'pspp_loot_run', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'posts_per_page' => 20 ) ) as $post ) :
 		$run = ps_pen_paper_get_loot_run( $campaign, $post->ID );
 		if ( is_wp_error( $run ) ) { echo '<li role="alert">' . esc_html( $run->get_error_message() ) . '</li>'; continue; } ?>
 		<li><a href="<?php echo esc_url( ps_pen_paper_loot_url( $campaign, $page_id, 0, $post->ID ) ); ?>"><?php echo esc_html( '#' . $post->ID . ' · ' . $run['proposal']['reason'] ); ?></a> · <?php echo esc_html( $run['award'] ? __( 'abgeschlossen', 'ps-pen-paper' ) : __( 'offen', 'ps-pen-paper' ) ); ?></li>
 	<?php endforeach; ?></ul>
+	<?php endif; ?>
 	<?php if ( ! ps_pen_paper_community_available() ) : ?><p role="alert"><?php esc_html_e( 'Beuteänderungen benötigen aktives PS Community. Gespeicherte Tabellen und Vorgänge bleiben erhalten.', 'ps-pen-paper' ); ?></p></details></section><?php return; endif;
 	$rules = ps_pen_paper_get_rules( $campaign->ID );
 	if ( $run_id ) :
@@ -184,8 +191,8 @@ function ps_pen_paper_render_loot( $campaign, $page_id ) {
 		if ( is_wp_error( $state ) || is_wp_error( $catalogue ) || ! $rules['revision'] || ! $rules['dice'] ) { echo '<p role="alert">' . esc_html__( 'Bitte prüfe Tabellenwahl, Gegenstandskatalog und das eingerichtete Regelwerk mit erlaubten Würfeln.', 'ps-pen-paper' ) . '</p></details></section>'; return; }
 		$blank = array( 'from' => '', 'to' => '', 'label' => '', 'item' => null, 'quantity' => '0', 'money' => '0' );
 		$t = $state['table'] ?: array( 'name' => '', 'die' => $rules['dice'][0], 'rows' => array( $blank ) );
-		if ( $table_id ) :
-			ps_pen_paper_render_loot_snapshot( $state, true );
+		if ( $table_id ) { ps_pen_paper_render_loot_snapshot( $state, true ); }
+		if ( $table_id && 'pspp_campaign' === $campaign->post_type ) :
 			ps_pen_paper_form_start( 'roll_loot', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 				<input type="hidden" name="loot_table_id" value="<?php echo esc_attr( $table_id ); ?>"><input type="hidden" name="loot_revision" value="<?php echo esc_attr( $state['revision'] ); ?>">
 				<input type="hidden" name="loot_rules_revision" value="<?php echo esc_attr( $rules['revision'] ); ?>"><input type="hidden" name="loot_token" value="<?php echo esc_attr( wp_generate_uuid4() ); ?>">
@@ -193,6 +200,9 @@ function ps_pen_paper_render_loot( $campaign, $page_id ) {
 				<button type="submit"><?php esc_html_e( 'Beutevorschlag auswürfeln', 'ps-pen-paper' ); ?></button>
 			</form>
 		<?php endif; ?>
+		<?php if ( $table_id && (int) get_post_field( 'post_parent', $table_id ) !== (int) $campaign->ID ) : ?>
+			<p><?php esc_html_e( 'Diese Tabelle wird im Universum bearbeitet. Du kannst sie hier für Beutevorgänge oder als Untertabelle verwenden.', 'ps-pen-paper' ); ?></p>
+			</details></section><?php return; endif; ?>
 		<h3><?php esc_html_e( 'Beutetabelle bearbeiten', 'ps-pen-paper' ); ?></h3>
 		<p><?php esc_html_e( 'Alle Ergebnisse von 1 bis zum höchsten Würfelwert genau einmal abdecken. Ein Ausgang kann mehrere Gegenstände, Geld und eine Untertabelle enthalten. Mengen und Geld dürfen erlaubte Würfelausdrücke sein. Speichern friert Vorlagen und Untertabellen ein; bestehende Vorgänge bleiben unverändert.', 'ps-pen-paper' ); ?></p>
 		<?php ps_pen_paper_form_start( 'save_loot_table', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>

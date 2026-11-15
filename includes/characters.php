@@ -16,6 +16,20 @@ function ps_pen_paper_character_mode( $rules ) {
 	return isset( $rules['character_mode'] ) ? $rules['character_mode'] : 'approval';
 }
 
+function ps_pen_paper_field_edit_modes() {
+	return array(
+		'inherit' => __( 'Vorgabe des Regelwerks', 'ps-pen-paper' ),
+		'direct' => __( 'Spieler direkt', 'ps-pen-paper' ),
+		'approval' => __( 'Mit Freigabe', 'ps-pen-paper' ),
+		'gm_only' => __( 'Nur Spielleitung', 'ps-pen-paper' ),
+	);
+}
+
+function ps_pen_paper_field_edit_mode( $field, $rules ) {
+	if ( ! empty( $rules['progression'] ) && $field['id'] === $rules['progression']['level_field'] ) { return 'gm_only'; }
+	return $field['edit_mode'] ?? ps_pen_paper_character_mode( $rules );
+}
+
 function ps_pen_paper_register_character_type() {
 	register_post_type(
 		'pspp_character',
@@ -48,7 +62,9 @@ function ps_pen_paper_character_schema( $rules ) {
 		$schema[ $field['id'] ] = array_intersect_key( $field, array_flip( array( 'type', 'required', 'min', 'max', 'choices' ) ) );
 	}
 	ksort( $schema );
-	return array( 'fields' => $schema, 'allocation' => isset( $rules['allocation'] ) ? $rules['allocation'] : null );
+	$result = array( 'fields' => $schema, 'allocation' => isset( $rules['allocation'] ) ? $rules['allocation'] : null );
+	if ( ! empty( $rules['progression'] ) ) { $result['progression'] = $rules['progression']; }
+	return $result;
 }
 
 function ps_pen_paper_get_character_scope( $id ) {
@@ -105,7 +121,13 @@ function ps_pen_paper_can_edit_character( $campaign, $character = null ) {
 			return false;
 		}
 	}
-	return ps_pen_paper_can_manage_character_scope( $campaign ) || 'gm_only' !== ps_pen_paper_character_mode( ps_pen_paper_get_rules( $campaign->ID ) );
+	if ( ps_pen_paper_can_manage_character_scope( $campaign ) ) { return true; }
+	$rules = ps_pen_paper_get_rules( $campaign->ID );
+	if ( 'gm_only' !== ps_pen_paper_character_mode( $rules ) ) { return true; }
+	foreach ( $rules['fields'] as $field ) {
+		if ( 'gm_only' !== ps_pen_paper_field_edit_mode( $field, $rules ) ) { return true; }
+	}
+	return false;
 }
 
 function ps_pen_paper_character_lock_name( $character_id ) {
@@ -164,7 +186,7 @@ function ps_pen_paper_character_values( $rules ) {
 		$defaults = ps_pen_paper_character_allocation_defaults( $rules );
 		if ( ! is_wp_error( $defaults ) ) { $values = array_merge( $values, $defaults ); }
 	}
-	return $values;
+	return ps_pen_paper_apply_progression( array( 'values' => $values ), $rules )['values'];
 }
 
 function ps_pen_paper_validate_character( $input, $rules ) {
@@ -215,7 +237,53 @@ function ps_pen_paper_validate_character( $input, $rules ) {
 	if ( ! ps_pen_paper_character_allocation_valid( $clean, $rules ) ) {
 		return new WP_Error( 'invalid_allocation', __( 'Die ausgewählten Attribute müssen zusammen genau die festgelegte Punktzahl ergeben.', 'ps-pen-paper' ) );
 	}
-	return $clean;
+	return ps_pen_paper_apply_progression( $clean, $rules );
+}
+
+function ps_pen_paper_player_character_state( $snapshot, $previous, $rules ) {
+	$defaults = array( 'name' => '', 'values' => ps_pen_paper_character_values( $rules ) );
+	$active = $previous['active'] ?? $defaults;
+	$form = $previous['pending'] ?? $active;
+	$state = $previous;
+	$pending = $previous['pending'];
+	$changes = array( 'name' => ps_pen_paper_character_mode( $rules ) );
+	foreach ( $rules['fields'] as $field ) { $changes[ $field['id'] ] = ps_pen_paper_field_edit_mode( $field, $rules ); }
+	foreach ( $changes as $id => $mode ) {
+		$is_name = 'name' === $id;
+		$value = $is_name ? $snapshot['name'] : $snapshot['values'][ $id ];
+		$before = $is_name ? $form['name'] : $form['values'][ $id ];
+		$current = $is_name ? $active['name'] : $active['values'][ $id ];
+		if ( ! empty( $rules['progression'] ) && $id === $rules['progression']['level_field'] ) { continue; }
+		if ( 'gm_only' === $mode ) {
+			if ( $value !== $current ) { return new WP_Error( 'field_forbidden', __( 'Ein geschütztes Feld darf nur die Spielleitung ändern.', 'ps-pen-paper' ) ); }
+			continue;
+		}
+		if ( $value === $before && null !== $previous['active'] ) { continue; }
+		if ( 'approval' === $mode ) {
+			if ( null === $pending ) { $pending = $active; }
+			if ( $is_name ) { $pending['name'] = $value; } else { $pending['values'][ $id ] = $value; }
+		} else {
+			if ( $is_name ) { $active['name'] = $value; } else { $active['values'][ $id ] = $value; }
+			if ( null !== $pending ) {
+				if ( $is_name ) { $pending['name'] = $value; } else { $pending['values'][ $id ] = $value; }
+			}
+		}
+	}
+	$active = ps_pen_paper_apply_progression( $active, $rules );
+	if ( null !== $pending ) { $pending = ps_pen_paper_apply_progression( $pending, $rules ); }
+	if ( null === $previous['active'] ) {
+		// A new mixed-mode sheet stays pending until its complete initial state is approved.
+		if ( null !== $pending ) { $pending = $snapshot; $active = null; }
+	}
+	if ( null !== $active && ! ps_pen_paper_valid_character_snapshot( $active, $rules ) ) {
+		return new WP_Error( 'mixed_character_conflict', __( 'Die sofortigen Änderungen passen nicht zum gültigen Bogen. Prüfe Pflichtfelder und Punkteverteilung oder bitte die Spielleitung um Freigabe.', 'ps-pen-paper' ) );
+	}
+	if ( null !== $pending && ! ps_pen_paper_valid_character_snapshot( $pending, $rules ) ) {
+		return new WP_Error( 'mixed_character_conflict', __( 'Der Antrag passt nicht zum Regelwerk. Bitte prüfe die Feldwerte und Punkteverteilung.', 'ps-pen-paper' ) );
+	}
+	$state['active'] = $active;
+	$state['pending'] = $pending;
+	return $state;
 }
 
 function ps_pen_paper_save_character( $campaign_id, $character_id, $owner_id, $input, $revision, $rules_revision ) {
@@ -254,15 +322,19 @@ function ps_pen_paper_save_character_locked( $campaign_id, $character_id, $owner
 	if ( is_wp_error( $snapshot ) ) {
 		return $snapshot;
 	}
-	$gear_check = ps_pen_paper_check_character_gear( $campaign, $character, $snapshot );
-	if ( is_wp_error( $gear_check ) ) { return $gear_check; }
 	$state = $previous;
-	$state['revision']++;
-	if ( ! $is_gm && 'approval' === ps_pen_paper_character_mode( $rules ) ) {
-		$state['pending'] = $snapshot;
+	if ( ! $is_gm ) {
+		$state = ps_pen_paper_player_character_state( $snapshot, $previous, $rules );
+		if ( is_wp_error( $state ) ) { return $state; }
 	} else {
 		$state['active'] = $snapshot;
 		$state['pending'] = null;
+	}
+	$state['revision']++;
+	foreach ( array( 'active', 'pending' ) as $slot ) {
+		if ( null === $state[ $slot ] ) { continue; }
+		$gear_check = ps_pen_paper_check_character_gear( $campaign, $character, $state[ $slot ] );
+		if ( is_wp_error( $gear_check ) ) { return $gear_check; }
 	}
 	if ( ! $character ) {
 		$character_id = wp_insert_post( array(

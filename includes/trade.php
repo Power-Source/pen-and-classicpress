@@ -34,6 +34,7 @@ function ps_pen_paper_trade_policy_default() {
 
 function ps_pen_paper_valid_trade_policy( $state ) {
 	if ( ! is_array( $state ) || ! isset( $state['kinds'] ) || ! is_array( $state['kinds'] ) ) { return false; }
+	if ( array_key_exists( 'transfers', $state ) && ! is_bool( $state['transfers'] ) ) { return false; }
 	foreach ( $state['kinds'] as $kind ) { if ( ! is_string( $kind ) || ! isset( ps_pen_paper_trade_kinds()[ $kind ] ) ) { return false; } }
 	return is_array( $state ) && isset( $state['revision'], $state['kinds'], $state['approval'] ) && is_int( $state['revision'] ) && $state['revision'] >= 0 &&
 		is_array( $state['kinds'] ) && array_values( $state['kinds'] ) === $state['kinds'] && count( array_unique( $state['kinds'], SORT_REGULAR ) ) === count( $state['kinds'] ) &&
@@ -59,6 +60,10 @@ function ps_pen_paper_save_trade_policy( $scope, $input, $revision ) {
 		$current = ps_pen_paper_trade_policy( $scope );
 		if ( is_wp_error( $current ) || $current['scope']->ID !== $scope->ID || ! is_string( $revision ) || (string) $current['policy']['revision'] !== $revision ) { return ps_pen_paper_trade_error(); }
 		$before = $current['policy']; $after = array( 'revision' => $before['revision'] + 1, 'kinds' => array_values( $input['kinds'] ), 'approval' => '1' === $input['approval'] );
+		if ( 'pspp_universe' === $scope->post_type ) {
+			if ( isset( $input['transfers'] ) && '1' !== $input['transfers'] ) { return ps_pen_paper_trade_error(); }
+			$after['transfers'] = isset( $input['transfers'] );
+		} elseif ( isset( $input['transfers'] ) ) { return ps_pen_paper_trade_error(); }
 		if ( ! ps_pen_paper_valid_trade_policy( $after ) ) { return ps_pen_paper_trade_error(); }
 		return ps_pen_paper_write_document_event( $scope->ID, $scope->ID, '_pspp_trade_policy', $before, $after,
 			array( 'kind' => 'trade_policy', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0 ), false );

@@ -444,7 +444,7 @@ ist weiterhin kein Ziel.
 5. **Spielwelt — beauftragte Grundlagen umgesetzt:** Mehrere Beuteempfänger,
    Gegenstandsgruppen, verschachtelte Tabellen einschließlich Wiederherstellung,
    Wiki-Verknüpfungen, geschützte PDF-/Text-Handouts, Empfängerkreise und
-   Einladungen. Weitere Würfelarten und Universums-Beutekataloge bleiben offen.
+   Einladungen. Universums-Beutekataloge sind ergänzt; weitere Würfelarten bleiben offen.
 6. **Qualität und Plattformprüfung begleitend:** Geänderte Abläufe live auf
    der Testseite und mit gezielten Regressionen prüfen. Unterstützte Versionen
    von WordPress, ClassicPress und PHP mit einer reproduzierbaren Testmatrix
@@ -864,8 +864,17 @@ automatisch angelegt. Regeländerungen sperren den Abschluss alter Angebote,
 nicht deren Zurückziehen/Ablehnen. Gemeinsame Basisguthaben sind bei Verkäufen und Geldgeschenken
 ausdrücklich eingebunden, ohne neue lokale Ersatzkonten zu erzeugen.
 
-**Noch offen:** Kampagnenübergreifende Übertragungen.
-Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
+**Umgesetzt:** Kontrollierte Übertragungen von Gegenständen und Währung
+zwischen Kampagnen desselben Universums. Die Universumsleitung erlaubt sie
+ausdrücklich; eine für beide Kampagnen berechtigte Spielleitung oder
+Administration bestätigt Auswahl, Empfänger und Betrag. Aktive und beantragte
+Inventare, geschützte lokale Bilder, Guthaben und Protokolle werden gemeinsam
+übernommen oder zurückgerollt. Reine Geldübertragungen ändern keine Inventare.
+Bindings, Reservierungen, Bonusfelder, tatsächliche Basiswallets und
+Wiederholungsschutz bleiben verbindlich.
+Keine Übertragung zwischen getrennten Universen, keine Währungsumrechnung
+und keine Doppelbuchung desselben gemeinsamen Kontos. Gemeinsame Kataloge
+oder Guthaben allein erteilen keine Übertragungsfreigabe.
 
 ### Gegner, NPCs und Universumsvorlagen seit 0.17.0
 
@@ -913,7 +922,10 @@ Gemeinsame Kataloge oder Guthaben allein erlauben keine Übertragung.
 - [x] Gegenstandsgruppen und Aufteilung auf mehrere Empfänger ergänzen.
   Kampagnensicherungen erhalten Tabellen, gespeicherte Würfe und Vergaben;
   offene Vorschläge bleiben ausführbar, abgeschlossene Vergaben zahlen nicht erneut.
-- [ ] Ausdrücklich verwaltete Universums-Beutekataloge ergänzen.
+- [x] Universumsleitung verwaltet gemeinsame Beutetabellen. Angeschlossene
+  Kampagnen verwenden sie schreibgeschützt, auch als Untertabellen.
+  Laufende Vorschläge bleiben eingefroren; vollständige Sicherungen erhalten
+  Tabellen, verschachtelte Bezüge und unabhängig fortsetzbare Vergaben.
 - [x] Begrenzte Verweise auf weitere Tabellen ohne Zyklen ergänzen.
 - [ ] Weitere Würfelarten wie `W3` gesondert unterstützen; derzeit sind nur
   die vorhandenen Standardwürfel zulässig.
@@ -1150,7 +1162,9 @@ Optionen bereit, statt eine einzige globale Spielweise festzulegen.
    Kampagnenkonten oder gemeinsame Universumscharakterkonten. Erstere
    verwaltet die Kampagnenleitung, letztere die Universumsleitung;
    Administration bleibt berechtigt. Das Modell ist nach Erstbuchung fest.
-9. Welche Übertragungen von Gegenständen und Währung zwischen Kampagnen
-   sind zulässig, insbesondere bei automatisierten Abenteuerdurchläufen?
+9. **Entschieden:** Kontrollierte Übertragungen von Gegenständen und Währung
+   ausschließlich zwischen Kampagnen desselben Universums. Die zuständige
+   Spielleitung bestimmt die Freigabe; Abenteuerdurchläufe umgehen diese
+   Kontrolle nicht. Keine Übertragungen zwischen getrennten Universen.
 10. Wie werden Entscheidungen, Proben, Wiedereinstieg und Belohnungen in
     automatisch spielenden Gruppen geregelt?

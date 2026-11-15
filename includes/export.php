@@ -134,7 +134,7 @@ function ps_pen_paper_export_campaign( $campaign_id, $mode ) {
 	}
 	if ( $universe_id ) {
 		foreach ( $records as $id => $record ) {
-			if ( $record['parent_id'] === $universe_id && in_array( $record['type'], array( 'pspp_item', 'pspp_npc', 'pspp_wiki_entry' ), true ) ) {
+			if ( $record['parent_id'] === $universe_id && in_array( $record['type'], array( 'pspp_item', 'pspp_npc', 'pspp_wiki_entry', 'pspp_loot_table' ), true ) ) {
 				$selected[ $id ] = true;
 			}
 		}

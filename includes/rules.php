@@ -69,6 +69,7 @@ function ps_pen_paper_validate_rules( $input, $previous ) {
 	}
 	$validated['roll_visibilities'] = array_values( array_unique( $visibilities ) );
 	$existing_ids = array_column( $previous['fields'], 'id' );
+	$old_fields = array_column( $previous['fields'], null, 'id' );
 	$seen_ids = array();
 	foreach ( $fields as $field ) {
 		if ( ! is_array( $field ) ) {
@@ -99,6 +100,9 @@ function ps_pen_paper_validate_rules( $input, $previous ) {
 			'description' => sanitize_textarea_field( $field['description'] ),
 			'required'    => isset( $field['required'] ),
 		);
+		$edit_mode = array_key_exists( 'edit_mode', $field ) ? $field['edit_mode'] : ( $old_fields[ $id ]['edit_mode'] ?? 'inherit' );
+		if ( ! is_string( $edit_mode ) || ! array_key_exists( $edit_mode, ps_pen_paper_field_edit_modes() ) ) { return $error; }
+		if ( 'inherit' !== $edit_mode ) { $clean['edit_mode'] = $edit_mode; }
 		if ( 'choice' === $clean['type'] ) {
 			$choices = isset( $field['choices'] ) ? $field['choices'] : array();
 			if ( is_string( $choices ) ) { $choices = preg_split( '/\r\n|\r|\n/', $choices ); }
@@ -157,7 +161,76 @@ function ps_pen_paper_validate_rules( $input, $previous ) {
 	} else {
 		$validated['allocation'] = null;
 	}
+	if ( array_key_exists( 'dice_mechanics_present', $input ) && '1' !== $input['dice_mechanics_present'] ) { return $error; }
+	if ( array_key_exists( 'dice_mechanics', $input ) || isset( $input['dice_mechanics_present'] ) || isset( $previous['dice_mechanics'] ) ) {
+		$mechanics = array_key_exists( 'dice_mechanics', $input ) ? $input['dice_mechanics'] : ( isset( $input['dice_mechanics_present'] ) ? array() : $previous['dice_mechanics'] );
+		if ( ! is_array( $mechanics ) || count( $mechanics ) > 4 ) { return $error; }
+		foreach ( $mechanics as $mechanic ) {
+			if ( ! is_string( $mechanic ) || ! isset( ps_pen_paper_dice_mechanic_labels()[ $mechanic ] ) ) { return $error; }
+		}
+		$validated['dice_mechanics'] = array_values( array_unique( $mechanics ) );
+	}
+	$progression_mode = $input['progression_mode'] ?? ( ! empty( $previous['progression'] ) ? 'configured' : 'none' );
+	if ( ! in_array( $progression_mode, array( 'none', 'configured' ), true ) ) { return $error; }
+	if ( 'configured' === $progression_mode ) {
+		$progression = ps_pen_paper_validate_progression( $input['progression'] ?? ( isset( $input['progression_mode'] ) ? null : ( $previous['progression'] ?? null ) ), $validated );
+		if ( is_wp_error( $progression ) ) { return $progression; }
+		$validated['progression'] = $progression;
+	} elseif ( array_key_exists( 'progression', $previous ) || isset( $input['progression_mode'] ) ) {
+		$validated['progression'] = null;
+	}
 	return $validated;
+}
+
+function ps_pen_paper_validate_progression( $input, $rules ) {
+	$error = new WP_Error( 'invalid_progression', __( 'Wähle unterschiedliche Zahlen-/Attributfelder für Erfahrung und Stufe. Die Schwellen müssen aufsteigend sein, beim Minimum des Erfahrungsfeldes beginnen und innerhalb der Feldgrenzen liegen. Punkteverteilungsfelder sind nicht erlaubt.', 'ps-pen-paper' ) );
+	if ( ! is_array( $input ) || count( $input ) !== 3 || ! isset( $input['experience_field'], $input['level_field'], $input['thresholds'] ) ||
+		! is_string( $input['experience_field'] ) || ! is_string( $input['level_field'] ) || $input['experience_field'] === $input['level_field'] ) { return $error; }
+	$fields = array_column( $rules['fields'], null, 'id' );
+	foreach ( array( 'experience_field', 'level_field' ) as $key ) {
+		if ( ! isset( $fields[ $input[ $key ] ] ) || ! in_array( $fields[ $input[ $key ] ]['type'], array( 'number', 'attribute' ), true ) ||
+			in_array( $input[ $key ], $rules['allocation']['fields'] ?? array(), true ) ) { return $error; }
+	}
+	$thresholds = $input['thresholds'];
+	if ( is_string( $thresholds ) ) {
+		if ( strlen( $thresholds ) > 20000 ) { return $error; }
+		$rows = preg_split( '/\r\n|\r|\n/', trim( $thresholds ) );
+		$thresholds = array();
+		foreach ( $rows as $row ) {
+			if ( ! preg_match( '/^\s*(-?\d{1,7})\s*:\s*(-?\d{1,7})\s*$/D', $row, $match ) ) { return $error; }
+			$thresholds[] = array( 'experience' => (int) $match[1], 'level' => (int) $match[2] );
+		}
+	}
+	if ( ! is_array( $thresholds ) || ! $thresholds || array_values( $thresholds ) !== $thresholds || count( $thresholds ) > 1000 ) { return $error; }
+	$experience = $fields[ $input['experience_field'] ];
+	$level = $fields[ $input['level_field'] ];
+	$last = null;
+	foreach ( $thresholds as &$row ) {
+		if ( is_array( $row ) ) {
+			foreach ( array( 'experience', 'level' ) as $key ) {
+				if ( isset( $row[ $key ] ) && is_string( $row[ $key ] ) && preg_match( '/^-?\d{1,7}$/D', $row[ $key ] ) ) { $row[ $key ] = (int) $row[ $key ]; }
+			}
+		}
+		if ( ! is_array( $row ) || array( 'experience', 'level' ) !== array_keys( $row ) ||
+			! is_int( $row['experience'] ) || ! is_int( $row['level'] ) ||
+			$row['experience'] < $experience['min'] || $row['experience'] > $experience['max'] ||
+			$row['level'] < $level['min'] || $row['level'] > $level['max'] ||
+			( null === $last ? $row['experience'] !== $experience['min'] : ( $row['experience'] <= $last['experience'] || $row['level'] <= $last['level'] ) ) ) { return $error; }
+		$last = $row;
+	}
+	unset( $row );
+	return array( 'experience_field' => $input['experience_field'], 'level_field' => $input['level_field'], 'thresholds' => $thresholds );
+}
+
+function ps_pen_paper_apply_progression( $snapshot, $rules ) {
+	if ( empty( $rules['progression'] ) ) { return $snapshot; }
+	$progression = $rules['progression'];
+	$experience = $snapshot['values'][ $progression['experience_field'] ];
+	foreach ( $progression['thresholds'] as $row ) {
+		if ( $experience < $row['experience'] ) { break; }
+		$snapshot['values'][ $progression['level_field'] ] = $row['level'];
+	}
+	return $snapshot;
 }
 
 function ps_pen_paper_save_rules( $campaign_id, $input, $revision ) {
@@ -350,6 +423,15 @@ function ps_pen_paper_character_allocation_valid( $snapshot, $rules ) {
 				'reason' => 'allocation',
 				'old_value' => array_intersect_key( $snapshot['values'], array_fill_keys( $new_rules['allocation']['fields'], true ) ),
 				'default' => $defaults,
+			);
+		}
+		$progressed = ps_pen_paper_apply_progression( $migrated, $new_rules );
+		if ( $progressed !== $migrated ) {
+			$id = $new_rules['progression']['level_field'];
+			$conflicts[] = array(
+				'token' => $character_id . ':' . $slot . ':progression', 'character_id' => (int) $character_id,
+				'slot' => $slot, 'field_id' => $id, 'field_label' => $new_fields[ $id ]['label'],
+				'reason' => 'progression', 'old_value' => $migrated['values'][ $id ], 'default' => $progressed['values'][ $id ],
 			);
 		}
 		return array( 'snapshot' => $migrated, 'conflicts' => $conflicts );

@@ -28,7 +28,8 @@ function ps_pen_paper_validate_context( $context, $rules ) {
 	$fields = array_column( $rules['fields'], null, 'id' );
 	foreach ( $context['overrides'] as $id => $value ) {
 		if ( ! isset( $fields[ $id ] ) || ! in_array( $fields[ $id ]['type'], array( 'number', 'attribute' ), true ) || ! is_int( $value ) ||
-			$value < $fields[ $id ]['min'] || $value > $fields[ $id ]['max'] ) {
+			$value < $fields[ $id ]['min'] || $value > $fields[ $id ]['max'] ||
+			( ! empty( $rules['progression'] ) && in_array( $id, array( $rules['progression']['experience_field'], $rules['progression']['level_field'] ), true ) ) ) {
 			return new WP_Error( 'invalid_context', __( 'Eine Kampagnenauflage passt nicht zum Regelwerk. Bitte informiere die Spielleitung.', 'ps-pen-paper' ) );
 		}
 	}
@@ -610,6 +611,14 @@ function ps_pen_paper_request_universe_character( $campaign_id, $universe_id, $i
 			}
 			$snapshot = ps_pen_paper_validate_character( $input, $rules );
 			if ( is_wp_error( $snapshot ) ) { return $snapshot; }
+			$defaults = ps_pen_paper_character_values( $rules );
+			foreach ( $rules['fields'] as $field ) {
+				if ( 'gm_only' === ( $field['edit_mode'] ?? 'inherit' ) &&
+					$field['id'] !== ( $rules['progression']['level_field'] ?? null ) &&
+					$snapshot['values'][ $field['id'] ] !== $defaults[ $field['id'] ] ) {
+					return new WP_Error( 'field_forbidden', __( 'Ein geschütztes Feld darf nur die Universumsleitung ändern.', 'ps-pen-paper' ) );
+				}
+			}
 			$id = wp_insert_post( array(
 				'post_type' => 'pspp_character', 'post_status' => 'draft', 'post_parent' => $universe_id,
 				'post_author' => $owner_id, 'post_title' => 'PS Pen & Paper Character',

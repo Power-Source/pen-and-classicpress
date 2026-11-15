@@ -29,14 +29,20 @@ function ps_pen_paper_render_die( $sides, $value = '' ) {
 }
 
 function ps_pen_paper_roll_description( $event ) {
-	return $event['expression'] . ( $event['attribute'] ? ' + ' . $event['attribute']['label'] . ' (' . $event['attribute']['value'] . ')' : '' );
+	$description = $event['expression'] . ( $event['attribute'] ? ' + ' . $event['attribute']['label'] . ' (' . $event['attribute']['value'] . ')' : '' );
+	if ( isset( $event['mechanic'] ) ) {
+		$description .= ' · ' . ps_pen_paper_dice_mechanic_labels()[ $event['mechanic'] ];
+		if ( 'pool' === $event['mechanic'] ) { $description .= ' · ' . __( 'Erfolg ab:', 'ps-pen-paper' ) . ' ' . $event['threshold']; }
+	}
+	return $description;
 }
 
 function ps_pen_paper_render_roll_details( $event ) {
 	?>
 	<ul>
+		<?php if ( isset( $event['mechanic'] ) ) : ?><li><?php echo esc_html( ps_pen_paper_roll_description( $event ) ); ?></li><?php endif; ?>
 		<?php foreach ( $event['groups'] as $group ) : ?>
-			<li><?php echo esc_html( count( $group['rolls'] ) . 'W' . $group['sides'] . ': ' . implode( ', ', $group['rolls'] ) . ' = ' . array_sum( $group['rolls'] ) ); ?></li>
+			<li><?php echo esc_html( count( $group['rolls'] ) . 'W' . $group['sides'] . ': ' . implode( ', ', $group['rolls'] ) . ( isset( $event['mechanic'] ) ? '' : ' = ' . array_sum( $group['rolls'] ) ) ); ?></li>
 		<?php endforeach; ?>
 		<li><?php echo esc_html( __( 'Modifikator:', 'ps-pen-paper' ) . ' ' . $event['modifier'] ); ?></li>
 		<?php if ( $event['character'] ) : ?>
@@ -72,6 +78,7 @@ function ps_pen_paper_render_dice( $campaign, $page_id = 0, $with_journal = true
 	$rules = ps_pen_paper_get_rules( $campaign->ID );
 	$labels = ps_pen_paper_roll_visibility_labels();
 	$allowed = ps_pen_paper_allowed_roll_visibilities( $rules );
+	$mechanics = ps_pen_paper_allowed_dice_mechanics( $rules );
 	$selected = ps_pen_paper_frontend_id( 'pspp_roll' );
 	$log_page = ps_pen_paper_frontend_id( 'pspp_log_page' );
 	$preferred_visibility = isset( $_GET['pspp_notice'] ) && 'roll_hidden_saved' === $_GET['pspp_notice'] ? 'gm' : ( $allowed ? $allowed[0] : '' );
@@ -118,7 +125,7 @@ function ps_pen_paper_render_dice( $campaign, $page_id = 0, $with_journal = true
 				</div>
 			<?php endif; ?>
 		<?php endif; ?>
-		<?php if ( $rules['dice'] && $allowed ) : ?>
+		<?php if ( $rules['dice'] && $allowed && $mechanics ) : ?>
 			<div class="pspp-dice-quick" data-dice-quick hidden>
 				<label for="pspp-dice-count"><?php esc_html_e( 'Anzahl für die Schnellwahl', 'ps-pen-paper' ); ?></label>
 				<input id="pspp-dice-count" type="number" min="1" max="100" step="1" value="1" required data-dice-count>
@@ -137,6 +144,15 @@ function ps_pen_paper_render_dice( $campaign, $page_id = 0, $with_journal = true
 				<p><label for="pspp-roll-expression"><?php esc_html_e( 'Würfelausdruck', 'ps-pen-paper' ); ?></label>
 					<input id="pspp-roll-expression" type="text" name="roll[expression]" value="<?php echo esc_attr( '1W' . $rules['dice'][0] ); ?>" maxlength="200" required aria-describedby="pspp-roll-help" data-dice-expression></p>
 				<p id="pspp-roll-help" class="description"><?php esc_html_e( 'Zum Beispiel 3W6 + 2 oder W20 + 2W6 - 1. Höchstens 10 Gruppen und insgesamt 100 Würfel; Modifikator bis ±1000000. W und D sind erlaubt.', 'ps-pen-paper' ); ?></p>
+				<p><label for="pspp-roll-mechanic"><?php esc_html_e( 'Würfelmechanik', 'ps-pen-paper' ); ?></label>
+					<select id="pspp-roll-mechanic" name="roll[mechanic]">
+						<?php foreach ( $mechanics as $mechanic ) : ?><option value="<?php echo esc_attr( $mechanic ); ?>"><?php echo esc_html( ps_pen_paper_dice_mechanic_labels()[ $mechanic ] ); ?></option><?php endforeach; ?>
+					</select></p>
+				<?php if ( in_array( 'pool', $mechanics, true ) ) : ?>
+					<p><label for="pspp-roll-threshold"><?php esc_html_e( 'Erfolgsschwelle (nur Würfelpool)', 'ps-pen-paper' ); ?></label>
+						<input id="pspp-roll-threshold" name="roll[threshold]" type="number" min="1" max="100" step="1" value="1"></p>
+				<?php endif; ?>
+				<?php if ( array( 'sum' ) !== $mechanics ) : ?><p class="description"><?php esc_html_e( 'Pool, bestes und schlechtestes Ergebnis verwenden genau eine Würfelgruppe. Beim Pool zählt jeder Würfel ab der Schwelle als ein Erfolg; Modifikatoren und Attributaddition sind dort nicht erlaubt. Bestes/schlechtestes Ergebnis meint den höchsten/niedrigsten Einzelwürfel, danach werden Modifikator und gewählter Attributwert addiert.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 				<div class="pspp-grid">
 					<p><label for="pspp-roll-character"><?php esc_html_e( 'Für Charakter', 'ps-pen-paper' ); ?></label>
 						<select id="pspp-roll-character" name="roll[character]">
@@ -183,7 +199,7 @@ function ps_pen_paper_render_dice( $campaign, $page_id = 0, $with_journal = true
 				<p role="status" data-roll-progress data-message="<?php esc_attr_e( 'Der Wurf wird gewürfelt und gespeichert …', 'ps-pen-paper' ); ?>"></p>
 			</form>
 		<?php else : ?>
-			<p><?php esc_html_e( 'Wähle im Regelwerk mindestens einen erlaubten Würfel und eine Sichtbarkeit, um zu würfeln.', 'ps-pen-paper' ); ?></p>
+			<p><?php esc_html_e( 'Wähle im Regelwerk mindestens einen erlaubten Würfel, eine Würfelmechanik und eine Sichtbarkeit, um zu würfeln.', 'ps-pen-paper' ); ?></p>
 		<?php endif; ?>
 		<?php if ( $with_journal ) { ps_pen_paper_render_journal( $campaign, $page_id ); } ?>
 	</section>

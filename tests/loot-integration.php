@@ -265,7 +265,123 @@ try {
 	$check( is_int( $sr ) && is_wp_error( ps_pen_paper_award_loot( $shared, $sr, $alias, '0', '0', '1', 'confirmed' ) ) && '' === get_post_meta( $base, '_pspp_wallet', true ), 'Local GM bypassed shared-account authority.' );
 	wp_set_current_user( $users['world'] );
 	$check( true === ps_pen_paper_award_loot( $shared, $sr, $alias, '0', '0', '1', 'confirmed' ) && 2 === get_post_meta( $base, '_pspp_wallet', true )['balance'] && '' === get_post_meta( $alias, '_pspp_wallet', true ), 'Shared award did not reach the base wallet.' );
-	WP_CLI::success( 'Complete ranges, grouped/nested restoration, mapped recipients, pending continuation, frozen rolls/items, replay protection, full-inventory and event rollback, private history and shared-account authority passed.' );
+	$universe_child = ps_pen_paper_save_loot_table( $universe, 0, $money_input, '0' );
+	$check( is_int( $universe_child ), 'Universe child table could not be created.' );
+	$universe_input = $money_input; $universe_input['name'] = 'Universe grouped loot';
+	$universe_input['rows'][0] = array_merge( $universe_input['rows'][0], array( 'money' => '3', 'items' => '', 'nested_id' => (string) $universe_child ) );
+	$page_id = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_author' => $users['world'],
+		'post_title' => 'Universe loot frontend fixture', 'post_content' => '[ps_pen_paper]' ), true );
+	$check( is_int( $page_id ), 'Universe loot page fixture failed.' ); $parents[] = $page_id;
+	$old_post = $_POST; $old_request = $_REQUEST; $old_query = $GLOBALS['wp_query'];
+	$old_method = $_SERVER['REQUEST_METHOD'] ?? null; $redirected = false;
+	$redirect = static function ( $url ) { throw new RuntimeException( 'loot-form-redirect:' . $url ); };
+	$die_handler = static function () {
+		return static function ( $message ) { throw new RuntimeException( 'loot-form-failure:' . $message ); };
+	};
+	add_filter( 'wp_redirect', $redirect, 1 ); add_filter( 'wp_die_handler', $die_handler, 1000 );
+	try {
+		$_POST = array( 'action' => 'ps_pen_paper', 'pspp_operation' => 'save_loot_table',
+			'pspp_frontend_page' => (string) $page_id, 'campaign_id' => (string) $u,
+			'pspp_scope_epoch' => ps_pen_paper_scope_epoch( $u ), '_wpnonce' => wp_create_nonce( 'pspp_campaign_' . $u ),
+			'loot_table_id' => '0', 'loot_revision' => '0', 'loot_complete' => 'complete', 'loot' => $universe_input );
+		$_REQUEST = $_POST; $_SERVER['REQUEST_METHOD'] = 'POST';
+		$GLOBALS['wp_query'] = new WP_Query( array( 'page_id' => $page_id ) );
+		try { ps_pen_paper_handle_frontend_action(); }
+		catch ( RuntimeException $error ) {
+			if ( 0 !== strpos( $error->getMessage(), 'loot-form-redirect:' ) ) { throw $error; }
+			$redirected = false !== strpos( $error->getMessage(), 'pspp_universe=' . $u );
+		}
+	} finally {
+		remove_filter( 'wp_redirect', $redirect, 1 ); remove_filter( 'wp_die_handler', $die_handler, 1000 );
+		$_POST = $old_post; $_REQUEST = $old_request; $GLOBALS['wp_query'] = $old_query;
+		if ( null === $old_method ) { unset( $_SERVER['REQUEST_METHOD'] ); } else { $_SERVER['REQUEST_METHOD'] = $old_method; }
+	}
+	$universe_tables = ps_pen_paper_loot_tables( $universe );
+	$check( $redirected && 2 === count( $universe_tables ), 'Universe frontend save did not persist and return to its own administration.' );
+	$universe_table = array_key_last( $universe_tables ); $universe_before = $universe_tables[ $universe_table ];
+	$check( is_wp_error( ps_pen_paper_roll_loot( $universe, $universe_table, '1', '1', 'Not a campaign', wp_generate_uuid4() ) ),
+		'Universe catalogue created a campaign reward run.' );
+	wp_set_current_user( $users['gm'] );
+	$check( isset( ps_pen_paper_loot_tables( $shared )[ $universe_table ] ) &&
+		is_wp_error( ps_pen_paper_get_loot_table( $campaign, $universe_table ) ) &&
+		is_wp_error( ps_pen_paper_save_loot_table( $shared, $universe_table, $money_input, '1' ) ) &&
+		is_wp_error( ps_pen_paper_save_loot_table( $universe, $universe_table, $money_input, '1' ) ) &&
+		$universe_before === get_post_meta( $universe_table, '_pspp_loot_table', true ),
+		'Catalogue leaked to an unrelated campaign or campaign GM overwrote a universe table.' );
+	$old_get = $_GET;
+	try {
+		$_GET['pspp_loot_table'] = (string) $universe_table;
+		ob_start(); ps_pen_paper_render_loot( $shared, $page_id ); $catalogue_html = ob_get_clean();
+	} finally { $_GET = $old_get; }
+	$check( false !== strpos( $catalogue_html, 'name="pspp_operation" value="roll_loot"' ) &&
+		false === strpos( $catalogue_html, 'name="pspp_operation" value="save_loot_table"' ),
+		'Inherited catalogue did not offer rolling or exposed an editable shared template.' );
+	$universe_run = ps_pen_paper_roll_loot( $shared, $universe_table, '1', '1', 'Universe catalogue roll', wp_generate_uuid4() );
+	$check( is_int( $universe_run ), 'Connected campaign could not use universe loot.' );
+	$universe_proposal = ps_pen_paper_get_loot_run( $shared, $universe_run );
+	$check( 5 === ps_pen_paper_loot_components( $universe_proposal['proposal'] )['money'], 'Universe nested table lost a reward.' );
+	wp_set_current_user( $users['world'] );
+	$universe_input['rows'][0]['money'] = '9';
+	$check( $universe_table === ps_pen_paper_save_loot_table( $universe, $universe_table, $universe_input, '1' ) &&
+		$universe_proposal === ps_pen_paper_get_loot_run( $shared, $universe_run ),
+		'Universe table edit rewrote an existing campaign proposal.' );
+	$archive = ps_pen_paper_export_campaign( $c, 'complete' );
+	$check( ! is_wp_error( $archive ), 'Universe catalogue export failed.' );
+	$parsed = ps_pen_paper_parse_import( wp_json_encode( $archive, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+	$check( ! is_wp_error( $parsed ) && isset( $parsed['records'][ $universe_child ], $parsed['records'][ $universe_table ] ),
+		'Complete native archive omitted or rejected universe tables.' );
+	$options = array( 'operation' => 'copy', 'target_id' => 0, 'universe_mode' => 'copy', 'universe_id' => 0, 'users' => array(), 'bases' => array() );
+	foreach ( $parsed['users'] as $owner => $requirement ) { $options['users'][ $owner ] = $owner; }
+	$map = array(); foreach ( array_keys( $parsed['records'] ) as $source_id ) { $map[ $source_id ] = $source_id + 1000000; }
+	$prepared = ps_pen_paper_prepare_import( $parsed, $options, $map, false );
+	$check( ! is_wp_error( $prepared ), 'Universe table and campaign proposal import mapping failed: ' .
+		( is_wp_error( $prepared ) ? $prepared->get_error_message() : '' ) );
+	$mapped_run = null;
+	foreach ( $prepared[ $universe_run ]['meta'] as $entry ) { if ( '_pspp_loot_run' === $entry['key'] ) { $mapped_run = $entry['value']; } }
+	$check( ps_pen_paper_valid_loot_run( $mapped_run ) && $map[ $universe_table ] === $mapped_run['proposal']['table_id'] &&
+		$map[ $universe_child ] === $mapped_run['proposal']['nested']['table_id'] &&
+		$map[ $u ] === $mapped_run['proposal']['table']['table']['currency']['scope_id'] &&
+		5 === ps_pen_paper_loot_components( $mapped_run['proposal'] )['money'], 'Restored universe references or frozen rewards changed.' );
+	wp_get_current_user()->add_cap( 'ps_pen_paper_import_campaigns' );
+	$token = ps_pen_paper_create_import_preview( wp_json_encode( $archive, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+	$check( is_string( $token ), 'Universe catalogue preview failed: ' . ( is_wp_error( $token ) ? $token->get_error_message() : '' ) ); $tokens[] = $token;
+	$preview = ps_pen_paper_get_import_preview( $token );
+	$check( ! is_wp_error( $preview ), 'Universe catalogue preview disappeared.' ); $preview['options'] = $options;
+	$check( set_transient( ps_pen_paper_import_preview_key( $token ), $preview, $preview['expires'] - time() ), 'Universe preview configuration failed.' );
+	$plan = ps_pen_paper_import_configuration( $parsed, $options );
+	$check( ! is_wp_error( $plan ), 'Universe restoration configuration failed.' );
+	$restored = ps_pen_paper_restore_campaign( $token, ps_pen_paper_restore_fingerprint( $parsed, $options, $plan ), false, 'private' );
+	$check( ! is_wp_error( $restored ), 'Universe catalogue restoration failed: ' .
+		( is_wp_error( $restored ) ? $restored->get_error_message() : '' ) );
+	$parents[] = $restored['campaign_id']; $restored_campaign = ps_pen_paper_get_campaign( $restored['campaign_id'] );
+	$restored_link = ps_pen_paper_get_universe_link( $restored_campaign->ID );
+	$check( ! is_wp_error( $restored_link ) && $restored_link['universe_id'] > 0 && $u !== $restored_link['universe_id'],
+		'Restoration did not create an independent universe.' ); $parents[] = $restored_link['universe_id'];
+	$copied = null; $copied_id = 0;
+	foreach ( get_posts( array( 'post_type' => 'pspp_loot_run', 'post_status' => 'private', 'post_parent' => $restored_campaign->ID,
+		'posts_per_page' => -1 ) ) as $copied_run ) {
+		$state = ps_pen_paper_get_loot_run( $restored_campaign, $copied_run->ID );
+		$check( ! is_wp_error( $state ), 'Restored universe proposal is unreadable.' );
+		if ( $state['proposal']['token'] === $universe_proposal['proposal']['token'] ) { $copied = $state; $copied_id = $copied_run->ID; }
+	}
+	$check( null !== $copied && $universe_table !== $copied['proposal']['table_id'] &&
+		(int) get_post_field( 'post_parent', $copied['proposal']['table_id'] ) === $restored_link['universe_id'] &&
+		! is_wp_error( ps_pen_paper_get_loot_table( $restored_campaign, $copied['proposal']['table_id'] ) ) &&
+		5 === ps_pen_paper_loot_components( $copied['proposal'] )['money'], 'Restored campaign cannot use its copied universe catalogue.' );
+	$recipients = ps_pen_paper_get_characters( $restored_campaign );
+	$check( 1 === count( $recipients ), 'Restored shared recipient is ambiguous.' ); $recipient = reset( $recipients );
+	$check( true === ps_pen_paper_award_loot_split( $restored_campaign, $copied_id, array( $recipient->ID => array(
+		'gear_revision' => '0', 'wallet_revision' => '1', 'currency_revision' => '2', 'items' => array(), 'money' => '5' ) ), 'confirmed' ) &&
+		7 === ps_pen_paper_wallet_context( $restored_campaign, $recipient->ID )['wallet']['balance'] &&
+		2 === get_post_meta( $base, '_pspp_wallet', true )['balance'] && $universe_proposal === ps_pen_paper_get_loot_run( $shared, $universe_run ),
+		'Restored universe reward altered the source campaign or paid the wrong amount.' );
+	$check( true === ps_pen_paper_award_loot_split( $shared, $universe_run, array( $alias => array(
+		'gear_revision' => '0', 'wallet_revision' => '1', 'currency_revision' => '2', 'items' => array(), 'money' => '5' ) ), 'confirmed' ) &&
+		7 === get_post_meta( $base, '_pspp_wallet', true )['balance'], 'Universe reward did not reach the actual shared wallet.' );
+	wp_set_current_user( $users['player'] );
+	$check( is_wp_error( ps_pen_paper_loot_tables( $universe ) ) && is_wp_error( ps_pen_paper_get_loot_table( $shared, $universe_table ) ),
+		'Player accessed the private universe catalogue.' );
+	WP_CLI::success( 'Campaign and universe tables, central frontend save, inherited read-only use, nested native mapping, frozen rewards, shared-account authority, private history and atomic rollback passed.' );
 } finally {
 	wp_set_current_user( $original_user );
 	foreach ( $tokens as $token ) { delete_transient( ps_pen_paper_import_preview_key( $token ) ); }

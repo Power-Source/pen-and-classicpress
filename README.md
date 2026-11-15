@@ -261,7 +261,31 @@ Zurückziehen, Ablehnen und Spielleiterablehnung geben Reservierungen frei.
 Neue Handelsregeln sperren den Abschluss alter Angebote; deren Ablehnung
 bleibt möglich. Ohne Community bleiben Daten und lesbare Handelsnachweise
 erhalten, wirtschaftliche Änderungen jedoch gesperrt.
-Kampagnenübergreifende Übertragungen bleiben offen.
+
+### Kontrollierte Übertragungen innerhalb eines Universums
+
+Die Universumsleitung aktiviert unter **Handelsregeln** ausdrücklich
+**Kontrollierte Übertragungen zwischen Kampagnen dieses Universums erlauben**.
+Standardmäßig bleiben sie ausgeschaltet. Eine für beide Kampagnen berechtigte
+Spielleitung oder Administration öffnet den Quellbogen und bestätigt unter
+**In eine andere Kampagne dieses Universums übertragen** die Exemplare,
+den Geldbetrag und den Zielcharakter. Auch eigene Figuren können so
+kontrolliert übertragen werden; Spielerhandel bleibt kampagnenintern.
+
+Nur handelbare, aktiv und beantragt abgelegte, nicht reservierte Exemplare
+werden übertragen. Identitäten und eingefrorene Werte bleiben erhalten;
+geschützte lokale Gegenstandsbilder werden in die Zielkampagne kopiert.
+Aktive und beantragte Inventare, Geld und beide Protokolle ändern sich atomar.
+Die Zielregeln müssen die enthaltenen Bonusfelder unterstützen.
+
+Geld benötigt dieselbe Universumswährung und die bestehenden Kontorechte.
+Lokale Währungen werden nicht umgerechnet. Verwenden beide Bögen bereits
+dasselbe Basisguthaben, wird keine Geldübertragung ausgeführt oder ein
+Ersatzkonto angelegt. Reine Geldübertragungen verändern kein Inventar.
+Veraltete Formulare, entzogene Freigaben und fehlendes Guthaben werden
+abgewiesen. Wiederholtes Absenden führt nicht zu doppelten Vergaben;
+native Sicherungen erhalten den Wiederholungsschutz.
+Übertragungen zwischen getrennten Universen sind ausgeschlossen.
 
 ## Soloabenteuer seit Version 0.21.0
 
@@ -423,16 +447,22 @@ gespeichert oder zurückgenommen. Ein abgeschlossener Vorgang kann nicht
 erneut auszahlen; ein bewusst neu gestarteter Wurf ist ein eigener Vorgang.
 Die bisherigen Kontorechte gelten auch bei gemeinsamem Universumsguthaben.
 
-Tabellen und Vorschläge bleiben ausschließlich für die Kampagnenleitung
+Tabellen und Vorschläge bleiben ausschließlich für die zuständige Spielleitung
 sichtbar. Empfänger sehen ihre tatsächlichen Gegenstände und Buchungen, nicht
-geheime Chancen oder Begründungen. Gegner/NPCs können auf eine lokale Tabelle
+geheime Chancen oder Begründungen. Gegner/NPCs können auf eine Kampagnen- oder Universumstabelle
 verweisen; Universumsvorlagen übernehmen diese Kampagnenreferenz nicht.
 Bestehende Vorschläge bleiben bei späteren Tabellenänderungen unverändert.
 
-Noch nicht enthalten: Gegenstandsgruppen, verschachtelte Tabellen,
-universumsweite Beutekataloge, Aufteilung auf mehrere Empfänger und automatische
-Vergabe. `W3` ist kein unterstützter Standardwürfel. Handel besteht separat
-seit Version 0.20.0.
+Die Universumsleitung pflegt **Beutetabellen** unter **Regelwerk &
+Basischaraktere**. Angeschlossene Kampagnen sehen die Tabellen in ihrer
+Spielleitermappe und können sie auswürfeln, als Untertabellen verwenden oder
+Abenteuerbelohnungen zuordnen. Nur die Universumsleitung verändert diese
+gemeinsamen Vorlagen; lokale Kampagnentabellen bleiben eigenständig.
+Jeder Vorgang friert seinen damaligen Stand ein, auch nach Vorlagenänderungen.
+Die vollständige Kampagnensicherung enthält Universumstabellen und ihre
+verschachtelten Bezüge. Gegenstandsgruppen, Aufteilung auf mehrere Empfänger
+und ausdrücklich freigegebene automatische Abenteuervergaben sind vorhanden.
+`W3` ist kein unterstützter Standardwürfel. Handel besteht separat seit Version 0.20.0.
 
 ## Gegner und NPCs seit Version 0.17.0
 

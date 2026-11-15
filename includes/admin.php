@@ -101,6 +101,7 @@ function ps_pen_paper_handle_admin_action() {
 	if ( 'group_adventure' === $operation ) { ps_pen_paper_handle_adventure_group_action(); }
 	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'save_adventure_world', 'save_adventure_scenario', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure', 'request_adventure_review', 'review_adventure_run', 'cancel_adventure_review' ), true ) ) { ps_pen_paper_handle_adventure_action( $operation ); }
 	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) ) { ps_pen_paper_handle_trade_action( $operation ); }
+	if ( 'transfer_campaign_assets' === $operation ) { ps_pen_paper_handle_transfer_action(); }
 	if ( 'save_wiki_link' === $operation ) { ps_pen_paper_handle_wiki_link_action(); }
 	if ( in_array( $operation, array( 'configure_wiki', 'prepare_wiki', 'publish_wiki' ), true ) ) { ps_pen_paper_handle_wiki_action( $operation ); }
 	if ( in_array( $operation, array( 'save_loot_table', 'roll_loot', 'award_loot' ), true ) ) { ps_pen_paper_handle_loot_action( $operation ); }

@@ -353,13 +353,15 @@ function ps_pen_paper_save_gear_locked( $campaign, $character_id, $operation, $i
 	) );
 }
 
-// Internal writer: both inventories are locked and the trade is authorized.
-function ps_pen_paper_write_item_exchange( $campaign, $characters, $uuids, $instances ) {
+// Internal writer: both inventories are locked and the exchange is authorized.
+function ps_pen_paper_write_item_exchange( $campaign, $characters, $uuids, $instances, $incoming = null ) {
 	foreach ( array( 0, 1 ) as $i ) {
 		if ( is_string( $uuids[ $i ] ) ) {
 			$instances[ $i ] = $uuids[ $i ] ? array( $uuids[ $i ] => $instances[ $i ] ) : array();
 			$uuids[ $i ] = array_keys( $instances[ $i ] );
 		}
+		$incoming = null === $incoming ? $instances : $incoming;
+		$campaigns = is_array( $campaign ) ? $campaign : array( $campaign, $campaign );
 	}
 	$states = array();
 	foreach ( $characters as $i => $character ) {
@@ -378,15 +380,16 @@ function ps_pen_paper_write_item_exchange( $campaign, $characters, $uuids, $inst
 		foreach ( array( 'active', 'pending' ) as $key ) {
 			if ( null === $after[ $key ] ) { continue; }
 			foreach ( $out as $uuid ) { unset( $after[ $key ]['items'][ $uuid ] ); }
-			foreach ( $in as $uuid ) { $after[ $key ]['items'][ $uuid ] = $instances[ 1 - $i ][ $uuid ]; }
+			foreach ( $in as $uuid ) { $after[ $key ]['items'][ $uuid ] = $incoming[ 1 - $i ][ $uuid ]; }
 			if ( count( $after[ $key ]['items'] ) > 100 ) { return new WP_Error( 'inventory_full', __( 'Das Zielinventar ist voll. Der Handel wurde nicht ausgeführt.', 'ps-pen-paper' ) ); }
 		}
 		$states[ $i ] = array( $before, $after );
 	}
 	foreach ( $characters as $i => $character ) {
-		$result = ps_pen_paper_write_document_event( $campaign->ID, $character->ID, '_pspp_gear', $states[ $i ][0], $states[ $i ][1], array(
+		$scope = $campaigns[ $i ];
+		$result = ps_pen_paper_write_document_event( $scope->ID, $character->ID, '_pspp_gear', $states[ $i ][0], $states[ $i ][1], array(
 			'kind' => 'gear_saved', 'visibility' => 'owner', 'recipient_id' => (int) $character->post_author,
-			'fields' => array(), 'rules_revision' => ps_pen_paper_get_rules( $campaign->ID )['revision'],
+			'fields' => array(), 'rules_revision' => ps_pen_paper_get_rules( $scope->ID )['revision'],
 		), false );
 		if ( is_wp_error( $result ) ) { return $result; }
 	}

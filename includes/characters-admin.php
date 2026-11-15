@@ -48,8 +48,8 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 	<h3><?php echo esc_html( $character ? __( 'Charakter bearbeiten', 'ps-pen-paper' ) : __( 'Charakter erstellen', 'ps-pen-paper' ) ); ?></h3>
 	<?php if ( $requesting ) : ?>
 		<p><?php esc_html_e( 'Dieser neue Universumsbogen wird ausschließlich als Antrag gespeichert. Erst die Universumsleitung gibt ihn frei; eine Aufnahme in die Kampagne erfolgt danach gesondert.', 'ps-pen-paper' ); ?></p>
-	<?php elseif ( ! $is_gm && 'approval' === ps_pen_paper_character_mode( $rules ) ) : ?>
-		<p><?php esc_html_e( 'Deine Eingaben werden als Antrag gespeichert. Name und Werte werden erst nach Spielleiterfreigabe wirksam. Ein neuer Antrag ersetzt deinen bisherigen Antrag.', 'ps-pen-paper' ); ?></p>
+	<?php elseif ( ! $is_gm ) : ?>
+		<p><?php esc_html_e( 'Die Rechte stehen an jedem Feld. Direkte Änderungen gelten sofort, Freigabefelder erst nach Bestätigung. Vorhandene Anträge werden durch direkte Änderungen nicht automatisch genehmigt. Ein neuer Bogen mit Freigabefeldern bleibt bis zur Erstfreigabe ein Antrag.', 'ps-pen-paper' ); ?></p>
 	<?php elseif ( $state['pending'] ) : ?>
 		<p><?php esc_html_e( 'Speichern übernimmt die unten stehenden Werte sofort und ersetzt den offenen Antrag.', 'ps-pen-paper' ); ?></p>
 	<?php endif; ?>
@@ -83,7 +83,7 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 			<input type="hidden" name="owner_id" value="<?php echo esc_attr( $character ? $character->post_author : get_current_user_id() ); ?>">
 		<?php endif; ?>
 		<p><label for="<?php echo esc_attr( $element_prefix . '-name' ); ?>"><?php esc_html_e( 'Charaktername', 'ps-pen-paper' ); ?></label>
-			<input id="<?php echo esc_attr( $element_prefix . '-name' ); ?>" name="character[name]" type="text" maxlength="200" value="<?php echo esc_attr( $snapshot['name'] ); ?>" required></p>
+			<input id="<?php echo esc_attr( $element_prefix . '-name' ); ?>" name="character[name]" type="text" maxlength="200" value="<?php echo esc_attr( ! $is_gm && ! $requesting && 'gm_only' === ps_pen_paper_character_mode( $rules ) ? ( $state['active']['name'] ?? '' ) : $snapshot['name'] ); ?>" <?php echo ! $is_gm && ! $requesting && 'gm_only' === ps_pen_paper_character_mode( $rules ) ? 'readonly' : ''; ?> required></p>
 		<?php if ( ! empty( $rules['allocation'] ) ) : ?>
 			<p><?php echo esc_html( sprintf( __( 'Die für die Punkteverteilung ausgewählten Attribute müssen zusammen genau %d Punkte ergeben.', 'ps-pen-paper' ), $rules['allocation']['points'] ) ); ?></p>
 		<?php endif; ?>
@@ -93,10 +93,21 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 				$value = $snapshot['values'][ $field['id'] ];
 				$id = $element_prefix . '-' . $field['id'];
 				$name = 'character[values][' . $field['id'] . ']';
+				$derived = ! empty( $rules['progression'] ) && $field['id'] === $rules['progression']['level_field'];
+				$mode = ps_pen_paper_field_edit_mode( $field, $rules );
+				$protected = $derived || ( ! $is_gm && ( $requesting ? 'gm_only' === ( $field['edit_mode'] ?? 'inherit' ) : 'gm_only' === $mode ) );
+				if ( $protected && ! $derived ) { $value = $state['active']['values'][ $field['id'] ] ?? ps_pen_paper_character_values( $rules )[ $field['id'] ]; }
 				?>
 				<fieldset class="pspp-field" <?php echo 'resource' === $field['type'] ? 'data-character-resource' : ''; ?> data-range-message="<?php esc_attr_e( 'Der aktuelle Wert darf das persönliche Maximum nicht überschreiten.', 'ps-pen-paper' ); ?>">
 					<legend><?php echo esc_html( $field['label'] ); ?></legend>
-					<?php if ( 'choice' === $field['type'] ) : ?>
+					<?php if ( $derived ) : ?><p><?php esc_html_e( 'Wird automatisch aus dem Erfahrungsstand berechnet.', 'ps-pen-paper' ); ?></p>
+					<?php elseif ( ! $is_gm ) : ?><p><?php echo esc_html( ps_pen_paper_field_edit_modes()[ $mode ] ); ?></p><?php endif; ?>
+					<?php if ( $protected ) : ?>
+						<p class="pspp-multiline"><?php echo esc_html( is_array( $value ) ? $value['current'] . ' / ' . $value['maximum'] : $value ); ?></p>
+						<?php if ( is_array( $value ) ) : ?>
+							<?php foreach ( $value as $key => $number ) : ?><input type="hidden" name="<?php echo esc_attr( $name . '[' . $key . ']' ); ?>" value="<?php echo esc_attr( $number ); ?>"><?php endforeach; ?>
+						<?php else : ?><input type="hidden" name="<?php echo esc_attr( $name ); ?>" value="<?php echo esc_attr( $value ); ?>"><?php endif; ?>
+					<?php elseif ( 'choice' === $field['type'] ) : ?>
 						<label class="screen-reader-text" for="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $field['label'] ); ?></label>
 						<select id="<?php echo esc_attr( $id ); ?>" name="<?php echo esc_attr( $name ); ?>" <?php echo $field['required'] ? 'required' : ''; ?>>
 							<?php if ( ! $field['required'] ) : ?><option value=""><?php esc_html_e( 'Keine Auswahl', 'ps-pen-paper' ); ?></option><?php endif; ?>
@@ -131,7 +142,7 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 			<?php endforeach; ?>
 		</div>
 		<input type="hidden" name="character_complete" value="complete">
-		<?php submit_button( $requesting || ( ! $is_gm && 'approval' === ps_pen_paper_character_mode( $rules ) ) ? __( 'Zur Freigabe einreichen', 'ps-pen-paper' ) : __( 'Charakter speichern', 'ps-pen-paper' ) ); ?>
+		<?php submit_button( $requesting ? __( 'Zur Freigabe einreichen', 'ps-pen-paper' ) : __( 'Charakter speichern', 'ps-pen-paper' ) ); ?>
 	</form>
 	<?php
 }

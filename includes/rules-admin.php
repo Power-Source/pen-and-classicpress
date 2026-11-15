@@ -32,6 +32,12 @@ function ps_pen_paper_render_rule_field( $field, $index, $locked = false ) {
 			<label for="<?php echo esc_attr( $element_id . '-description' ); ?>"><?php esc_html_e( 'Erläuterung', 'ps-pen-paper' ); ?></label>
 			<textarea id="<?php echo esc_attr( $element_id . '-description' ); ?>" name="<?php echo esc_attr( $prefix . '[description]' ); ?>" rows="2" maxlength="2000"><?php echo esc_textarea( $field['description'] ); ?></textarea>
 		</p>
+		<p><label for="<?php echo esc_attr( $element_id . '-edit-mode' ); ?>"><?php esc_html_e( 'Bearbeitungsrecht', 'ps-pen-paper' ); ?></label>
+			<select id="<?php echo esc_attr( $element_id . '-edit-mode' ); ?>" name="<?php echo esc_attr( $prefix . '[edit_mode]' ); ?>">
+				<?php foreach ( ps_pen_paper_field_edit_modes() as $mode => $label ) : ?>
+					<option value="<?php echo esc_attr( $mode ); ?>" <?php selected( $field['edit_mode'] ?? 'inherit', $mode ); ?>><?php echo esc_html( $label ); ?></option>
+				<?php endforeach; ?>
+			</select></p>
 		<fieldset class="pspp-grid pspp-numeric" data-numeric>
 			<legend><?php esc_html_e( 'Wertebereich (nur für Zahlen, Attribute und Ressourcen)', 'ps-pen-paper' ); ?></legend>
 			<?php
@@ -121,7 +127,7 @@ function ps_pen_paper_render_rules( $campaign, $can_manage, $page_id = 0 ) {
 							<?php endforeach; ?>
 						</select>
 					</p>
-					<p class="description"><?php esc_html_e( 'Bei Freigabepflicht werden Name und sämtliche Werte erst nach Bestätigung wirksam. Spielleiter dürfen sofort speichern. Ein Moduswechsel genehmigt oder verwirft offene Anträge nicht automatisch.', 'ps-pen-paper' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Diese Vorgabe gilt für den Namen und für Felder ohne eigenes Bearbeitungsrecht. Jedes Feld kann stattdessen direkt, mit Freigabe oder nur durch die Spielleitung bearbeitbar sein. Direkte Änderungen wirken sofort; beantragte Änderungen bleiben getrennt. Neue Bögen mit Freigabefeldern benötigen eine vollständige Erstfreigabe. Ein Moduswechsel genehmigt oder verwirft offene Anträge nicht automatisch. Gemeinsame Basisbögen bleiben leitungsverwaltet.', 'ps-pen-paper' ); ?></p>
 					<fieldset>
 						<legend><strong><?php esc_html_e( 'Erlaubte Würfel', 'ps-pen-paper' ); ?></strong></legend>
 						<div class="pspp-dice">
@@ -132,12 +138,44 @@ function ps_pen_paper_render_rules( $campaign, $can_manage, $page_id = 0 ) {
 						<p class="description"><?php esc_html_e( 'Ohne Auswahl sind keine Würfe möglich. Erlaubte Würfel können in Ausdrücken wie 3W6 + 2 kombiniert werden.', 'ps-pen-paper' ); ?></p>
 					</fieldset>
 					<fieldset>
+						<legend><strong><?php esc_html_e( 'Erlaubte Würfelmechaniken', 'ps-pen-paper' ); ?></strong></legend>
+						<input type="hidden" name="rules[dice_mechanics_present]" value="1">
+						<?php foreach ( ps_pen_paper_dice_mechanic_labels() as $mechanic => $label ) : ?>
+							<label class="pspp-check"><input type="checkbox" name="rules[dice_mechanics][]" value="<?php echo esc_attr( $mechanic ); ?>" <?php checked( in_array( $mechanic, ps_pen_paper_allowed_dice_mechanics( $rules ), true ) ); ?>> <?php echo esc_html( $label ); ?></label>
+						<?php endforeach; ?>
+						<p class="description"><?php esc_html_e( 'Ohne Auswahl sind keine Würfe möglich. Neue Mechaniken gelten nur für die Würfelbühne; bestehende Abenteuerproben und Beutetabellen behalten ihre Würfelsummen.', 'ps-pen-paper' ); ?></p>
+					</fieldset>
+					<fieldset>
 						<legend><strong><?php esc_html_e( 'Erlaubte Wurfsichtbarkeiten', 'ps-pen-paper' ); ?></strong></legend>
 						<input type="hidden" name="rules[roll_visibilities_present]" value="1">
 						<?php foreach ( ps_pen_paper_roll_visibility_labels() as $visibility => $label ) : ?>
 							<label class="pspp-check"><input type="checkbox" name="rules[roll_visibilities][]" value="<?php echo esc_attr( $visibility ); ?>" <?php checked( in_array( $visibility, ps_pen_paper_allowed_roll_visibilities( $rules ), true ) ); ?>> <?php echo esc_html( $label ); ?></label>
 						<?php endforeach; ?>
 						<p class="description"><?php esc_html_e( 'Ohne Auswahl ist Würfeln deaktiviert. „Gruppe“ meint nur Kampagnenmitglieder. Bei verdeckten Proben sehen Spieler auch ihr eigenes Ergebnis nicht. Änderungen gelten nur für neue Würfe; ältere Würfe behalten ihre Sichtbarkeit. Aktuelle Spielleiter und Administratoren dürfen alle Würfe lesen.', 'ps-pen-paper' ); ?></p>
+					</fieldset>
+					<fieldset>
+						<legend><strong><?php esc_html_e( 'Optionale Erfahrung und Stufen', 'ps-pen-paper' ); ?></strong></legend>
+						<p><label for="pspp-progression-mode"><?php esc_html_e( 'Stufenberechnung', 'ps-pen-paper' ); ?></label>
+							<select id="pspp-progression-mode" name="rules[progression_mode]">
+								<option value="none" <?php selected( empty( $rules['progression'] ) ); ?>><?php esc_html_e( 'Nicht verwenden', 'ps-pen-paper' ); ?></option>
+								<option value="configured" <?php selected( ! empty( $rules['progression'] ) ); ?>><?php esc_html_e( 'Aus Erfahrung und Schwellen berechnen', 'ps-pen-paper' ); ?></option>
+							</select></p>
+						<?php foreach ( array( 'experience_field' => __( 'Erfahrungsfeld', 'ps-pen-paper' ), 'level_field' => __( 'Stufenfeld', 'ps-pen-paper' ) ) as $key => $label ) : ?>
+							<p><label for="<?php echo esc_attr( 'pspp-progression-' . $key ); ?>"><?php echo esc_html( $label ); ?></label>
+								<select id="<?php echo esc_attr( 'pspp-progression-' . $key ); ?>" name="<?php echo esc_attr( 'rules[progression][' . $key . ']' ); ?>">
+									<option value=""><?php esc_html_e( 'Feld wählen', 'ps-pen-paper' ); ?></option>
+									<?php foreach ( $rules['fields'] as $field ) : if ( ! in_array( $field['type'], array( 'number', 'attribute' ), true ) ) { continue; } ?>
+										<option value="<?php echo esc_attr( $field['id'] ); ?>" <?php selected( $rules['progression'][ $key ] ?? '', $field['id'] ); ?>><?php echo esc_html( $field['label'] ); ?></option>
+									<?php endforeach; ?>
+								</select></p>
+						<?php endforeach; ?>
+						<p><label for="pspp-progression-thresholds"><?php esc_html_e( 'Schwellen: Erfahrung : Stufe, eine Zeile je Schwelle', 'ps-pen-paper' ); ?></label>
+							<textarea id="pspp-progression-thresholds" name="rules[progression][thresholds]" rows="5" maxlength="20000"><?php
+								$thresholds = array();
+								foreach ( $rules['progression']['thresholds'] ?? array() as $row ) { $thresholds[] = $row['experience'] . ' : ' . $row['level']; }
+								echo esc_textarea( implode( "\n", $thresholds ) );
+							?></textarea></p>
+						<p class="description"><?php esc_html_e( 'Beispiel bei Erfahrungsminimum 0: „0 : 1“, „100 : 2“, „300 : 3“. Speichere die beiden Felder zuerst. Erfahrung und Stufen müssen aufsteigend sein und innerhalb der Feldgrenzen liegen. Das Stufenfeld wird automatisch aus dem jeweiligen Erfahrungsstand berechnet, auch im Antrag; keine Klassen oder Attributboni werden vergeben. Änderungen an vorhandenen Bögen benötigen eine bestätigte Vorschau. Beim Ausschalten bleiben erreichte Werte erhalten.', 'ps-pen-paper' ); ?></p>
 					</fieldset>
 					<h3><?php esc_html_e( 'Charakterfelder', 'ps-pen-paper' ); ?></h3>
 					<p><?php esc_html_e( 'Bis zu 30 frei benennbare Felder. Auswahlfelder enthalten je eine Option pro Zeile. Strukturänderungen an verwendeten Bögen benötigen vor dem Speichern eine Vorschau und eine ausdrückliche Lösung für jeden Konflikt.', 'ps-pen-paper' ); ?></p>
@@ -231,6 +269,16 @@ function ps_pen_paper_render_rules_migration_preview( $campaign, $preview, $page
 			<input type="hidden" name="rules[name]" value="<?php echo esc_attr( $rules['name'] ); ?>">
 			<input type="hidden" name="rules[description]" value="<?php echo esc_attr( $rules['description'] ); ?>">
 			<input type="hidden" name="rules[character_mode]" value="<?php echo esc_attr( ps_pen_paper_character_mode( $rules ) ); ?>">
+			<input type="hidden" name="rules[dice_mechanics_present]" value="1">
+			<?php foreach ( ps_pen_paper_allowed_dice_mechanics( $rules ) as $mechanic ) : ?><input type="hidden" name="rules[dice_mechanics][]" value="<?php echo esc_attr( $mechanic ); ?>"><?php endforeach; ?>
+			<input type="hidden" name="rules[progression_mode]" value="<?php echo esc_attr( empty( $rules['progression'] ) ? 'none' : 'configured' ); ?>">
+			<?php if ( ! empty( $rules['progression'] ) ) : ?>
+				<input type="hidden" name="rules[progression][experience_field]" value="<?php echo esc_attr( $rules['progression']['experience_field'] ); ?>">
+				<input type="hidden" name="rules[progression][level_field]" value="<?php echo esc_attr( $rules['progression']['level_field'] ); ?>">
+				<?php foreach ( $rules['progression']['thresholds'] as $index => $row ) : ?>
+					<?php foreach ( $row as $key => $number ) : ?><input type="hidden" name="<?php echo esc_attr( 'rules[progression][thresholds][' . $index . '][' . $key . ']' ); ?>" value="<?php echo esc_attr( $number ); ?>"><?php endforeach; ?>
+				<?php endforeach; ?>
+			<?php endif; ?>
 			<input type="hidden" name="rules[roll_visibilities_present]" value="1">
 			<?php foreach ( $rules['dice'] as $die ) : ?><input type="hidden" name="rules[dice][]" value="<?php echo esc_attr( $die ); ?>"><?php endforeach; ?>
 			<?php foreach ( ps_pen_paper_allowed_roll_visibilities( $rules ) as $visibility ) : ?><input type="hidden" name="rules[roll_visibilities][]" value="<?php echo esc_attr( $visibility ); ?>"><?php endforeach; ?>
@@ -244,6 +292,7 @@ function ps_pen_paper_render_rules_migration_preview( $campaign, $preview, $page
 				<input type="hidden" name="<?php echo esc_attr( 'rules[fields][' . $index . '][label]' ); ?>" value="<?php echo esc_attr( $field['label'] ); ?>">
 				<input type="hidden" name="<?php echo esc_attr( 'rules[fields][' . $index . '][type]' ); ?>" value="<?php echo esc_attr( $field['type'] ); ?>">
 				<input type="hidden" name="<?php echo esc_attr( 'rules[fields][' . $index . '][description]' ); ?>" value="<?php echo esc_attr( $field['description'] ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( 'rules[fields][' . $index . '][edit_mode]' ); ?>" value="<?php echo esc_attr( $field['edit_mode'] ?? 'inherit' ); ?>">
 				<?php if ( $field['required'] ) : ?><input type="hidden" name="<?php echo esc_attr( 'rules[fields][' . $index . '][required]' ); ?>" value="1"><?php endif; ?>
 				<?php if ( in_array( $field['type'], array( 'number', 'attribute', 'resource' ), true ) ) : ?>
 					<?php foreach ( array( 'min', 'max', 'start' ) as $key ) : ?><input type="hidden" name="<?php echo esc_attr( 'rules[fields][' . $index . '][' . $key . ']' ); ?>" value="<?php echo esc_attr( $field[ $key ] ); ?>"><?php endforeach; ?>

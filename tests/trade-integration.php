@@ -5,6 +5,7 @@ require_once dirname( __DIR__ ) . '/ps-pen-paper.php';
 require_once ABSPATH . 'wp-admin/includes/user.php';
 if ( is_multisite() ) { require_once ABSPATH . 'wp-admin/includes/ms.php'; }
 foreach ( array( 'campaign', 'universe', 'character', 'event', 'item', 'trade' ) as $type ) { call_user_func( 'ps_pen_paper_register_' . $type . '_type' ); }
+ps_pen_paper_register_asset_type();
 $original_user = get_current_user_id(); $users = array(); $parents = array();
 $check = function ( $condition, $message ) { if ( ! $condition ) { throw new RuntimeException( $message ); } };
 try {
@@ -361,11 +362,232 @@ try {
 		1 === get_post_meta( $bases['a'], '_pspp_wallet', true )['balance'] && 9 === get_post_meta( $bases['b'], '_pspp_wallet', true )['balance'] &&
 		'' === get_post_meta( $aliases['a'], '_pspp_wallet', true ) && '' === get_post_meta( $aliases['b'], '_pspp_wallet', true ) &&
 		$shared_gear === array( ps_pen_paper_gear_state( $aliases['a'] ), ps_pen_paper_gear_state( $aliases['b'] ) ), 'Shared gift used alias wallets or changed inventory.' );
-	WP_CLI::success( 'Single and batch gift/sale/swap, money gifts, GM removals, consent, reservations, atomic rollback, capacity, shared wallet locks, pending equipment, import mapping and replay guards passed.' );
+	wp_set_current_user( $users['gm'] );
+	$tc = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'],
+		'post_title' => 'Transfer target fixture' ), true );
+	$check( is_int( $tc ), 'Transfer target campaign failed.' ); $parents[] = $tc; $target = ps_pen_paper_get_campaign( $tc );
+	foreach ( array( 'a', 'b' ) as $key ) { add_post_meta( $tc, '_pspp_player', (string) $users[ $key ] ); }
+	$check( ! is_wp_error( ps_pen_paper_save_universe_link( $tc, $u, '0', '1', 'confirmed' ) ) &&
+		! is_wp_error( ps_pen_paper_adopt_universe_rules( $tc, '1', 'confirmed' ) ), 'Transfer target link failed.' );
+	$target_chars = array();
+	foreach ( array( 'a', 'b' ) as $key ) {
+		$target_chars[ $key ] = ps_pen_paper_attach_base_character( $tc, $bases[ $key ], '1', '1', 'shared', 'confirmed' );
+		$check( is_int( $target_chars[ $key ] ), 'Transfer target character failed.' );
+	}
+	$check( is_wp_error( ps_pen_paper_transfer_context( $shared, $target, $aliases['a'], $target_chars['b'], false ) ),
+		'Cross-campaign transfers were enabled by default.' );
+	$policy['transfers'] = '1';
+	$check( true === ps_pen_paper_save_trade_policy( $universe, $policy, '1' ), 'Universe transfer permission failed.' );
+	$image = wp_insert_post( array( 'post_type' => 'pspp_asset', 'post_status' => 'private', 'post_parent' => $sc,
+		'post_author' => $users['gm'], 'post_title' => 'Transfer image fixture', 'post_mime_type' => 'image/png',
+		'post_content' => 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=' ), true );
+	$check( is_int( $image ), 'Transfer image failed.' );
+	$check( true === ps_pen_paper_save_equipment_schema( $shared, array( 'slots' => 'hand | Hand | tool',
+		'rarities' => 'normal | Normal | #abcdef' ), '0' ), 'Local transfer schema failed.' );
+	$local_item = ps_pen_paper_save_item( $shared, 0, $item_input, '0' );
+	$check( is_int( $local_item ), 'Local transfer item failed.' );
+	$local_document = get_post_meta( $local_item, '_pspp_item', true ); $local_document['item']['asset_id'] = $image;
+	update_post_meta( $local_item, '_pspp_item', $local_document );
+	foreach ( array( $local_item, $local_item ) as $catalogue_id ) {
+		$check( true === ps_pen_paper_save_gear( $shared, $aliases['a'], 'grant_item',
+			array( 'item_id' => (string) $catalogue_id, 'item_revision' => '1' ),
+			(string) ps_pen_paper_gear_state( $aliases['a'] )['revision'] ), 'Transfer grant failed.' );
+	}
+	$check( true === ps_pen_paper_change_wallet( $shared, $aliases['a'], 'grant', '9', 'Transfer funds',
+		(string) get_post_meta( $bases['a'], '_pspp_wallet', true )['revision'], (string) ps_pen_paper_currency_document( $u )['revision'] ), 'Transfer funds failed.' );
+	wp_set_current_user( $users['a'] );
+	$check( true === ps_pen_paper_save_gear( $shared, $aliases['a'], 'equip_items', array( 'slots' => array() ),
+		(string) ps_pen_paper_gear_state( $aliases['a'] )['revision'] ), 'Transfer sender pending fixture failed.' );
+	wp_set_current_user( $users['b'] );
+	$check( true === ps_pen_paper_save_gear( $target, $target_chars['b'], 'equip_items', array( 'slots' => array() ), '0' ), 'Transfer recipient pending fixture failed.' );
+	wp_set_current_user( $users['gm'] );
+	$transfer_items = array_keys( ps_pen_paper_gear_state( $aliases['a'] )['active']['items'] );
+	$transfer = array( 'items' => $transfer_items, 'amount' => '3', 'confirmation' => 'confirmed', 'token' => wp_generate_uuid4(),
+		'gear_revision' => (string) ps_pen_paper_gear_state( $aliases['a'] )['revision'],
+		'target_gear_revision' => (string) ps_pen_paper_gear_state( $target_chars['b'] )['revision'],
+		'policy_revision' => '2', 'wallet_revision' => (string) get_post_meta( $bases['a'], '_pspp_wallet', true )['revision'],
+		'target_wallet_revision' => (string) get_post_meta( $bases['b'], '_pspp_wallet', true )['revision'],
+		'currency_revision' => (string) ps_pen_paper_currency_document( $u )['revision'],
+		'target_currency_revision' => (string) ps_pen_paper_currency_document( $u )['revision'],
+		'epochs' => array( $sc => ps_pen_paper_scope_epoch( $sc ), $tc => ps_pen_paper_scope_epoch( $tc ), $u => ps_pen_paper_scope_epoch( $u ) ) );
+	wp_set_current_user( $users['a'] );
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $transfer ) ),
+		'Player bypassed transfer control.' );
+	ob_start(); ps_pen_paper_render_character_transfers( $shared, get_post( $aliases['a'] ), $page_id );
+	$check( '' === ob_get_clean(), 'Transfer form was exposed to a player.' );
+	add_post_meta( $sc, '_pspp_gm', (string) $users['other'] ); wp_set_current_user( $users['other'] );
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $transfer ) ),
+		'A GM of only the source campaign transferred into another campaign.' );
+	wp_set_current_user( $users['gm'] );
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $campaign, $aliases['a'], $a, $transfer ) ),
+		'Transfer reached a campaign outside the universe.' );
+	$foreign_u = ps_pen_paper_save_universe( 0, array( 'name' => 'Foreign transfer universe', 'description' => '' ), '0' );
+	$check( is_int( $foreign_u ), 'Foreign transfer universe failed.' ); $parents[] = $foreign_u;
+	$fc = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'],
+		'post_title' => 'Foreign transfer campaign' ), true ); $check( is_int( $fc ), 'Foreign transfer campaign failed.' ); $parents[] = $fc;
+	$check( ! is_wp_error( ps_pen_paper_save_universe_link( $fc, $foreign_u, '0', '1', 'confirmed' ) ) &&
+		is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, ps_pen_paper_get_campaign( $fc ), $aliases['a'], $a, $transfer ) ),
+		'Transfer crossed into a different universe.' );
+	$bad = $transfer; $bad['confirmation'] = '';
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $bad ) ), 'Unconfirmed transfer succeeded.' );
+	$bad = $transfer; $bad['epochs'][ $tc ] = wp_generate_uuid4();
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $bad ) ), 'Transfer used a stale target epoch.' );
+	$bad = $transfer; $bad['items'] = array( $transfer_items[0], $transfer_items[0] );
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $bad ) ), 'Transfer duplicated an instance.' );
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['a'], $transfer ) ),
+		'Same shared wallet was debited and credited as separate accounts.' );
+	$locked = ps_pen_paper_with_character_lock( $bases['b'], function () use ( $shared, $target, $aliases, $target_chars, $transfer ) {
+		return ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $transfer );
+	} );
+	$check( is_wp_error( $locked ), 'Transfer bypassed the actual recipient wallet lock.' );
+	$bad = $transfer; $bad['policy_revision'] = '1';
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $bad ) ), 'Transfer ignored a stale universe policy.' );
+	$bad = $transfer; $bad['amount'] = '11';
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $bad ) ) &&
+		10 === get_post_meta( $bases['a'], '_pspp_wallet', true )['balance'], 'Unfunded transfer debited the source.' );
+	wp_set_current_user( $users['a'] );
+	$reservation = ps_pen_paper_offer_trade( $shared, $aliases['a'], $aliases['b'], 'sale', $transfer_items[0], '1',
+		$transfer['gear_revision'], '2', wp_generate_uuid4() );
+	$check( is_int( $reservation ), 'Transfer reservation fixture failed.' );
+	wp_set_current_user( $users['gm'] );
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $transfer ) ),
+		'Transfer bypassed a pending trade reservation.' );
+	wp_set_current_user( $users['a'] );
+	$check( true === ps_pen_paper_change_trade( $shared, $reservation, 'cancel', '1', 'confirmed' ), 'Transfer reservation cleanup failed.' );
+	wp_set_current_user( $users['gm'] );
+	$original_gear = ps_pen_paper_gear_state( $aliases['a'] );
+	foreach ( array( 'active', 'pending' ) as $slot_state ) {
+		$equipped = $original_gear; $equipped[ $slot_state ]['slots']['hand'] = $transfer_items[0];
+		update_post_meta( $aliases['a'], '_pspp_gear', $equipped );
+		$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $transfer ) ),
+			'Transfer moved an active or pending equipped item.' );
+	}
+	$bound_gear = $original_gear;
+	foreach ( array( 'active', 'pending' ) as $state ) { $bound_gear[ $state ]['items'][ $transfer_items[0] ]['item']['binding'] = 'bound'; }
+	update_post_meta( $aliases['a'], '_pspp_gear', $bound_gear );
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $transfer ) ), 'Transfer moved a character-bound instance.' );
+	$incompatible = $original_gear; $missing_bonus = wp_generate_uuid4();
+	foreach ( array( 'active', 'pending' ) as $state ) {
+		$incompatible[ $state ]['items'][ $transfer_items[0] ]['item']['bonuses'][ $missing_bonus ] = 5;
+	}
+	update_post_meta( $aliases['a'], '_pspp_gear', $incompatible );
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $transfer ) ),
+		'Transfer accepted bonus fields absent from the target rules.' );
+	update_post_meta( $aliases['a'], '_pspp_gear', $original_gear );
+	$before = array( ps_pen_paper_gear_state( $aliases['a'] ), ps_pen_paper_gear_state( $target_chars['b'] ),
+		get_post_meta( $bases['a'], '_pspp_wallet', true ), get_post_meta( $bases['b'], '_pspp_wallet', true ) );
+	foreach ( array( 'wallet_saved', 'gear_saved' ) as $kind ) {
+		$fail_event = static function ( $check, $object, $key, $value ) use ( $kind ) {
+			return '_pspp_event' === $key && $kind === ( $value['kind'] ?? '' ) ? false : $check;
+		};
+		add_filter( 'update_post_metadata', $fail_event, 10, 4 );
+		try {
+			$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $transfer ) ) &&
+				$before === array( ps_pen_paper_gear_state( $aliases['a'] ), ps_pen_paper_gear_state( $target_chars['b'] ),
+					get_post_meta( $bases['a'], '_pspp_wallet', true ), get_post_meta( $bases['b'], '_pspp_wallet', true ) ),
+				'Transfer journal failure left a partial transfer.' );
+		} finally { remove_filter( 'update_post_metadata', $fail_event, 10 ); }
+	}
+	$fail_receipt = static function ( $check, $object, $key ) { return '_pspp_transfer_receipts' === $key ? false : $check; };
+	add_filter( 'update_post_metadata', $fail_receipt, 10, 3 );
+	try {
+		$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $transfer ) ) &&
+			$before === array( ps_pen_paper_gear_state( $aliases['a'] ), ps_pen_paper_gear_state( $target_chars['b'] ),
+				get_post_meta( $bases['a'], '_pspp_wallet', true ), get_post_meta( $bases['b'], '_pspp_wallet', true ) ) &&
+			! get_posts( array( 'post_type' => 'pspp_asset', 'post_status' => 'private', 'post_parent' => $tc ) ),
+			'Failed transfer receipt left partial inventories, payments or copied private images.' );
+	} finally { remove_filter( 'update_post_metadata', $fail_receipt, 10 ); }
+	$recipient_before = ps_pen_paper_gear_state( $target_chars['b'] ); $full = $recipient_before;
+	while ( count( $full['active']['items'] ) < 99 ) { $full['active']['items'][ wp_generate_uuid4() ] = $local_document + array( 'source_id' => $local_item, 'scope_id' => $sc ); }
+	$full['pending']['items'] = $full['active']['items']; update_post_meta( $target_chars['b'], '_pspp_gear', $full );
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $transfer ) ) &&
+		10 === get_post_meta( $bases['a'], '_pspp_wallet', true )['balance'] &&
+		9 === get_post_meta( $bases['b'], '_pspp_wallet', true )['balance'], 'Full target inventory left a transfer payment behind.' );
+	update_post_meta( $target_chars['b'], '_pspp_gear', $recipient_before );
+	$target_value = implode( ':', array( $tc, $target_chars['b'], $transfer['target_gear_revision'],
+		$transfer['target_wallet_revision'], $transfer['target_currency_revision'], $transfer['epochs'][ $tc ] ) );
+	ob_start(); ps_pen_paper_render_character_transfers( $shared, get_post( $aliases['a'] ), $page_id ); $transfer_html = ob_get_clean();
+	$check( false !== strpos( $transfer_html, 'value="' . $target_value . '"' ) && 2 === substr_count( $transfer_html, 'name="transfer_items[]"' ),
+		'Transfer form omitted the eligible target or concrete instances.' );
+	$submit_frontend( array( 'pspp_operation' => 'transfer_campaign_assets', 'campaign_id' => (string) $sc,
+		'character_id' => (string) $aliases['a'], 'transfer_complete' => 'complete', 'transfer_target' => $target_value,
+		'transfer_items' => $transfer_items, 'transfer_amount' => '3', 'transfer_confirmation' => 'confirmed',
+		'transfer_token' => $transfer['token'], 'transfer_policy_revision' => '2', 'transfer_gear_revision' => $transfer['gear_revision'],
+		'transfer_wallet_revision' => $transfer['wallet_revision'], 'transfer_currency_revision' => $transfer['currency_revision'],
+		'transfer_source_epoch' => $transfer['epochs'][ $sc ], 'transfer_universe_epoch' => $transfer['epochs'][ $u ] ) );
+	foreach ( array( $aliases['a'], $target_chars['b'], $bases['a'], $bases['b'] ) as $id ) { clean_post_cache( $id ); }
+	$received = ps_pen_paper_gear_state( $target_chars['b'] );
+	$check( array() === ps_pen_paper_gear_state( $aliases['a'] )['active']['items'] &&
+		array() === ps_pen_paper_gear_state( $aliases['a'] )['pending']['items'] &&
+		$transfer_items === array_keys( $received['active']['items'] ) && $received['active']['items'] === $received['pending']['items'] &&
+		7 === get_post_meta( $bases['a'], '_pspp_wallet', true )['balance'] && 12 === get_post_meta( $bases['b'], '_pspp_wallet', true )['balance'],
+		'Frontend transfer lost UUIDs, pending inventory or conserved balances.' );
+	foreach ( $received['active']['items'] as $instance ) {
+		$check( $tc === $instance['scope_id'] && $local_item === $instance['source_id'] &&
+			$image !== $instance['item']['asset_id'] && ! is_wp_error( ps_pen_paper_private_image_data( $target, $instance['item']['asset_id'] ) ),
+			'Transferred private image or frozen source identity is invalid.' );
+	}
+	$check( true === ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $transfer ) &&
+		7 === get_post_meta( $bases['a'], '_pspp_wallet', true )['balance'], 'Transfer retry paid twice or lost its receipt.' );
+	$bad = $transfer; $bad['amount'] = '4';
+	$check( is_wp_error( ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $bad ) ), 'Transfer token accepted changed terms.' );
+	$money_only = $transfer; $money_only['items'] = array(); $money_only['amount'] = '2'; $money_only['token'] = wp_generate_uuid4();
+	$money_only['gear_revision'] = (string) ps_pen_paper_gear_state( $aliases['a'] )['revision'];
+	$money_only['target_gear_revision'] = (string) $received['revision'];
+	$money_only['wallet_revision'] = (string) get_post_meta( $bases['a'], '_pspp_wallet', true )['revision'];
+	$money_only['target_wallet_revision'] = (string) get_post_meta( $bases['b'], '_pspp_wallet', true )['revision'];
+	$money_gear = array( ps_pen_paper_gear_state( $aliases['a'] ), $received );
+	$check( true === ps_pen_paper_transfer_campaign_assets( $shared, $target, $aliases['a'], $target_chars['b'], $money_only ) &&
+		$money_gear === array( ps_pen_paper_gear_state( $aliases['a'] ), ps_pen_paper_gear_state( $target_chars['b'] ) ) &&
+		5 === get_post_meta( $bases['a'], '_pspp_wallet', true )['balance'] && 14 === get_post_meta( $bases['b'], '_pspp_wallet', true )['balance'],
+		'Money-only transfer changed inventory or failed to conserve balances.' );
+	unset( $policy['transfers'] );
+	$check( true === ps_pen_paper_save_trade_policy( $universe, $policy, '2' ) &&
+		is_wp_error( ps_pen_paper_transfer_context( $shared, $target, $aliases['a'], $target_chars['b'], false ) ),
+		'Universe transfer permission could not be revoked.' );
+	$policy['transfers'] = '1';
+	$check( true === ps_pen_paper_save_trade_policy( $universe, $policy, '3' ), 'Transfer permission reactivation failed.' );
+	$lc = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'],
+		'post_title' => 'Local currency transfer target' ), true );
+	$check( is_int( $lc ), 'Local currency campaign failed.' ); $parents[] = $lc; $local_target = ps_pen_paper_get_campaign( $lc );
+	add_post_meta( $lc, '_pspp_player', (string) $users['b'] );
+	$check( true === ps_pen_paper_save_currency( $local_target, array( 'name' => 'Local transfer currency', 'symbol' => 'LC', 'wallet_mode' => 'campaign' ), '0' ) &&
+		! is_wp_error( ps_pen_paper_save_universe_link( $lc, $u, '0', '1', 'confirmed', 'local' ) ) &&
+		! is_wp_error( ps_pen_paper_adopt_universe_rules( $lc, '1', 'confirmed' ) ), 'Local currency transfer fixture failed.' );
+	$local_character = ps_pen_paper_attach_base_character( $lc, $bases['b'], '1', '1', 'shared', 'confirmed' );
+	$check( is_int( $local_character ), 'Local currency recipient failed.' );
+	$check( is_wp_error( ps_pen_paper_transfer_context( $shared, $local_target, $aliases['a'], $local_character, true ) ) &&
+		! is_wp_error( ps_pen_paper_transfer_context( $target, $local_target, $target_chars['b'], $local_character, false ) ),
+		'Transfer converted local currency or unnecessarily blocked item-only transfers.' );
+	$item_only = array( 'items' => $transfer_items, 'amount' => '0', 'confirmation' => 'confirmed', 'token' => wp_generate_uuid4(),
+		'gear_revision' => (string) ps_pen_paper_gear_state( $target_chars['b'] )['revision'],
+		'target_gear_revision' => '0', 'policy_revision' => '4',
+		'epochs' => array( $tc => ps_pen_paper_scope_epoch( $tc ), $lc => ps_pen_paper_scope_epoch( $lc ), $u => ps_pen_paper_scope_epoch( $u ) ) );
+	$check( true === ps_pen_paper_transfer_campaign_assets( $target, $local_target, $target_chars['b'], $local_character, $item_only ) &&
+		$transfer_items === array_keys( ps_pen_paper_gear_state( $local_character )['active']['items'] ) &&
+		array() === ps_pen_paper_gear_state( $target_chars['b'] )['active']['items'] &&
+		5 === get_post_meta( $bases['a'], '_pspp_wallet', true )['balance'] && 14 === get_post_meta( $bases['b'], '_pspp_wallet', true )['balance'] &&
+		'' === get_post_meta( $local_character, '_pspp_wallet', true ), 'Item-only transfer changed balances or created a replacement wallet.' );
+	$archive = ps_pen_paper_export_campaign( $sc, 'complete' );
+	$check( ! is_wp_error( $archive ), 'Transferred source export failed.' );
+	$parsed = ps_pen_paper_parse_import( wp_json_encode( $archive, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+	$check( ! is_wp_error( $parsed ), 'Transfer receipt archive did not parse.' );
+	$options = array( 'operation' => 'copy', 'target_id' => 0, 'universe_mode' => 'copy', 'universe_id' => 0, 'users' => array(), 'bases' => array() );
+	foreach ( $parsed['users'] as $owner => $requirement ) { $options['users'][ $owner ] = $owner; }
+	$map = array(); foreach ( array_keys( $parsed['records'] ) as $source_id ) { $map[ $source_id ] = $source_id + 1000000; }
+	$prepared = ps_pen_paper_prepare_import( $parsed, $options, $map, false );
+	$check( ! is_wp_error( $prepared ), 'Transfer receipts failed native restoration preparation.' ); $receipt_found = false;
+	foreach ( $prepared[ $aliases['a'] ]['meta'] as $entry ) {
+		if ( '_pspp_transfer_receipts' !== $entry['key'] ) { continue; }
+		$receipt_found = isset( $entry['value'][ $transfer['token'] ] ) &&
+			$entry['value'] === get_post_meta( $aliases['a'], '_pspp_transfer_receipts', true ) && ps_pen_paper_valid_transfer_receipts( $entry['value'] );
+	}
+	$check( $receipt_found, 'Native restoration discarded transfer replay protection.' );
+	WP_CLI::success( 'Single/batch trade, controlled same-universe transfers, both-campaign authority, private image copies, shared wallet locks, atomic receipts, native mapping and replay guards passed.' );
 } finally {
 	wp_set_current_user( $original_user );
 	foreach ( $parents as $parent ) {
-		foreach ( get_posts( array( 'post_type' => array( 'pspp_trade', 'pspp_character', 'pspp_item', 'pspp_event' ), 'post_status' => array( 'private', 'draft' ), 'post_parent' => $parent, 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $child ) { wp_delete_post( $child, true ); }
+		foreach ( get_posts( array( 'post_type' => array( 'pspp_trade', 'pspp_character', 'pspp_item', 'pspp_event', 'pspp_asset' ), 'post_status' => array( 'private', 'draft' ), 'post_parent' => $parent, 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $child ) { wp_delete_post( $child, true ); }
 		wp_delete_post( $parent, true );
 	}
 	foreach ( $users as $user ) { is_multisite() ? wpmu_delete_user( $user ) : wp_delete_user( $user ); }

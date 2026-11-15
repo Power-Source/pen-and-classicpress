@@ -34,7 +34,7 @@ function ps_pen_paper_render_trade_policy( $scope, $page_id ) {
 	$p = $current['policy'];
 	?>
 	<section class="pspp-settings-section"><h3><?php esc_html_e( 'Handelsregeln', 'ps-pen-paper' ); ?></h3>
-	<p><?php esc_html_e( 'Handel bleibt innerhalb derselben Kampagne. Die Spielleitung bestimmt erlaubte Arten und zusätzliche Freigabe. Standardmäßig ist keine Handelsart aktiviert und eine Spielleiterfreigabe erforderlich. Eine Regeländerung macht offene Angebote nicht mehr ausführbar; sie können zurückgezogen oder abgelehnt werden.', 'ps-pen-paper' ); ?></p>
+	<p><?php esc_html_e( 'Spielerhandel bleibt innerhalb derselben Kampagne. Die Spielleitung bestimmt erlaubte Arten und zusätzliche Freigabe. Standardmäßig ist keine Handelsart aktiviert und eine Spielleiterfreigabe erforderlich. Eine Regeländerung macht offene Angebote nicht mehr ausführbar; sie können zurückgezogen oder abgelehnt werden.', 'ps-pen-paper' ); ?></p>
 	<?php if ( (int) $current['scope']->ID !== (int) $scope->ID ) : ?>
 		<p><?php esc_html_e( 'Diese Kampagne übernimmt die Handelsregeln ihres Universums ohne lokale Abweichung.', 'ps-pen-paper' ); ?></p>
 		<?php ps_pen_paper_render_trade_snapshot( $p ); ?>
@@ -43,6 +43,10 @@ function ps_pen_paper_render_trade_policy( $scope, $page_id ) {
 	<?php else : ps_pen_paper_form_start( 'save_trade_policy', 'pspp_campaign_' . $scope->ID, $scope->ID, $page_id ); ?>
 		<input type="hidden" name="trade_complete" value="complete"><input type="hidden" name="trade_policy_revision" value="<?php echo esc_attr( $p['revision'] ); ?>">
 		<?php foreach ( ps_pen_paper_trade_kinds() as $key => $label ) : ?><label class="pspp-check"><input type="checkbox" name="trade_policy[kinds][]" value="<?php echo esc_attr( $key ); ?>" <?php checked( in_array( $key, $p['kinds'], true ) ); ?>><?php echo esc_html( $label ); ?></label><?php endforeach; ?>
+		<?php if ( 'pspp_universe' === $scope->post_type ) : ?>
+			<label class="pspp-check"><input type="checkbox" name="trade_policy[transfers]" value="1" <?php checked( ! empty( $p['transfers'] ) ); ?>><?php esc_html_e( 'Kontrollierte Übertragungen zwischen Kampagnen dieses Universums erlauben', 'ps-pen-paper' ); ?></label>
+			<p><?php esc_html_e( 'Nur eine für beide Kampagnen berechtigte Spielleitung oder Administration kann eine Übertragung ausdrücklich bestätigen. Spielerhandel bleibt in der eigenen Kampagne. Getrennte Universen und Währungsumrechnungen sind ausgeschlossen.', 'ps-pen-paper' ); ?></p>
+		<?php endif; ?>
 		<label><?php esc_html_e( 'Nach Zustimmung beider Besitzer', 'ps-pen-paper' ); ?><select name="trade_policy[approval]"><option value="1" <?php selected( $p['approval'], true ); ?>><?php esc_html_e( 'Zusätzliche Spielleiterfreigabe erforderlich', 'ps-pen-paper' ); ?></option><option value="0" <?php selected( $p['approval'], false ); ?>><?php esc_html_e( 'Direkt abschließen', 'ps-pen-paper' ); ?></option></select></label>
 		<button type="submit"><?php esc_html_e( 'Handelsregeln speichern', 'ps-pen-paper' ); ?></button>
 	</form><?php endif; ?></section>
@@ -52,7 +56,11 @@ function ps_pen_paper_render_trade_policy( $scope, $page_id ) {
 function ps_pen_paper_render_trade_snapshot( $state ) {
 	if ( isset( $state['kinds'] ) ) {
 		echo '<p>' . esc_html( implode( ', ', array_intersect_key( ps_pen_paper_trade_kinds(), array_flip( $state['kinds'] ) ) ) ) . '</p>';
-		echo '<p>' . esc_html( $state['approval'] ? __( 'Spielleiterfreigabe erforderlich', 'ps-pen-paper' ) : __( 'Abschluss nach beiderseitiger Zustimmung', 'ps-pen-paper' ) ) . '</p>'; return;
+		echo '<p>' . esc_html( $state['approval'] ? __( 'Spielleiterfreigabe erforderlich', 'ps-pen-paper' ) : __( 'Abschluss nach beiderseitiger Zustimmung', 'ps-pen-paper' ) ) . '</p>';
+		if ( array_key_exists( 'transfers', $state ) ) {
+			echo '<p>' . esc_html( $state['transfers'] ? __( 'Kontrollierte Übertragungen im Universum erlaubt', 'ps-pen-paper' ) : __( 'Kampagnenübergreifende Übertragungen ausgeschaltet', 'ps-pen-paper' ) ) . '</p>';
+		}
+		return;
 	}
 	if ( ! $state['offer'] ) { echo '<p>' . esc_html__( 'Noch kein Angebot.', 'ps-pen-paper' ) . '</p>'; return; }
 	$o = $state['offer'];

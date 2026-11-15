@@ -189,7 +189,7 @@ function ps_pen_paper_parse_import( $json ) {
 			return ps_pen_paper_import_error();
 		}
 		if ( $parsed['universe_id'] && $record['parent_id'] === $parsed['universe_id'] && ! in_array( $record['type'],
-			array( 'pspp_character', 'pspp_item', 'pspp_npc', 'pspp_wiki_entry', 'pspp_event', 'pspp_asset' ), true ) ) { return ps_pen_paper_import_error(); }
+			array( 'pspp_character', 'pspp_item', 'pspp_npc', 'pspp_wiki_entry', 'pspp_loot_table', 'pspp_event', 'pspp_asset' ), true ) ) { return ps_pen_paper_import_error(); }
 	}
 	$references = array();
 	foreach ( $parsed['meta'] as $id => $metadata ) {

@@ -135,6 +135,7 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 	if ( ! ps_pen_paper_community_available() ) {
 		echo '<p>' . esc_html__( 'Inventar, Guthaben und Ausrüstung sind ohne PS Community inaktiv; gespeicherte Bestände bleiben erhalten.', 'ps-pen-paper' ) . '</p>';
 		ps_pen_paper_render_character_trade( $campaign, $character, $page_id );
+		ps_pen_paper_render_character_transfers( $campaign, $character, $page_id );
 		ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); return;
 	}
 	$gear = ps_pen_paper_gear_state( $character->ID );

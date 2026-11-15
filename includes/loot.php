@@ -18,6 +18,22 @@ function ps_pen_paper_can_manage_loot( $campaign ) {
 		'private' === $campaign->post_status && ps_pen_paper_can_manage_campaign( $campaign );
 }
 
+function ps_pen_paper_loot_scopes( $scope ) {
+	if ( ! ps_pen_paper_can_access_site() || ! $scope || ! ps_pen_paper_get_character_scope( $scope->ID ) ||
+		! ps_pen_paper_can_manage_character_scope( $scope ) ) { return ps_pen_paper_loot_error(); }
+	$scopes = array( $scope->ID => $scope );
+	if ( 'pspp_campaign' === $scope->post_type ) {
+		$link = ps_pen_paper_get_universe_link( $scope->ID );
+		if ( is_wp_error( $link ) ) { return $link; }
+		if ( $link['universe_id'] ) {
+			$universe = ps_pen_paper_get_universe( $link['universe_id'] );
+			if ( ! $universe ) { return ps_pen_paper_loot_error(); }
+			$scopes[ $universe->ID ] = $universe;
+		}
+	}
+	return $scopes;
+}
+
 function ps_pen_paper_loot_spec( $expression, $limit, $zero = true, $dice = null ) {
 	if ( ! is_string( $expression ) ) { return ps_pen_paper_loot_error(); }
 	if ( preg_match( '/^(0|[1-9]\d{0,8})$/D', $expression ) ) {
@@ -164,16 +180,18 @@ function ps_pen_paper_loot_snapshot_limits( $state ) {
 }
 
 function ps_pen_paper_get_loot_table( $campaign, $id ) {
-	if ( ! ps_pen_paper_can_manage_loot( $campaign ) ) { return ps_pen_paper_loot_error(); }
+	$scopes = ps_pen_paper_loot_scopes( $campaign );
+	if ( is_wp_error( $scopes ) ) { return $scopes; }
 	$post = ps_pen_paper_record_post( $id ); $state = get_post_meta( $id, '_pspp_loot_table', true );
-	return $post && 'pspp_loot_table' === $post->post_type && 'private' === $post->post_status && (int) $post->post_parent === (int) $campaign->ID &&
+	return $post && 'pspp_loot_table' === $post->post_type && 'private' === $post->post_status && isset( $scopes[ (int) $post->post_parent ] ) &&
 		ps_pen_paper_valid_loot_table( $state, 0, array( (int) $id ) ) && $state['revision'] > 0 ? $state : ps_pen_paper_loot_error();
 }
 
 function ps_pen_paper_loot_tables( $campaign ) {
-	if ( ! ps_pen_paper_can_manage_loot( $campaign ) ) { return ps_pen_paper_loot_error(); }
+	$scopes = ps_pen_paper_loot_scopes( $campaign );
+	if ( is_wp_error( $scopes ) ) { return $scopes; }
 	$tables = array();
-	foreach ( get_posts( array( 'post_type' => 'pspp_loot_table', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'ASC' ) ) as $post ) {
+	foreach ( get_posts( array( 'post_type' => 'pspp_loot_table', 'post_status' => 'private', 'post_parent__in' => array_keys( $scopes ), 'posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'ASC' ) ) as $post ) {
 		$state = ps_pen_paper_get_loot_table( $campaign, $post->ID );
 		if ( is_wp_error( $state ) ) { return $state; }
 		$tables[ $post->ID ] = $state;
@@ -199,11 +217,12 @@ function ps_pen_paper_save_loot_table( $campaign, $id, $input, $revision ) {
 
 function ps_pen_paper_save_loot_table_locked( $campaign, $id, $input, $revision ) {
 	if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
-	if ( ! ps_pen_paper_can_manage_loot( $campaign ) || ! is_array( $input ) || ! isset( $input['name'], $input['die'], $input['rows'] ) ||
+	if ( is_wp_error( ps_pen_paper_loot_scopes( $campaign ) ) || ! is_array( $input ) || ! isset( $input['name'], $input['die'], $input['rows'] ) ||
 		! is_string( $input['name'] ) || ! is_string( $input['die'] ) || ! is_array( $input['rows'] ) || count( $input['rows'] ) > 30 ) { return ps_pen_paper_loot_error(); }
 	$result = ps_pen_paper_atomic_event( $campaign->ID, function () use ( $campaign, &$id, $input, $revision ) {
-		$campaign = ps_pen_paper_get_campaign( $campaign->ID );
-		if ( ! ps_pen_paper_can_manage_loot( $campaign ) ) { return ps_pen_paper_loot_error(); }
+		$campaign = ps_pen_paper_get_character_scope( $campaign->ID );
+		if ( is_wp_error( ps_pen_paper_loot_scopes( $campaign ) ) ||
+			( $id && (int) get_post_field( 'post_parent', $id ) !== (int) $campaign->ID ) ) { return ps_pen_paper_loot_error(); }
 		if ( $id ) { clean_post_cache( $id ); }
 		$before = $id ? ps_pen_paper_get_loot_table( $campaign, $id ) : array( 'revision' => 0, 'table' => null );
 		if ( is_wp_error( $before ) || ! is_string( $revision ) || (string) $before['revision'] !== $revision ) { return ps_pen_paper_loot_error(); }

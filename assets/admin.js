@@ -3,6 +3,7 @@
 
 const psppDirtyForms = new Set();
 document.querySelectorAll('[data-pspp-form]').forEach((form) => {
+	if (form.hasAttribute('data-pspp-download')) return;
 	form.addEventListener('input', () => psppDirtyForms.add(form));
 	form.addEventListener('change', () => psppDirtyForms.add(form));
 });
@@ -65,6 +66,7 @@ window.addEventListener('beforeunload', (event) => {
 	}
 });
 document.addEventListener('submit', (event) => {
+	if (event.target.hasAttribute('data-pspp-download')) return;
 	const others = Array.from(psppDirtyForms).filter((form) => form !== event.target);
 	if (others.length && !window.confirm(others[0].dataset.unsavedMessage)) {
 		event.preventDefault();

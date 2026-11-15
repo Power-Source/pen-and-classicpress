@@ -53,8 +53,12 @@ function ps_pen_paper_get_folio( $campaign, $id ) {
 	$post = get_post( $id );
 	$value = get_post_meta( $id, '_pspp_folio', true );
 	if ( ! $post || 'pspp_folio' !== $post->post_type || 'private' !== $post->post_status ||
-		(int) $post->post_parent !== (int) $campaign->ID || ! is_array( $value ) ||
-		! isset( $value['revision'], $value['draft'] ) || ! array_key_exists( 'published', $value ) ||
+		(int) $post->post_parent !== (int) $campaign->ID ) { return ps_pen_paper_folio_error(); }
+	return ps_pen_paper_validate_folio_state( $value );
+}
+
+function ps_pen_paper_validate_folio_state( $value ) {
+	if ( ! is_array( $value ) || ! isset( $value['revision'], $value['draft'] ) || ! array_key_exists( 'published', $value ) ||
 		! is_int( $value['revision'] ) || $value['revision'] < 1 ||
 		! ps_pen_paper_validate_folio_snapshot( $value['draft'] ) ||
 		( null !== $value['published'] && ( 'handout' !== $value['draft']['type'] || ! ps_pen_paper_validate_folio_snapshot( $value['published'], true ) ) ) ) {

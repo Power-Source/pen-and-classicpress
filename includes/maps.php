@@ -53,6 +53,10 @@ function ps_pen_paper_get_scene( $campaign, $id ) {
 		return ps_pen_paper_scene_error();
 	}
 	$state = get_post_meta( $id, '_pspp_scene', true );
+	return ps_pen_paper_validate_scene_state( $state );
+}
+
+function ps_pen_paper_validate_scene_state( $state ) {
 	if ( ! is_array( $state ) || ! isset( $state['revision'], $state['publication'], $state['draft'] ) || ! array_key_exists( 'published', $state ) ||
 		! is_int( $state['revision'] ) || $state['revision'] < 1 || ! is_int( $state['publication'] ) || $state['publication'] < 0 ||
 		is_wp_error( ps_pen_paper_validate_scene_snapshot( $state['draft'], true ) ) ||

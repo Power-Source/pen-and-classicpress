@@ -113,5 +113,6 @@ function ps_pen_paper_render_settings_directory( $page_id = 0 ) {
 		<?php endforeach; ?>
 	</ul>
 	<?php if ( ! $found ) : ?><p><?php esc_html_e( 'Du leitest derzeit keine Runde. Für Änderungen wende dich an deine Spielleitung.', 'ps-pen-paper' ); ?></p><?php endif; ?>
+	<?php ps_pen_paper_render_import_settings( $page_id ); ?>
 	<?php
 }

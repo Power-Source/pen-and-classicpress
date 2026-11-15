@@ -1,6 +1,6 @@
 # PS Pen & Paper – Pluginhandbuch
 
-Stand: Version 0.25.0 · 15. November 2026.
+Stand: Version 0.26.0 · 15. November 2026.
 
 Dieses Handbuch beschreibt den vorhandenen Funktionsumfang, nicht die gesamte
 Roadmap. Die Abbildungen zur Demorunde stammen aus der tatsächlich angelegten
@@ -33,6 +33,7 @@ Eine fremde Partnerprogramm-Debugleiste wurde nur für diese Aufnahmen ausgeblen
 19. [Öffentliches Weltlexikon mit PS Wiki](#19-öffentliches-weltlexikon-mit-ps-wiki)
 20. [Geschenke, Verkauf und Tausch](#20-geschenke-verkauf-und-tausch)
 21. [Soloabenteuer](#21-soloabenteuer)
+22. [Kampagne sichern](#22-kampagne-sichern)
 
 ## 1. Ist das schon spielbar?
 
@@ -52,6 +53,7 @@ sind seit 0.13.0 enthalten.
 | Spielleitermappe, geschützte Text-/Bild-Handouts und responsive Bedienung | Strukturierte NPC-Werte und private PDF-Dateien |
 | Private Porträts sowie Community-gebundene Inventare, Ausrüstung und kontrollierter Handel | Stapelmengen und automatische Gegenstandssynchronisierung |
 | Soloabenteuer mit freigegebenen Szenen, UND-/ODER-Wertebedingungen, Proben, optionalen Kosten und Belohnungen sowie privaten Einzeldurchläufen | Gruppenabenteuer, hybride Freigabeschritte und Verbrauch gemeinsamer Basisressourcen |
+| Privater, versionierter Kampagnenexport mit lokalen oder berechtigten Universumsdaten | Import mit Vorschau und geprüfte Wiederherstellung |
 
 Die Spielleitung kann Szenentexte und Karten vorbereiten und gezielt anzeigen.
 Die Kampagnenbeschreibung eignet sich weiter für eine gemeinsame Einleitung,
@@ -1609,3 +1611,110 @@ In der Nebelhafen-Demo ist **Die Wetterkapsel vor dem Ablegen** als
 Soloabenteuer freigegeben. Jorins Durchlauf endete nach einer erfolgreichen
 Verstandprobe mit 9 gegen Zielwert 7 an der Szene **Auf dem Servicesteg**.
 Die aktive Gruppenszene und Jorins Charakterbogen blieben dabei unverändert.
+
+## 22. Kampagne sichern
+
+Seit **0.26.0** können Spielleitungen eine versionierte JSON-Sicherung
+herunterladen:
+
+1. Die Kampagne öffnen und **Rundeneinstellungen → Kampagne sichern** wählen.
+   Dieselbe Funktion steht bei der Kampagne im Backend bereit.
+2. Die **Exportvariante** auswählen:
+   - **Lokale Kampagnendaten mit ausgewiesenen Abhängigkeiten:** Sichert
+     ausschließlich die kampagneneigenen Plugin-Daten und Bilder. Gemeinsame
+     Universumsdaten und zugeordnete Basisbögen werden nicht mitkopiert,
+     sondern als benötigte, nicht enthaltene Abhängigkeiten ausgewiesen.
+   - **Vollständig einschließlich benötigter Universumsdaten:** Sichert
+     zusätzlich die Universumsdefinitionen und gemeinsamen Gegenstands-,
+     NPC- und plugininternen Wiki-Kataloge, tatsächlich zugeordnete gemeinsame
+     Basisbögen sowie benötigte Bilder und zugehörige Ereignisse. Dafür muss
+     die exportierende Person auch das zugeordnete Universum verwalten dürfen.
+     Ohne Universumszuordnung werden nur die Kampagnendaten benötigt.
+3. Bestätigen, dass die Datei private Inhalte enthält und geschützt
+   aufbewahrt wird.
+4. **JSON-Sicherung herunterladen** wählen und die Datei an einem geschützten
+   Ort speichern. Nicht in der öffentlichen Mediathek oder auf einer
+   öffentlich erreichbaren Website ablegen.
+
+Die Anfrage öffnet sich separat in einer neuen Registerkarte. Ungespeicherte
+Eingaben und Änderungswarnungen auf der bisherigen Seite bleiben erhalten,
+auch wenn die Exportanfrage einen Fehler meldet.
+
+Gesichert werden unter anderem Regeln, Mitgliedschaftszuordnungen, Charaktere
+mit freigegebenen und beantragten Ständen, Inventare, Guthaben, Kapitel,
+Handouts, Szenen, NPCs, Beutetabellen, Handelsstände, Würfe, Ereignisse,
+Soloabenteuer und Durchläufe sowie gespeicherte private Bilder. Geheimnisse,
+Entwürfe und private Protokolle sind ausdrücklich enthalten. Der Export
+verändert keine Spielstände, zahlt nichts aus und vergibt keine Gegenstände.
+Die Datei wird direkt heruntergeladen, nicht öffentlich auf dem Server abgelegt.
+
+Andere Kampagnen, unbeteiligte Universums-Basisbögen und deren private
+Protokolle bleiben ausgeschlossen. Eine unabhängige Kampagnenkopie nimmt
+ihren ursprünglichen Basisbogen nicht mit. Fehlende benötigte Bilder oder
+Basisbögen verhindern den vollständigen Export; die lokale Variante hält die
+entsprechenden Abhängigkeiten fest. Bereits gelöschte Bilder aus alten
+Ereignisprotokollen werden als historische Fehlbestände ausgewiesen und
+blockieren die Sicherung des aktuellen Stands nicht.
+
+**Nicht enthalten:** Benutzerkonten und Zugangsdaten, Community-Profile,
+Chatnachrichten sowie externe Wiki-Artikel und Kategorien. Ihre Verweise
+beziehungsweise die vorhandenen plugininternen Wiki-Stände bleiben erhalten.
+Sie müssen bei einer späteren Wiederherstellung kontrolliert zugeordnet
+werden; fremde Konten oder Integrationsdaten werden nicht automatisch kopiert.
+
+Die Datei enthält eine Formatversion und SHA-256-Prüfsumme. Diese erkennt
+Beschädigungen, ersetzt aber keine Zugriffsprüfung und ist keine Signatur.
+Die ursprünglichen Objekt- und Benutzer-IDs sind keine Erlaubnis zum
+Überschreiben vorhandener Zieldaten.
+
+**Schreibender Import und Wiederherstellung sind noch nicht verfügbar.**
+Die JSON-Datei ersetzt deshalb derzeit kein vollständiges Website-Backup.
+
+## 23. Private Importvorschau
+
+Seit **0.27.0** kann berechtigte Administration oder Spielleitung eine
+Sicherung prüfen und Zuordnungen vorbereiten:
+
+1. **Einstellungen → Sicherung prüfen und Wiederherstellung vorbereiten**
+   im Spielbereich oder Backend öffnen.
+2. Eine private JSON-Kampagnensicherung auswählen und **Datei prüfen und
+   Vorschau öffnen** wählen. Es gelten die angezeigten Hostgrenzen.
+3. **Pro Vorgang selbst auswählen:** neue Kampagne oder Ersatz einer bestehenden
+   verwaltbaren Kampagne. Neue Kampagnen und Universen benötigen die
+   ausdrücklich vergebene Erstellungsberechtigung.
+4. Enthaltene Universumsdaten getrennt wiederherstellen oder ein verwaltbares
+   vorhandenes Universum zuordnen. Eine Quelluniversumsverbindung wird nicht
+   still entfernt; eine eigenständige Kampagne ist ohne diese Abhängigkeit möglich.
+5. Quellbenutzer ausdrücklich bestehenden Websitekonten zuordnen. Rein
+   historische Konten dürfen ohne aktive Mitgliedschaft bleiben;
+   Charakterbesitzer und benötigte Autorisierungen brauchen eine Zuordnung.
+   Es werden keine Konten erstellt oder globale Rollen vergeben.
+6. Bei einem bestehenden Universum **Zuordnungen und Konflikte prüfen** wählen,
+   um dessen Basisbögen auszuwählen, danach erneut prüfen. Basisbogen,
+   Universum und zugeordneter Besitzer müssen zusammenpassen.
+7. Konflikte und Hinweise lesen. Bei Ersatz kann die aktuelle Zielkampagne
+   über **Aktuelle Zielkampagne vor dem Ersatz sichern** heruntergeladen werden.
+   **Private Vorschau verwerfen** entfernt die eigene Vorschau.
+
+Die Vorschau zeigt Quelle, Exportversion, Prüfsumme und enthaltene Datentypen.
+Seit **0.28.0** zeigt sie zusätzlich die **Fachdokumentprüfung**: Unterstützte
+Regel-, Charakter-, Story- und Wirtschaftsdokumente werden mit denselben
+Fachvalidatoren wie im Plugin geprüft. Ungültige Werte erscheinen als Konflikte;
+die Originalwerte werden nicht korrigiert oder überschrieben.
+Noch ungeprüfte Metadaten werden ausdrücklich aufgelistet. Protokollinhalte,
+fachliche Beziehungen und sämtliche ID-Zuordnungen sind damit noch nicht
+vollständig geprüft.
+Dateiformat, Struktur, Bilddaten und Kampagnenabgrenzung werden geprüft;
+fehlende Bilder, nicht passende Feldstrukturen oder lokale Guthabenwährungen
+werden nicht still ersetzt beziehungsweise umgerechnet. Zugeordnete bestehende
+Universumsdaten, Basiswerte und gemeinsame Guthaben bleiben unverändert.
+
+Die Originaldatei und Optionen bleiben privat an Konto und Website gebunden.
+Die Vorschau ist höchstens eine Stunde verfügbar; erneutes Prüfen verlängert
+die Frist nicht. Es wird keine öffentliche Datei oder Mediathekanlage erstellt.
+
+**Auch eine konfliktfreie Vorschau ist noch keine Wiederherstellung.**
+Vollständige Fachdokumentprüfung, kontrollierte ID-Zuordnung, atomare Speicherung,
+Absicherung zwischen Prüfung und Speicherung sowie Wiederholungsabwehr folgen.
+Spielstände, Inventare, Guthaben und historische Vergaben werden in dieser
+Etappe weder überschrieben noch erneut ausgeführt.

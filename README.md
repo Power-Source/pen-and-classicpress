@@ -82,6 +82,82 @@ gleich oder ungleich. Zahlen und Attribute verwenden den freigegebenen
 wirksamen Wert; Ressourcen können aktuellen Wert oder Maximum prüfen.
 Die Bedingungen verbrauchen nichts und werden mit ihren damaligen Werten
 im privaten Verlauf gespeichert. Ältere Mindestwerte bleiben unverändert gültig.
+Version 0.26.0 ergänzt einen privaten, versionierten JSON-Kampagnenexport:
+lokale Daten mit ausgewiesenen Abhängigkeiten oder zusätzlich benötigte
+Universumsdaten bei entsprechender Verwaltungsberechtigung. Eine SHA-256-Prüfsumme
+begleitet den unveränderten Datenstand. Version 0.27.0 ergänzt eine private
+Importvorschau mit ausdrücklichen Ziel-, Universums-, Benutzer- und
+Basisbogenzuordnungen. Ein schreibender Import und eine geprüfte Wiederherstellung
+fehlen noch; externe Konten und Integrationsdaten benötigen eigene Backups.
+Seit 0.28.0 prüft die Vorschau zusätzlich unterstützte Regel-, Charakter-,
+Story- und Wirtschaftsdokumente mit den vorhandenen Fachvalidatoren.
+Ungültige Werte werden als Konflikte angezeigt, nicht still korrigiert.
+
+## Kampagnenexport seit Version 0.26.0
+
+Unter **Rundeneinstellungen → Kampagne sichern** können Spielleitungen
+eine JSON-Datei herunterladen. Der Export verändert keine Spielstände,
+Guthaben, Vergaben oder IDs und legt keine öffentlich erreichbare Datei an.
+Er enthält private Inhalte einschließlich Geheimnissen und muss geschützt
+aufbewahrt werden. Der Download benötigt eine Nonce und die ausdrückliche
+Bestätigung dieses Datenschutzhinweises.
+Die Anfrage öffnet sich separat in einer neuen Registerkarte; ungespeicherte
+Eingaben und deren Änderungswarnungen bleiben auf der bisherigen Seite erhalten.
+
+- **Lokal:** Alle kampagneneigenen Plugin-Inhalte und `_pspp_`-Metadaten,
+  einschließlich Entwürfen, Inventaren, offenen Anträgen, Wurf-/Ereignishistorien,
+  Handouts, Szenen, Soloabenteuern und Durchläufen sowie gespeicherten Bildern.
+  Gemeinsame Universums-/Basisdaten werden als nicht enthaltene Abhängigkeiten
+  ausgewiesen.
+- **Vollständig:** Zusätzlich das zugeordnete Universumsdokument mit Regeln,
+  Währung und weiteren Einstellungen, gemeinsame Gegenstands-/NPC-/Wiki-Kataloge,
+  tatsächlich zugeordnete gemeinsame Basisbögen sowie deren benötigte Bilder
+  und zugehörige Ereignisse. Dafür muss die exportierende Person auch das
+  Universum verwalten dürfen. Eine unabhängige Kampagnenkopie nimmt ihren
+  ursprünglichen Basisbogen nicht mit. Andere Kampagnen, unbeteiligte Basisbögen
+  und deren private Protokolle bleiben ausgeschlossen.
+
+Fehlende benötigte Basisbögen oder Bilder sperren die vollständige Variante;
+die lokale Sicherung weist diese Bild-/Basisabhängigkeiten ausdrücklich aus.
+Bereits entfernte Bilder aus alten Ereignisprotokollen werden als nicht
+enthaltene historische Abhängigkeiten festgehalten und sperren den Export
+des aktuellen Stands nicht.
+
+Benutzerkonten, Zugangsdaten, Community-Profile, PS-Chat-Nachrichten und externe
+Wiki-Artikel/-Kategorien werden nicht exportiert. Benutzer- und
+Integrationsverweise beziehungsweise vorhandene plugininterne Wiki-Stände
+bleiben erhalten. **Es gibt noch keinen schreibenden Import und keinen geprüften
+Wiederherstellungsablauf. Die Datei ersetzt kein vollständiges Website-Backup.**
+
+## Private Importvorschau seit Version 0.27.0
+
+Unter **Einstellungen → Sicherung prüfen und Wiederherstellung vorbereiten**
+prüfen berechtigte Administration und Spielleitung eine JSON-Sicherung.
+Die Vorschau ist konten- und websitegebunden, höchstens eine Stunde verfügbar
+und liegt nicht in der öffentlichen Mediathek. Die Dateigröße richtet sich
+nach den Upload- und verfügbaren Speichergrenzen des Hosts.
+
+Die verantwortliche Person wählt **pro Vorgang**, innerhalb ihrer Rechte:
+
+- neue Kampagne oder Ersatz einer verwaltbaren bestehenden Kampagne;
+- enthaltenes Universum getrennt wiederherstellen oder vorhandenes Universum
+  und passende gemeinsame Basisbögen zuordnen; ohne Quelluniversum ist auch
+  eine eigenständige Kampagne möglich;
+- vorhandene Websitekonten ausdrücklich zuordnen; rein historische Konten
+  können ohne aktive Mitgliedschaft bleiben; Charakterbesitzer und benötigte
+  Autorisierungen brauchen eine Zuordnung.
+
+Dateiformat, Prüfsumme, Datentypen, private Bilddaten und Kampagnenabgrenzung
+werden geprüft. Fehlende Zuordnungen/Bilder, unpassende Basisbesitzer,
+Feldstrukturen oder lokale Guthabenwährungen erscheinen als Konflikte.
+Vorhandene Universumsdaten, Basiswerte und gemeinsame Guthaben bleiben
+bei einer Zuordnung unverändert. Die Zielkampagne kann aus der Vorschau
+privat gesichert und die Vorschau ausdrücklich verworfen werden.
+
+**Diese Etappe schreibt keine Spielstände zurück.** Vollständige
+Fachdokumentprüfung, atomare Wiederherstellung, abgesicherte ID-Zuordnung,
+Konflikte zwischen Vorschau und Speicherung sowie Wiederholungsabwehr
+stehen noch aus. Keine historischen Geld-/Gegenstandsaktionen werden ausgeführt.
 
 ## Geschützter Spielbereich im Frontend
 
@@ -881,6 +957,120 @@ Der interne Schreib-Callback liefert eine Ereignis-ID oder `0` ausschließlich
 für eine idempotente Wiederholung ohne Änderung; ein Fehler wird als `WP_Error`
 zurückgegeben. Direkte Rollen-Metadatenänderungen umgehen diese Historie und
 sind kein unterstützter Schreibweg für neue Integrationen.
+
+### Interne Exportschnittstelle und Dateiformat
+
+`ps_pen_paper_export_campaign(int $campaign_id, string $mode)` liefert ein
+Array oder `WP_Error`; `mode` ist `local` oder `complete`. Rechte gelten
+auch für PHP-Aufrufer. Der Export liest Beiträge und Metadaten einschließlich
+der berechtigten Universumsabhängigkeiten in einer gemeinsamen, ungecachten
+SQL-Abfrage. Anschließend werden Berechtigung und Universumszuordnung anhand
+dieses Stands erneut geprüft. Er schreibt keine Dokumente oder Ereignisse.
+Nichtstandard-Datenbankverbindungen und Replikationsmodelle sind noch nicht geprüft.
+
+Der äußere JSON-Umschlag enthält:
+
+- `format: "ps-pen-paper-campaign"`, `format_version: 1`, `plugin_version`
+  und UTC-Zeitstempel `created_at`;
+- `payload`: `source` mit Websiteadresse, Blog-/Kampagnen-ID, `mode`,
+  `meta_encoding: "wordpress-raw"`, `records`, `dependencies` und `external_data`;
+- `payload_sha256`: SHA-256 der mit
+  `JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES` kodierten `payload`,
+  unter Erhalt der Schlüssel- und Listenreihenfolge.
+
+Jeder Eintrag in `records` enthält `id`, `type`, `parent_id`, `author_id`,
+`status`, `title`, `content`, `excerpt`, `mime_type`, `date_gmt`, `modified_gmt`,
+`menu_order` und `meta`. `meta` ist eine Liste aus `{key, value}`; `value`
+enthält den unveränderten Datenbankstring, gegebenenfalls PHP-serialisiert.
+Mehrfache Rollenmetadaten, gespeicherte Schlüsselreihenfolgen, numerische
+Strings, UUIDs und eingefrorene historische Dokumente bleiben damit erhalten.
+Bilddaten stehen unverändert als Base64 im Inhalt ihrer `pspp_asset`-Datensätze.
+Die Formatversion betrifft dieses Sicherungsformat, nicht eine Migration
+gespeicherter Spielstände. Neue kampagneneigene Inhaltstypen müssen in der
+Exportsammlung ergänzt werden.
+
+`dependencies` weist Universen, gemeinsame Basisbögen und Bildverweise mit
+`included` aus. Bildverweise enthalten zusätzlich `referenced_by` und
+`historical`; historische Fehlbestände sind ausdrücklich sichtbar.
+`external_data` beschreibt die nicht enthaltenen Konten, Profile, Chatdaten
+und externen Wiki-Daten. Alte IDs sind Herkunftsverweise, keine Erlaubnis,
+vorhandene Zieldaten bei einem künftigen Import zu überschreiben.
+
+Die Prüfsumme erkennt Beschädigungen, ist aber keine Signatur und kein
+Vertrauens- oder Berechtigungsnachweis. Ein künftiger Import muss Format,
+Dokumente, Benutzer-/Objektzuordnungen und Zugriffsrechte unabhängig prüfen;
+keine fremden Metadaten ungeprüft deserialisieren oder direkt zurückschreiben
+und keine historischen Geld-/Gegenstandsaktionen erneut ausführen.
+
+`tests/export-integration.php` prüft lokale und vollständige Varianten,
+Gemeinschaftsbögen gegenüber unabhängigen Kopien, unveränderte Metadaten und
+Bildbytes, Prüfsumme, Fremddatenausschluss, fehlende Abhängigkeiten,
+geänderte Berechtigungen/Zuordnungen und Datenbankfehler:
+
+```bash
+wp --url=https://example.test/ --skip-plugins --skip-themes eval-file wp-content/plugins/pen-and-classicpress/tests/export-integration.php
+```
+
+Mit `PSPP_TEST_HTTP=1` werden zusätzlich echte Backend-/Frontend-Downloads
+einschließlich Nonce-/Bestätigungsprüfung und privater Downloadheader geprüft.
+Dafür muss das Plugin in HTTP-Anfragen aktiv sein und die Website vom
+Testprozess erreichbar sein. Es werden ausschließlich temporäre Testkonten,
+Kampagnen und eine Testseite verwendet; eine vorhandene Easy-Blogging-
+Installation erhält im Test die übliche Modus-Cookie-Kennung, damit nicht
+deren Erststartseite statt des Downloads antwortet.
+`node tests/export-ui.js` prüft, dass Downloads ungespeicherte Änderungen
+und deren Warnung erhalten, ohne das Verhalten normaler Formulare zu verändern.
+
+### Interne Importvorschau
+
+`ps_pen_paper_parse_import(string $json)` liefert geprüfte Archivstruktur,
+Datensätze, sicher dekodierte Metadaten, Benutzer-/Basisbedarf und fehlende
+Bilder oder `WP_Error`. PHP-Objekte, Enums und Referenzen werden vor einer
+Deserialisierung abgewiesen; normale Texte innerhalb serialisierter Strings
+bleiben erhalten. Die Prüfsumme ersetzt keine Berechtigungsprüfung.
+
+`ps_pen_paper_import_configuration($parsed, $options)` erwartet ein erfolgreiches
+Parsergebnis und prüft die aktuellen Rechte und ausdrücklich gewählten Ziele.
+Die Optionen enthalten `operation` (`copy`/`replace`), `target_id`,
+`universe_mode` (`none`/`copy`/`bind`), `universe_id`, `users` und `bases`.
+Bei Konten bedeutet `0` noch nicht zugeordnet und `-1` bewusst ohne aktives Konto;
+positive Werte sind bestehende Website-IDs. Leere Auswahlen werden als Konflikte
+angezeigt, nicht durch fachliche Standardentscheidungen ersetzt.
+Das Ergebnis enthält `conflicts`, `warnings`, `target_hash` und `universe_hash`,
+aber ausdrücklich keine Schreibfreigabe.
+
+Seit 0.28.0 enthält es außerdem `documents`: `checked` zählt fachlich geprüfte
+Dokumente, `conflicts` enthält Fehler und `deferred` die noch separat zu prüfenden
+Metadaten. `ps_pen_paper_import_documents($parsed)` nutzt vorhandene Validatoren
+für Regeln, Charakterstände, Szenen, Mappeneinträge, Figuren, Gegenstände,
+Inventare, Währung/Guthaben, Handel, Beute, Abenteuer und Wiki-Stände.
+Die reinen Szenen-, Mappen- und Inventarvalidatoren werden auch von den
+bisherigen Datenbank-Lesern verwendet. Originalwerte bleiben unverändert.
+Protokollinhalte, weitere Metadaten und die vollständige Auflösung fachlicher
+Beziehungen und IDs bleiben offen; ein konfliktfreier Bericht ist keine
+vollständige Archiv- oder Wiederherstellungsfreigabe.
+
+`ps_pen_paper_create_import_preview($json)` und
+`ps_pen_paper_get_import_preview($token)` verwalten private Transients mit
+Besitzer, Blog, Ablaufzeit, Originaldatei und gewählten Optionen. Änderungen
+verlängern die einstündige Verfügbarkeit nicht. Es gibt keinen Restore-Writer.
+
+`tests/import-preview-integration.php` prüft reale lokale/vollständige Exporte,
+gemeinsame und unabhängige Bögen, Laufzeitoptionen, Konten-/Besitzerprüfung,
+fehlerhafte Dateien, gefährliche Serialisierungen, genaue Dateigrößengrenzen,
+fehlende Bilder trotz entferntem Manifest und unveränderte Spielstände.
+Seit 0.28.0 prüft er zusätzlich neu berechnete Prüfsummen bei ungültigen
+Regel-/Charakterwerten, Geheimnisse in veröffentlichten Szenen, Guthabengrenzen
+und unveränderte Quelldokumente bei der Fachprüfung.
+Ausführung wie bei den übrigen WP-CLI-Integrationstests. Mit `PSPP_TEST_HTTP=1`
+werden echte Multipart-Uploads, wiederholte Konfigurationsformulare,
+Nonceprüfung, Verwerfen und die Vorschauseiten geprüft. Testkonten und
+Vorschautickets werden anschließend entfernt.
+Für die hier vorhandene externe Easy-Blogging-Startseitenregel kann zusätzlich
+`PSPP_TEST_HTTP_ADMIN_REDIRECT=1` gesetzt werden: Dann wird der bekannte
+Backend-GET-Redirect ausdrücklich geprüft und gemeldet, statt eine erfolgreiche
+Backendansicht zu behaupten. Backendaktionen und direkte Darstellung bleiben
+geprüft; die echte Frontend-Vorschauseite muss weiterhin funktionieren.
 
 `tests/equipment-integration.php` prüft die Community-Sperre mit erhaltenen
 Beständen, echte Community-Profil-Tab-Schnittstellen, private Porträts und

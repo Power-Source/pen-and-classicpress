@@ -6,6 +6,9 @@ PS Pen & Paper wird ein universeller Baukasten für Pen-and-Paper-Rollenspiele
 auf WordPress und ClassicPress. Spielleiter erschaffen eigene Kampagnen, Regeln,
 Charakterbögen und Abenteuer. Das Plugin schreibt weder eine Spielwelt noch ein
 bestimmtes Regelsystem vor.
+Fachliche Optionen wählt die jeweilige Administration oder Spielleitung
+innerhalb ihrer Rechte im Plugin, pro Vorgang beziehungsweise Kampagne.
+Persönliche Entwicklungspräferenzen werden nicht als globale Spielregeln festgelegt.
 
 Mehrere Kampagnen mit unterschiedlichen Regeln können auf derselben Website
 nebeneinander bestehen. Das Plugin soll ohne externe Spieleplattform,
@@ -121,6 +124,19 @@ einen endgültigen Funktionsumfang.
   sechs Vergleiche für Zahlen, Attribute und Ressourcen (aktueller Wert oder
   Maximum), ohne Verbrauch und mit unveränderlichem privatem Nachweis.
   Ältere Mindestwert-Voraussetzungen bleiben gültig.
+- Version 0.26.0 ergänzt einen privaten, versionierten JSON-Kampagnenexport:
+  lokal mit ausgewiesenen Abhängigkeiten oder einschließlich benötigter
+  Universumsdaten bei zusätzlicher Verwaltungsberechtigung. Andere Kampagnen
+  und unbeteiligte Basisbögen bleiben ausgeschlossen.
+- Version 0.27.0 ergänzt die private Importvorschau: Dateiprüfung,
+  neue oder bestehende Zielkampagne, getrennte oder bestehende Universumsdaten,
+  ausdrückliche Konten-/Basiszuordnung und Konfliktanzeige. Sie verändert
+  keine Spielstände; schreibender Import und geprüfte Wiederherstellung
+  sind weiterhin offen.
+- Version 0.28.0 ergänzt fachliche Dokumentprüfungen mit vorhandenen Regel-,
+  Charakter-, Story- und Wirtschaftsvalidatoren. Ungültige Stände werden
+  abgewiesen, noch ungeprüfte Metadaten ausdrücklich angezeigt. Protokolle,
+  vollständige Referenzauflösung und schreibende Wiederherstellung bleiben offen.
 
 ### Universum vor Kampagne: Grundmodell seit Version 0.11.0
 
@@ -355,6 +371,9 @@ optionale Wiki-Anbindung das öffentliche Weltlexikon. Seit **0.20.0** ist
 kontrollierter, konfigurierbarer Handel vorhanden.
 Seit 0.24.0 sind konfigurierbare Soloentscheidungsbelohnungen vorhanden.
 Seit 0.25.0 sind mehrere Wertebedingungen mit UND/ODER vorhanden.
+Seit 0.26.0 steht der erste versionierte Kampagnenexport bereit.
+Seit 0.27.0 steht die private Importvorschau mit frei wählbaren,
+berechtigungsgeprüften Zuordnungen bereit; sie schreibt noch keine Spielstände.
 
 Die funktionale Grundlage ist damit umfangreich genug, um zunächst ihre
 Sicherung, Wiederherstellung und verlässliche Nutzung zu priorisieren.
@@ -365,9 +384,11 @@ die Spielleitung; eine vollständige Game-Engine ist weiterhin kein Ziel.
 
 ### Reihenfolge der nächsten Schritte
 
-1. **Kampagnenexport und Wiederherstellung:** Zunächst einen vollständigen,
-   versionierten Export entwickeln, danach Import mit Vorschau und die
-   Wiederherstellung einer einzelnen Kampagne. Regeln, Charaktere, Inventare,
+1. **Kampagnenexport und Wiederherstellung:** Der versionierte Export steht
+   seit 0.26.0 in lokaler und vollständiger Variante bereit; seit 0.27.0
+   ergänzt ihn eine private Importvorschau. Als Nächstes folgen vollständige
+   Fachdokumentprüfung und atomare Wiederherstellung einer einzelnen Kampagne.
+   Regeln, Charaktere, Inventare,
    Währung und Guthaben, Kapitel, Szenen, Handouts, NPCs, Beutetabellen,
    Ereignishistorien, Soloabenteuer und Durchläufe sowie geschützte Assets
    berücksichtigen. Konflikte bestehender IDs und Benutzerzuordnungen
@@ -449,10 +470,26 @@ Ausbau weiterer Spielmechanismen:
   Charakteren und deckt keine externen Hook-Nebenwirkungen ab.
 - [ ] Echte Mehrprozess- und Zwei-Subsite-Tests sowie die unterstützte
   WordPress-/ClassicPress-/PHP-Matrix ergänzen.
-- [ ] Vollständigen, versionierten Kampagnenexport mit Regeln, Charakteren,
-  Szenen und geschützten Assets sowie die Wiederherstellung einzelner
-  Kampagnen vorziehen. Universumsbezüge und Benutzerzuordnungen ausdrücklich
-  behandeln; keine fremden oder nicht freigegebenen Daten mitexportieren.
+- [x] Seit 0.26.0 versionierten Kampagnenexport mit Regeln, Charakteren,
+  Szenen, Inventaren, Guthaben, Handouts, Protokollen, Abenteuerdurchläufen
+  und geschützten Assets bereitstellen. Lokale und vollständige Varianten,
+  Berechtigungen für benötigte Universumsdaten, ausgewiesene Abhängigkeiten
+  und Prüfsumme unterstützen; keine anderen Kampagnen oder unbeteiligten
+  Basisbögen mitexportieren. Backend-/Frontend-Downloads sind geprüft.
+- [x] Seit 0.27.0 private Importvorschau mit Format-/Prüfsummenprüfung,
+  Ziel- und Universumswahl, ausdrücklichen Konten-/Basiszuordnungen,
+  Konfliktanzeige, Zielsicherung und Verwerfen bereitstellen. Konten,
+  Websitegrenzen, Ablauf, reale Uploads und unveränderte Spielstände prüfen.
+- [ ] Schreibenden Import und die Wiederherstellung einzelner Kampagnen
+  ergänzen. Vollständige Fachdokumentprüfung, atomare Speicherung,
+  Änderungen zwischen Vorschau und Speicherung sowie Wiederholungsabwehr
+  absichern. Benutzer-/Objektzuordnungen, gemeinsame Universumsdaten und
+  externe Integrationen kontrolliert behandeln; keine stillen Überschreibungen
+  oder erneuten wirtschaftlichen Vergaben. Eine erfolgreiche Wiederherstellung
+  und sichere Ablehnung fehlerhafter Dateien nachweisen.
+- [x] Seit 0.28.0 vorhandene Fachvalidatoren in die private Importvorschau
+  einbinden, Dokumentfehler und verbleibenden Prüfbedarf ausdrücklich zeigen.
+  Keine Werte still korrigieren und keine wirtschaftlichen Vorgänge ausführen.
 - [ ] Interne Lese-/Schreibschnittstellen und kontrollierte Fach-Hooks
   dokumentieren; Tastatur- und Screenreader-Bedienung weiter prüfen.
 
@@ -883,7 +920,10 @@ Stabilisierungspriorität zurückgestellt.
 - [ ] Text- und Gegenstandsbedingungen als gesonderten Ausbau vorsehen.
 - [ ] Hybride Abläufe mit ausdrücklich notwendigen Spielleiterfreigaben ergänzen.
 
-Die Spielleitung bleibt Abenteuerautor und bestimmt je Kampagne den Modus:
+Abenteuerautor und ausführende Spielleitung sind getrennte Zuständigkeiten.
+Vorbereitete Abenteuer können von anderen Personen übernommen und ohne
+Beteiligung des ursprünglichen Autors gespielt werden. Die verantwortliche
+Administration beziehungsweise Spielleitung wählt den Modus innerhalb ihrer Rechte:
 
 | Modus | Ablauf |
 |---|---|
@@ -906,6 +946,10 @@ Die Spielleitung bleibt Abenteuerautor und bestimmt je Kampagne den Modus:
   Figuren würfeln und wie Teilnahme, Wiedereinstieg sowie gemeinsame
   Belohnungen behandelt werden. Keine stillschweigende Mehrheits- oder
   Gruppenführerregel voraussetzen.
+- Persönliche Charakterressourcen und gemeinsame Gruppenbestände getrennt
+  führen. Teilnehmerwechsel, Pausen und Wiedereinstieg dürfen den gemeinsamen
+  Fortschritt nicht löschen; Entscheidungsverfahren und Umgang mit abwesenden
+  Teilnehmern werden je Abenteuer konfiguriert.
 - Voraussetzungen, Ressourcenverbrauch, Würfe, Fortschritt und Übergänge
   auf dem Server prüfen. Parallele Aktionen und wiederholte Anfragen dürfen
   keinen mehrfachen Verbrauch, übersprungene Voraussetzungen oder doppelte
@@ -925,6 +969,25 @@ Die Spielleitung bleibt Abenteuerautor und bestimmt je Kampagne den Modus:
 - Keine automatische Kampf-Engine, Echtzeitpflicht oder KI-Abhängigkeit
   voraussetzen. Der Schwerpunkt bleibt ein systemoffener Pen-and-Paper-
   Baukasten, kein MMORPG und keine vollständige Tabletop-Engine.
+
+### Wiederverwendbare, eigenständig spielbare Abenteuerpakete
+
+- [ ] Versionierte Pakete aus Szenen, Entscheidungen, Voraussetzungen,
+  möglichen Folgen und benötigten Regel-/Vorlagendaten anbieten.
+  Abenteuerdefinitionen von persönlichen Spielständen und Teilnehmerkonten trennen.
+- [ ] Autoren wählen ausdrücklich, ob und für wen ein Paket bereitgestellt
+  wird. Geheimnisse für automatische Abläufe geschützt behalten; keine
+  privaten Kampagnenprotokolle, Konten oder laufenden Durchläufe mitveröffentlichen.
+- [ ] Übernommene Pakete als unabhängige, kontrolliert anpassbare Kopien verwenden.
+  Solo- und Gruppendurchläufe benötigen den ursprünglichen Autor nicht.
+  Hybride Pakete benötigen eine ausdrücklich zuständige örtliche Spielleitung.
+- [ ] Paketversionen und laufende Durchläufe getrennt halten. Änderungen am
+  Original dürfen laufende Abenteuer nicht ungefragt verändern.
+- [ ] „Pen & Paper“ und „Abenteuer“ als unterschiedliche Bedienbereiche
+  derselben Regel-, Charakter-, Rechte- und Speicherbasis ausbauen, nicht
+  als zwei konkurrierende Engines. Keine Flowchart-, Echtzeit- oder KI-Pflicht.
+
+Diese Erweiterung folgt nach der aktuellen Sicherungs- und Stabilisierungsarbeit.
 
 ## Phase 8: Mögliche spätere Erweiterungen
 

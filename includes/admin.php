@@ -29,7 +29,7 @@ function ps_pen_paper_enqueue_admin_assets( $hook ) {
 	$url = plugin_dir_url( dirname( __DIR__ ) . '/ps-pen-paper.php' );
 	wp_enqueue_style( 'ps-pen-paper-admin', $url . 'assets/admin.css', array(), '0.7.0' );
 	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.1' );
-	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.25.0', true );
+	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.26.0', true );
 	wp_enqueue_script( 'ps-pen-paper-style', $url . 'assets/styles.js', array(), '0.7.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
 	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.15.0' );
@@ -78,6 +78,8 @@ function ps_pen_paper_handle_admin_action() {
 	}
 
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
+	if ( in_array( $operation, array( 'preview_import', 'configure_import_preview', 'discard_import_preview' ), true ) ) { ps_pen_paper_handle_import_preview_action( $operation ); }
+	if ( 'export_campaign' === $operation ) { ps_pen_paper_handle_export_action(); }
 	if ( in_array( $operation, array( 'save_adventure', 'save_adventure_edge', 'remove_adventure_edge', 'publish_adventure', 'pause_adventure', 'resume_adventure', 'start_adventure', 'advance_adventure' ), true ) ) { ps_pen_paper_handle_adventure_action( $operation ); }
 	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) ) { ps_pen_paper_handle_trade_action( $operation ); }
 	if ( in_array( $operation, array( 'configure_wiki', 'prepare_wiki', 'publish_wiki' ), true ) ) { ps_pen_paper_handle_wiki_action( $operation ); }
@@ -306,10 +308,10 @@ function ps_pen_paper_handle_admin_action() {
 	ps_pen_paper_fail( __( 'Unbekannte Aktion.', 'ps-pen-paper' ) );
 }
 
-function ps_pen_paper_form_start( $operation, $nonce, $campaign_id = 0, $page_id = 0, $multipart = false ) {
+function ps_pen_paper_form_start( $operation, $nonce, $campaign_id = 0, $page_id = 0, $multipart = false, $download = false ) {
 	$action = apply_filters( 'pspp_form_action', $page_id ? get_permalink( $page_id ) : admin_url( 'admin-post.php' ) );
 	?>
-	<form method="post" action="<?php echo esc_url( $action ); ?>"<?php if ( $multipart ) { echo ' enctype="multipart/form-data"'; } ?> data-pspp-form data-unsaved-message="<?php esc_attr_e( 'Es gibt ungespeicherte Änderungen. Möchtest du sie verwerfen?', 'ps-pen-paper' ); ?>">
+	<form method="post" action="<?php echo esc_url( $action ); ?>"<?php if ( $multipart ) { echo ' enctype="multipart/form-data"'; } ?><?php if ( $download ) { echo ' target="_blank" rel="noopener" data-pspp-download'; } ?> data-pspp-form data-unsaved-message="<?php esc_attr_e( 'Es gibt ungespeicherte Änderungen. Möchtest du sie verwerfen?', 'ps-pen-paper' ); ?>">
 		<input type="hidden" name="action" value="ps_pen_paper">
 		<input type="hidden" name="pspp_operation" value="<?php echo esc_attr( $operation ); ?>">
 		<?php if ( $page_id ) : ?>

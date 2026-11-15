@@ -195,6 +195,10 @@ function ps_pen_paper_valid_item_instance( $item ) {
 function ps_pen_paper_gear_state( $character_id ) {
 	$state = get_post_meta( $character_id, '_pspp_gear', true );
 	if ( '' === $state ) { return array( 'revision' => 0, 'active' => array( 'items' => array(), 'slots' => array() ), 'pending' => null ); }
+	return ps_pen_paper_validate_gear_state( $state );
+}
+
+function ps_pen_paper_validate_gear_state( $state ) {
 	if ( ! is_array( $state ) || ! isset( $state['revision'], $state['active'] ) || ! array_key_exists( 'pending', $state ) ||
 		! is_int( $state['revision'] ) || $state['revision'] < 1 ) { return ps_pen_paper_equipment_error(); }
 	foreach ( array( $state['active'], $state['pending'] ) as $snapshot ) {

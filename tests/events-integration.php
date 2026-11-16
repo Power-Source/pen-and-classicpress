@@ -99,6 +99,18 @@ try {
 	$roll_input['label'] = '';
 	$public_roll = ps_pen_paper_roll_dice( $campaign_id, $roll_input, '2' );
 	pspp_event_assert( ! is_wp_error( $private_roll ) && ! is_wp_error( $hidden_roll ) && ! is_wp_error( $public_roll ), 'Could not create mixed journal fixtures.' );
+	wp_set_current_user( $users['gm'] );
+	$player_ids = array_column( ps_pen_paper_get_events( $campaign, 1, true )['events'], 'id' );
+	pspp_event_assert( in_array( $public_roll, $player_ids, true ) && ! in_array( $private_roll, $player_ids, true ) &&
+		! in_array( $hidden_roll, $player_ids, true ) && ! in_array( $created['id'], $player_ids, true ),
+		'GM player projection exposed foreign private events or hidden rolls.' );
+	pspp_event_assert( is_wp_error( ps_pen_paper_get_event( $campaign, $created['id'], true ) ) &&
+		is_wp_error( ps_pen_paper_get_roll( $campaign, $hidden_roll, true ) ) &&
+		! is_wp_error( ps_pen_paper_get_event( $campaign, $created['id'] ) ), 'Direct event projection weakened leadership or bypassed player privacy.' );
+	wp_set_current_user( $users['assistant'] );
+	pspp_event_assert( ! is_wp_error( ps_pen_paper_get_roll( $campaign, $private_roll, true ) ) &&
+		in_array( $private_roll, array_column( ps_pen_paper_get_events( $campaign, 1, true )['events'], 'id' ), true ),
+		'GM player projection lost its own private roll.' );
 	delete_post_meta( $campaign_id, '_pspp_gm', (string) $users['assistant'] );
 	add_post_meta( $campaign_id, '_pspp_player', (string) $users['assistant'] );
 	wp_set_current_user( $users['assistant'] );
@@ -291,8 +303,10 @@ try {
 		}
 	}
 	wp_set_current_user( $users['player'] );
-	$pending_id = ps_pen_paper_save_character( $campaign_id, 0, $users['player'], $character_input, '0', '2' );
-	pspp_event_assert( ! is_wp_error( $pending_id ), 'Could not create an initial approval request.' );
+	$initial_request = $character_input;
+	$initial_request['values'] = array( $attribute => '2', $resource => array( 'current' => '3', 'maximum' => '20' ) );
+	$pending_id = ps_pen_paper_save_character( $campaign_id, 0, $users['player'], $initial_request, '0', '2' );
+	pspp_event_assert( ! is_wp_error( $pending_id ), 'Could not create an initial approval request.' . ( is_wp_error( $pending_id ) ? ' ' . $pending_id->get_error_code() . ': ' . $pending_id->get_error_message() : '' ) );
 	wp_set_current_user( $users['gm'] );
 	pspp_event_assert( true === ps_pen_paper_review_character( $campaign_id, $pending_id, 'reject', '1' ), 'Could not reject an initial approval request.' );
 	wp_set_current_user( $users['player'] );

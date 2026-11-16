@@ -34,7 +34,7 @@ function ps_pen_paper_handle_transfer_action() {
 }
 
 function ps_pen_paper_render_character_transfers( $source, $character, $page_id ) {
-	if ( ! ps_pen_paper_community_available() || ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $source ) ) { return; }
+	if ( ! ps_pen_paper_community_available() || ! ps_pen_paper_can_access_site() || ! ps_pen_paper_management_view( $page_id ) || ! ps_pen_paper_can_manage_campaign( $source ) ) { return; }
 	$link = ps_pen_paper_get_universe_link( $source->ID );
 	if ( is_wp_error( $link ) ) { echo '<p role="alert">' . esc_html( $link->get_error_message() ) . '</p>'; return; }
 	if ( ! $link['universe_id'] ) { return; }

@@ -22,6 +22,26 @@
 	padding-bottom: 70px;
 }
 
+.pspp-workspace-navigation,
+.pspp-preparation > header,
+.pspp-preparation > section,
+.pspp-preparation > nav,
+.pspp-workspace > .pspp-play-directory,
+.pspp-workspace > .pspp-campaign-journal,
+.pspp-workspace > #pspp-rulebook,
+.pspp-workspace > #pspp-handouts {
+	padding: 16px 24px;
+}
+
+.pspp-workspace-navigation [aria-current="page"] {
+	font-weight: 700;
+	border-bottom: 3px solid var(--pspp-accent);
+}
+
+.pspp-preparation > section {
+	border-top: 1px solid var(--pspp-border);
+}
+
 .pspp-game .pspp-table-header {
 	display: flex;
 	align-items: center;

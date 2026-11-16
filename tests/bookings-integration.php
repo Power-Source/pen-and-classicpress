@@ -80,6 +80,9 @@ try {
 	$rows = $success( ps_pen_paper_booking_events( $round ), 'Lobby events failed' );
 	$check( 1 === count( $rows ) && 'Noch keine Antwort' === $rows[0]['response'], 'An accessible lobby hid its appointment or invented a response.' );
 	$model = new Eab_EventModel( get_post( $event_id ) );
+	$identity_field = 'name="user_id" value="' . $users['player'] . '"';
+	$check( false !== strpos( Eab_Template::get_rsvp_form( get_post( $event_id ) ), $identity_field ),
+		'First native RSVP submitted a booking ID instead of the current user.' );
 	$success( $model->add_attendance( $users['player'], Eab_EventModel::BOOKING_YES ), 'Native RSVP failed' );
 	$rows = $success( ps_pen_paper_booking_events( $round ), 'Response loading failed' );
 	$check( Eab_Template::get_rsvp_status_list()['yes'] === $rows[0]['response'] &&
@@ -87,6 +90,7 @@ try {
 	$native_form = Eab_Template::get_rsvp_form( get_post( $event_id ) );
 	$check( false !== strpos( $native_form, 'name="action_no"' ) && false !== strpos( $native_form, 'name="_wpnonce"' ),
 		'Native participation actions were unavailable.' );
+	$check( false !== strpos( $native_form, $identity_field ), 'Changing a native RSVP submitted a booking ID instead of the current user.' );
 	$success( $model->cancel_attendance( $users['player'] ), 'Native RSVP cancellation failed' );
 	$check( Eab_Template::get_rsvp_status_list()['no'] === ps_pen_paper_booking_events( $round )[0]['response'] &&
 		$state === ps_pen_paper_play_round( $round_id ), 'Cancellation changed the game state or left a stale RSVP.' );
@@ -94,6 +98,16 @@ try {
 	$check( false !== strpos( $html, esc_url( get_permalink( $event_id ) ) ) &&
 		false !== strpos( $html, 'Termin &amp; Teilnahme' ) && false === strpos( $html, 'name="action_yes"' ), 'UI did not delegate participation to the native event page.' );
 	$check( 2 === count( ps_pen_paper_booking_agenda() ), 'Cross-context agenda omitted accessible appointments.' );
+	$bookings_table = Eab_EventsHub::tablename( Eab_EventsHub::BOOKING_TABLE );
+	$break_response = static function ( $query ) use ( $bookings_table, $event_id ) {
+		return 0 === strpos( $query, "SELECT status FROM $bookings_table WHERE event_id = $event_id " ) ? 'SELECT FROM' : $query;
+	};
+	$previous_suppression = $wpdb->suppress_errors( true );
+	add_filter( 'query', $break_response );
+	try { $unreadable = ps_pen_paper_booking_events( $round ); }
+	finally { remove_filter( 'query', $break_response ); $wpdb->suppress_errors( $previous_suppression ); }
+	$check( is_wp_error( $unreadable ) && 'booking_read_failed' === $unreadable->get_error_code(),
+		'Failed native booking lookup was displayed as no response.' );
 
 	wp_set_current_user( $users['outsider'] );
 	$check( array() === ps_pen_paper_booking_agenda() && array() === ps_pen_paper_booking_events( $round ),
@@ -101,6 +115,9 @@ try {
 	wp_set_current_user( $users['player'] );
 	wp_update_post( array( 'ID' => $event_id, 'post_status' => 'private' ) );
 	$check( array() === ps_pen_paper_booking_events( $round ), 'Private event bypassed native read permissions.' );
+	wp_set_current_user( $users['gm'] );
+	$check( 1 === count( ps_pen_paper_booking_events( $round ) ), 'Organizer could not read their own private event.' );
+	wp_set_current_user( $users['player'] );
 	wp_update_post( array( 'ID' => $event_id, 'post_status' => 'publish', 'post_password' => 'fixture-only' ) );
 	$check( array() === ps_pen_paper_booking_events( $round ), 'Password-protected event details were exposed.' );
 	wp_update_post( array( 'ID' => $event_id, 'post_password' => '' ) );
@@ -111,8 +128,7 @@ try {
 	update_post_meta( $event_id, 'psource_event_end', gmdate( 'Y-m-d H:i:s', eab_current_time() - 86400 ) );
 	$past_agenda = ps_pen_paper_booking_agenda(); $past_context = ps_pen_paper_booking_events( $round );
 	$check( array() === $past_agenda && is_array( $past_context ) && 1 === count( $past_context ),
-		'Past events remained upcoming or disappeared from their context: ' . wp_json_encode( array( $past_agenda, $past_context,
-			get_post_meta( $event_id, 'psource_event_start' ), get_post_meta( $event_id, 'psource_event_end' ) ) ) );
+		'Past events remained upcoming or disappeared from their context.' );
 	$solo = $state; $solo['mode'] = 'solo'; $solo['adventure_id'] = 1; $solo['host_id'] = $users['outsider'];
 	update_post_meta( $round_id, '_pspp_play_round', $solo );
 	$check( array() === ps_pen_paper_booking_events( $round ), 'Another player received private solo appointments.' );
@@ -123,8 +139,11 @@ try {
 	$success( ps_pen_paper_change_booking_link( $scope_id, $event_id, 'unlink', '1' ), 'Dead reference could not be removed' );
 	$success( ps_pen_paper_change_booking_link( $round_id, $event_id, 'unlink', '1' ), 'Round reference could not be removed' );
 	$success( wp_untrash_post( $event_id ), 'Restore event fixture failed' );
+	wp_update_post( array( 'ID' => $event_id, 'post_status' => 'publish' ) );
 	delete_post_meta( $event_id, 'psource_event_end' );
-	$check( is_wp_error( ps_pen_paper_change_booking_link( $scope_id, $event_id, 'link', '2' ) ), 'Invalid event dates were accepted.' );
+	$invalid_dates = ps_pen_paper_change_booking_link( $scope_id, $event_id, 'link', '2' );
+	$check( is_wp_error( $invalid_dates ) && 'booking_dates_missing' === $invalid_dates->get_error_code(), 'Invalid event dates were accepted.' );
+	update_post_meta( $event_id, 'psource_event_end', gmdate( 'Y-m-d H:i:s', eab_current_time() - 86400 ) );
 	update_post_meta( $scope_id, '_pspp_booking_links', array( 'revision' => 3, 'events' => array( 'bad' ) ) );
 	$check( is_wp_error( ps_pen_paper_booking_links( $scope_id ) ), 'Corrupt links became a successful empty schedule.' );
 	update_post_meta( $scope_id, '_pspp_booking_links', array( 'revision' => 3, 'events' => array( $event_id ) ) );
@@ -134,6 +153,8 @@ try {
 		$state === ps_pen_paper_play_round( $round_id ) && array( $event_id ) === ps_pen_paper_booking_links( $scope_id )['events'],
 		'Provider deactivation damaged the game, discarded links or exposed controls.' );
 	$check( is_wp_error( ps_pen_paper_change_booking_link( $scope_id, $event_id, 'unlink', '3' ) ), 'Inactive provider accepted a stale action.' );
+	( new Eab_Taxonomies() )->register_post_type();
+	$check( 1 === count( ps_pen_paper_booking_events( $scope ) ), 'Reactivation lost valid saved event associations.' );
 } finally {
 	remove_filter( 'pre_schedule_event', '__return_false' );
 	( new Eab_Taxonomies() )->register_post_type();
@@ -142,7 +163,10 @@ try {
 		foreach ( $children as $child ) { wp_delete_post( $child->ID, true ); }
 		wp_delete_post( $id, true );
 	}
-	foreach ( $users as $id ) { wp_delete_user( $id ); }
+	foreach ( $users as $id ) {
+		if ( is_multisite() ) { wpmu_delete_user( $id ); }
+		else { wp_delete_user( $id ); }
+	}
 	wp_set_current_user( $original_user );
 	foreach ( $tables as $table ) { $wpdb->query( "DROP TEMPORARY TABLE `$table`" ); }
 }

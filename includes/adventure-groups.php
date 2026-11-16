@@ -126,7 +126,7 @@ function ps_pen_paper_adventure_group_member( $campaign, $group, $user_id ) {
 	return null;
 }
 
-function ps_pen_paper_adventure_group_records( $campaign ) {
+function ps_pen_paper_adventure_group_records( $campaign, $player_view = false ) {
 	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_campaign( $campaign ) ) { return ps_pen_paper_adventure_group_error(); }
 	$records = array();
 	foreach ( get_posts( array( 'post_type' => 'pspp_adventure_group', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'ASC' ) ) as $post ) {
@@ -135,7 +135,7 @@ function ps_pen_paper_adventure_group_records( $campaign ) {
 		$joined = false;
 		foreach ( $group['participants'] as $participant ) { if ( $participant['owner_id'] === get_current_user_id() ) { $joined = true; } }
 		$records[ $post->ID ] = array( 'title' => $group['title'], 'status' => $group['status'], 'revision' => $group['revision'],
-			'state' => $joined || ps_pen_paper_can_manage_campaign( $campaign ) ? $group : null );
+			'state' => $joined || ( ! $player_view && ps_pen_paper_can_manage_campaign( $campaign ) ) ? $group : null );
 	}
 	return $records;
 }

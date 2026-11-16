@@ -37,7 +37,7 @@ function ps_pen_paper_handle_scene_action( $operation ) {
 	exit;
 }
 
-function ps_pen_paper_render_map( $campaign, $state, $preview = false ) {
+function ps_pen_paper_render_map( $campaign, $state, $preview = false, $page_id = 0 ) {
 	if ( is_wp_error( $state ) ) {
 		echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p>';
 		$state = array( 'scene' => null, 'ping' => null );
@@ -57,6 +57,7 @@ function ps_pen_paper_render_map( $campaign, $state, $preview = false ) {
 	);
 	?>
 	<div class="pspp-map" data-map data-map-endpoint="<?php echo esc_url( rest_url( 'ps-pen-paper/v1/campaigns/' . $campaign->ID . '/map' ) ); ?>"
+		data-map-view="<?php echo ps_pen_paper_management_view( $page_id ) ? 'lead' : 'overview'; ?>"
 		data-map-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>" data-map-preview="<?php echo $preview ? 'true' : 'false'; ?>"
 		data-map-state="<?php echo esc_attr( wp_json_encode( $state ) ); ?>" data-map-labels="<?php echo esc_attr( wp_json_encode( $labels ) ); ?>"<?php if ( ! $scene ) { echo ' hidden'; } ?>>
 		<header class="pspp-map-heading"><span class="pspp-eyebrow"><?php echo esc_html( $preview ? __( 'Private Spielervorschau – gespeicherter Entwurf', 'ps-pen-paper' ) : __( 'Aktuelle Szene', 'ps-pen-paper' ) ); ?></span>
@@ -223,7 +224,7 @@ function ps_pen_paper_render_story( $campaign, $page_id ) {
 	?>
 	<h2><?php esc_html_e( 'Abenteuer vorbereiten & leiten', 'ps-pen-paper' ); ?></h2>
 	<p><?php esc_html_e( 'Für den Anfang reicht eine Szene: Titel und Text schreiben, speichern, die Spielervorschau prüfen und freigeben. Mit „Am Tisch anzeigen“ sehen alle Teilnehmer die Szene. Karten, Kapitel und automatische Abenteuerentscheidungen sind optional.', 'ps-pen-paper' ); ?></p>
-	<p><a class="button" href="<?php echo esc_url( $base_url . '#pspp-play' ); ?>"><?php esc_html_e( 'Zum Spieltisch', 'ps-pen-paper' ); ?></a></p>
+	<p><a class="button" href="<?php echo esc_url( $page_id ? ps_pen_paper_play_url( $page_id, $campaign->ID ) : $base_url . '#pspp-play' ); ?>"><?php esc_html_e( 'Zum Spieltisch', 'ps-pen-paper' ); ?></a></p>
 	<details class="pspp-fold"<?php if ( ! $id && $plan['scenes'] ) { echo ' open'; } ?>>
 		<summary><?php esc_html_e( 'Abenteuerplan und aktuelle Spielleitungsnotizen', 'ps-pen-paper' ); ?></summary>
 		<?php ps_pen_paper_render_adventure_plan( $campaign, $page_id, $plan ); ?>

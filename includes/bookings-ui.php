@@ -31,10 +31,13 @@ function ps_pen_paper_render_booking_rows( $events, $page_id = 0, $agenda = fals
 		echo '</p><a class="button" href="' . esc_url( get_permalink( $event->ID ) ) . '">' . esc_html__( 'Termin & Teilnahme öffnen', 'ps-pen-paper' ) . '</a>';
 		if ( $agenda ) {
 			$round = ps_pen_paper_play_round( $scope->ID );
-			$url = $page_id ? ( $round ? ps_pen_paper_play_url( $page_id, $round['source_id'], 'choose', $scope->ID ) :
-				ps_pen_paper_play_url( $page_id, $scope->ID ) ) : ps_pen_paper_admin_url( $scope->ID );
-			$source = $round ? ps_pen_paper_get_campaign( $round['source_id'] ) : null;
-			echo ' <a href="' . esc_url( $url ) . '">' . esc_html( $source ? $source->post_title . ' · ' . $scope->post_title : $scope->post_title ) . '</a>';
+			if ( is_wp_error( $round ) ) { echo '<p role="alert">' . esc_html( $round->get_error_message() ) . '</p>'; }
+			else {
+				$url = $page_id ? ( $round ? ps_pen_paper_play_url( $page_id, $round['source_id'], 'choose', $scope->ID ) :
+					ps_pen_paper_play_url( $page_id, $scope->ID ) ) : ps_pen_paper_admin_url( $scope->ID );
+				$source = $round ? ps_pen_paper_get_campaign( $round['source_id'] ) : null;
+				echo ' <a href="' . esc_url( $url ) . '">' . esc_html( $source ? $source->post_title . ' · ' . $scope->post_title : $scope->post_title ) . '</a>';
+			}
 		}
 		echo '</li>';
 	}
@@ -60,7 +63,7 @@ function ps_pen_paper_render_booking_agenda( $page_id = 0 ) {
 }
 
 function ps_pen_paper_render_booking_settings( $scope, $page_id = 0 ) {
-	if ( ! ps_pen_paper_bookings_available() || ! ps_pen_paper_can_manage_campaign( $scope ) ) { return; }
+	if ( ! ps_pen_paper_bookings_available() || ! ps_pen_paper_can_manage_campaign( $scope ) || ! ps_pen_paper_management_view( $page_id ) ) { return; }
 	$links = ps_pen_paper_booking_links( $scope->ID );
 	if ( is_wp_error( $links ) ) { echo '<p role="alert">' . esc_html( $links->get_error_message() ) . '</p>'; return; }
 	?>

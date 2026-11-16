@@ -54,6 +54,7 @@ try {
 	$character = $assert_result( ps_pen_paper_save_character( $source, 0, $users['player'],
 		array( 'name' => 'Restore hero', 'values' => array( $rules['fields'][0]['id'] => '2' ) ), '0', '1' ), 'Character fixture failed' );
 	$assert_result( ps_pen_paper_save_access( $source, array( 'visibility' => 'teaser', 'admission' => 'approval', 'teaser' => 'Deliberate public teaser' ), '0' ), 'Access fixture failed' );
+	add_post_meta( $source, '_pspp_booking_links', array( 'revision' => 1, 'events' => array( 123 ) ) );
 	$archive = $assert_result( ps_pen_paper_export_campaign( $source, 'local' ), 'Export fixture failed' );
 	$json = $encode( $archive );
 	$copy = $preview( $json, 'copy' );
@@ -61,6 +62,7 @@ try {
 	$check( ps_pen_paper_import_configuration( $copy[2], $without_universe )['conflicts'], 'Legacy archive could be restored without an explicit universe.' );
 	$result = $assert_result( ps_pen_paper_restore_campaign( $copy[0], $copy[1], false, 'private' ), 'New campaign restore failed' );
 	$restored = ps_pen_paper_get_campaign( $result['campaign_id'] );
+	$check( array() === ps_pen_paper_booking_links( $restored->ID )['events'], 'Imported campaign adopted foreign scheduling references.' );
 	$restored_link = ps_pen_paper_get_universe_link( $result['campaign_id'] );
 	$check( $restore_world === $restored_link['universe_id'] && 'local' === $restored_link['economy_mode'], 'Legacy archive lost its selected universe or local economic rules.' );
 	$check( $restored && $restored->ID !== $source && 'private' === ps_pen_paper_get_access( $restored->ID )['visibility'], 'Copy did not create a private independent campaign.' );
@@ -79,6 +81,7 @@ try {
 	$target = $post( 'pspp_campaign', 0, $users['old_owner'], 'Original target secret' );
 	add_post_meta( $target, '_pspp_gm', (string) $users['gm'] );
 	add_post_meta( $target, '_foreign_fixture', 'Foreign metadata retained in the backup' );
+	add_post_meta( $target, '_pspp_booking_links', array( 'revision' => 1, 'events' => array( 987 ) ) );
 	$target_rules = $assert_result( ps_pen_paper_save_rules( $target, array( 'name' => 'Old target rules', 'description' => '', 'dice' => array( '6' ), 'fields' => array(
 		array( 'id' => '', 'label' => 'Old attribute', 'type' => 'attribute', 'description' => '', 'min' => '0', 'max' => '10', 'start' => '2' ),
 	) ), '0' ), 'Target rules failed' );
@@ -90,9 +93,15 @@ try {
 		$key = ps_pen_paper_table_key( $target, $users['gm'], $kind ); $presence_keys[] = $key; set_transient( $key, $value, DAY_IN_SECONDS );
 	}
 	$replacement = $preview( $json, 'replace', $target );
+	update_post_meta( $target, '_pspp_booking_links', array( 'revision' => 2, 'events' => array( 988 ) ) );
+	$stale_schedule = ps_pen_paper_restore_campaign( $replacement[0], $replacement[1], false, 'private' );
+	$check( is_wp_error( $stale_schedule ) && 'restore_changed' === $stale_schedule->get_error_code(),
+		'Changed local event associations did not invalidate a stale replacement confirmation.' );
+	$replacement = $preview( $json, 'replace', $target );
 	$assert_result( ps_pen_paper_prepare_import( $replacement[2], $replacement[3], ps_pen_paper_import_identity_map( $replacement[2], $replacement[3] ), false ), 'Replacement identity preparation failed' );
 	$replaced = $assert_result( ps_pen_paper_restore_campaign( $replacement[0], $replacement[1], false, 'private' ), 'Target replacement failed' );
 	$check( $target === $replaced['campaign_id'] && $users['old_owner'] === (int) ps_pen_paper_get_campaign( $target )->post_author, 'Replacement changed target identity or original creator.' );
+	$check( array() === ps_pen_paper_booking_links( $target )['events'], 'Replacement retained scheduling references from an older game state.' );
 	$check( $old_chat !== ps_pen_paper_chat_id( $target ) &&
 		! ps_pen_paper_chat_access( true, array( 'id' => $old_chat, 'blog_id' => get_current_blog_id(), 'session_type' => 'page' ) ), 'Replacement reused an old private chat session.' );
 	$check( ! in_array( 'Private old target pause', array_column( ps_pen_paper_table_state( ps_pen_paper_get_campaign( $target ) )['members'], 'note' ), true ), 'Old private presence notes leaked into the restored campaign.' );

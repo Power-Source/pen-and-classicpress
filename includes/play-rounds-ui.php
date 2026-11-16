@@ -46,7 +46,7 @@ function ps_pen_paper_handle_play_action( $operation, $page_id, $id ) {
 }
 
 function ps_pen_paper_render_play_options( $source, $page_id ) {
-	if ( ! ps_pen_paper_can_manage_campaign( $source ) ) { return; }
+	if ( ! ps_pen_paper_can_manage_campaign( $source ) || ! ps_pen_paper_management_view( $page_id ) ) { return; }
 	$options = ps_pen_paper_play_options( $source->ID );
 	if ( is_wp_error( $options ) ) { echo '<p role="alert">' . esc_html( $options->get_error_message() ) . '</p>'; return; }
 	?>
@@ -67,8 +67,9 @@ function ps_pen_paper_render_play_directory( $source, $page_id, $mode = 'choose'
 	$options = ps_pen_paper_play_options( $source->ID ); $rounds = ps_pen_paper_play_rounds( $source );
 	if ( is_wp_error( $options ) || is_wp_error( $rounds ) ) { echo '<p role="alert">' . esc_html( is_wp_error( $options ) ? $options->get_error_message() : $rounds->get_error_message() ) . '</p>'; return; }
 	?>
-	<section class="pspp-play-directory"><h2><?php echo esc_html( $source->post_title ); ?></h2>
-		<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id ) ); ?>"><?php esc_html_e( 'Zur Game-Lounge', 'ps-pen-paper' ); ?></a>
+	<section class="pspp-play-directory" id="pspp-play"><h2><?php echo esc_html( $source->post_title ); ?></h2>
+		<a href="<?php echo esc_url( remove_query_arg( 'pspp_view', ps_pen_paper_game_url( $page_id ) ) ); ?>"><?php esc_html_e( 'Zur Game-Lounge', 'ps-pen-paper' ); ?></a>
+		<p class="pspp-multiline"><?php echo esc_html( $source->post_content ); ?></p>
 		<?php ps_pen_paper_render_notice(); ps_pen_paper_render_lounge_modes( $source, $page_id ); ?>
 		<?php ps_pen_paper_render_bookings( $source ); ?>
 		<h3><?php esc_html_e( 'Runden', 'ps-pen-paper' ); ?></h3>
@@ -93,7 +94,7 @@ function ps_pen_paper_render_play_directory( $source, $page_id, $mode = 'choose'
 		</div>
 		<?php if ( ! $found ) : ?><p><?php esc_html_e( 'Hier wartet noch keine Runde.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 		<?php if ( 'choose' !== $mode && in_array( $mode, $options['modes'], true ) &&
-			( ps_pen_paper_can_manage_campaign( $source ) || ( 'guided' !== $mode && $options['player_starts'] ) ) ) :
+			( ( ps_pen_paper_management_view( $page_id ) && ps_pen_paper_can_manage_campaign( $source ) ) || ( 'guided' !== $mode && $options['player_starts'] ) ) ) :
 			$adventures = 'guided' === $mode ? array() : ps_pen_paper_play_adventures( $source, $mode );
 			if ( is_wp_error( $adventures ) ) : ?><p role="alert"><?php echo esc_html( $adventures->get_error_message() ); ?></p>
 			<?php elseif ( 'guided' === $mode || $adventures ) : ?>
@@ -128,7 +129,7 @@ function ps_pen_paper_play_button( $round, $page_id, $state, $action, $label ) {
 
 function ps_pen_paper_render_play_round( $source, $round, $page_id, $state, $character_id = 0 ) {
 	$member = ps_pen_paper_play_participant( $state, get_current_user_id() );
-	$gm = ps_pen_paper_can_manage_campaign( $source );
+	$gm = ps_pen_paper_can_manage_campaign( $source ) && ps_pen_paper_management_view( $page_id );
 	$controller = $gm || ( 'guided' !== $state['mode'] && $state['host_id'] === get_current_user_id() );
 	$active = array_filter( $state['participants'], static function ( $participant ) { return $participant['active']; } );
 	if ( 'solo' === $state['mode'] && ! $controller ) { echo '<p role="alert">' . esc_html__( 'Diese Solo-Runde ist privat.', 'ps-pen-paper' ) . '</p>'; return; }

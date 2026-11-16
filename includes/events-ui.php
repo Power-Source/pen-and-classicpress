@@ -53,6 +53,28 @@ function ps_pen_paper_render_event_details( $event, $scope = null ) {
 					<?php else : ?>
 						<p><?php esc_html_e( 'Noch keine Runde angelegt.', 'ps-pen-paper' ); ?></p>
 					<?php endif; ?>
+				<?php elseif ( 'invitation_saved' === $event['kind'] ) : ?>
+					<p><?php echo esc_html( __( 'Einladungen', 'ps-pen-paper' ) . ': ' . implode( ', ', $event[ $key ]['users'] ) ); ?></p>
+				<?php elseif ( 'wiki_links_saved' === $event['kind'] ) : ?>
+					<ul><?php foreach ( $event[ $key ]['links'] as $target => $entry_id ) : ?><li><?php echo esc_html( $target . ' → #' . $entry_id ); ?></li><?php endforeach; ?></ul>
+				<?php elseif ( 'campaign_restored' === $event['kind'] ) : ?>
+					<?php if ( $event[ $key ]['revision'] ) : ?>
+						<p><?php echo esc_html( __( 'Sicherungs-ID:', 'ps-pen-paper' ) . ' ' . $event[ $key ]['backup_id'] ); ?></p>
+						<p><?php echo esc_html( 'SHA-256: ' . $event[ $key ]['source_hash'] ); ?></p>
+					<?php else : ?>
+						<p><?php esc_html_e( 'Noch keine Wiederherstellung.', 'ps-pen-paper' ); ?></p>
+					<?php endif; ?>
+				<?php elseif ( 'adventure_group' === $event['kind'] ) : ?>
+					<?php $group = $event[ $key ]; ?>
+					<?php if ( $group['revision'] ) : ?>
+						<p><?php echo esc_html( $group['title'] . ' · ' . ps_pen_paper_play_statuses()[ $group['status'] ] ); ?></p>
+						<p><?php echo esc_html( ps_pen_paper_adventure_group_rules()[ $group['rule'] ] ); ?></p>
+						<?php if ( $group['scene_id'] ) : ?>
+							<p><?php echo esc_html( __( 'Aktuelle Szene:', 'ps-pen-paper' ) . ' ' . $group['snapshot']['scenes'][ $group['scene_id'] ]['title'] ); ?></p>
+						<?php endif; ?>
+					<?php else : ?>
+						<p><?php esc_html_e( 'Noch kein Durchlauf.', 'ps-pen-paper' ); ?></p>
+					<?php endif; ?>
 				<?php elseif ( 'character_resource_spent' === $event['kind'] ) : ?>
 					<?php
 					$snapshot = $event[ $key ]['active'];
@@ -195,7 +217,7 @@ function ps_pen_paper_render_event_details( $event, $scope = null ) {
 function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 	$page = ps_pen_paper_frontend_id( 'pspp_log_page' );
 	$page = $page ? $page : 1;
-	$log = is_wp_error( $page ) ? $page : ps_pen_paper_get_events( $campaign, $page );
+	$log = is_wp_error( $page ) ? $page : ps_pen_paper_get_events( $campaign, $page, ! ps_pen_paper_management_view( $page_id ) );
 	$base_url = $page_id ? ps_pen_paper_game_url( $page_id, $campaign->ID ) : ps_pen_paper_admin_url( $campaign->ID );
 	$labels = ps_pen_paper_event_labels();
 	$visibility_labels = ps_pen_paper_roll_visibility_labels();
@@ -222,6 +244,14 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 						<?php
 						if ( in_array( $event['kind'], array( 'trade_policy', 'trade_changed' ), true ) ) {
 							$snapshot = array( 'name' => __( 'Handel', 'ps-pen-paper' ) );
+						} elseif ( in_array( $event['kind'], array( 'adventure_saved', 'adventure_published' ), true ) ) {
+							$snapshot = array( 'name' => $event['after']['draft']['title'] );
+						} elseif ( 'adventure_run' === $event['kind'] ) {
+							$snapshot = array( 'name' => $event['after']['snapshot']['title'] );
+						} elseif ( 'adventure_group' === $event['kind'] ) {
+							$snapshot = array( 'name' => $event['after']['title'] );
+						} elseif ( 'character_context' === $event['kind'] ) {
+							$snapshot = $event['effective_after'];
 						} elseif ( in_array( $event['kind'], array( 'wiki_configured', 'wiki_prepared', 'wiki_published' ), true ) ) {
 							$snapshot = array( 'name' => 'wiki_configured' === $event['kind'] ? $event['after']['name'] : $event['after']['title'] );
 						} elseif ( in_array( $event['kind'], array( 'loot_table_saved', 'loot_rolled', 'loot_awarded' ), true ) ) {
@@ -232,7 +262,7 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 							$snapshot = array( 'name' => $event['character_name'] );
 						} elseif ( 'currency_saved' === $event['kind'] ) {
 							$snapshot = array( 'name' => $event['after']['name'] );
-						} elseif ( in_array( $event['kind'], array( 'play_options', 'play_round', 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved', 'game_round', 'item_action_policy', 'character_policy_saved', 'member_invitation_saved', 'universe_members_saved' ), true ) ) {
+						} elseif ( in_array( $event['kind'], array( 'play_options', 'play_round', 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved', 'game_round', 'item_action_policy', 'character_policy_saved', 'member_invitation_saved', 'universe_members_saved', 'invitation_saved', 'wiki_links_saved', 'campaign_restored' ), true ) ) {
 							$snapshot = array( 'name' => $labels[ $event['kind'] ] );
 						} elseif ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) {
 							$snapshot = array( 'name' => $event['after']['draft']['title'] );

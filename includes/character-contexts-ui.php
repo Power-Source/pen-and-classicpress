@@ -279,7 +279,7 @@ function ps_pen_paper_render_character_context( $campaign, $character, $state, $
 		<p><?php echo esc_html( ps_pen_paper_character_context_modes()[ $context['mode'] ] ); ?></p>
 		<p><?php esc_html_e( 'Leere Auflagen übernehmen den Grundwert. Ressourcen können eigene Kampagnenwerte verwenden oder den gemeinsamen Vorrat mit einem Kampagnenmaximum. Eigene Werte ändern weder Basisbogen noch andere Runden; beim gemeinsamen Vorrat wirken Verbrauch und Heilung am Basisbogen. Ein Maximum darf den vorhandenen aktuellen Wert nicht abschneiden.', 'ps-pen-paper' ); ?></p>
 		<p class="pspp-multiline"><?php echo esc_html( $context['note'] ); ?></p>
-		<?php if ( ps_pen_paper_can_manage_campaign( $campaign ) ) : ?>
+		<?php if ( ps_pen_paper_management_view( $page_id ) && ps_pen_paper_can_manage_campaign( $campaign ) ) : ?>
 			<?php if ( 'shared' === $context['mode'] ) :
 				$preview = ps_pen_paper_preview_character_copy( $campaign->ID, $character->ID );
 				?>

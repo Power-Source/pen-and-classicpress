@@ -235,7 +235,7 @@ function ps_pen_paper_roll_dice_locked( $campaign_id, $input, $rules_revision ) 
 	return ps_pen_paper_insert_record( 'pspp_roll', $campaign_id, $metadata );
 }
 
-function ps_pen_paper_get_roll( $campaign, $roll_id ) {
+function ps_pen_paper_get_roll( $campaign, $roll_id, $player_view = false ) {
 	$error = new WP_Error( 'forbidden', __( 'Dieser Wurf ist für dich nicht verfügbar.', 'ps-pen-paper' ) );
 	if ( ! current_user_can( 'read' ) || ! ps_pen_paper_can_view_campaign( $campaign ) ) {
 		return $error;
@@ -272,7 +272,7 @@ function ps_pen_paper_get_roll( $campaign, $roll_id ) {
 			if ( ! is_string( $id ) || ! is_int( $bonus ) || abs( $bonus ) > 30000000 ) { return new WP_Error( 'invalid_roll', __( 'Die gespeicherten Ausrüstungsboni des Wurfs sind beschädigt.', 'ps-pen-paper' ) ); }
 		}
 	}
-	if ( ! ps_pen_paper_can_manage_campaign( $campaign ) && 'group' !== $event['visibility'] && ! $is_private_reader ) {
+	if ( ( $player_view || ! ps_pen_paper_can_manage_campaign( $campaign ) ) && 'group' !== $event['visibility'] && ! $is_private_reader ) {
 		return $error;
 	}
 	$event['id'] = $post->ID;

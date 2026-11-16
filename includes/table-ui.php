@@ -5,32 +5,37 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 function ps_pen_paper_render_table_sheet( $campaign, $page_id ) {
+	$management = ps_pen_paper_management_view( $page_id );
 	$rules = ps_pen_paper_get_rules( $campaign->ID );
 	$characters = ps_pen_paper_get_characters( $campaign );
 	$link = ps_pen_paper_get_universe_link( $campaign->ID );
 	$universe = ! is_wp_error( $link ) && $link['universe_id'] ? ps_pen_paper_get_universe( $link['universe_id'] ) : null;
 	$profile_creation = $universe && ps_pen_paper_community_available();
 	$choices = array();
+	$picker_args = array( 'pspp_campaign' => $campaign->ID );
+	$view = ps_pen_paper_frontend_view();
+	if ( $management && ! is_wp_error( $view ) && 'overview' !== $view ) { $picker_args['pspp_view'] = $view; }
 	$has_own_character = false;
 	foreach ( $characters as $character ) {
+		if ( ! $management && (int) $character->post_author !== get_current_user_id() ) { continue; }
 		if ( (int) $character->post_author === get_current_user_id() ) { $has_own_character = true; }
 		$choices[] = array( 'scope' => $campaign, 'character' => $character, 'state' => ps_pen_paper_character_state( $campaign, $character ) );
 	}
 	?>
-	<h2><?php echo esc_html( ps_pen_paper_can_manage_campaign( $campaign ) ? __( 'Bögen & Freigaben', 'ps-pen-paper' ) : __( 'Mein Charakterbogen', 'ps-pen-paper' ) ); ?></h2>
+	<h2><?php echo esc_html( $management && ps_pen_paper_can_manage_campaign( $campaign ) ? __( 'Bögen & Freigaben', 'ps-pen-paper' ) : __( 'Mein Charakterbogen', 'ps-pen-paper' ) ); ?></h2>
 	<p class="description"><?php esc_html_e( 'Nur du und die Spielleitung sehen deine Werte.', 'ps-pen-paper' ); ?></p>
-	<?php ps_pen_paper_render_character_picker( $choices, get_permalink( $page_id ), 0, array( 'pspp_campaign' => $campaign->ID ) ); ?>
+	<?php ps_pen_paper_render_character_picker( $choices, get_permalink( $page_id ), 0, $picker_args ); ?>
 	<?php if ( ! $has_own_character ) { ps_pen_paper_render_campaign_base_requests( $campaign, $page_id ); } ?>
 	<?php if ( ! $characters && $rules['revision'] && ! $profile_creation ) : ?><p><?php echo esc_html( ps_pen_paper_can_edit_character( $campaign ) ? __( 'Dein erster Bogen wartet noch auf dich. Öffne unten „Neuen Charakter erstellen“.', 'ps-pen-paper' ) : __( 'In dieser Runde erstellt die Spielleitung deinen Charakter. Bitte wende dich an sie.', 'ps-pen-paper' ) ); ?></p><?php endif; ?>
 	<?php if ( $rules['revision'] && ps_pen_paper_can_edit_character( $campaign ) && ! $profile_creation ) : ?>
 		<details class="pspp-fold"><summary><?php esc_html_e( 'Neuen Charakter erstellen', 'ps-pen-paper' ); ?></summary>
-			<?php ps_pen_paper_render_character_form( $campaign, $rules, null, $page_id ); ?>
+			<?php ps_pen_paper_render_character_form( $campaign, $rules, null, $page_id, null, false, ! $management ); ?>
 		</details>
 	<?php elseif ( ! $rules['revision'] ) : ?>
 		<p><?php esc_html_e( 'Die Spielleitung muss zuerst das Regelwerk einrichten.', 'ps-pen-paper' ); ?></p>
 		<?php
 		$source_rules = $universe ? ps_pen_paper_get_rules( $universe->ID ) : null;
-		if ( $source_rules && $source_rules['revision'] && ps_pen_paper_can_manage_campaign( $campaign ) && ps_pen_paper_can_manage_universe( $universe ) ) {
+		if ( $management && $source_rules && $source_rules['revision'] && ps_pen_paper_can_manage_campaign( $campaign ) && ps_pen_paper_can_manage_universe( $universe ) ) {
 			ps_pen_paper_form_start( 'adopt_universe_rules', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id );
 			echo '<input type="hidden" name="source_rules_revision" value="' . esc_attr( $source_rules['revision'] ) . '"><input type="hidden" name="pspp_table_adoption" value="1"><button name="context_confirmation" value="confirmed">' . esc_html__( 'Regeln dieses Universums übernehmen', 'ps-pen-paper' ) . '</button></form>';
 		}
@@ -43,7 +48,7 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 	$state = ps_pen_paper_table_state( $campaign );
 	$epoch = ps_pen_paper_scope_epoch( $campaign->ID );
 	if ( is_wp_error( $state ) || is_wp_error( $epoch ) ) { echo '<p role="alert">' . esc_html( is_wp_error( $state ) ? $state->get_error_message() : $epoch->get_error_message() ) . '</p>'; return; }
-	$is_gm = ps_pen_paper_can_manage_campaign( $campaign );
+	$is_gm = ps_pen_paper_can_manage_campaign( $campaign ) && ps_pen_paper_management_view( $page_id );
 	$backdrop = ps_pen_paper_backdrop_image( $campaign );
 	$labels = array(
 		'online' => __( 'Am Tisch', 'ps-pen-paper' ), 'offline' => __( 'Offline', 'ps-pen-paper' ),
@@ -145,7 +150,7 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 						<a href="#pspp-dice"><?php esc_html_e( 'Würfeln', 'ps-pen-paper' ); ?></a>
 					</div>
 					<p class="description"><?php esc_html_e( 'Hier zeigt die Spielleitung die aktuelle Szene – mit Karte, wenn eine vorbereitet wurde. Für gespeicherte Abenteuerentscheidungen öffne „Abenteuer spielen“.', 'ps-pen-paper' ); ?></p>
-					<?php ps_pen_paper_render_map( $campaign, ps_pen_paper_map_state( $campaign ) ); ?>
+					<?php ps_pen_paper_render_map( $campaign, ps_pen_paper_map_state( $campaign, ! $is_gm ), false, $page_id ); ?>
 					<div class="pspp-scene-caption" data-map-fallback>
 					<span class="pspp-eyebrow"><?php esc_html_e( 'Eure Welt. Eure Geschichte.', 'ps-pen-paper' ); ?></span>
 					<h2><?php echo esc_html( $campaign->post_title ); ?></h2>

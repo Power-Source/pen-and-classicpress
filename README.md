@@ -7,6 +7,8 @@ Kampagnen auf WordPress und ClassicPress.
 
 - [Pluginhandbuch mit Screenshots](docs/handbuch.md): Einrichtung, Rollen,
   Charaktere, Freigaben, Würfel, Ressourcen, Farben und bekannte Grenzen.
+- [Erweiterung: PS Events](docs/erweiterung-ps-events.md): Spieltermine
+  verknüpfen, in der Lounge finden und zu- oder absagen, mit Screenshots.
 - [Durchgespielte Demokampagne](docs/demokampagne.md): echte Würfelergebnisse,
   getrennte Rollen und ergänzende Prüfungen von Universen und Kartentisch.
 
@@ -66,7 +68,7 @@ und einzelnen Spielrunden verknüpfen. Anstehende Spieltermine erscheinen
 universumsübergreifend in der Lounge und Verwaltungsübersicht. Termine,
 Anmeldungen und Zu-/Absagen bleiben in PS Events; eine Terminzusage erteilt
 keinen Spielzugang und wählt keinen Charakter. Ohne PS Events läuft das Spiel
-unverändert weiter. [Einrichtung und Grenzen](docs/handbuch.md#23-spieltermine-mit-ps-events).
+unverändert weiter. [Einrichtung und Grenzen](docs/erweiterung-ps-events.md).
 
 Die drei Spielarten wurden exemplarisch über echte Browserformulare bis zum
 Abschluss und Austritt geprüft, einschließlich Pause, Wiedereinstieg und
@@ -258,6 +260,21 @@ Weltbeschreibung. Die Lounge und Kampagnenkarten übernehmen die Universumsfarbe
 Einladungen lassen sich hier annehmen oder ablehnen; sie gewähren vorher keine
 internen Inhalte. Eigene Charaktere bleiben im Charakterprofil.
 
+Der Standardbereich **Spielen** bleibt auch für Administratoren und
+Spielleitungen die Spieler-Lounge. Berechtigte öffnen **Spielleitung** ausdrücklich:
+Dort liegen die Verwaltungsnavigation und unter **Kampagnen → Vorbereiten**
+Regeln, Szenen, NPCs/Gegner, Bögen, Spielangebote und Zugangseinstellungen.
+**Spielrunden leiten** öffnet die Rundenverwaltung. Links und Formulare erhalten
+den gewählten Bereich; **Spielen** wechselt bewusst zurück.
+Auch die eingebetteten Bogen-, Inventar-, Handels-, Verbrauchs- und Porträtansichten
+zeigen Leitungswerkzeuge nur im Verwaltungsbereich. Unter **Spielen** bleiben
+Würfelfiguren auf eigene Charaktere begrenzt; Protokolle, Gruppenstände und
+Kartenaktualisierungen verwenden die Spieleransicht statt erweiterter Leitungsrechte.
+Die abschließende Prüfung aller Unteransichten einschließlich der
+Chatmoderation steht noch aus. Die vollständige
+NPC-/Gegnerautomatik und die vier vereinfachten Spielerwege sind weiterhin
+offene Ziele der [Roadmap](ROADMAP.md).
+
 Unter **Spielarten anbieten** legt die Leitung fest, ob die Kampagne geleitet,
 solo oder als automatisches Gruppenabenteuer gespielt werden darf und ob Spieler
 selbst neue automatische Runden anlegen dürfen. Automatische Abenteuer benötigen
@@ -286,9 +303,9 @@ bleibt man im Frontend. Zugang, Beitrittsanfragen, Hintergrundbild und Farben
 sind über **Rundeneinstellungen** direkt im Frontend erreichbar. Dort können
 Spielleiter auch Name, Beschreibung und Archivstatus ändern sowie bestehende
 Website-Benutzer als Spieler oder Spielleiter aufnehmen und entfernen.
-Das **Regelwerk** lässt sich durch die Spielleitung direkt am Spieltisch
+Das **Regelwerk** lässt sich unter **Spielleitung → Kampagnen → Vorbereiten**
 einrichten und bearbeiten; Spieler behalten die lesende Ansicht.
-Berechtigte können unter **Vorbereiten & verwalten → Kampagnen** eine neue Kampagne
+Berechtigte können unter **Spielleitung → Kampagnen** eine neue Kampagne
 anlegen und anschließend direkt deren Regelwerk einrichten. Dafür ist kein
 Wechsel ins Backend erforderlich; die Erstellberechtigung vergibt weiterhin
 die Website-Administration.

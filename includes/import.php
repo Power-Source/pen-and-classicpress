@@ -304,6 +304,11 @@ function ps_pen_paper_import_configuration( $parsed, $options ) {
 			$backup = ps_pen_paper_export_campaign( $target->ID, 'local' );
 			if ( is_wp_error( $backup ) ) { return $backup; }
 			$target_hash = $backup['payload_sha256'];
+			$booking_links = get_post_meta( $target->ID, '_pspp_booking_links', false );
+			if ( $booking_links ) {
+				$target_hash = hash( 'sha256', serialize( array( $target_hash, $booking_links ) ) );
+				$warnings[] = __( 'Lokale Terminverknüpfungen werden beim Ersatz entfernt und sind nicht in der Kampagnensicherung enthalten. Verknüpfe anschließend passende Veranstaltungen in PS Events neu.', 'ps-pen-paper' );
+			}
 			$warnings[] = __( 'Der Ersatz betrifft alle kampagneneigenen Spielstände. Vor dem schreibenden Import sind eine aktuelle Sicherung und eine gesonderte Bestätigung erforderlich. Der bisherige Kampagnenersteller bleibt geschützt.', 'ps-pen-paper' );
 		}
 	}

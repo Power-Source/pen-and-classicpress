@@ -84,7 +84,7 @@ function ps_pen_paper_enqueue_frontend() {
 		return;
 	}
 	$url = plugin_dir_url( dirname( __DIR__ ) . '/ps-pen-paper.php' );
-	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.29.1' );
+	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.29.2' );
 	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.26.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
 	wp_enqueue_script( 'ps-pen-paper-table', $url . 'assets/table.js', array(), '0.29.1', true );
@@ -92,12 +92,16 @@ function ps_pen_paper_enqueue_frontend() {
 	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.2' );
 	wp_enqueue_script( 'ps-pen-paper-character', $url . 'assets/character.js', array(), '0.1.0', true );
 	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.15.0' );
-	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array( 'ps-pen-paper-table' ), '0.13.0', true );
+	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array( 'ps-pen-paper-table' ), '0.29.2', true );
 	wp_enqueue_script( 'ps-pen-paper-style', $url . 'assets/styles.js', array(), '0.7.0', true );
 }
 
 function ps_pen_paper_game_url( $page_id, $campaign_id = 0, $character_id = 0 ) {
 	$args = array();
+	$view = ps_pen_paper_frontend_view();
+	if ( ! is_wp_error( $view ) && 'overview' !== $view ) {
+		$args['pspp_view'] = $view;
+	}
 	if ( $campaign_id ) {
 		$args['pspp_campaign'] = $campaign_id;
 	}
@@ -105,6 +109,85 @@ function ps_pen_paper_game_url( $page_id, $campaign_id = 0, $character_id = 0 ) 
 		$args['pspp_character'] = $character_id;
 	}
 	return add_query_arg( $args, get_permalink( $page_id ) );
+}
+
+function ps_pen_paper_frontend_view() {
+	$view = $_GET['pspp_view'] ?? $_POST['pspp_view'] ?? 'overview';
+	return is_string( $view ) && in_array( $view, array( 'overview', 'lead', 'universes', 'campaigns', 'characters', 'settings' ), true )
+		? $view : new WP_Error( 'invalid_view', __( 'Dieser Verwaltungsbereich ist nicht verfügbar.', 'ps-pen-paper' ) );
+}
+
+function ps_pen_paper_management_view( $page_id ) {
+	return ! $page_id || ! ps_pen_paper_is_frontend_page() ||
+		in_array( ps_pen_paper_frontend_view(), array( 'lead', 'universes', 'campaigns', 'characters', 'settings' ), true );
+}
+
+function ps_pen_paper_request_player_view( $request ) {
+	$view = $request->get_header( 'X-PSPP-View' );
+	if ( null === $view || '' === $view || 'lead' === $view ) { return false; }
+	if ( 'overview' === $view ) { return true; }
+	return new WP_Error( 'invalid_view', __( 'Dieser Verwaltungsbereich ist nicht verfügbar.', 'ps-pen-paper' ), array( 'status' => 400 ) );
+}
+
+function ps_pen_paper_can_open_leadership() {
+	if ( ! ps_pen_paper_can_access_site() ) { return false; }
+	if ( ps_pen_paper_can_create_campaign() ) { return true; }
+	foreach ( ps_pen_paper_get_campaigns() as $campaign ) {
+		if ( ps_pen_paper_can_manage_campaign( $campaign ) ) { return true; }
+	}
+	foreach ( ps_pen_paper_get_universes() as $universe ) {
+		if ( ps_pen_paper_can_manage_universe( $universe ) ) { return true; }
+	}
+	return false;
+}
+
+function ps_pen_paper_render_workspace_navigation( $page_id, $campaign = null, $round = null ) {
+	$url = remove_query_arg( 'pspp_view', ps_pen_paper_game_url( $page_id, $campaign ? $campaign->ID : 0 ) );
+	if ( $round ) { $url = add_query_arg( 'pspp_round', $round->ID, $url ); }
+	$management = ps_pen_paper_management_view( $page_id );
+	?>
+	<nav class="pspp-navigation pspp-workspace-navigation" aria-label="<?php esc_attr_e( 'Frontend-Arbeitsbereich', 'ps-pen-paper' ); ?>">
+		<a href="<?php echo esc_url( $url ); ?>"<?php if ( ! $management ) { echo ' aria-current="page"'; } ?>><?php esc_html_e( 'Spielen', 'ps-pen-paper' ); ?></a>
+		<?php if ( $campaign ? ps_pen_paper_can_manage_campaign( $campaign ) : ps_pen_paper_can_open_leadership() ) : ?>
+			<a href="<?php echo esc_url( add_query_arg( 'pspp_view', 'lead', $url ) ); ?>"<?php if ( $management ) { echo ' aria-current="page"'; } ?>><?php esc_html_e( 'Spielleitung', 'ps-pen-paper' ); ?></a>
+		<?php endif; ?>
+	</nav>
+	<?php
+}
+
+function ps_pen_paper_render_campaign_preparation( $campaign, $page_id ) {
+	if ( ! ps_pen_paper_can_manage_campaign( $campaign ) || ! ps_pen_paper_management_view( $page_id ) ) { return; }
+	?>
+	<section class="pspp-preparation">
+		<header><span class="pspp-eyebrow"><?php esc_html_e( 'Spielleitung / Kampagnenvorbereitung', 'ps-pen-paper' ); ?></span>
+			<h2><?php echo esc_html( $campaign->post_title ); ?></h2>
+			<a href="<?php echo esc_url( ps_pen_paper_dashboard_url( 'campaigns', $page_id ) ); ?>"><?php esc_html_e( 'Meine geleiteten Kampagnen', 'ps-pen-paper' ); ?></a>
+			<a href="<?php echo esc_url( ps_pen_paper_play_url( $page_id, $campaign->ID ) ); ?>"><?php esc_html_e( 'Spielrunden leiten', 'ps-pen-paper' ); ?></a>
+		</header>
+		<?php ps_pen_paper_render_notice(); ?>
+		<nav class="pspp-navigation" aria-label="<?php esc_attr_e( 'Kampagnenvorbereitung', 'ps-pen-paper' ); ?>">
+			<?php foreach ( array( 'offers' => __( 'Spielangebote', 'ps-pen-paper' ), 'rulebook' => __( 'Regeln', 'ps-pen-paper' ),
+				'story' => __( 'Szenen & Abläufe', 'ps-pen-paper' ), 'npcs' => __( 'NPCs & Gegner', 'ps-pen-paper' ),
+				'folio' => __( 'Spielleitermappe', 'ps-pen-paper' ), 'sheet' => __( 'Bögen & Freigaben', 'ps-pen-paper' ),
+				'equipment' => __( 'Gegenstände', 'ps-pen-paper' ), 'settings' => __( 'Zugang & Einstellungen', 'ps-pen-paper' ),
+				'log' => __( 'Spielprotokoll', 'ps-pen-paper' ) ) as $id => $label ) : ?>
+				<a href="#pspp-<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $label ); ?></a>
+			<?php endforeach; ?>
+		</nav>
+		<section id="pspp-offers"><h2><?php esc_html_e( 'Spielangebote vorbereiten', 'ps-pen-paper' ); ?></h2>
+			<p><?php esc_html_e( 'Die Spielarten allein machen eine Kampagne noch nicht automatisch spielbar. Bereite die benötigten Szenen und Entscheidungen vor. Die vollständige regelgesteuerte NPC- und Gegnerautomatik ist noch nicht umgesetzt.', 'ps-pen-paper' ); ?></p>
+			<?php ps_pen_paper_render_play_options( $campaign, $page_id ); ?>
+		</section>
+		<section id="pspp-rulebook"><?php ps_pen_paper_render_rules( $campaign, true, $page_id ); ?></section>
+		<section id="pspp-story"><?php ps_pen_paper_render_story( $campaign, $page_id ); ?></section>
+		<section id="pspp-npcs"><?php ps_pen_paper_render_npcs( $campaign, $page_id ); ?></section>
+		<section id="pspp-folio"><?php ps_pen_paper_render_folio( $campaign, $page_id ); ?></section>
+		<section id="pspp-sheet"><?php ps_pen_paper_render_table_sheet( $campaign, $page_id ); ?></section>
+		<section id="pspp-equipment"><?php ps_pen_paper_render_equipment_catalogue( $campaign, $page_id ); ?></section>
+		<section id="pspp-settings"><?php ps_pen_paper_render_access_settings( $campaign, $page_id ); ?></section>
+		<section><?php ps_pen_paper_render_journal( $campaign, $page_id ); ?></section>
+	</section>
+	<?php
 }
 
 function ps_pen_paper_frontend_id( $key ) {
@@ -135,9 +218,9 @@ function ps_pen_paper_frontend_shortcode() {
 		return ps_pen_paper_frontend_message( __( 'Bitte verwende den Spielbereich auf einer veröffentlichten Seite.', 'ps-pen-paper' ) );
 	}
 	$page_id = get_queried_object_id();
-	$view = isset( $_GET['pspp_view'] ) ? $_GET['pspp_view'] : 'overview';
-	if ( ! is_string( $view ) || ! in_array( $view, array( 'overview', 'universes', 'campaigns', 'characters', 'settings' ), true ) ) {
-		return ps_pen_paper_frontend_message( __( 'Dieser Verwaltungsbereich ist nicht verfügbar.', 'ps-pen-paper' ) );
+	$view = ps_pen_paper_frontend_view();
+	if ( is_wp_error( $view ) ) {
+		return ps_pen_paper_frontend_message( $view->get_error_message() );
 	}
 	$campaign_id = ps_pen_paper_frontend_id( 'pspp_campaign' );
 	$character_id = ps_pen_paper_frontend_id( 'pspp_character' );
@@ -170,8 +253,15 @@ function ps_pen_paper_frontend_shortcode() {
 		$round = ps_pen_paper_get_campaign( $round_id ); $round_state = $round ? ps_pen_paper_play_round( $round_id ) : null;
 		if ( ! $round_state || is_wp_error( $round_state ) || $round_state['source_id'] !== (int) $campaign->ID ) { return ps_pen_paper_frontend_message( ps_pen_paper_play_error()->get_error_message() ); }
 	}
+	$management = 'overview' !== $view;
+	if ( $management && ! ( $campaign ? ps_pen_paper_can_manage_campaign( $campaign ) : ps_pen_paper_can_open_leadership() ) ) {
+		return ps_pen_paper_frontend_message( __( 'Für diesen Spielleitungsbereich hast du keine Berechtigung.', 'ps-pen-paper' ) );
+	}
 	if ( $character_id && ! ps_pen_paper_get_character( $round ? $round : $campaign, $character_id ) ) {
 		return ps_pen_paper_frontend_message( __( 'Dieser Charakter ist für dich nicht verfügbar.', 'ps-pen-paper' ) );
+	}
+	if ( $character_id && ! $management && (int) get_post_field( 'post_author', $character_id ) !== get_current_user_id() ) {
+		return ps_pen_paper_frontend_message( __( 'Fremde Charaktere öffnest du im Bereich Spielleitung.', 'ps-pen-paper' ) );
 	}
 	$lounge = ! $campaign && 'overview' === $view ? ps_pen_paper_lounge_data() : null;
 	if ( is_wp_error( $lounge ) ) { return ps_pen_paper_frontend_message( $lounge->get_error_message() ); }
@@ -187,15 +277,16 @@ function ps_pen_paper_frontend_shortcode() {
 	ob_start();
 	?>
 	<div class="pspp-game<?php echo $campaign ? ' pspp-workspace' : ''; ?>" style="<?php echo esc_attr( ps_pen_paper_style_variables( $style['colors'] ) ); ?>">
+		<?php ps_pen_paper_render_workspace_navigation( $page_id, $campaign, $round ); ?>
 		<?php if ( ! $campaign ) : ?>
 			<?php ps_pen_paper_render_notice(); ?>
 			<?php if ( 'overview' === $view ) { ps_pen_paper_render_lounge( $page_id, $lounge, $universe_id ); } ?>
-			<?php if ( 'overview' !== $view || ps_pen_paper_can_create_campaign() || ps_pen_paper_get_universes() ||
-				array_filter( $lounge['campaigns'], static function ( $row ) { return 'gm' === $row['role']; } ) ) : ?>
-			<?php if ( 'overview' === $view ) : ?><details class="pspp-fold"><summary><?php esc_html_e( 'Vorbereiten & verwalten', 'ps-pen-paper' ); ?></summary><?php endif; ?>
+			<?php if ( $management ) : ?>
+			<header><h2><?php esc_html_e( 'Spielleitung', 'ps-pen-paper' ); ?></h2>
+				<p><?php esc_html_e( 'Bereite deine Welten und Kampagnen vor und verwalte ihre Freigaben.', 'ps-pen-paper' ); ?></p></header>
 			<?php ps_pen_paper_render_dashboard_navigation( $page_id ); ?>
-			<?php if ( 'overview' === $view ) : ?></details><?php endif; ?>
 			<?php endif; ?>
+			<?php if ( 'lead' === $view ) { ps_pen_paper_render_dashboard( $page_id ); } ?>
 			<?php if ( 'universes' === $view ) : ?>
 				<?php ps_pen_paper_render_universes( $page_id ); ?>
 			<?php elseif ( 'characters' === $view ) : ?>
@@ -204,10 +295,10 @@ function ps_pen_paper_frontend_shortcode() {
 				<?php ps_pen_paper_render_settings_directory( $page_id ); ?>
 			<?php elseif ( 'campaigns' === $view ) : ?>
 			<h2><?php esc_html_e( 'Deine Kampagnen', 'ps-pen-paper' ); ?></h2>
-			<?php $campaigns = ps_pen_paper_get_campaigns(); ?>
+			<?php $campaigns = array_filter( ps_pen_paper_get_campaigns(), 'ps_pen_paper_can_manage_campaign' ); ?>
 			<?php if ( ! $campaigns ) : ?>
 				<p><?php esc_html_e( 'Du bist noch keiner Kampagne zugeordnet.', 'ps-pen-paper' ); ?></p>
-				<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id ) . '#pspp-lounge-invitations' ); ?>"><?php esc_html_e( 'Zur Game-Lounge und meinen Einladungen', 'ps-pen-paper' ); ?></a>
+				<a href="<?php echo esc_url( remove_query_arg( 'pspp_view', ps_pen_paper_game_url( $page_id ) ) . '#pspp-lounge-invitations' ); ?>"><?php esc_html_e( 'Zur Game-Lounge und meinen Einladungen', 'ps-pen-paper' ); ?></a>
 			<?php else : ?>
 				<div class="pspp-grid">
 					<?php foreach ( $campaigns as $item ) : ?>
@@ -215,7 +306,7 @@ function ps_pen_paper_frontend_shortcode() {
 						<article class="pspp-card">
 							<h3><a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $item->ID ) ); ?>"><?php echo esc_html( $item->post_title ); ?></a></h3>
 							<p class="pspp-multiline"><?php echo esc_html( wp_html_excerpt( $item->post_content, 220, '…' ) ); ?></p>
-							<a class="button button-primary" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $item->ID ) . '#pspp-play' ); ?>"><?php esc_html_e( 'Spielen', 'ps-pen-paper' ); ?></a>
+							<a class="button button-primary" href="<?php echo esc_url( remove_query_arg( 'pspp_view', ps_pen_paper_play_url( $page_id, $item->ID ) ) ); ?>"><?php esc_html_e( 'Spielen', 'ps-pen-paper' ); ?></a>
 							<?php if ( ps_pen_paper_can_manage_campaign( $item ) ) : ?><a class="button" href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $item->ID ) . '#pspp-story' ); ?>"><?php esc_html_e( 'Vorbereiten', 'ps-pen-paper' ); ?></a><?php endif; ?>
 							<?php if ( '1' === get_post_meta( $item->ID, '_pspp_archived', true ) ) : ?>
 								<p><?php esc_html_e( 'Archiviert', 'ps-pen-paper' ); ?></p>
@@ -228,8 +319,19 @@ function ps_pen_paper_frontend_shortcode() {
 			<?php endif; ?>
 		<?php else : ?>
 			<?php if ( $round ) { ps_pen_paper_render_play_round( $campaign, $round, $page_id, $round_state, $character_id ); }
+			elseif ( $management ) {
+				if ( $mode ) { ps_pen_paper_render_play_directory( $campaign, $page_id, $mode ); }
+				elseif ( $character_id ) { ps_pen_paper_render_characters( $campaign, $character_id, $page_id ); }
+				else { ps_pen_paper_render_campaign_preparation( $campaign, $page_id ); }
+			}
 			elseif ( $mode ) { ps_pen_paper_render_play_directory( $campaign, $page_id, $mode ); }
-			else { ps_pen_paper_render_table( $campaign, $page_id, $character_id ); } ?>
+			elseif ( $character_id || isset( $_GET['pspp_roll'] ) ) { ps_pen_paper_render_table( $campaign, $page_id, $character_id ); }
+			else {
+				ps_pen_paper_render_play_directory( $campaign, $page_id );
+				echo '<section id="pspp-rulebook">'; ps_pen_paper_render_rules( $campaign, false, $page_id ); echo '</section>';
+				echo '<section id="pspp-handouts">'; ps_pen_paper_render_handouts( $campaign, $page_id ); echo '</section>';
+				echo '<section class="pspp-campaign-journal">'; ps_pen_paper_render_journal( $campaign, $page_id ); echo '</section>';
+			} ?>
 		<?php endif; ?>
 	</div>
 	<?php

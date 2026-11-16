@@ -246,7 +246,7 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 	$gear = ps_pen_paper_gear_state( $character->ID );
 	$schema = ps_pen_paper_equipment_schema( $campaign );
 	if ( is_wp_error( $gear ) || is_wp_error( $schema ) ) { echo '<p role="alert">' . esc_html__( 'Die Ausrüstung ist nicht verfügbar. Bitte informiere die Spielleitung.', 'ps-pen-paper' ) . '</p>'; return; }
-	$is_gm = 'profile' !== $context && ps_pen_paper_can_manage_character_scope( $campaign );
+	$is_gm = 'profile' !== $context && ps_pen_paper_management_view( $page_id ) && ps_pen_paper_can_manage_character_scope( $campaign );
 	$scope_permission = ps_pen_paper_require_equipment_character_scope( $campaign, $character, $context );
 	echo '<h3>' . esc_html__( 'Inventar & Ausrüstung', 'ps-pen-paper' ) . '</h3>';
 	foreach ( $gear['active']['items'] as $instance_id => $instance ) {
@@ -340,10 +340,17 @@ function ps_pen_paper_render_portrait_form( $campaign, $character, $page_id, $pr
 		} else { echo '<p>' . esc_html__( 'Ohne Bild', 'ps-pen-paper' ) . '</p>'; }
 	}
 	if ( ! ps_pen_paper_can_edit_portrait( $campaign, $character->ID ) ) { return; }
+	$management = ps_pen_paper_management_view( $page_id ) && ! $profile && ps_pen_paper_can_manage_character_scope( $campaign );
+	$universe = ps_pen_paper_portrait_policy_scope( $campaign );
+	$policy = is_wp_error( $universe ) ? $universe : ( $universe ? ps_pen_paper_character_policy( $universe->ID ) : null );
+	if ( is_wp_error( $policy ) ) { echo '<p role="alert">' . esc_html( $policy->get_error_message() ) . '</p>'; return; }
+	$upload = $management || ! $policy || $policy['custom_portraits'];
 	ps_pen_paper_equipment_form_start( $campaign, 'save_portrait', $state['revision'], $page_id, $character->ID, true );
-	echo '<input type="file" name="equipment_image" accept="image/png,image/jpeg,image/webp"><p>' . esc_html__( 'PNG, JPEG oder WebP bis 2 MiB und 3000 × 3000 Pixel. Privat für Besitzer und Spielleitung, kein öffentlicher Benutzeravatar. Spieleränderungen folgen der Charakter-Freigabepolitik; Wertefreigaben bleiben getrennt.', 'ps-pen-paper' ) . '</p>';
-	foreach ( array( 'upload' => __( 'Porträt einreichen / speichern', 'ps-pen-paper' ), 'remove' => __( 'Porträt entfernen / beantragen', 'ps-pen-paper' ) ) as $key => $label ) { echo '<button name="portrait_action" value="' . esc_attr( $key ) . '">' . esc_html( $label ) . '</button>'; }
-	if ( ! $profile && null !== $state['pending'] && ps_pen_paper_can_manage_campaign( $campaign ) ) {
+	if ( $upload ) { echo '<input type="file" name="equipment_image" accept="image/png,image/jpeg,image/webp"><p>' . esc_html__( 'PNG, JPEG oder WebP bis 2 MiB und 3000 × 3000 Pixel. Privat für Besitzer und Spielleitung, kein öffentlicher Benutzeravatar. Spieleränderungen folgen der Charakter-Freigabepolitik; Wertefreigaben bleiben getrennt.', 'ps-pen-paper' ) . '</p>'; }
+	$actions = array( 'remove' => __( 'Porträt entfernen / beantragen', 'ps-pen-paper' ) );
+	if ( $upload ) { $actions = array( 'upload' => __( 'Porträt einreichen / speichern', 'ps-pen-paper' ) ) + $actions; }
+	foreach ( $actions as $key => $label ) { echo '<button name="portrait_action" value="' . esc_attr( $key ) . '">' . esc_html( $label ) . '</button>'; }
+	if ( $management && null !== $state['pending'] ) {
 		echo '<button name="portrait_action" value="approve">' . esc_html__( 'Porträt freigeben', 'ps-pen-paper' ) . '</button><button name="portrait_action" value="reject">' . esc_html__( 'Porträtantrag verwerfen', 'ps-pen-paper' ) . '</button>';
 	}
 	echo '</form>';

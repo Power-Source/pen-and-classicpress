@@ -33,7 +33,7 @@ function ps_pen_paper_enqueue_admin_assets( $hook ) {
 	wp_enqueue_script( 'ps-pen-paper-style', $url . 'assets/styles.js', array(), '0.7.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
 	wp_enqueue_style( 'ps-pen-paper-maps', $url . 'assets/maps.css', array( 'ps-pen-paper-game' ), '0.15.0' );
-	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array(), '0.13.0', true );
+	wp_enqueue_script( 'ps-pen-paper-maps', $url . 'assets/maps.js', array(), '0.29.2', true );
 	wp_enqueue_style( 'ps-pen-paper-folio', $url . 'assets/folio.css', array( 'ps-pen-paper-game' ), '0.17.0' );
 	wp_enqueue_style( 'ps-pen-paper-equipment', $url . 'assets/equipment.css', array( 'ps-pen-paper-game' ), '0.16.2' );
 	wp_enqueue_script( 'ps-pen-paper-character', $url . 'assets/character.js', array(), '0.1.0', true );
@@ -236,7 +236,7 @@ function ps_pen_paper_handle_admin_action() {
 		if ( is_wp_error( $result ) ) {
 			ps_pen_paper_fail( $result->get_error_message() );
 		}
-		$hidden = 'gm' === $input['visibility'] && ! ps_pen_paper_can_manage_campaign( $campaign );
+		$hidden = 'gm' === $input['visibility'] && ( ! ps_pen_paper_management_view( $page_id ) || ! ps_pen_paper_can_manage_campaign( $campaign ) );
 		$args = array( 'pspp_notice' => $hidden ? 'roll_hidden_saved' : 'roll_saved' );
 		if ( ! $hidden ) {
 			$args['pspp_roll'] = $result;
@@ -260,7 +260,7 @@ function ps_pen_paper_handle_admin_action() {
 			}
 			$input = isset( $_POST['character'] ) ? wp_unslash( $_POST['character'] ) : null;
 			$rules_revision = isset( $_POST['character_rules_revision'] ) ? $_POST['character_rules_revision'] : null;
-			$result = ps_pen_paper_save_character( $campaign_id, $character_id, ps_pen_paper_posted_id( 'owner_id' ), $input, $revision, $rules_revision, '' !== $profile_url );
+			$result = ps_pen_paper_save_character( $campaign_id, $character_id, ps_pen_paper_posted_id( 'owner_id' ), $input, $revision, $rules_revision, '' !== $profile_url || ! ps_pen_paper_management_view( $page_id ) );
 			if ( ! is_wp_error( $result ) ) {
 				$character_id = $result;
 			}
@@ -370,6 +370,10 @@ function ps_pen_paper_form_start( $operation, $nonce, $campaign_id = 0, $page_id
 		<input type="hidden" name="pspp_operation" value="<?php echo esc_attr( $operation ); ?>">
 		<?php if ( $page_id ) : ?>
 			<input type="hidden" name="pspp_frontend_page" value="<?php echo esc_attr( $page_id ); ?>">
+			<?php $frontend_view = ps_pen_paper_frontend_view(); ?>
+			<?php if ( ! is_wp_error( $frontend_view ) && 'overview' !== $frontend_view ) : ?>
+				<input type="hidden" name="pspp_view" value="<?php echo esc_attr( $frontend_view ); ?>">
+			<?php endif; ?>
 		<?php endif; ?>
 		<?php if ( $campaign_id ) : ?>
 			<input type="hidden" name="campaign_id" value="<?php echo esc_attr( $campaign_id ); ?>">

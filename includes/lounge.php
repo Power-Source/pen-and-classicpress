@@ -170,7 +170,6 @@ function ps_pen_paper_render_lounge( $page_id, $data, $universe_id ) {
 					<?php if ( is_wp_error( $wiki_url ) ) : ?><p role="alert"><?php echo esc_html( $wiki_url->get_error_message() ); ?></p>
 					<?php elseif ( $wiki_url ) : ?><a class="button" href="<?php echo esc_url( $wiki_url ); ?>"><?php esc_html_e( 'Weltwiki öffnen', 'ps-pen-paper' ); ?></a><?php endif; ?>
 					<?php if ( ps_pen_paper_community_url() ) : ?><a class="button" href="<?php echo esc_url( ps_pen_paper_community_url( 0, 0, $universe_id ) ); ?>"><?php esc_html_e( 'Charaktere dieser Welt', 'ps-pen-paper' ); ?></a><?php endif; ?>
-					<?php if ( ps_pen_paper_can_manage_universe( $universe ) ) : ?><a href="<?php echo esc_url( ps_pen_paper_universe_url( $universe_id, $page_id ) ); ?>"><?php esc_html_e( 'Welt vorbereiten', 'ps-pen-paper' ); ?></a><?php endif; ?>
 				</nav>
 			<?php endif; ?>
 			<h3><?php esc_html_e( 'Kampagnen dieser Welt', 'ps-pen-paper' ); ?></h3>

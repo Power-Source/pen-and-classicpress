@@ -16,7 +16,7 @@ function ps_pen_paper_admin_sections() {
 
 function ps_pen_paper_dashboard_url( $section, $page_id = 0 ) {
 	return $page_id
-		? add_query_arg( 'pspp_view', $section, get_permalink( $page_id ) )
+		? add_query_arg( 'pspp_view', 'overview' === $section ? 'lead' : $section, get_permalink( $page_id ) )
 		: add_query_arg( 'page', 'overview' === $section ? 'ps-pen-paper' : 'ps-pen-paper-' . $section, admin_url( 'admin.php' ) );
 }
 
@@ -34,7 +34,7 @@ function ps_pen_paper_render_dashboard( $page_id = 0 ) {
 	?>
 	<h2><?php esc_html_e( 'Vorbereiten & verwalten', 'ps-pen-paper' ); ?></h2>
 	<?php $game_page = ps_pen_paper_find_frontend_page( $page_id ); ?>
-	<?php if ( $game_page ) : ?><p><a href="<?php echo esc_url( ps_pen_paper_game_url( $game_page->ID ) ); ?>"><?php esc_html_e( 'Zur Game-Lounge', 'ps-pen-paper' ); ?></a></p><?php endif; ?>
+	<?php if ( $game_page ) : ?><p><a href="<?php echo esc_url( remove_query_arg( 'pspp_view', ps_pen_paper_game_url( $game_page->ID ) ) ); ?>"><?php esc_html_e( 'Zur Game-Lounge', 'ps-pen-paper' ); ?></a></p><?php endif; ?>
 	<?php ps_pen_paper_render_booking_agenda( $game_page ? $game_page->ID : 0 ); ?>
 	<?php
 }

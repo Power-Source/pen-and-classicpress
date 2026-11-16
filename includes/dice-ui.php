@@ -89,7 +89,7 @@ function ps_pen_paper_render_dice( $campaign, $page_id = 0, $with_journal = true
 		<?php if ( is_wp_error( $selected ) || is_wp_error( $log_page ) ) : ?>
 			<p role="alert"><?php esc_html_e( 'Ungültige Wurfauswahl oder Protokollseite.', 'ps-pen-paper' ); ?></p>
 		<?php elseif ( $selected ) : ?>
-			<?php $event = ps_pen_paper_get_roll( $campaign, $selected ); ?>
+			<?php $event = ps_pen_paper_get_roll( $campaign, $selected, ! ps_pen_paper_management_view( $page_id ) ); ?>
 			<?php if ( is_wp_error( $event ) ) : ?>
 				<p role="alert"><?php echo esc_html( $event->get_error_message() ); ?></p>
 			<?php else : ?>
@@ -159,6 +159,7 @@ function ps_pen_paper_render_dice( $campaign, $page_id = 0, $with_journal = true
 							<option value=""><?php esc_html_e( 'Ohne Charakter', 'ps-pen-paper' ); ?></option>
 							<?php foreach ( ps_pen_paper_get_characters( $campaign ) as $character ) : ?>
 								<?php
+								if ( ! ps_pen_paper_management_view( $page_id ) && (int) $character->post_author !== get_current_user_id() ) { continue; }
 								$state = ps_pen_paper_character_state( $campaign, $character );
 								if ( is_wp_error( $state ) ) {
 									echo '<option value="" disabled>' . esc_html( $state->get_error_message() ) . '</option>';

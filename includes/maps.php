@@ -182,7 +182,7 @@ function ps_pen_paper_select_scene( $campaign, $id, $revision ) {
 	) );
 }
 
-function ps_pen_paper_map_state( $campaign ) {
+function ps_pen_paper_map_state( $campaign, $player_view = false ) {
 	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_campaign( $campaign ) ) { return new WP_Error( 'forbidden', __( 'Diese Karte ist für dich nicht verfügbar.', 'ps-pen-paper' ), array( 'status' => 403 ) ); }
 	$selection = ps_pen_paper_map_selection( $campaign );
 	if ( is_wp_error( $selection ) ) { return $selection; }
@@ -197,7 +197,7 @@ function ps_pen_paper_map_state( $campaign ) {
 	$members = ps_pen_paper_table_members( $campaign );
 	foreach ( $scene['tokens'] as &$token ) {
 		$token = array_intersect_key( $token, array_flip( array( 'id', 'name', 'type', 'owner_id', 'x', 'y', 'color' ) ) );
-		$token['can_move'] = ps_pen_paper_can_manage_campaign( $campaign ) || ( $token['owner_id'] === get_current_user_id() && isset( $members[ $token['owner_id'] ] ) );
+		$token['can_move'] = ( ! $player_view && ps_pen_paper_can_manage_campaign( $campaign ) ) || ( $token['owner_id'] === get_current_user_id() && isset( $members[ $token['owner_id'] ] ) );
 	}
 	unset( $token );
 	$ping = get_transient( 'pspp_ping_' . $campaign->ID );
@@ -207,8 +207,10 @@ function ps_pen_paper_map_state( $campaign ) {
 }
 
 function ps_pen_paper_map_request( $request ) {
+	$player_view = ps_pen_paper_request_player_view( $request );
+	if ( is_wp_error( $player_view ) ) { return $player_view; }
 	$campaign = ps_pen_paper_get_campaign( (int) $request['id'] );
-	$state = ps_pen_paper_map_state( $campaign );
+	$state = ps_pen_paper_map_state( $campaign, $player_view );
 	if ( is_wp_error( $state ) ) { return $state; }
 	if ( 'POST' === $request->get_method() ) {
 		$input = $request->get_json_params();
@@ -229,7 +231,7 @@ function ps_pen_paper_map_request( $request ) {
 			$found = false;
 			foreach ( $after['published']['tokens'] as &$token ) {
 				if ( ! isset( $input['token_id'] ) || $token['id'] !== $input['token_id'] ) { continue; }
-				if ( ! ps_pen_paper_can_manage_campaign( $campaign ) && ( $token['owner_id'] !== get_current_user_id() || ! isset( ps_pen_paper_table_members( $campaign )[ get_current_user_id() ] ) ) ) {
+				if ( ( $player_view || ! ps_pen_paper_can_manage_campaign( $campaign ) ) && ( $token['owner_id'] !== get_current_user_id() || ! isset( ps_pen_paper_table_members( $campaign )[ get_current_user_id() ] ) ) ) {
 					return new WP_Error( 'forbidden', __( 'Du darfst nur deine zugewiesenen Figuren bewegen.', 'ps-pen-paper' ), array( 'status' => 403 ) );
 				}
 				foreach ( array( 'x' => 'width', 'y' => 'height' ) as $axis => $dimension ) {
@@ -243,7 +245,7 @@ function ps_pen_paper_map_request( $request ) {
 			$result = ps_pen_paper_scene_event( $campaign, $scene['id'], $before, $after, 'map_moved' );
 			if ( is_wp_error( $result ) ) { return $result; }
 		} else { return ps_pen_paper_scene_error(); }
-		$state = ps_pen_paper_map_state( $campaign );
+		$state = ps_pen_paper_map_state( $campaign, $player_view );
 		if ( is_wp_error( $state ) ) { return $state; }
 	}
 	$response = rest_ensure_response( $state );
@@ -252,11 +254,13 @@ function ps_pen_paper_map_request( $request ) {
 }
 
 function ps_pen_paper_map_image_request( $request ) {
+	$player_view = ps_pen_paper_request_player_view( $request );
+	if ( is_wp_error( $player_view ) ) { return $player_view; }
 	$campaign = ps_pen_paper_get_campaign( (int) $request['id'] );
 	$asset_id = (int) $request['asset'];
-	$public = ps_pen_paper_map_state( $campaign );
+	$public = ps_pen_paper_map_state( $campaign, $player_view );
 	if ( is_wp_error( $public ) ) { return $public; }
-	if ( ps_pen_paper_can_manage_campaign( $campaign ) ) {
+	if ( ! $player_view && ps_pen_paper_can_manage_campaign( $campaign ) ) {
 		$scene = ps_pen_paper_get_scene( $campaign, (int) $request['scene'] );
 		if ( is_wp_error( $scene ) ) { return $scene; }
 		$allowed = $asset_id === $scene['draft']['asset_id'] || ( $scene['published'] && $asset_id === $scene['published']['asset_id'] );

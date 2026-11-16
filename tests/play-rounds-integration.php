@@ -125,12 +125,86 @@ try {
 		ps_pen_paper_prepare_frontend();
 		$large_image_data = 'data:image/png;base64,' . str_repeat( 'A', 4 * (int) ceil( 2 * MB_IN_BYTES / 3 ) );
 		$check( false !== strpos( apply_filters( 'the_content', '<img src="' . $large_image_data . '">' ), $large_image_data ), 'Large protected images broke the frontend content pipeline.' );
-		$_GET = array( 'pspp_campaign' => (string) $source_id, 'pspp_round' => (string) $a, 'pspp_character' => (string) $alias_id );
 		wp_set_current_user( $users['gm'] );
+		$_GET = array();
+		$lounge = ps_pen_paper_frontend_shortcode();
+		$check( false !== strpos( $lounge, 'pspp_view=lead' ) && false === strpos( $lounge, 'aria-label="Verwaltungsbereiche"' ) &&
+			false === strpos( $lounge, 'Welt vorbereiten' ), 'GM player lounge still embedded management navigation.' );
+		$_GET = array( 'pspp_campaign' => (string) $source_id );
+		$entry = ps_pen_paper_frontend_shortcode();
+		$check( false !== strpos( $entry, 'id="pspp-play"' ) && false !== strpos( $entry, 'id="pspp-log"' ) &&
+			false === strpos( $entry, 'value="save_scene"' ), 'Campaign entry lost existing information anchors or exposed the scene editor.' );
+		$check( false === strpos( $entry, 'Round adventure · Revision' ) && false === strpos( $entry, 'SECRET_ROUND_NOTE' ),
+			'Player campaign entry exposed privileged preparation history.' );
+		$_GET = array( 'pspp_campaign' => (string) $source_id, 'pspp_mode' => 'guided' );
+		$player_directory = ps_pen_paper_frontend_shortcode();
+		$check( false === strpos( $player_directory, 'value="save_play_options"' ) &&
+			false === strpos( $player_directory, 'value="create_play_round"' ) &&
+			false === strpos( $player_directory, 'value="change_booking_link"' ), 'GM player view exposed preparation or guided round creation.' );
+		$_GET['pspp_view'] = 'lead';
+		$lead_directory = ps_pen_paper_frontend_shortcode();
+		$check( false !== strpos( $lead_directory, 'value="save_play_options"' ) &&
+			false !== strpos( $lead_directory, 'value="create_play_round"' ) &&
+			false !== strpos( $lead_directory, 'name="pspp_view" value="lead"' ), 'Leadership lost its forms or their return context.' );
+		$check( false !== strpos( ps_pen_paper_game_url( $frontend_page, $source_id ), 'pspp_view=lead' ), 'Leadership links lost the selected workspace.' );
+		unset( $_GET['pspp_mode'] );
+		$preparation = ps_pen_paper_frontend_shortcode();
+		$check( false !== strpos( $preparation, 'value="save_scene"' ) && false !== strpos( $preparation, 'value="save_npc"' ) &&
+			false !== strpos( $preparation, 'Kampagnenvorbereitung' ), 'Dedicated campaign preparation was unavailable.' );
+		$check( false !== strpos( $preparation, 'Round adventure · Revision' ) &&
+			false !== strpos( $preparation, 'SECRET_ROUND_NOTE' ), 'Leadership lost private preparation history.' );
+		set_error_handler( static function ( $severity, $message, $file, $line ) { throw new ErrorException( $message, 0, $severity, $file, $line ); } );
+		ob_start();
+		try {
+			foreach ( array(
+				'invitation_saved' => array( array( 'revision' => 0, 'users' => array() ), array( 'revision' => 1, 'users' => array( $users['player'] ) ) ),
+				'wiki_links_saved' => array( array( 'revision' => 0, 'links' => array() ), array( 'revision' => 1, 'links' => array( 'scene:123' => 456 ) ) ),
+				'campaign_restored' => array( array( 'revision' => 0 ), array( 'revision' => 1, 'backup_id' => 'test-backup', 'source_hash' => str_repeat( 'a', 64 ) ) ),
+			) as $kind => $states ) {
+				ps_pen_paper_render_event_details( array( 'kind' => $kind, 'object_id' => $source_id, 'rules_revision' => 1,
+					'before' => $states[0], 'after' => $states[1] ), $source );
+			}
+			$history = ob_get_contents();
+			$check( false !== strpos( $history, 'scene:123' ) && false !== strpos( $history, 'test-backup' ) &&
+				false !== strpos( $history, (string) $users['player'] ), 'Preparation audit details omitted non-character records.' );
+		} finally { ob_end_clean(); restore_error_handler(); }
+		$gm_base = $success( ps_pen_paper_save_character( $universe_id, 0, $users['gm'], array( 'name' => 'Playing GM',
+			'values' => array( $field => array( 'current' => '10', 'maximum' => '20' ) ) ), '0', '1' ), 'GM player character failed' );
+		$gm_alias = $success( ps_pen_paper_attach_base_character( $source_id, $gm_base, '1', '1', 'shared', 'confirmed' ), 'GM player attachment failed' );
+		$_GET = array( 'pspp_campaign' => (string) $source_id, 'pspp_character' => (string) $gm_alias );
+		$playing_gm = ps_pen_paper_frontend_shortcode();
+		$check( false !== strpos( $playing_gm, 'Playing GM' ) &&
+			false === strpos( $playing_gm, 'value="save_character_context"' ) &&
+			false === strpos( $playing_gm, 'value="grant_item"' ) &&
+			false === strpos( $playing_gm, 'value="change_wallet"' ), 'Own GM character exposed privileged inventory, currency or context actions in player view.' );
+		$_GET['pspp_view'] = 'lead';
+		$managing_gm = ps_pen_paper_frontend_shortcode();
+		$check( false !== strpos( $managing_gm, 'value="save_character_context"' ) &&
+			false !== strpos( $managing_gm, 'value="grant_item"' ), 'Leadership lost its own character management actions.' );
+		$saved_post = $_POST;
+		try {
+			$_GET = array(); $_POST['pspp_view'] = 'lead';
+			$check( false !== strpos( ps_pen_paper_game_url( $frontend_page, $source_id ), 'pspp_view=lead' ),
+				'POST actions lost the workspace on return links.' );
+		} finally { $_POST = $saved_post; }
+		wp_set_current_user( $users['other'] );
+		wp_get_current_user()->add_cap( 'ps_pen_paper_create_campaigns' );
+		$_GET = array( 'pspp_campaign' => (string) $source_id, 'pspp_view' => 'lead' );
+		$check( ps_pen_paper_can_open_leadership() &&
+			false !== strpos( ps_pen_paper_frontend_shortcode(), 'Für diesen Spielleitungsbereich hast du keine Berechtigung.' ),
+			'Leadership access elsewhere granted management of a foreign campaign.' );
+		wp_set_current_user( $users['gm'] );
+		$_GET = array( 'pspp_campaign' => (string) $source_id, 'pspp_round' => (string) $a, 'pspp_character' => (string) $alias_id );
+		$check( false !== strpos( ps_pen_paper_frontend_shortcode(), 'Fremde Charaktere öffnest du im Bereich Spielleitung.' ),
+			'Player workspace opened a foreign character using GM privileges.' );
+		$_GET['pspp_view'] = 'lead';
 		$sheet = ps_pen_paper_frontend_shortcode();
 		$check( false !== strpos( $sheet, 'value="save_character_context"' ) &&
 			false !== strpos( $sheet, 'context_resources[' . $field . '][mode]' ), 'Selected runtime sheet did not expose resource overrides to its GM.' );
 		wp_set_current_user( $users['player'] );
+		$check( false !== strpos( ps_pen_paper_frontend_shortcode(), 'Für diesen Spielleitungsbereich hast du keine Berechtigung.' ),
+			'Player accessed leadership through a crafted URL.' );
+		unset( $_GET['pspp_view'] );
 		$sheet = ps_pen_paper_frontend_shortcode();
 		$check( false !== strpos( $sheet, 'name="character_id" value="' . $alias_id . '"' ) &&
 			false === strpos( $sheet, 'value="save_character_context"' ), 'Selected runtime sheet was lost or exposed GM overrides to its owner.' );
@@ -200,6 +274,24 @@ try {
 		$success( ps_pen_paper_change_play_round( $round, 'start', (string) ps_pen_paper_play_round( $id )['revision'] ), 'Automatic start failed' );
 		$state = ps_pen_paper_play_round( $id );
 		$check( 'active' === $state['status'] && $state['run_id'] && $state['adventure_id'] !== $adventure_id, 'Automatic round did not start a separate snapshot.' );
+		wp_set_current_user( $users['gm'] );
+		set_error_handler( static function ( $severity, $message, $file, $line ) { throw new ErrorException( $message, 0, $severity, $file, $line ); } );
+		ob_start();
+		try {
+			ps_pen_paper_render_journal( $round );
+			$check( false !== strpos( ob_get_contents(), 'Round adventure' ), 'Automatic round history lost its adventure identity.' );
+		} finally {
+			ob_end_clean(); restore_error_handler(); wp_set_current_user( $users['player'] );
+		}
+		if ( 'group' === $mode ) {
+			wp_set_current_user( $users['gm'] );
+			$check( null === ps_pen_paper_adventure_group_records( $round, true )[ $state['run_id'] ]['state'] &&
+				null !== ps_pen_paper_adventure_group_records( $round )[ $state['run_id'] ]['state'],
+				'GM player projection exposed an unjoined group or leadership lost its view.' );
+			wp_set_current_user( $users['player'] );
+			$check( null !== ps_pen_paper_adventure_group_records( $round, true )[ $state['run_id'] ]['state'],
+				'Player projection hid an enrolled group from its participant.' );
+		}
 		$before_base = ps_pen_paper_raw_character_state( $characters['player'] );
 		if ( 'solo' === $mode ) {
 			$run = get_post_meta( $state['run_id'], '_pspp_adventure_run', true ); $edge = $run['snapshot']['edges'][0]['id'];

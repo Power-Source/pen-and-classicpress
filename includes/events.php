@@ -243,7 +243,7 @@ function ps_pen_paper_write_document_event( $campaign_id, $object_id, $key, $bef
 	return $id;
 }
 
-function ps_pen_paper_get_event( $campaign, $id ) {
+function ps_pen_paper_get_event( $campaign, $id, $player_view = false ) {
 	$error = new WP_Error( 'forbidden', __( 'Dieser Protokolleintrag ist für dich nicht verfügbar.', 'ps-pen-paper' ) );
 	$universe = $campaign && 'pspp_universe' === $campaign->post_type;
 	if ( ! current_user_can( 'read' ) || ! ( $universe ? ps_pen_paper_can_manage_universe( $campaign ) : ps_pen_paper_can_view_campaign( $campaign ) ) ) {
@@ -259,7 +259,7 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 		|| ! in_array( $event['visibility'], array( 'group', 'owner', 'gm' ), true ) || ! is_array( $event['before'] ) || ! is_array( $event['after'] ) || ! is_array( $event['fields'] ) ) {
 		return new WP_Error( 'invalid_event', __( 'Ein Protokolleintrag ist beschädigt. Bitte informiere den Administrator.', 'ps-pen-paper' ) );
 	}
-	if ( ! ( $universe ? ps_pen_paper_can_manage_universe( $campaign ) : ps_pen_paper_can_manage_campaign( $campaign ) ) && 'group' !== $event['visibility'] && ( 'gm' === $event['visibility'] || get_current_user_id() !== $event['recipient_id'] ) ) {
+	if ( ( $player_view || ! ( $universe ? ps_pen_paper_can_manage_universe( $campaign ) : ps_pen_paper_can_manage_campaign( $campaign ) ) ) && 'group' !== $event['visibility'] && ( 'gm' === $event['visibility'] || get_current_user_id() !== $event['recipient_id'] ) ) {
 		return $error;
 	}
 	$event['id'] = $post->ID;
@@ -349,7 +349,7 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 	return $event;
 }
 
-function ps_pen_paper_journal_query( $campaign, $page, $types ) {
+function ps_pen_paper_journal_query( $campaign, $page, $types, $player_view = false ) {
 	$universe = $campaign && 'pspp_universe' === $campaign->post_type;
 	if ( ! current_user_can( 'read' ) || ! ( $universe ? ps_pen_paper_can_manage_universe( $campaign ) : ps_pen_paper_can_view_campaign( $campaign ) ) ) {
 		return new WP_Error( 'forbidden', __( 'Du darfst dieses Spielprotokoll nicht lesen.', 'ps-pen-paper' ) );
@@ -361,7 +361,7 @@ function ps_pen_paper_journal_query( $campaign, $page, $types ) {
 		'post_type' => $types, 'post_status' => 'private', 'post_parent' => $campaign->ID,
 		'posts_per_page' => 20, 'paged' => $page, 'orderby' => 'ID', 'order' => 'DESC',
 	);
-	if ( ! $universe && ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
+	if ( $player_view || ( ! $universe && ! ps_pen_paper_can_manage_campaign( $campaign ) ) ) {
 		$args['meta_query'] = array(
 			'relation' => 'OR',
 			array( 'key' => '_pspp_visibility', 'value' => 'group' ),
@@ -384,14 +384,14 @@ function ps_pen_paper_journal_query( $campaign, $page, $types ) {
 	return new WP_Query( $args );
 }
 
-function ps_pen_paper_get_events( $campaign, $page = 1 ) {
-	$query = ps_pen_paper_journal_query( $campaign, $page, array( 'pspp_roll', 'pspp_event' ) );
+function ps_pen_paper_get_events( $campaign, $page = 1, $player_view = false ) {
+	$query = ps_pen_paper_journal_query( $campaign, $page, array( 'pspp_roll', 'pspp_event' ), $player_view );
 	if ( is_wp_error( $query ) ) {
 		return $query;
 	}
 	$events = array();
 	foreach ( $query->posts as $post ) {
-		$event = 'pspp_roll' === $post->post_type ? ps_pen_paper_get_roll( $campaign, $post->ID ) : ps_pen_paper_get_event( $campaign, $post->ID );
+		$event = 'pspp_roll' === $post->post_type ? ps_pen_paper_get_roll( $campaign, $post->ID, $player_view ) : ps_pen_paper_get_event( $campaign, $post->ID, $player_view );
 		if ( is_wp_error( $event ) ) {
 			return $event;
 		}

@@ -111,7 +111,7 @@
 			try {
 				const response = await fetch(url, {
 					method:input ? 'POST' : 'GET',credentials:'same-origin',cache:'no-store',signal:controller.signal,
-					headers:{'X-WP-Nonce':root.dataset.mapNonce,'Content-Type':'application/json'},
+					headers:{'X-WP-Nonce':root.dataset.mapNonce,'X-PSPP-View':root.dataset.mapView || 'overview','Content-Type':'application/json'},
 					body:input ? JSON.stringify(input) : undefined
 				});
 				const data = await response.json();

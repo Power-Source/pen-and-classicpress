@@ -74,7 +74,7 @@ function ps_pen_paper_render_wallet( $scope, $character, $page_id, $context = 'g
 		<h3><?php esc_html_e( 'Guthaben', 'ps-pen-paper' ); ?></h3>
 		<p class="pspp-wallet-balance"><strong><?php echo esc_html( number_format_i18n( $current['wallet']['balance'], 0 ) . ' ' . $current['currency']['symbol'] ); ?></strong> · <?php echo esc_html( $current['currency']['name'] ); ?></p>
 		<p><?php echo esc_html( ps_pen_paper_wallet_modes()[ $current['currency']['wallet_mode'] ] ); ?></p>
-		<?php if ( 'profile' !== $context && ps_pen_paper_can_manage_character_scope( $current['scope'] ) ) : ?>
+		<?php if ( 'profile' !== $context && ps_pen_paper_management_view( $page_id ) && ps_pen_paper_can_manage_character_scope( $current['scope'] ) ) : ?>
 			<details class="pspp-fold"><summary><?php esc_html_e( 'Guthaben vergeben oder abziehen', 'ps-pen-paper' ); ?></summary>
 			<?php ps_pen_paper_form_start( 'change_wallet', 'pspp_campaign_' . $scope->ID, $scope->ID, $page_id ); ?>
 				<input type="hidden" name="economy_complete" value="complete"><input type="hidden" name="character_id" value="<?php echo esc_attr( $character->ID ); ?>">

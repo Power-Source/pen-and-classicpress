@@ -39,9 +39,9 @@ function ps_pen_paper_adventure_group_user_label( $user_id ) {
 function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 	$round = ps_pen_paper_play_round( $campaign->ID );
 	if ( is_wp_error( $round ) || ( $round && 'group' !== $round['mode'] ) ) { return; }
-	$records = ps_pen_paper_adventure_group_records( $campaign );
+	$records = ps_pen_paper_adventure_group_records( $campaign, ! ps_pen_paper_management_view( $page_id ) );
 	if ( is_wp_error( $records ) ) { echo '<p role="alert">' . esc_html( $records->get_error_message() ) . '</p>'; return; }
-	$gm = ps_pen_paper_can_manage_campaign( $campaign ); $own_characters = array();
+	$gm = ps_pen_paper_management_view( $page_id ) && ps_pen_paper_can_manage_campaign( $campaign ); $own_characters = array();
 	foreach ( get_posts( array( 'post_type' => 'pspp_character', 'post_status' => 'private', 'post_parent' => $campaign->ID,
 		'author' => get_current_user_id(), 'posts_per_page' => -1 ) ) as $post ) {
 		$state = ps_pen_paper_character_state( $campaign, $post );

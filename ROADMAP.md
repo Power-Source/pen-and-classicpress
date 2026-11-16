@@ -16,7 +16,102 @@ Mehrere Kampagnen mit unterschiedlichen Regeln können auf derselben Website
 nebeneinander bestehen. Das Plugin soll ohne externe Spieleplattform,
 Echtzeitpflicht oder große Game-Engine nutzbar sein.
 
-## Aktueller Auftrag: einfacher, zusammenhängender Spieleinstieg
+## Aktueller Korrekturauftrag: Spielerablauf und Spielleitung trennen
+
+**Korrektur vom 16.11.2026:** Die bisherige Umsetzung verbindet technische
+Einzelfunktionen noch nicht zum zugesagten Spielerablauf. Vorhandene
+Modusschalter, Szenenverzweigungen und bestandene Lifecycle-Tests sind kein
+Nachweis einer vollständig vorbereitbaren Solo-/Gruppenautomatik.
+Die folgenden Produktziele bleiben bis zur jeweiligen End-to-End-Abnahme offen.
+Bestehende Universen, Kampagnen, Charaktere und Spielstände bleiben erhalten.
+
+### A. Getrennte Frontend-Arbeitsbereiche – schrittweise Umsetzung
+
+- [x] Die Game-Lounge ist der Spielereinstieg, auch für Administratoren.
+  Keine Vorbereitungsformulare und keine stillschweigende Leitungsansicht.
+- [x] Ein ausdrücklich geöffneter, rechtegeschützter Bereich **Spielleitung**
+  bündelt Kampagnenvorbereitung, Regeln, Szenen, NPCs/Gegner und Freigaben.
+  Berechtigte können bewusst zwischen Spielen und Spielleitung wechseln.
+- [x] Links, Formulare und Rückleitungen erhalten den gewählten Bereich.
+  Die Auswahl des Bereichs ersetzt niemals die Berechtigungsprüfung.
+- [ ] Bestehende Spieltisch-, Bogen-, Protokoll- und Abenteueransichten vollständig auf
+  beide Aufgaben prüfen; Leitungskonten dürfen in der Spieleroberfläche
+  nicht automatisch fremde Bögen, Geheimnisse oder Leitungsaktionen erhalten.
+  - [x] Eingebettete Bogen-, Inventar-, Handels-, Verbrauchs- und Porträtwerkzeuge
+    sowie Guthaben, Auflagen und Übertragungen an den Verwaltungsbereich binden.
+    Eigene Bogenänderungen unter Spielen beachten den bestehenden Spielerkontext.
+  - [x] Würfelfiguren auf eigene Charaktere begrenzen; Protokolle und direkte
+    Wurfansichten ohne erweiterte Leitungsleserechte ausgeben.
+  - [x] Gruppenstände nur für eigene Teilnahme ausgeben und Kartenbewegungen
+    sowie Bildfreigaben auch bei REST-Aktualisierungen im Spielerbereich begrenzen.
+  - [ ] Übrige Unteransichten und Fremdplugin-Oberflächen einschließlich
+    Chatmoderation abschließend prüfen.
+
+**Nachweis der ersten Etappe:** Gezielte native Regressionen für Spielrunden,
+Spieltisch und PS Events bestanden. Im Browser mit einem eigenen temporären
+Leitungskonto geprüft: Spieler-Lounge ohne eingebettete Verwaltungsnavigation,
+Kampagneneinstieg ohne Angebots-/Terminverwaltung, ausdrücklicher Wechsel in
+die Vorbereitung, echtes Speichern des Angebots mit Rückkehr in den
+Leitungsbereich sowie Rückwechsel zu Spielen ohne diese Verwaltungsformulare.
+Die eigenen fünf Testposts und das Testkonto wurden anschließend entfernt.
+Dies ist noch keine vollständige Abnahme aller Unteransichten oder Spielerwege.
+
+**Nachweis der zweiten Etappe:** Sechs gezielte native Integrationsprüfungen für
+Spielrunden, Protokolle, Karten, Ausrüstung, Gegenstandsverbrauch und
+Charakterrichtlinien sowie die JavaScript-Prüfungen bestanden.
+Im Browser eine eigene geleitete Runde mit zwei temporären Konten geprüft:
+Leitungskonto unter Spielen ohne geheime Vorbereitungsinhalte, fremde
+Würfelfiguren oder eingebettete Bogenverwaltung; Karten-REST-Aktualisierung ohne
+NPC-Bewegungsrecht. Der ausdrückliche Wechsel zur Spielleitung stellte
+Vorbereitung, fremde Würfelfiguren und NPC-Bewegungsrecht wieder bereit.
+Ein normales Spielerkonto konnte den Leitungsbereich auch per Direktlink nicht
+öffnen. Die eigenen 30 Testposts und beide Konten wurden anschließend entfernt;
+der Browser ist wieder abgemeldet. Dies ersetzt nicht die vollständige Abnahme
+der vier Spielerwege.
+
+### B. Vorbereitung und ausführbare Solo-/Gruppenautomatik
+
+- [ ] Die Spielleitung kann einen vollständigen Ablauf mit möglichen Aktionen,
+  Voraussetzungen, Proben, Wirkungen, Folgeaktionen und Abschluss vorbereiten.
+  NPCs/Gegner und deren Reaktionen werden dort eingebunden, wo vorgesehen.
+  Kein fest eingebautes Regelwerk und keine Pflicht zu Kampfbegegnungen.
+- [ ] NPC-/Gegnerdaten mit der regelgesteuerten Ausführung verbinden;
+  Beschreibungen und Begegnungszuordnungen allein reichen nicht aus.
+- [ ] Vor der Freigabe erkennbar prüfen, welche Abläufe ohne anwesende
+  Spielleitung ausführbar sind und wo noch manuelle Entscheidungen fehlen.
+- [ ] Einen vollständigen vertikalen Ablauf nachweisen: vorbereiten,
+  für Solo freigeben, als Spieler Charakter wählen und das Spielfeld erreichen,
+  erlaubte Aktion samt vorbereiteter Reaktion ausführen, Fortschritt speichern
+  und nach erneuter Anmeldung fortsetzen.
+
+### C. Vier verständliche Spielereinstiege je Kampagne
+
+Nur tatsächlich freigegebene und verfügbare Angebote anzeigen:
+
+- [ ] **Solo spielen:** vorbereitetes Abenteuer wählen, eigenen passenden
+  Charakter auswählen und ohne technische Rundenverwaltung ins Spiel gelangen.
+- [ ] **Mit Freunden spielen:** automatische Gruppenrunde mit Einladungen über
+  **PS Community**, Annahme durch Freunde, Charakterwahl und gemeinsamem Start.
+- [ ] **Spieltermin auswählen:** über **PS Events** anmelden und die zugehörige
+  Runde eindeutig erreichen. Terminzusage, Spielzugang und Charakterwahl
+  bleiben getrennt; keine zweite Buchungsverwaltung.
+- [ ] **Runde anfragen:** eine geleitete Runde für die gewählte Kampagne
+  beantragen; Spielleitung entscheidet und stellt bei Annahme die Runde bereit.
+  Das ist nicht dasselbe wie eine allgemeine Kampagnen-Beitrittsanfrage.
+- [ ] Fehlenden Charakter mit passendem Erstellweg und Rückweg zum gewählten
+  Spiel behandeln. Wartezustände nennen konkret, worauf gewartet wird.
+
+### D. Abnahme aus Spielersicht
+
+- [ ] Alle vier Wege mit normalen Spielerkonten abnehmen, einschließlich
+  Einladungen, Ablehnungen, ausstehenden Freigaben und Wiedereinstieg.
+- [ ] Dieselben Einstiege mit einem Leitungskonto im Bereich **Spielen**
+  prüfen. Kein unbemerkter Wechsel zur Verwaltungsoberfläche.
+- [ ] Spielfeld und tatsächlich wirksame Aktion prüfen, nicht nur das Anlegen,
+  Starten und Abschließen technischer Runden.
+- [ ] Erst nach diesen Nachweisen Handbuch und Fertigmeldungen aktualisieren.
+
+## Vorhandene Bausteine und bisherige technische Nachweise
 
 Die folgenden Anforderungen sind bestätigt. Der Abgleich vom **16.11.2026**
 trennt den implementierten Funktionsstand von der vollständigen Bedienabnahme:
@@ -79,10 +174,19 @@ ungeprüften Versionssprung. Die Versionsübersicht weiter unten ist historisch.
 - [x] Veranstaltungsrechte, private Solo-Runden, gelöschte Termine und
   veraltete Zuordnungsformulare beachten. Lokale Veranstaltungs-IDs werden
   weder in neue Runden kopiert noch in Kampagnensicherungen exportiert.
+- [x] Auf der Entwicklungs-Unterwebsite aktiviert und exemplarisch im Browser
+  geprüft: Verknüpfen, Lösen, erneutes Verknüpfen, Lounge, native Zu-/Absage,
+  separate Charakterwahl und verweigerter Zugang für Außenstehende.
+  Der fehlerhafte Benutzerbezug im nativen PS-Events-Teilnahmeformular ist
+  korrigiert und durch eine Regression abgedeckt.
+- [x] Eigene [Handbuchseite zur Erweiterung](docs/erweiterung-ps-events.md)
+  mit fünf echten Screenshots, Einrichtungsablauf und Grenzen der Abnahme.
 - Die gezielte Regression verwendet das echte Nachbarplugin mit
   verbindungslokalen temporären Buchungstabellen; vorhandene Anmeldungen und
   der Aktivierungszustand werden nicht verändert. Eine umfassende
   Browser-/Plattformprüfung aller PS-Events-Zusatzmodule ist damit nicht erledigt.
+  Das Anlegen im nativen Veranstaltungseditor war durch die vorhandene
+  Easy-Mode-Verwaltung blockiert; dafür wurde eine native Testfixture verwendet.
 
 ### 1. Universum als verpflichtende Grundlage
 
@@ -114,9 +218,9 @@ ungeprüften Versionssprung. Die Versionsübersicht weiter unten ist historisch.
   Einladen und Leitungsfreigaben gehören zur jeweiligen Spielrunde, nicht ins
   Spielerprofil. Vorschläge durch Mitspieler benötigen zunächst die Zustimmung
   der Leitung.
-- [x] Im Spielbereich eine klare Aktion zum Spielen beziehungsweise Fortsetzen
-  anbieten. Spieleauswahl, Vorbereitung und Verwaltung bleiben dort getrennt
-  und eindeutig auffindbar.
+- [ ] Im Spielbereich einen durchgängigen Weg zum Spielen beziehungsweise
+  Fortsetzen anbieten. Einzelne Links sind vorhanden; die bisherige Mischung
+  aus Spieleauswahl, Vorbereitung und Verwaltung erfüllt dieses Ziel nicht.
 - [x] Ersetzte Profil-Menü- und Formularwege entfernen, nicht parallel als zweite
   Oberfläche weiterpflegen. Bestehende Rechte und gespeicherte Inhalte erhalten.
   Alte direkte Abenteuerstarts verweisen auf die Lounge. Einladungen,
@@ -133,13 +237,16 @@ ungeprüften Versionssprung. Die Versionsübersicht weiter unten ist historisch.
   Kampagnen nach Bestätigung verlassen, ohne Charaktere oder Verlauf zu löschen.
 - [x] Eigene laufende Abenteuer direkt öffnen; Gruppenstart zum neu angelegten
   Durchlauf zurückführen statt zur allgemeinen Übersicht.
-- [x] Drei ausdrücklich konfigurierbare Angebote: geleitet, solo und automatische
-  Gruppe; Leitung entscheidet zusätzlich über neue automatische Spielerstarts.
+- [x] Technische Konfiguration für geleitet, solo und automatische Gruppe;
+  Leitung entscheidet zusätzlich über neue automatische Spielerstarts.
+  Die vollständige Vorbereitung und Ausführung nach Abschnitt B ist damit
+  ausdrücklich noch nicht fertig.
 - [x] Vorbereitete Kampagnen von Spielrunden trennen: dieselbe Kampagne mit
   unterschiedlichen Gruppen und getrennten Spielständen wiederverwenden,
   auch für geleitetes Spiel.
-- [x] Warte-Lobby mit Teilnehmern, Charakterwahl und ausdrücklichem Rundenstart.
-  „Neue Runde anlegen“, „Beitreten“ und „Fortsetzen“ dürfen nicht verwechselt werden.
+- [x] Technische Warte-Lobby mit Teilnehmern, Charakterwahl und Rundenstart.
+- [ ] „Neue Runde anlegen“, „Beitreten“ und „Fortsetzen“ durch einen verständlichen
+  Spielerablauf ersetzen beziehungsweise eindeutig voneinander unterscheiden.
 - [x] Neue Runden nutzen freigegebene Universumsfiguren samt unvervielfachtem
   Inventar; Ressourcenverbrauch, Gegenstandsverbrauch und Handel bleiben im Profil.
   Austritt bereinigt aktive Teilnahmen und offene Reservierungen, ohne Figuren
@@ -208,8 +315,9 @@ ungeprüften Versionssprung. Die Versionsübersicht weiter unten ist historisch.
 - [x] Die oben benannten zehn nativen Integrationstests und zwei
   UI-Regressionen ausführen, einschließlich der zuvor noch offenen
   Abenteuer- und Import-Write-Gesamtläufe.
-- [x] Vollständige exemplarische Spielabläufe aller drei Spielarten mit eigenen
-  temporären Konten und Daten im Browser prüfen. Fremde Demos unverändert lassen.
+- [x] Technische Lifecycle-Abläufe aller drei Spielarten mit eigenen temporären
+  Konten im Browser prüfen. Diese Nachweise belegen weder die vier Spielereinstiege
+  noch eine regelgesteuerte NPC-/Gegnerautomatik; deren Abnahme bleibt offen.
 - [ ] Die breitere Browsermatrix für Einladungsvarianten, Slots und sämtliche
   Gegenstandsaktionen sowie weitere WordPress-/ClassicPress-Konfigurationen
   bleibt gesonderte Abnahme; native Rechte- und Aktionsregressionen ersetzen sie nicht.

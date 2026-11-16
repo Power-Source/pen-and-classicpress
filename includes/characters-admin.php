@@ -157,6 +157,7 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id = 0, $overview_url = '', $item_context = 'game' ) {
 	$rules = ps_pen_paper_get_rules( $campaign->ID );
 	$profile = 'profile' === $item_context;
+	$management = ! $profile && ps_pen_paper_management_view( $page_id );
 	?>
 	<section id="pspp-characters" class="pspp-rules" aria-labelledby="pspp-characters-heading">
 		<h2 id="pspp-characters-heading"><?php echo esc_html( $profile ? __( 'Dein Charakter', 'ps-pen-paper' ) : ( 'pspp_universe' === $campaign->post_type ? __( 'Basischaraktere', 'ps-pen-paper' ) : __( 'Charaktere', 'ps-pen-paper' ) ) ); ?></h2>
@@ -171,10 +172,14 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 			if ( ! $character ) {
 				ps_pen_paper_fail( __( 'Du darfst diesen Charakter nicht ansehen.', 'ps-pen-paper' ) );
 			}
+			if ( ! $management && (int) $character->post_author !== get_current_user_id() ) {
+				echo '<p role="alert">' . esc_html__( 'Fremde Charaktere öffnest du im Bereich Spielleitung.', 'ps-pen-paper' ) . '</p></section>';
+				return;
+			}
 			$state = ps_pen_paper_character_state( $campaign, $character );
 			if ( is_wp_error( $state ) ) {
 				echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p>';
-				if ( ! $profile && 'resource_limit_conflict' === $state->get_error_code() && ps_pen_paper_can_manage_campaign( $campaign ) ) {
+				if ( $management && 'resource_limit_conflict' === $state->get_error_code() && ps_pen_paper_can_manage_campaign( $campaign ) ) {
 					$raw = ps_pen_paper_raw_character_state( $character->ID );
 					if ( ! is_wp_error( $raw ) && 'shared' === $raw['context']['mode'] ) {
 						$base = ps_pen_paper_raw_character_state( $raw['context']['source_id'] );
@@ -228,7 +233,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 					<section class="pspp-snapshot">
 						<h3><?php esc_html_e( 'Offener Antrag', 'ps-pen-paper' ); ?></h3>
 						<?php ps_pen_paper_render_character_snapshot( $state['pending'], $rules, $campaign ); ?>
-						<?php if ( ! $profile && ps_pen_paper_can_manage_character_scope( $campaign ) ) : ?>
+						<?php if ( $management && ps_pen_paper_can_manage_character_scope( $campaign ) ) : ?>
 							<?php ps_pen_paper_form_start( 'pspp_universe' === $campaign->post_type ? 'review_base_character' : 'review_character', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 								<input type="hidden" name="character_id" value="<?php echo esc_attr( $character_id ); ?>">
 								<input type="hidden" name="character_revision" value="<?php echo esc_attr( $state['revision'] ); ?>">
@@ -261,7 +266,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 			<?php endif; ?>
 			<?php if ( ps_pen_paper_can_edit_character( $campaign, $character ) ) : ?>
 				<?php if ( $page_id || $overview_url ) : ?><details class="pspp-fold"><summary><?php esc_html_e( 'Bogen bearbeiten', 'ps-pen-paper' ); ?></summary><?php endif; ?>
-				<?php ps_pen_paper_render_character_form( $campaign, $rules, $character, $page_id, null, false, $profile ); ?>
+				<?php ps_pen_paper_render_character_form( $campaign, $rules, $character, $page_id, null, false, ! $management ); ?>
 				<?php if ( $page_id || $overview_url ) : ?></details><?php endif; ?>
 			<?php endif; ?>
 			</section></div>

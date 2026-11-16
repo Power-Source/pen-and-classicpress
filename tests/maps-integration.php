@@ -15,8 +15,9 @@ $users = array();
 $parents = array();
 $path = '';
 $check = function ( $condition, $message ) { if ( ! $condition ) { throw new RuntimeException( $message ); } };
-$call = function ( $campaign_id, $suffix = '/map', $input = null ) {
+$call = function ( $campaign_id, $suffix = '/map', $input = null, $view = null ) {
 	$request = new WP_REST_Request( null === $input ? 'GET' : 'POST', '/ps-pen-paper/v1/campaigns/' . $campaign_id . $suffix );
+	if ( null !== $view ) { $request->set_header( 'X-PSPP-View', $view ); }
 	if ( null !== $input ) { $request->set_header( 'Content-Type', 'application/json' ); $request->set_body( wp_json_encode( $input ) ); }
 	return rest_do_request( $request );
 };
@@ -40,6 +41,7 @@ try {
 	$input = array( 'title' => 'PRIVATE_DRAFT', 'text' => 'PUBLIC_TEXT', 'secret' => 'GM_SECRET', 'grid' => '50', 'tokens' => array(
 		array( 'id' => '', 'name' => 'Mara', 'type' => 'player', 'owner_id' => (string) $users['player'], 'color' => '#d6a858', 'x' => '50', 'y' => '50' ),
 		array( 'id' => '', 'name' => 'Wache', 'type' => 'npc', 'owner_id' => '0', 'color' => '#c76b73', 'x' => '70', 'y' => '50' ),
+		array( 'id' => '', 'name' => 'Leitungsfigur', 'type' => 'player', 'owner_id' => (string) $users['gm'], 'color' => '#d6a858', 'x' => '30', 'y' => '50' ),
 	) );
 	wp_set_current_user( $users['player'] );
 	$check( is_wp_error( ps_pen_paper_save_scene( $campaign, 0, $input, '0', $path ) ), 'Player created a scene.' );
@@ -58,7 +60,15 @@ try {
 	wp_set_current_user( $users['gm'] );
 	$check( true === ps_pen_paper_publish_scene( $campaign, $scene_id, '1', 'confirmed' ), 'Publish failed.' );
 	$check( null === ps_pen_paper_map_state( $campaign )['scene'] && true === ps_pen_paper_select_scene( $campaign, $scene_id, '0' ), 'Publish unexpectedly switched scene or explicit selection failed.' );
+	$player_map = $call( $campaign->ID, '/map', null, 'overview' )->get_data()['scene'];
+	$check( ! $player_map['tokens'][0]['can_move'] && ! $player_map['tokens'][1]['can_move'] && $player_map['tokens'][2]['can_move'] &&
+		ps_pen_paper_map_state( $campaign )['scene']['tokens'][1]['can_move'], 'GM player map regained foreign markers or lost its own marker.' );
+	$check( 400 === $call( $campaign->ID, '/map', null, 'invalid' )->get_status(), 'Invalid map perspective was silently accepted.' );
+	$gm_player_move = array( 'operation' => 'move', 'scene_id' => $scene_id, 'publication' => 1, 'revision' => 2,
+		'token_id' => $player_map['tokens'][1]['id'], 'x' => 6500, 'y' => 3500 );
+	$check( 403 === $call( $campaign->ID, '/map', $gm_player_move, 'overview' )->get_status(), 'GM player map moved a foreign marker.' );
 	wp_set_current_user( $users['player'] );
+	$check( ! $call( $campaign->ID, '/map', null, 'lead' )->get_data()['scene']['tokens'][1]['can_move'], 'Leadership view header granted authority to a player.' );
 	$response = $call( $campaign->ID );
 	$visible = $response->get_data()['scene'];
 	$check( 200 === $response->get_status() && false === strpos( wp_json_encode( $response->get_data() ), 'GM_SECRET' ) && ! isset( $visible['draft'] ) && $visible['tokens'][0]['can_move'] && ! $visible['tokens'][1]['can_move'], 'Published view leaks secret or movement authority.' );
@@ -96,6 +106,9 @@ try {
 	$edit['text'] = 'UNRELEASED_TEXT';
 	$check( $scene_id === ps_pen_paper_save_scene( $campaign, $scene_id, $edit, '3', $path ), 'Draft update failed.' );
 	$new_asset = ps_pen_paper_get_scene( $campaign, $scene_id )['draft']['asset_id'];
+	$check( 403 === $call( $campaign->ID, '/maps/' . $scene_id . '/images/' . $new_asset, null, 'overview' )->get_status() &&
+		200 === $call( $campaign->ID, '/maps/' . $scene_id . '/images/' . $new_asset, null, 'lead' )->get_status(),
+		'GM player image refresh exposed a draft or leadership lost its preview.' );
 	$check( is_wp_error( ps_pen_paper_save_scene( $campaign, $scene_id, $edit, '3' ) ), 'Stale draft accepted.' );
 	ob_start();
 	ps_pen_paper_render_journal( $campaign );

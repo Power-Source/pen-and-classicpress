@@ -137,7 +137,7 @@ function ps_pen_paper_render_member_invitation_form( $scope, $page_id = 0 ) {
 		<p><?php esc_html_e( 'Mitgliedereinladungen benötigen standardmäßig zuerst die Freigabe der Spielleitung. Die eingeladene Person sieht den offenen Freigabestatus im Profil.', 'ps-pen-paper' ); ?></p>
 		<?php submit_button( __( 'Einladung senden', 'ps-pen-paper' ) ); ?>
 	</form>
-	<?php ps_pen_paper_render_profile_invitations( $page_id, $scope ); ?>
+	<?php if ( ps_pen_paper_management_view( $page_id ) ) { ps_pen_paper_render_profile_invitations( $page_id, $scope ); } ?>
 	<?php
 }
 
@@ -186,10 +186,11 @@ function ps_pen_paper_render_portrait_presets( $scope, $character, $page_id = 0,
 	if ( ! $universe ) { return; }
 	$policy = ps_pen_paper_character_policy( $universe->ID );
 	$state = ps_pen_paper_portrait_state( $character->ID );
+	$gm = ! $profile && ps_pen_paper_management_view( $page_id ) && ps_pen_paper_can_manage_character_scope( $scope );
 	if ( is_wp_error( $policy ) || is_wp_error( $state ) ) { echo '<p role="alert">' . esc_html( is_wp_error( $policy ) ? $policy->get_error_message() : $state->get_error_message() ) . '</p>'; return; }
-	if ( ! $policy['custom_portraits'] && ! ps_pen_paper_can_manage_character_scope( $scope ) ) { echo '<p>' . esc_html__( 'Eigene Porträtuploads sind deaktiviert. Bereits gespeicherte Bilder bleiben erhalten.', 'ps-pen-paper' ) . '</p>'; }
+	if ( ! $policy['custom_portraits'] && ! $gm ) { echo '<p>' . esc_html__( 'Eigene Porträtuploads sind deaktiviert. Bereits gespeicherte Bilder bleiben erhalten.', 'ps-pen-paper' ) . '</p>'; }
 	if ( 'pspp_universe' === $scope->post_type ) {
-		if ( $policy['custom_portraits'] || ps_pen_paper_can_manage_character_scope( $scope ) ) {
+		if ( $policy['custom_portraits'] || $gm ) {
 			ps_pen_paper_form_start( 'profile_portrait', 'pspp_campaign_' . $scope->ID, $scope->ID, $page_id, true );
 			?>
 			<input type="hidden" name="character_id" value="<?php echo esc_attr( $character->ID ); ?>">
@@ -202,7 +203,7 @@ function ps_pen_paper_render_portrait_presets( $scope, $character, $page_id = 0,
 			<?php
 		}
 		$actions = array( 'remove' => __( 'Porträt entfernen', 'ps-pen-paper' ) );
-		if ( ! $profile && $state['pending'] && ps_pen_paper_can_manage_character_scope( $scope ) ) {
+		if ( $gm && $state['pending'] ) {
 			$pending_image = $state['pending']['asset_id'] ? ps_pen_paper_private_image_data( $scope, $state['pending']['asset_id'] ) : '';
 			if ( is_wp_error( $pending_image ) ) { echo '<p role="alert">' . esc_html( $pending_image->get_error_message() ) . '</p>'; }
 			if ( $pending_image && ! is_wp_error( $pending_image ) ) { echo '<span class="pspp-portrait"><img src="' . esc_attr( $pending_image ) . '" alt=""></span>'; }

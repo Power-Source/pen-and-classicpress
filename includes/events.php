@@ -16,6 +16,7 @@ function ps_pen_paper_event_labels() {
 		'game_round' => __( 'Spielsitzung oder Runde geändert', 'ps-pen-paper' ),
 		'play_options' => __( 'Angebotene Spielarten geändert', 'ps-pen-paper' ),
 		'play_round' => __( 'Spielrunde geändert', 'ps-pen-paper' ),
+		'play_result' => __( 'Persönlicher Abschlussbeleg gespeichert', 'ps-pen-paper' ),
 		'item_action_policy' => __( 'Profilrechte für Gegenstände geändert', 'ps-pen-paper' ),
 		'wiki_links_saved'    => __( 'Wiki-Verknüpfungen geändert', 'ps-pen-paper' ),
 		'campaign_restored'   => __( 'Kampagne wiederhergestellt', 'ps-pen-paper' ),
@@ -265,6 +266,7 @@ function ps_pen_paper_get_event( $campaign, $id, $player_view = false ) {
 		return $error;
 	}
 	$event['id'] = $post->ID;
+	if ( 'play_result' === $event['kind'] && ! ps_pen_paper_valid_play_result_event( $event ) ) { return ps_pen_paper_play_result_error(); }
 	if ( in_array( $event['kind'], array( 'condition_policy_saved', 'character_condition_changed' ), true ) && ! ps_pen_paper_valid_condition_event( $event ) ) {
 		return ps_pen_paper_condition_error();
 	}

@@ -37,7 +37,8 @@ implementiert. Der Ersteller
 bleibt Spielleiter seiner Kampagne. Ein Archivkennzeichen markiert Kampagnen
 derzeit nur in der Übersicht; es sperrt keine Aktionen.
 
-Neue Kampagnen benötigen ein vorhandenes Universum. Im eigenen PS-Community-Profil
+Neue Kampagnen benötigen ein vorhandenes Universum. Genau ein verwaltbares Universum
+wird automatisch zugeordnet; bei mehreren ist die Auswahl erforderlich. Im eigenen PS-Community-Profil
 stehen die Universumsauswahl zur Charaktererstellung und die Auswahl eigener Bögen
 bereit. Das Profil enthält nur eigene Charaktere, Werte, Inventar und erlaubte
 Charakteraktionen, keine Einladungen, Abenteuerstarts oder Leitungsfreigaben.
@@ -56,6 +57,12 @@ Charakternamen und freigegebene Porträts lassen sich ausdrücklich für die
 Teilnehmerleiste teilen, ohne Werte und Inventar freizugeben. Porträts werden
 bei Bedarf geschützt nachgeladen; bei gemeinsamem Basisstand gilt dessen
 aktuelle Freigabe im Profil.
+Die Universumsleitung definiert eigene Charakterzustände und deren Auswirkungen:
+Aktions-/Beitrittssperren, Wertänderungen und optionale Ressourcengrenzen.
+Sie entscheidet, ob Kampagnenleitungen lokale oder dauerhafte Folgen ändern
+und vorbereitete Abenteuer diese automatisch auslösen dürfen. Rettung und
+Wiederbelebung sind ausdrücklich vorbereitbar; Abenteuerergebnis und
+Charaktertod bleiben unabhängig. Es gibt keine feste Nullpunkte-Todesregel.
 Für Porträts, Bogen- und Spieltischhintergründe sind Bildfüllung und Position
 mit Vorschau einstellbar. Der Rundenchat zeigt zusätzlich die letzten
 20 öffentlichen Gruppenwürfe aus dem geschützten Wurfprotokoll, unabhängig
@@ -325,6 +332,18 @@ Spielleitung. Automatische Gruppen organisiert der jeweilige Gastgeber, ohne
 Spielleiterrechte zu erhalten; eine Abenteuerentscheidung wird direkt ausgeführt.
 In einer Pause sind Beitritt und Charakterwechsel möglich. Derselbe Charakter
 kann nicht gleichzeitig in mehreren laufenden Runden spielen.
+
+Nach dem Ende zeigt der Spieltisch **Deine Abschlussübersicht**: die persönliche
+Bilanz von Ressourcen, Zahlenwerten (auch frei definierten Erfahrungspunkten),
+Gegenständen, Guthaben und Charakterfolgen. Neue Runden speichern dafür private
+Vergleichsstände beim Einstieg und beim Ende der Teilnahme. Austritt und
+Wiedereinstieg bilden getrennte Abschnitte; Änderungen dazwischen zählen nicht.
+Spätere Profiländerungen schreiben die Abrechnung nicht um. Bei älteren Runden
+werden ausschließlich vorhandene Abenteuerkosten und ausgegebene Belohnungen
+ausgewertet; fehlende historische Daten werden ausdrücklich kenntlich gemacht.
+**Zurück zur Lounge** beendet keine Mitgliedschaft und zahlt nichts erneut aus.
+Unter **Abgeschlossene Runden → Ergebnis ansehen** lässt sich die Übersicht
+wieder öffnen. Die Rückkehr funktioniert für Solo-, Gruppen- und geleitete Runden.
 
 Mitglieder können **Kampagne verlassen** ausdrücklich bestätigen. Das beendet
 auch ihre aktiven Rundenteilnahmen und verwirft offene Gruppenvorschläge,
@@ -1498,6 +1517,16 @@ Feldkennungen, bestätigte Übernahmen, gemeinsame und unabhängige Charakterst�
 lokale Zahlenauflagen, effektive Würfel-Snapshots, Revisionen, private Welt- und
 Charakterdaten, beschädigte Kontexte und Rücknahme bei Protokollfehlern.
 Auch diese Prüfung erstellt und entfernt ausschließlich eigene temporäre Daten.
+`tests/character-conditions-integration.php` prüft frei definierte Zustände,
+Universumsbefugnisse und deren Entzug, lokale und dauerhafte Folgen,
+Wertänderungen, optionale Ressourcengrenzen, Beitritts-/Aktionssperren,
+Rettung in Solo- und Gruppenabenteuern, Sieg trotz Charaktertod sowie
+Rückabwicklung und Sicherungsaufbereitung. Auch hier bleiben reale
+Figuren und reale Demospielstände unberührt.
+`tests/play-rounds-integration.php` prüft zusätzlich gespeicherte persönliche
+Abschlussbilanzen, verbrauchte Gegenstände, Guthaben und Folgen, getrennte
+Teilnahmeabschnitte, Gruppenprivatsphäre, Altstände, Unveränderlichkeit beim
+Anzeigen und nach späteren Profiländerungen, Rollback und Sicherungsaufbereitung.
 Ausführung wie bei den übrigen Integrationstests, beispielsweise:
 
 ```sh

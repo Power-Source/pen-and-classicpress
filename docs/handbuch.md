@@ -296,6 +296,8 @@ Im Backend unter **Pen & Paper** und im Frontend nach dem Wechsel zu **Spielleit
 
 Neue Kampagnen benötigen immer ein vorhandenes Universum: zuerst unter
 **Universen** die Welt erstellen, danach im Kampagnenformular diese Welt wählen.
+Ist genau ein verwaltbares Universum vorhanden, wird es automatisch zugeordnet;
+bei mehreren ist eine ausdrückliche Auswahl erforderlich.
 Ohne verwaltbares Universum führt der Einstieg direkt zur Welterstellung.
 Ältere, unzugeordnete Kampagnen werden nicht automatisch verändert; ihre
 Zuordnung erfolgt bewusst über die folgende Vorschau.
@@ -697,6 +699,73 @@ beziehungsweise Administratoren, nicht automatisch die ganze Gruppe.
 Gewöhnliche Bögen bleiben kampagnengebunden. Aus einem Universum übernommene
 Bögen folgen dem ausdrücklich gewählten gemeinsamen oder unabhängigen Modus
 und können zusätzliche lokale Zahlenauflagen besitzen; siehe Abschnitt 3.
+
+### Verletzung, Gefangenschaft, Tod und andere Charakterfolgen
+
+Unter **Universen → Regelwerk & Basischaraktere → Charaktervorgaben,
+Einladungen und Porträts → Charakterzustände, Verletzung und Tod selbst regeln**
+bestimmt die Universumsleitung die Regeln ihrer Welt. Es sind keine Zustände
+und insbesondere keine Todesregel vorgegeben.
+
+Für jeden frei benannten Zustand lassen sich festlegen:
+
+- Beschreibung der Folgen und verbleibenden Möglichkeiten.
+- Normale Spielaktionen sperren und/oder neue Rundenbeitritte verhindern.
+- Zahlenwerte und Attribute verändern, ohne Grundwerte zu überschreiben.
+  Schreibweise pro Zeile: `Mut | -2`. Gleichnamige Felder lassen sich mit ihrer
+  Feld-ID unterscheiden.
+- Optional zusätzlich wirksam werden, **solange** eine bestimmte Ressource
+  höchstens den gewählten Grenzwert hat. Erholung beendet diese automatische
+  Wirkung wieder. **Null Punkte bedeuten ohne solche Regel nichts Zusätzliches.**
+
+Gespeicherte Folgen funktionieren anders als diese dynamischen Ressourcenregeln:
+Ein ausdrücklich gesetzter Zustand bleibt bis zu seiner Aufhebung erhalten,
+auch wenn Ressourcen später steigen. Das eignet sich beispielsweise für einen
+bleibenden Tod, eine Verletzung oder Gefangenschaft. Wer den automatischen
+Schwellenzustand beenden will, muss die zugehörige Ressource erholen oder die
+Regel ändern; bloßes Entfernen einer gespeicherten Folge ersetzt das nicht.
+
+Die Universumsleitung entscheidet getrennt, ob Kampagnenleitungen **lokale**
+Folgen und/oder **dauerhafte Universumsfolgen** setzen und aufheben dürfen.
+Vorbereitete Abenteuerautomatik und Rettungsausnahmen müssen ausdrücklich
+zugelassen werden. Die Universumsleitung behält ihre eigene Korrekturbefugnis.
+Spieler können geschützte Folgen nicht durch Bearbeiten ihres Bogens entfernen.
+
+**Lokal** bezieht sich auf genau diesen Kampagnen-/Rundenbogen; eine andere Runde
+übernimmt diese Folge nicht. **Dauerhaft** schreibt am verbundenen Universumsbogen
+und wirkt dadurch auch in dessen anderen gemeinsamen Bögen. Unabhängige Kopien
+und Bögen ohne gemeinsame Basisverbindung schreiben keine vermeintlich
+dauerhaften Folgen an eine fremde oder ehemalige Quelle.
+Ist derselbe Zustand gleichzeitig lokal und dauerhaft gespeichert, wird er
+nur einmal wirksam; der dauerhafte Stand hat Vorrang. Beide Zuordnungen bleiben
+getrennt korrigierbar, das Aufheben einer Zuordnung entfernt die andere nicht.
+
+In der Spielverwaltung zeigt der Charakterbogen unter **Charakter** die
+berechtigten Korrekturformulare. „Zustand aufheben / heilen / wiederbeleben“
+entfernt die gewählte gespeicherte Folge, löscht aber niemals die Figur.
+Vorlagenänderungen überschreiben keine bereits gespeicherten Folgen:
+Diese lassen sich ausdrücklich aktualisieren oder aufheben.
+
+Bei einer Abenteuerentscheidung enthält **Charakterfolgen und Rettungsaktionen**
+die Voraussetzungen, gezielten Ausnahmen von Aktionssperren und Folgen bei
+Ausführung, Erfolg oder Misserfolg. Diese betreffen nur die handelnde Figur,
+nicht automatisch die ganze Gruppe. Beispielsweise kann eine misslungene Probe
+„Gefangen“ setzen und eine spätere Fluchtentscheidung gerade diese Sperre
+überwinden und den Zustand aufheben. In einer Gruppe müssen gesunde Mitspieler
+den Zustand des Handelnden nicht selbst haben, um seine Rettung zu unterstützen.
+Ändert die Universumsleitung Befugnisse oder die verwendete Zustandsschablone,
+müssen nicht mehr passende automatische Folgen neu vorbereitet/veröffentlicht
+werden; sie werden nicht still durch Ersatzregeln ausgeführt.
+
+Am Spieltisch und Bogen bleiben eigene Folgen sichtbar. Unzulässige Aktionen
+sind gesperrt; gültige vorbereitete Rettungsaktionen bleiben nutzbar.
+**Gewonnen**, **Verloren** und **Neutral abgeschlossen** sind davon unabhängig:
+Ein Ziel kann scheitern, obwohl alle überleben, oder erreicht werden, obwohl
+eine Figur stirbt. Ressourcen, Folgen und Verlauf bleiben nach Abschluss bestehen.
+Sicherungen enthalten die neuen Vorgaben, gespeicherten Folgen und Protokolle.
+Die Solo-Demo wurde durch diese Erweiterung nicht umgeschrieben. Auf einen
+späteren ausdrücklichen Spielauftrag wurde sie regulär gewonnen abgeschlossen;
+Jona hat danach Ausdauer 7/10.
 
 ## 6. Würfeln
 
@@ -2252,6 +2321,46 @@ noch einen zusätzlichen Durchlauf zurück. Ein bereits in einer anderen laufend
 Runde verwendeter Charakter lässt sich nicht gleichzeitig erneut starten.
 Dieser Einstieg führt vorbereitete Entscheidungen und ausdrücklich eingerichtete
 NPC-Reaktionen aus. Er ersetzt keine eigenständige Kampf- oder Simulationsengine.
+
+### Abschluss, Gewinne und Verluste
+
+Nach dem Rundenende steht **Deine Abschlussübersicht** direkt auf dem Spieltisch.
+Sie zeigt das Abenteuerergebnis und die persönliche Bilanz der gespielten Figur:
+
+- Ressourcen sowie weitere Zahlenwerte, etwa selbst definierte Erfahrungspunkte.
+- Gewonnene, abgegebene oder verbrauchte Gegenstandsexemplare.
+- Veränderungen am Guthaben, ohne unterschiedliche Währungen zu vermischen.
+- Hinzugekommene und aufgehobene Charakterfolgen, getrennt nach rundenbezogen,
+  dauerhaft und ressourcenabhängig.
+
+Bei neuen Runden werden Anfang und Ende jedes Teilnahmeabschnitts privat
+gespeichert. Die Bilanz enthält auch freigegebene Änderungen der Leitung.
+Ein Austritt schließt den Abschnitt; beim Wiedereinstieg beginnt ein neuer.
+Änderungen während der Abwesenheit und spätere Profiländerungen werden nicht
+nachträglich eingerechnet. Es handelt sich um **Nettoänderungen**, nicht um eine
+erneute Vergabe und nicht um ein vorgeschriebenes Belohnungs- oder Todesregelwerk.
+Geleitete Runden ohne festgelegten Abenteuerabschluss erhalten kein erfundenes
+Sieg-/Niederlagenetikett.
+
+Bei älteren Runden fehlen diese Vergleichsstände. Dann zählt die Übersicht nur
+belegte Abenteuerkosten und tatsächlich ausgegebene Belohnungen. **Keine
+Änderungen belegt** bedeutet dort nicht, dass andere Veränderungen ausgeschlossen
+sind. Die Erläuterung steht unter **Wie diese Bilanz entsteht**. Ein nachträglich
+angelegtes Zahlenfeld oder ein geändertes Guthabenmodell wird ebenfalls nicht
+mit einem erfundenen Anfangswert verrechnet.
+
+Mit **Zurück zur Lounge** gelangst du unmittelbar zur Spielauswahl. Die Runde
+ist bereits beendet; der Button verlässt weder die Kampagne noch deine
+Mitgliedschaft. Unter **Abgeschlossene Runden → Ergebnis ansehen** öffnest du
+denselben gespeicherten Abschluss später wieder. **Meinen Charakterbogen
+ansehen** öffnet den aktuellen Bogen; dessen heutiger Stand kann sich vom
+gespeicherten Rundenende unterscheiden.
+
+Die fertig gespielte Solo-Demo zeigt **Gewonnen** und **−3 Ausdauer**; Jona steht
+danach bei **7/10**. Gegenstands-, Geld- oder Erfahrungsbelohnungen waren nicht
+vorbereitet und werden deshalb nicht hinzugefügt.
+
+![Abschlussübersicht der gewonnenen Solo-Demo mit drei verbrauchten Ausdauerpunkten und Lounge-Rückweg](images/38-rundenabschluss.png)
 
 ### Mit Freunden spielen
 

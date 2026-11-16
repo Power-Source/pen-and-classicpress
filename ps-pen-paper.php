@@ -67,6 +67,8 @@ require_once __DIR__ . '/includes/universes.php';
 require_once __DIR__ . '/includes/character-contexts.php';
 require_once __DIR__ . '/includes/character-conditions.php';
 require_once __DIR__ . '/includes/character-conditions-ui.php';
+require_once __DIR__ . '/includes/play-results.php';
+require_once __DIR__ . '/includes/play-results-ui.php';
 require_once __DIR__ . '/includes/character-contexts-ui.php';
 require_once __DIR__ . '/includes/universes-ui.php';
 require_once __DIR__ . '/includes/dashboard.php';

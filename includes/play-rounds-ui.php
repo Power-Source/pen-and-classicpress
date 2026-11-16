@@ -142,7 +142,7 @@ function ps_pen_paper_render_play_directory( $source, $page_id, $mode = 'choose'
 			foreach ( $rounds as $row ) :
 				$state = $row['state']; $round = $row['post'];
 				if ( ! ps_pen_paper_can_open_friend_round( $state ) && ! ( ps_pen_paper_management_view( $page_id ) && ps_pen_paper_can_manage_campaign( $source ) ) ) { continue; }
-				if ( ( 'choose' !== $mode && $state['mode'] !== $mode ) || 'completed' === $state['status'] ||
+				if ( ( 'choose' !== $mode && $state['mode'] !== $mode ) ||
 					( 'solo' === $state['mode'] && $state['host_id'] !== get_current_user_id() &&
 						( ! ps_pen_paper_management_view( $page_id ) || ! ps_pen_paper_can_manage_campaign( $source ) ) ) ) { continue; }
 				$names = array();
@@ -154,7 +154,8 @@ function ps_pen_paper_render_play_directory( $source, $page_id, $mode = 'choose'
 					<p><?php echo esc_html( ps_pen_paper_play_statuses()[ $state['status'] ] ); ?></p>
 					<p><?php echo esc_html( implode( ', ', $names ) ); ?></p>
 					<a class="button" href="<?php echo esc_url( ps_pen_paper_play_url( $page_id, $source->ID, 'choose', $round->ID ) ); ?>"><?php
-						echo esc_html( 'lobby' === $state['status'] ? __( 'Wartebereich öffnen', 'ps-pen-paper' ) : __( 'Runde öffnen', 'ps-pen-paper' ) ); ?></a>
+						echo esc_html( 'completed' === $state['status'] ? __( 'Ergebnis ansehen', 'ps-pen-paper' ) :
+							( 'lobby' === $state['status'] ? __( 'Wartebereich öffnen', 'ps-pen-paper' ) : __( 'Runde öffnen', 'ps-pen-paper' ) ) ); ?></a>
 				</article>
 			<?php endforeach; ?>
 		</div>

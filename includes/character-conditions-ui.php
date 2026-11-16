@@ -7,7 +7,7 @@ function ps_pen_paper_condition_modifiers_text( $definition, $rules ) {
 	$fields = array_column( $rules['fields'], null, 'id' );
 	foreach ( $definition['modifiers'] as $id => $amount ) {
 		$label = $fields[ $id ]['label'] ?? $id;
-		$lines[] = ( 1 === ( $labels[ $label ] ?? 0 ) ? $label : $id ) . ' | ' . $amount;
+		$lines[] = ( 1 === ( $labels[ $label ] ?? 0 ) && false === strpos( $label, '|' ) ? $label : $id ) . ' | ' . $amount;
 	}
 	return implode( "\n", $lines );
 }
@@ -125,7 +125,7 @@ function ps_pen_paper_render_condition_policy( $scope, $page_id ) {
 	<?php
 }
 
-function ps_pen_paper_render_character_conditions( $scope, $character, $page_id = 0, $compact = false ) {
+function ps_pen_paper_render_character_conditions( $scope, $character, $page_id = 0, $compact = false, $management = false ) {
 	$state = ps_pen_paper_resolve_character_state( $scope, $character, false );
 	$values = is_wp_error( $state ) ? $state : ps_pen_paper_character_conditions( $scope, $character, $state );
 	$durations = array( 'local' => __( 'Nur dieser Kampagnen-/Rundenbogen', 'ps-pen-paper' ), 'universe' => __( 'Dauerhaft am Universumscharakter', 'ps-pen-paper' ), 'threshold' => __( 'Solange die Ressourcengrenze erreicht ist', 'ps-pen-paper' ) );
@@ -135,6 +135,7 @@ function ps_pen_paper_render_character_conditions( $scope, $character, $page_id 
 		foreach ( $values as $value ) {
 			$definition = $value['definition'];
 			echo '<li><strong>' . esc_html( $definition['label'] ) . '</strong> · ' . esc_html( $durations[ $value['scope'] ] );
+			if ( ! empty( $value['also_local'] ) ) { echo ' · ' . esc_html__( 'Zusätzlich lokal gespeichert; getrennt aufheben', 'ps-pen-paper' ); }
 			if ( $definition['block_actions'] ) { echo ' · ' . esc_html__( 'Nur vorbereitete Rettungsaktionen', 'ps-pen-paper' ); }
 			if ( $definition['block_join'] ) { echo ' · ' . esc_html__( 'Keine neue Runde', 'ps-pen-paper' ); }
 			if ( ! $compact ) {
@@ -145,7 +146,7 @@ function ps_pen_paper_render_character_conditions( $scope, $character, $page_id 
 		}
 		echo '</ul></div>';
 	}
-	if ( $compact || ! ps_pen_paper_management_view( $page_id ) || ! ps_pen_paper_can_manage_character_scope( $scope ) ) { return; }
+	if ( $compact || ! $management || ! ps_pen_paper_can_manage_character_scope( $scope ) ) { return; }
 	$context = ps_pen_paper_condition_context( $scope, $character ); $policy = ps_pen_paper_condition_policy( $scope );
 	if ( is_wp_error( $context ) || is_wp_error( $policy ) ) { return; }
 	$world_manager = ps_pen_paper_can_manage_character_scope( $context['scope'] );
@@ -197,4 +198,20 @@ function ps_pen_paper_render_adventure_character_condition_row( $policy, $index 
 		echo '</select>';
 	}
 	echo '</div>';
+}
+
+function ps_pen_paper_render_adventure_character_condition_summary( $scope, $value ) {
+	$policy = ps_pen_paper_condition_policy( $scope );
+	if ( is_wp_error( $policy ) ) { echo '<p role="alert">' . esc_html( $policy->get_error_message() ) . '</p>'; return; }
+	echo '<details class="pspp-fold"><summary>' . esc_html__( 'Vorbereitete Charakterfolgen und Rettung', 'ps-pen-paper' ) . '</summary><ul>';
+	foreach ( array( 'requires' => __( 'Voraussetzung:', 'ps-pen-paper' ), 'allows' => __( 'Erlaubte Rettungsausnahme:', 'ps-pen-paper' ) ) as $key => $label ) {
+		foreach ( $value[ $key ] as $id ) { echo '<li>' . esc_html( $label . ' ' . ( $policy['definitions'][ $id ]['label'] ?? $id ) ) . '</li>'; }
+	}
+	$timings = array( 'decision' => __( 'Bei Ausführung', 'ps-pen-paper' ), 'success' => __( 'Bei Erfolg', 'ps-pen-paper' ), 'failure' => __( 'Bei Misserfolg', 'ps-pen-paper' ) );
+	foreach ( $value['effects'] as $effect ) {
+		echo '<li>' . esc_html( $timings[ $effect['when'] ] . ' · ' . $effect['definition']['label'] . ' · ' .
+			( 'set' === $effect['operation'] ? __( 'Zustand setzen', 'ps-pen-paper' ) : __( 'Zustand aufheben', 'ps-pen-paper' ) ) . ' · ' .
+			( 'universe' === $effect['scope'] ? __( 'Dauerhaft am Universumscharakter', 'ps-pen-paper' ) : __( 'Nur dieser Kampagnen-/Rundenbogen', 'ps-pen-paper' ) ) ) . '</li>';
+	}
+	echo '</ul></details>';
 }

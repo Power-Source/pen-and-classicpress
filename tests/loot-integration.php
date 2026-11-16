@@ -13,8 +13,16 @@ try {
 		$id = wp_insert_user( array( 'user_login' => 'pspp-loot-' . wp_generate_password( 12, false ), 'user_pass' => wp_generate_password( 40 ), 'role' => 'subscriber' ) );
 		$check( is_int( $id ), 'Fixture account failed.' ); $users[ $role ] = $id;
 	}
+	get_userdata( $users['gm'] )->add_cap( 'ps_pen_paper_create_campaigns' );
+	wp_set_current_user( $users['gm'] );
+	$local_universe = ps_pen_paper_save_universe( 0, array( 'name' => 'Local loot universe', 'description' => '' ), '0' );
+	$check( is_int( $local_universe ), 'Local loot universe failed.' ); $parents[] = $local_universe;
+	$check( true === ps_pen_paper_save_character_policy( $local_universe, array(
+		'max_characters' => '2', 'creation_access' => 'site', 'custom_portraits' => 'disabled', 'member_invites' => 'approval',
+	), '0' ), 'Multiple loot recipients could not be configured.' );
 	$id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => 'Loot fixture' ), true );
 	$check( is_int( $id ), 'Campaign failed.' ); $parents[] = $id; $campaign = ps_pen_paper_get_campaign( $id );
+	$check( ! is_wp_error( ps_pen_paper_save_universe_link( $id, $local_universe, '0', '1', 'confirmed', 'local' ) ), 'Local loot universe association failed.' );
 	add_post_meta( $id, '_pspp_player', (string) $users['player'] );
 	wp_set_current_user( $users['gm'] );
 	$check( is_wp_error( ps_pen_paper_save_loot_table( $campaign, 0, array(), '0' ) ), 'Community gate bypassed.' );
@@ -128,7 +136,6 @@ try {
 		count( ps_pen_paper_loot_snapshot_items( $mapped ) ) === 3, 'Recursive item/currency/table mapping failed.' );
 	$rejected_map = ps_pen_paper_loot_snapshot_map( $group_table, function ( &$instance ) { $instance['source_id'] = 0; return true; } );
 	$check( is_wp_error( $rejected_map ) && $group_table === $group_state['proposal']['table'], 'Invalid mapping succeeded or mutated the source snapshot.' );
-	wp_get_current_user()->add_cap( 'ps_pen_paper_create_campaigns' );
 	$pending_run = ps_pen_paper_roll_loot( $campaign, $group, '1', '1', 'Pending nested restoration', wp_generate_uuid4() );
 	$check( is_int( $pending_run ), 'Pending nested restoration fixture failed.' );
 	$source_awarded = ps_pen_paper_get_loot_run( $campaign, $group_run );
@@ -138,24 +145,32 @@ try {
 		$source_wallets[] = ps_pen_paper_wallet_context( $campaign, $recipient )['wallet']['balance'];
 		$source_counts[] = count( ps_pen_paper_gear_state( $recipient )['active']['items'] );
 	}
-	$archive = ps_pen_paper_export_campaign( $campaign->ID, 'local' );
+	$archive = ps_pen_paper_export_campaign( $campaign->ID, 'complete' );
 	$check( ! is_wp_error( $archive ), 'Nested loot export failed.' );
 	$json = wp_json_encode( $archive, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 	$parsed = ps_pen_paper_parse_import( $json );
 	$check( ! is_wp_error( $parsed ), 'Nested loot archive did not parse.' );
 	$token = ps_pen_paper_create_import_preview( $json );
 	$check( is_string( $token ), 'Nested loot preview failed: ' . ( is_wp_error( $token ) ? $token->get_error_message() : '' ) ); $tokens[] = $token;
-	$options = array( 'operation' => 'copy', 'target_id' => 0, 'universe_mode' => 'none', 'universe_id' => 0, 'users' => array(), 'bases' => array() );
+	$options = array( 'operation' => 'copy', 'target_id' => 0, 'universe_mode' => 'copy', 'universe_id' => 0, 'users' => array(), 'bases' => array() );
 	foreach ( $parsed['users'] as $owner => $requirement ) { $options['users'][ $owner ] = $owner === $users['gm'] ? $users['world'] : $owner; }
+	$unassigned = $options; $unassigned['universe_mode'] = 'none';
+	$rejected = ps_pen_paper_import_configuration( $parsed, $unassigned );
+	$check( ! is_wp_error( $rejected ) && 1 === count( $rejected['conflicts'] ), 'Restoration without a universe was accepted.' );
 	$preview = ps_pen_paper_get_import_preview( $token );
 	$check( ! is_wp_error( $preview ), 'Nested loot preview disappeared.' ); $preview['options'] = $options;
 	$check( set_transient( ps_pen_paper_import_preview_key( $token ), $preview, $preview['expires'] - time() ), 'Nested loot preview configuration failed.' );
 	$plan = ps_pen_paper_import_configuration( $parsed, $options );
-	$check( ! is_wp_error( $plan ), 'Nested loot import configuration failed.' );
+	$check( ! is_wp_error( $plan ) && ! $plan['conflicts'], 'Nested loot import configuration failed.' );
 	$fingerprint = ps_pen_paper_restore_fingerprint( $parsed, $options, $plan );
 	$restored = ps_pen_paper_restore_campaign( $token, $fingerprint, false, 'private' );
 	$check( ! is_wp_error( $restored ), 'Nested loot restoration failed: ' . ( is_wp_error( $restored ) ? $restored->get_error_message() : '' ) );
 	$parents[] = $restored['campaign_id']; $restored_campaign = ps_pen_paper_get_campaign( $restored['campaign_id'] );
+	$restored_link = ps_pen_paper_get_universe_link( $restored_campaign->ID );
+	if ( ! is_wp_error( $restored_link ) && $restored_link['universe_id'] ) { $parents[] = $restored_link['universe_id']; }
+	$check( ! is_wp_error( $restored_link ) && $restored_link['universe_id'] > 0 &&
+		$local_universe !== $restored_link['universe_id'] && 'local' === ( $restored_link['economy_mode'] ?? '' ),
+		'Restoration lost its independent universe or campaign-local economy.' );
 	$restored_runs = array();
 	foreach ( get_posts( array( 'post_type' => 'pspp_loot_run', 'post_status' => 'private',
 		'post_parent' => $restored_campaign->ID, 'posts_per_page' => -1 ) ) as $copied_run ) {
@@ -203,7 +218,7 @@ try {
 	wp_set_current_user( $users['gm'] );
 	$check( $source_awarded === ps_pen_paper_get_loot_run( $campaign, $group_run ) &&
 		$source_pending === ps_pen_paper_get_loot_run( $campaign, $pending_run ) &&
-		$archive['payload_sha256'] === ps_pen_paper_export_campaign( $campaign->ID, 'local' )['payload_sha256'], 'Restored play changed the original campaign.' );
+		$archive['payload_sha256'] === ps_pen_paper_export_campaign( $campaign->ID, 'complete' )['payload_sha256'], 'Restored play changed the original campaign.' );
 	$alternatives = $group_table; $first = $alternatives['table']['rows'][0]; $first['to'] = 3;
 	$second = $first; $second['from'] = 4; $second['to'] = 6; $second['quantity'] = '50'; $second['money'] = '0'; $second['items'] = array(); $second['nested'] = null;
 	$alternatives['table']['rows'] = array( $first, $second );

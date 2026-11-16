@@ -44,10 +44,44 @@ Unterscheidung gilt auch für die weiter unten aufgeführten technischen Nachwei
   Spielerprojektion und Bilder ergänzen; Bogen- und Hashnavigation prüfen.
 - [x] Bestehende Solo-Demo im Browser ohne weitere Spielentscheidung prüfen und
   aktuelle große sowie schmale Aufnahmen und den direkten Bogen im Handbuch
-  ergänzen. Stand bleibt Wartungsbrücke, Ausdauer 10.
+  ergänzen. Die Aufnahmen zeigen den damaligen Zwischenstand an der
+  Wartungsbrücke mit Ausdauer 10; die Demo wurde später ausdrücklich fortgesetzt.
 - [ ] Eine vollständige visuelle Browserabnahme sämtlicher Gruppen-,
   Leitungs- und seltenen Fehlerzustände durchführen. Der Solo-Sichttest ersetzt
   diese noch nicht.
+
+### Frei definierbare Charakterfolgen
+
+- [x] Abenteuerergebnis und Charakterzustand unabhängig führen; Figuren nicht
+  durch Verletzung oder Tod löschen.
+- [x] Universumsleitung definiert eigene Zustände, Aktions-/Beitrittssperren,
+  Zahlen-/Attributänderungen und optionale Ressourcengrenzen.
+- [x] Befugnisse für lokale und dauerhafte Änderungen sowie vorbereitete
+  Automatik/Rettungsausnahmen am Universum festlegen.
+- [x] Folgen bei Ausführung, Erfolg und Misserfolg in Solo- und Gruppenabenteuern
+  anwenden; gezielte Rettungsaktionen trotz eigener Aktionssperren zulassen.
+- [x] Zustände am Tisch und Bogen zeigen; berechtigte Leitung kann sie ausdrücklich
+  setzen, aufheben und damit auch Heilung oder Wiederbelebung regeln.
+- [x] Rechte, Persistenz, Rücknahme, Schwellenregeln, Modifikatoren, atomaren
+  Rollback und Sicherungsaufbereitung mit eigenen Testfiguren prüfen.
+- [x] Bestehende Demo auf erneuten ausdrücklichen Auftrag regulär fertig spielen:
+  gewonnen, fünf Entscheidungen, Ausdauer 7/10 nach drei Ressourcenabzügen.
+  Keine neuen Belohnungen, Todesregeln oder Erzählpfade nachträglich erfinden.
+- [ ] Zusätzliche Gewinn-/Niederlagenpfade und Charakterfolgen in einer eigenen
+  passenden Demo auf gesonderten Auftrag vorbereiten.
+
+### Abschlussabrechnung und Rückkehr zur Lounge
+
+- [x] Persönliche Bilanz für Ressourcen, frei definierte Zahlenwerte, Inventar,
+  Guthaben und Charakterfolgen auf dem abgeschlossenen Spieltisch anzeigen.
+- [x] Neue Teilnahmeabschnitte mit privaten Anfangs-/Endständen protokollieren;
+  spätere Profiländerungen und Zeiten nach einem Austritt nicht einrechnen.
+- [x] Historische Abenteuerkosten und tatsächliche Belohnungsbelege auswerten,
+  fehlende Daten nicht als vermeintlich vollständige Nullbilanz ausgeben.
+- [x] Deutlicher Rückweg **Zurück zur Lounge**, ohne Kampagnenaustritt oder erneute
+  Auszahlung; eigene **Abgeschlossene Runden → Ergebnis ansehen** wieder öffnen.
+- [x] Native Prüfungen für Solo, Gruppe, geleitete Runde, Inventarverbrauch,
+  Guthaben, Folgen, Wiedereinstieg, Privatsphäre, Rollback und Sicherungen.
 
 ### A. Getrennte Frontend-Arbeitsbereiche – schrittweise Umsetzung
 

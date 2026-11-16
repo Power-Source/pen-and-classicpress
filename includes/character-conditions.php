@@ -101,6 +101,7 @@ function ps_pen_paper_character_conditions( $scope, $character, $state ) {
 	}
 	foreach ( $raw['conditions'] ?? array() as $id => $definition ) {
 		if ( ! isset( $values[ $id ] ) ) { $values[ $id ] = array( 'definition' => $definition, 'scope' => 'local' ); }
+		elseif ( $context['base'] && (int) $context['base']->ID !== (int) $character->ID ) { $values[ $id ]['also_local'] = true; }
 	}
 	foreach ( $policy['definitions'] as $id => $definition ) {
 		if ( null === $definition['threshold'] || isset( $values[ $id ] ) || ! $state['active'] ) { continue; }
@@ -192,6 +193,14 @@ function ps_pen_paper_write_character_condition( $scope, $character, $definition
 		$policy['definitions'][ $definition['id'] ] !== $definition ) ) { return ps_pen_paper_condition_error(); }
 	$target = 'universe' === $duration ? $context['base'] : $character;
 	if ( ! $target || ( 'local' === $duration && 'pspp_universe' === $scope->post_type ) ) { return ps_pen_paper_condition_error(); }
+	$target_scope = 'universe' === $duration ? $context['scope'] : $scope;
+	$rules = ps_pen_paper_get_rules( $target_scope->ID );
+	if ( 'set' === $operation ) {
+		$fields = array_column( $rules['fields'], null, 'id' );
+		foreach ( $definition['modifiers'] as $id => $amount ) {
+			if ( ! isset( $fields[ $id ] ) || ! in_array( $fields[ $id ]['type'], array( 'attribute', 'number' ), true ) ) { return ps_pen_paper_condition_error(); }
+		}
+	}
 	$before = ps_pen_paper_raw_character_state( $target->ID );
 	if ( is_wp_error( $before ) ) { return $before; }
 	if ( null !== $revision && ( ! is_string( $revision ) || (string) $before['revision'] !== $revision ) ) { return ps_pen_paper_condition_error(); }
@@ -200,8 +209,6 @@ function ps_pen_paper_write_character_condition( $scope, $character, $definition
 	if ( $conditions === ( $before['conditions'] ?? array() ) ) { return 0; }
 	if ( ! ps_pen_paper_valid_character_conditions( $conditions ) ) { return ps_pen_paper_condition_error(); }
 	$after['conditions'] = $conditions; $after['revision']++;
-	$target_scope = 'universe' === $duration ? $context['scope'] : $scope;
-	$rules = ps_pen_paper_get_rules( $target_scope->ID );
 	return ps_pen_paper_write_document_event( $target_scope->ID, $target->ID, '_pspp_character', $before, $after,
 		array( 'kind' => 'character_condition_changed', 'visibility' => 'owner', 'recipient_id' => (int) $target->post_author,
 			'fields' => $rules['fields'], 'rules_revision' => $rules['revision'] ), false );

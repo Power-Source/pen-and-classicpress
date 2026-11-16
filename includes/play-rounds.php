@@ -50,6 +50,10 @@ function ps_pen_paper_valid_play_round( $value ) {
 		$keys[] = 'invitations';
 		if ( 'group' !== ( $value['mode'] ?? '' ) || ! ps_pen_paper_valid_play_invitations( $value['invitations'] ) ) { return false; }
 	}
+	if ( is_array( $value ) && array_key_exists( 'result_tracking', $value ) ) {
+		$keys[] = 'result_tracking';
+		if ( true !== $value['result_tracking'] ) { return false; }
+	}
 	if ( ! is_array( $value ) || array_keys( $value ) !== $keys ||
 		! is_int( $value['revision'] ) || $value['revision'] < 1 || ! is_int( $value['source_id'] ) || $value['source_id'] < 1 ||
 		! is_string( $value['mode'] ) || ! isset( ps_pen_paper_play_modes()[ $value['mode'] ] ) || ! in_array( $value['status'], array( 'lobby', 'active', 'paused', 'completed' ), true ) ||
@@ -240,6 +244,7 @@ function ps_pen_paper_create_play_round_locked( $source, $mode, $adventure_id, $
 		$state = array( 'revision' => 1, 'source_id' => (int) $source->ID, 'mode' => $mode, 'status' => 'lobby',
 			'host_id' => get_current_user_id(), 'adventure_id' => $adventure_id ? $map[ $adventure_id ] : 0, 'run_id' => 0, 'participants' => array() );
 		if ( null !== $invitations ) { $state['invitations'] = $invitations; }
+		$state['result_tracking'] = true;
 		$written = ps_pen_paper_write_play_round( (int) $id, array( 'revision' => 0 ), $state, true );
 		if ( is_wp_error( $written ) || ! $character_id ) { return $written; }
 		$round = ps_pen_paper_get_campaign( (int) $id );
@@ -271,6 +276,10 @@ function ps_pen_paper_create_play_round_locked( $source, $mode, $adventure_id, $
 
 function ps_pen_paper_write_play_round( $id, $before, $after, $new = false ) {
 	if ( ! ps_pen_paper_valid_play_round( $after ) ) { return ps_pen_paper_play_error(); }
+	if ( ! $new ) {
+		$result = ps_pen_paper_write_play_results( $id, $before, $after );
+		if ( is_wp_error( $result ) ) { return $result; }
+	}
 	return ps_pen_paper_write_document_event( $id, $id, '_pspp_play_round', $before, $after,
 		array( 'kind' => 'play_round', 'visibility' => 'group', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0 ), $new );
 }

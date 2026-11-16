@@ -49,6 +49,12 @@ try {
 	$field = $rules['fields'][0]['id']; $characters = array();
 	$world = ps_pen_paper_get_universe( $universe_id );
 	$success( ps_pen_paper_save_equipment_schema( $world, array( 'slots' => 'hand | Hand | potion', 'rarities' => 'normal | Normal | #718096' ), '0' ), 'World equipment schema failed' );
+	$success( ps_pen_paper_save_currency( $world, array( 'name' => 'Round marks', 'symbol' => 'RM', 'wallet_mode' => 'universe' ), '0' ), 'Round currency fixture failed' );
+	$injury_id = wp_generate_uuid4();
+	$condition_policy = ps_pen_paper_condition_policy_default(); $condition_policy['revision'] = 1;
+	$condition_policy['definitions'][ $injury_id ] = array( 'id' => $injury_id, 'label' => 'Round injury', 'description' => '',
+		'block_actions' => false, 'block_join' => false, 'modifiers' => array(), 'threshold' => null );
+	$success( ps_pen_paper_save_condition_policy( $world, $condition_policy, '0' ), 'Round condition fixture failed' );
 	$item_id = $success( ps_pen_paper_save_item( $world, 0, array( 'name' => 'Mana potion', 'description' => '', 'kind' => 'potion',
 		'rarity' => 'normal', 'binding' => 'bound', 'properties' => '', 'bonuses' => array(),
 		'use' => array( 'condition' => 'immediate', 'expression' => '', 'attribute' => '', 'threshold' => '0', 'failure' => 'keep',
@@ -262,6 +268,13 @@ try {
 		'' === get_post_meta( $alias_id, '_pspp_gear', true ) && is_wp_error( ps_pen_paper_use_item( $round_a, $alias_id, 'use_item', $use_input, '1', 'game' ) ),
 		'Consume failed to persist to the profile or replayed the item.' );
 	wp_set_current_user( $users['gm'] );
+	$success( ps_pen_paper_change_wallet( $world, $characters['player'], 'grant', '7', 'Round reward', '0',
+		(string) ps_pen_paper_currency_document( $universe_id )['revision'] ), 'Round award failed' );
+	$success( ps_pen_paper_change_wallet( $world, $characters['player'], 'debit', '2', 'Round expense',
+		(string) ps_pen_paper_resolve_wallet_context( $world, ps_pen_paper_record_post( $characters['player'] ) )['wallet']['revision'],
+		(string) ps_pen_paper_currency_document( $universe_id )['revision'] ), 'Round expense failed' );
+	$success( ps_pen_paper_change_character_condition( $round_a, $alias_id, $injury_id, 'local', 'set',
+		(string) ps_pen_paper_raw_character_state( $alias_id )['revision'] ), 'Round injury failed' );
 	$map_a = ps_pen_paper_map_selection( $round_a ); $map_b = ps_pen_paper_map_selection( $round_b );
 	$check( $map_a['scene_id'] && $map_b['scene_id'] && $map_a['scene_id'] !== $map_b['scene_id'] &&
 		0 === ps_pen_paper_map_selection( $source )['scene_id'], 'Guided rounds shared their scene or changed the template.' );
@@ -276,7 +289,89 @@ try {
 	$success( ps_pen_paper_change_play_round( $round_a, 'leave', (string) ps_pen_paper_play_round( $a )['revision'] ), 'Leaving guided round failed' );
 	$check( ! ps_pen_paper_can_view_campaign( $round_a ) && ps_pen_paper_record_post( $characters['player'] ), 'Leaving retained access or deleted the base character.' );
 	wp_set_current_user( $users['gm'] );
+	$success( ps_pen_paper_save_character( $universe_id, $characters['player'], $users['player'], array( 'name' => 'player',
+		'values' => array( $field => array( 'current' => '14', 'maximum' => '20' ) ) ),
+		(string) ps_pen_paper_raw_character_state( $characters['player'] )['revision'], (string) $rules['revision'] ), 'Outside-participation resource change failed' );
+	wp_set_current_user( $users['player'] );
+	$success( ps_pen_paper_change_play_round( $round_a, 'join', (string) ps_pen_paper_play_round( $a )['revision'],
+		$characters['player'], (string) ps_pen_paper_raw_character_state( $characters['player'] )['revision'] ), 'Rejoining guided round failed' );
+	wp_set_current_user( $users['gm'] );
+	$success( ps_pen_paper_change_play_round( $round_a, 'complete', (string) ps_pen_paper_play_round( $a )['revision'] ), 'Closing rejoined round failed' );
 	$success( ps_pen_paper_change_play_round( $round_b, 'complete', (string) ps_pen_paper_play_round( $b )['revision'] ), 'Closing second guided round failed' );
+	wp_set_current_user( $users['player'] );
+	$statement = $success( ps_pen_paper_own_play_result( $round_a, ps_pen_paper_play_round( $a ) ), 'Guided statement failed' );
+	$amounts = array();
+	foreach ( $statement['rows'] as $row ) { $amounts[ $row['kind'] ][] = $row['amount']; }
+	$check( ! $statement['legacy'] && null === $statement['outcome'] && array( 1 ) === $amounts['resource'] &&
+		array( -1 ) === $amounts['item'] && array( 5 ) === $amounts['money'] && array( 1 ) === $amounts['condition'] &&
+		2 === count( ps_pen_paper_play_result_document( $alias_id )['periods'] ),
+		'Guided statement missed consumption, money or injury, invented an outcome or included changes outside participation.' );
+	$stored_statement = ps_pen_paper_play_result_document( $alias_id );
+	$demo_document = $stored_statement; $demo_document['revision'] = 2;
+	$demo_document['periods'] = array( $stored_statement['periods'][0] );
+	$demo_document['periods'][0]['before']['values'][ $field ]['value'] = 10;
+	$demo_document['periods'][0]['after']['values'][ $field ]['value'] = 7;
+	$experience_id = wp_generate_uuid4();
+	foreach ( array( 'before' => 0, 'after' => 5 ) as $side => $amount ) {
+		$demo_document['periods'][0][ $side ]['values'][ $experience_id ] = array( 'label' => 'Experience', 'type' => 'number', 'value' => $amount, 'maximum' => null );
+	}
+	$demo_rows = $success( ps_pen_paper_play_result_rows( $demo_document ), 'Demo-like statement failed' );
+	$check( -3 === $demo_rows['rows'][0]['amount'] &&
+		in_array( array( 'kind' => 'value', 'label' => 'Experience', 'amount' => 5 ), $demo_rows['rows'], true ), 'Statement lost the 10-to-7 resource loss or configured experience gain.' );
+	unset( $demo_document['periods'][0]['before']['values'][ $experience_id ] );
+	$partial = $success( ps_pen_paper_play_result_rows( $demo_document ), 'Changed fields made the whole statement unreadable' );
+	$check( in_array( 'value', $partial['incomplete'], true ) && $partial['notes'], 'Missing start values were silently treated as zero.' );
+	$broken = $stored_statement; $broken['periods'][0]['after'] = null;
+	$check( is_wp_error( ps_pen_paper_play_result_rows( $broken ) ), 'Malformed historical evidence produced a successful statement.' );
+	$currency_periods = $stored_statement;
+	$currency_periods['periods'][1]['before']['wallet']['currency_id'] = wp_generate_uuid4();
+	$currency_periods['periods'][1]['after']['wallet']['currency_id'] = $currency_periods['periods'][1]['before']['wallet']['currency_id'];
+	$currency_periods['periods'][1]['before']['wallet']['balance'] = 10;
+	$currency_periods['periods'][1]['after']['wallet']['balance'] = 7;
+	$currencies = $success( ps_pen_paper_play_result_rows( $currency_periods ), 'Multi-currency statement failed' );
+	$money_rows = array_values( array_filter( $currencies['rows'], static function ( $row ) { return 'money' === $row['kind']; } ) );
+	$check( array( 5, -3 ) === array_column( $money_rows, 'amount' ), 'Different currencies with identical symbols were combined.' );
+	$events_before_read = ps_pen_paper_get_events( $round_a );
+	$completed_guided = $render_round( $source, $round_a );
+	$check( false !== strpos( $completed_guided, 'Deine Abschlussübersicht' ) &&
+		false !== strpos( $completed_guided, 'Zurück zur Lounge' ) &&
+		$statement === ps_pen_paper_own_play_result( $round_a, ps_pen_paper_play_round( $a ) ) &&
+		$stored_statement === ps_pen_paper_play_result_document( $alias_id ) && $events_before_read === ps_pen_paper_get_events( $round_a ),
+		'Reading a completed guided round lost its result or changed stored data.' );
+	wp_set_current_user( $users['gm'] );
+	$success( ps_pen_paper_change_wallet( $world, $characters['player'], 'grant', '1', 'Later profile change',
+		(string) ps_pen_paper_resolve_wallet_context( $world, ps_pen_paper_record_post( $characters['player'] ) )['wallet']['revision'],
+		(string) ps_pen_paper_currency_document( $universe_id )['revision'] ), 'Post-round profile change failed' );
+	wp_set_current_user( $users['player'] );
+	$check( $statement === ps_pen_paper_own_play_result( $round_a, ps_pen_paper_play_round( $a ) ), 'Later profile change rewrote the frozen result.' );
+	wp_set_current_user( $users['other'] );
+	$other_result = $success( ps_pen_paper_own_play_result( $round_b, ps_pen_paper_play_round( $b ) ), 'Other guided statement failed' );
+	$check( array() === $other_result['rows'], 'Another guided participant received private changes from a different round.' );
+	wp_set_current_user( $users['gm'] );
+	$late_id = $success( ps_pen_paper_create_play_round( $source, 'guided', 0, wp_generate_uuid4(),
+		(string) ps_pen_paper_play_options( $source_id )['revision'] ), 'Late participation fixture failed' );
+	$parents[] = $late_id; $late_round = ps_pen_paper_get_campaign( $late_id );
+	foreach ( array( 'player', 'other' ) as $owner ) {
+		wp_set_current_user( $users[ $owner ] );
+		$success( ps_pen_paper_change_play_round( $late_round, 'join', (string) ps_pen_paper_play_round( $late_id )['revision'],
+			$characters[ $owner ], (string) ps_pen_paper_raw_character_state( $characters[ $owner ] )['revision'] ), 'Late fixture join failed' );
+		if ( 'player' === $owner ) {
+			$success( ps_pen_paper_change_play_round( $late_round, 'leave', (string) ps_pen_paper_play_round( $late_id )['revision'] ), 'Pre-start departure failed' );
+		}
+	}
+	wp_set_current_user( $users['gm'] );
+	foreach ( array( 'start', 'pause' ) as $operation ) {
+		$success( ps_pen_paper_change_play_round( $late_round, $operation, (string) ps_pen_paper_play_round( $late_id )['revision'] ), 'Late fixture lifecycle failed' );
+	}
+	wp_set_current_user( $users['player'] );
+	$success( ps_pen_paper_change_play_round( $late_round, 'join', (string) ps_pen_paper_play_round( $late_id )['revision'],
+		$characters['player'], (string) ps_pen_paper_raw_character_state( $characters['player'] )['revision'] ), 'First actual participation after lobby departure failed' );
+	wp_set_current_user( $users['gm'] );
+	$success( ps_pen_paper_change_play_round( $late_round, 'complete', (string) ps_pen_paper_play_round( $late_id )['revision'] ), 'Late fixture completion failed' );
+	wp_set_current_user( $users['player'] );
+	$late_result = $success( ps_pen_paper_own_play_result( $late_round, ps_pen_paper_play_round( $late_id ) ), 'Late statement failed' );
+	$check( ! $late_result['legacy'] && array() === $late_result['rows'], 'Leaving before start disabled comparison for a new round.' );
+	wp_set_current_user( $users['gm'] );
 	$export = $success( ps_pen_paper_export_campaign( $a, 'complete' ), 'Round backup failed' );
 	$parsed = $success( ps_pen_paper_parse_import( json_encode( $export, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) ), 'Round backup parse failed' );
 	$options = array( 'operation' => 'copy', 'target_id' => 0, 'universe_mode' => 'copy', 'universe_id' => 0, 'users' => array(), 'bases' => array() );
@@ -287,6 +382,8 @@ try {
 	$keys = array_column( $prepared[ $a ]['meta'], 'key' );
 	$check( ! in_array( '_pspp_play_round', $keys, true ) && ! in_array( '_pspp_play_token', $keys, true ) &&
 		in_array( '_pspp_import_archive', $keys, true ), 'Imported runtime activated old campaign authority or start tokens.' );
+	$result_metadata = array_column( $prepared[ $alias_id ]['meta'], 'value', 'key' );
+	$check( $stored_statement === $result_metadata['_pspp_play_result'], 'Backup preparation lost or changed the immutable personal statement.' );
 	foreach ( $prepared[ $a ]['meta'] as $entry ) {
 		if ( '_pspp_game_round' === $entry['key'] ) { $check( ! $entry['value']['active'], 'Import automatically resumed a prior session.' ); }
 	}
@@ -375,6 +472,18 @@ try {
 			}
 			$hero = ps_pen_paper_adventure_character( $round, $run['character_id'], true );
 			$check( $next && ! ps_pen_paper_scenario_access( $round, $next['id'], $next['snapshot'], $hero, 'solo' )['met'], 'Prerequisite disappeared when the campaign was copied.' );
+			$before_statement = ps_pen_paper_play_result_document( $run['character_id'] );
+			$reject_statement = static function ( $check, $object_id, $key ) {
+				return '_pspp_play_result' === $key ? false : $check;
+			};
+			add_filter( 'update_post_metadata', $reject_statement, 10, 3 );
+			try {
+				$check( is_wp_error( ps_pen_paper_advance_adventure_run( $round, $state['run_id'], $edge, '1' ) ), 'Failed statement save still completed the adventure.' );
+			} finally { remove_filter( 'update_post_metadata', $reject_statement, 10 ); }
+			$check( $before_base === ps_pen_paper_raw_character_state( $characters['player'] ) &&
+				$run === get_post_meta( $state['run_id'], '_pspp_adventure_run', true ) &&
+				$before_statement === ps_pen_paper_play_result_document( $run['character_id'] ) &&
+				'active' === ps_pen_paper_play_round( $id )['status'], 'Failed statement save retained resource costs, progress or partial snapshots.' );
 			$success( ps_pen_paper_advance_adventure_run( $round, $state['run_id'], $edge, '1' ), 'Solo decision failed' );
 			$check( ps_pen_paper_scenario_access( $round, $next['id'], $next['snapshot'], $hero, 'solo' )['met'], 'Completed adventure did not unlock its copied successor.' );
 			$check( is_wp_error( ps_pen_paper_advance_adventure_run( $round, $state['run_id'], $edge, '1' ) ), 'Solo decision replay was accepted.' );
@@ -412,6 +521,29 @@ try {
 			$decision['reaction']['total'] >= 5 && $decision['reaction']['total'] <= 10,
 			'Prepared NPC value, die or failure response was lost in solo/group execution.' );
 		$completed_table = $render_round( $source, $round );
+		$closed = ps_pen_paper_play_round( $id );
+		$result = $success( ps_pen_paper_own_play_result( $round, $closed ), 'Automatic statement failed' );
+		$resource_rows = array_values( array_filter( $result['rows'], static function ( $row ) { return 'resource' === $row['kind']; } ) );
+		$check( ! $result['legacy'] && -2 === $resource_rows[0]['amount'] &&
+			false !== strpos( $completed_table, 'Zurück zur Lounge' ), 'Automatic statement omitted its own cost or lounge return.' );
+		$own_document = ps_pen_paper_play_result_document( $closed['participants'][0]['character_id'] );
+		delete_post_meta( $closed['participants'][0]['character_id'], '_pspp_play_result' );
+		try {
+			$legacy = $success( ps_pen_paper_own_play_result( $round, $closed ), 'Legacy statement failed' );
+			$check( $legacy['legacy'] && array( array( 'kind' => 'resource', 'label' => 'Mana', 'amount' => -2 ) ) === $legacy['rows'],
+				'Legacy statement invented unrecorded inventory or wallet changes.' );
+		} finally { update_post_meta( $closed['participants'][0]['character_id'], '_pspp_play_result', wp_slash( $own_document ) ); }
+		if ( 'group' === $mode ) {
+			$item_rows = array_values( array_filter( $result['rows'], static function ( $row ) { return 'item' === $row['kind']; } ) );
+			$check( -1 === $item_rows[0]['amount'], 'Completed group omitted the actual inventory transfer.' );
+			wp_set_current_user( $users['other'] );
+			$other_result = $success( ps_pen_paper_own_play_result( $round, $closed ), 'Recipient statement failed' );
+			$check( array( array( 'kind' => 'item', 'label' => 'Trade token', 'amount' => 1 ) ) === $other_result['rows'],
+				'Recipient statement leaked the acting player resource cost or lost its own item.' );
+			wp_set_current_user( $users['gm'] );
+			$check( null === ps_pen_paper_own_play_result( $round, $closed ), 'GM player projection received a foreign personal statement.' );
+			wp_set_current_user( $users['player'] );
+		}
 		$check( false !== strpos( $completed_table, 'class="pspp-table"' ) &&
 			false !== strpos( $completed_table, '<details class="pspp-table-history">' ) &&
 			preg_match( '~class="pspp-table-result".*?Watcher waits.*?</aside>~s', $completed_table ) &&
@@ -577,12 +709,19 @@ try {
 	$check( ! ps_pen_paper_can_open_friend_round( ps_pen_paper_play_round( $revoke_id ) ) &&
 		is_wp_error( ps_pen_paper_change_play_round( $revoke_round, 'join', (string) ps_pen_paper_play_round( $revoke_id )['revision'],
 			$characters['outsider'], '1' ) ), 'Revoked invitation remained usable.' );
+	wp_set_current_user( $users['gm'] );
+	$departure_id = $success( ps_pen_paper_create_play_round( $source, 'guided', 0, wp_generate_uuid4(),
+		(string) ps_pen_paper_play_options( $source_id )['revision'] ), 'Departure round fixture failed' );
+	$parents[] = $departure_id; $departure_round = ps_pen_paper_get_campaign( $departure_id );
 	wp_set_current_user( $users['player'] );
-	$success( ps_pen_paper_change_play_round( $round_a, 'join', (string) ps_pen_paper_play_round( $a )['revision'],
-		$characters['player'], (string) ps_pen_paper_raw_character_state( $characters['player'] )['revision'] ), 'Returning to paused round failed' );
+	$success( ps_pen_paper_change_play_round( $departure_round, 'join', (string) ps_pen_paper_play_round( $departure_id )['revision'],
+		$characters['player'], (string) ps_pen_paper_raw_character_state( $characters['player'] )['revision'] ), 'Departure round join failed' );
+	wp_set_current_user( $users['gm'] );
+	$success( ps_pen_paper_change_play_round( $departure_round, 'start', (string) ps_pen_paper_play_round( $departure_id )['revision'] ), 'Departure round start failed' );
+	wp_set_current_user( $users['player'] );
 	$success( ps_pen_paper_change_membership( $source_id, $users['player'], 'leave', '', (string) ps_pen_paper_membership_revision( $source_id )['revision'] ), 'Campaign departure failed' );
-	$check( ! ps_pen_paper_play_participant( ps_pen_paper_play_round( $a ), $users['player'] ) &&
-		! ps_pen_paper_can_view_campaign( $round_a ) && ps_pen_paper_record_post( $characters['player'] ), 'Campaign departure retained a live round participant or deleted the profile character.' );
+	$check( ! ps_pen_paper_play_participant( ps_pen_paper_play_round( $departure_id ), $users['player'] ) &&
+		! ps_pen_paper_can_view_campaign( $departure_round ) && ps_pen_paper_record_post( $characters['player'] ), 'Campaign departure retained a live round participant or deleted the profile character.' );
 	WP_CLI::success( 'Play round integration tests passed.' );
 } finally {
 	remove_filter( 'pre_option_cpc_friendships_all', $normal_friends );

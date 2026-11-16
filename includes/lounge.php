@@ -143,6 +143,7 @@ function ps_pen_paper_render_lounge( $page_id, $data, $universe_id ) {
 				<p><?php esc_html_e( 'Deine Welten, Kampagnen und laufenden Spiele.', 'ps-pen-paper' ); ?></p></div>
 			<nav class="pspp-actions" aria-label="<?php esc_attr_e( 'Meine Spiele', 'ps-pen-paper' ); ?>">
 				<a href="#pspp-lounge-running"><?php esc_html_e( 'Meine laufenden Spiele', 'ps-pen-paper' ); ?></a>
+				<a href="#pspp-lounge-results"><?php esc_html_e( 'Abgeschlossene Runden', 'ps-pen-paper' ); ?></a>
 				<a href="#pspp-lounge-invitations"><?php esc_html_e( 'Einladungen', 'ps-pen-paper' ); ?></a>
 				<?php if ( ps_pen_paper_community_url() ) : ?><a href="<?php echo esc_url( ps_pen_paper_community_url() ); ?>"><?php esc_html_e( 'Meine Charaktere', 'ps-pen-paper' ); ?></a><?php endif; ?>
 			</nav>
@@ -216,6 +217,7 @@ function ps_pen_paper_render_lounge( $page_id, $data, $universe_id ) {
 				</div></details>
 			<?php endif; ?>
 		</section>
+		<?php ps_pen_paper_render_completed_play_rounds( array_column( $data['campaigns'], 'post' ), $page_id ); ?>
 		<section id="pspp-lounge-invitations"><?php ps_pen_paper_render_profile_invitations( $page_id ); ps_pen_paper_render_friend_round_offers( $data, $page_id ); ?></section>
 	</section>
 	<?php

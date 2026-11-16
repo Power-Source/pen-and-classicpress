@@ -15,6 +15,33 @@ $hidden = function ( $html, $name ) {
 	if ( preg_match( '/<input[^>]+name="' . preg_quote( $name, '/' ) . '"[^>]+value="([^"]*)"/', $html, $match ) ) { return html_entity_decode( $match[1], ENT_QUOTES, 'UTF-8' ); }
 	throw new RuntimeException( 'Missing form field: ' . $name );
 };
+$create_campaign = function ( $fields = array() ) use ( &$scopes ) {
+	$post = $_POST; $request = $_REQUEST;
+	$result = array( 'redirect' => null, 'error' => null );
+	$finished = new RuntimeException( 'Campaign request finished.' );
+	$redirect = function ( $location ) use ( &$result, $finished ) { $result['redirect'] = $location; throw $finished; };
+	$die = function () use ( &$result, $finished ) {
+		return function ( $message ) use ( &$result, $finished ) { $result['error'] = $message; throw $finished; };
+	};
+	$_POST = array_merge( array( 'pspp_operation' => 'create', 'title' => 'Universe selection fixture', '_wpnonce' => wp_create_nonce( 'pspp_create' ) ), $fields );
+	$_REQUEST = $_POST;
+	add_filter( 'wp_redirect', $redirect, 0 );
+	add_filter( 'wp_die_handler', $die );
+	try {
+		ps_pen_paper_handle_admin_action();
+		throw new RuntimeException( 'Campaign creation did not terminate with a redirect or an error.' );
+	} catch ( RuntimeException $error ) {
+		if ( $error !== $finished ) { throw $error; }
+	} finally {
+		remove_filter( 'wp_redirect', $redirect, 0 ); remove_filter( 'wp_die_handler', $die );
+		$_POST = $post; $_REQUEST = $request;
+		$scopes = array_values( array_unique( array_merge( $scopes, get_posts( array(
+			'post_type' => 'pspp_campaign', 'post_status' => array( 'private', 'draft' ), 'author' => get_current_user_id(),
+			'posts_per_page' => -1, 'fields' => 'ids',
+		) ) ) ) );
+	}
+	return $result;
+};
 $failure = static function ( $data ) { if ( 'pspp_event' === $data['post_type'] && 'private' === $data['post_status'] ) { $data['post_status'] = 'draft'; } return $data; };
 try {
 	foreach ( array( 'member_invitation', 'start_adventure', 'advance_adventure', 'review_base_character', 'review_item_use', 'end_item_effect', 'change_wallet' ) as $operation ) {
@@ -32,9 +59,35 @@ try {
 	}
 	get_userdata( $users['gm'] )->add_cap( 'ps_pen_paper_create_campaigns' );
 	wp_set_current_user( $users['gm'] );
+	$html = $capture( function () { ps_pen_paper_render_campaign_create_form(); } );
+	$result = $create_campaign();
+	$check( false === strpos( $html, 'name="universe_id"' ) && null !== $result['error'] && ! ps_pen_paper_get_campaigns(),
+		'Campaign creation without an available universe was accepted.' );
 	$universe_id = ps_pen_paper_save_universe( 0, array( 'name' => 'Profile universe', 'description' => 'DO_NOT_EXPOSE_WORLD_DESCRIPTION' ), '0' );
 	$check( is_int( $universe_id ) && $universe_id > 0, 'Universe creation failed.' ); $scopes[] = $universe_id;
 	$universe = ps_pen_paper_get_universe( $universe_id );
+	$html = $capture( function () { ps_pen_paper_render_campaign_create_form(); } );
+	$check( 1 === preg_match( '/<option value="' . $universe_id . '"\s+selected(?:\s|=|>)/', $html ) &&
+		false === strpos( $html, '<option value="">' ), 'The only available universe was not selected in the campaign form.' );
+	$result = $create_campaign();
+	$created = ps_pen_paper_get_campaigns();
+	$check( null !== $result['redirect'] && null === $result['error'] && 1 === count( $created ) &&
+		$universe_id === ps_pen_paper_get_universe_link( $created[0]->ID )['universe_id'],
+		'Campaign creation did not persist its sole available universe when the field was omitted.' );
+	$result = $create_campaign( array( 'universe_id' => array( (string) $universe_id ) ) );
+	$check( null !== $result['error'] && 1 === count( ps_pen_paper_get_campaigns() ),
+		'Malformed universe input silently fell back to automatic assignment.' );
+	$second_universe = ps_pen_paper_save_universe( 0, array( 'name' => 'Second creation universe', 'description' => '' ), '0' );
+	$check( is_int( $second_universe ), 'Second creation universe failed.' ); $scopes[] = $second_universe;
+	$html = $capture( function () { ps_pen_paper_render_campaign_create_form(); } );
+	$result = $create_campaign( array( 'universe_id' => '' ) );
+	$check( false !== strpos( $html, '<option value="">' ) && null !== $result['error'] && 1 === count( ps_pen_paper_get_campaigns() ),
+		'Multiple universes did not require an explicit campaign selection.' );
+	$result = $create_campaign( array( 'universe_id' => (string) $second_universe ) );
+	$selected = array_values( array_diff( wp_list_pluck( ps_pen_paper_get_campaigns(), 'ID' ), wp_list_pluck( $created, 'ID' ) ) );
+	$check( null !== $result['redirect'] && null === $result['error'] && 1 === count( $selected ) &&
+		$second_universe === ps_pen_paper_get_universe_link( $selected[0] )['universe_id'],
+		'Explicit campaign universe selection was not persisted.' );
 	$rules_input = array( 'name' => 'Named text selections', 'description' => '', 'dice' => array( '20' ), 'character_mode' => 'approval',
 		'fields' => array( array( 'id' => '', 'label' => 'Freie Herkunft', 'type' => 'text', 'description' => '',
 			'required' => '1', 'start' => 'Wanderer', 'allowed_choices' => "Wanderer\nWächter" ) ) );
@@ -171,7 +224,7 @@ try {
 	$check( true === ps_pen_paper_change_member_invitation( $universe_id, $users['invited'], 'accept', '4' ) && ps_pen_paper_is_universe_member( $universe ), 'Approved member invitation not accepted.' );
 	wp_set_current_user( $users['outsider'] );
 	$check( ! ps_pen_paper_profile_characters() && ! ps_pen_paper_get_character( $universe, $character_id ), 'Another player obtained private base sheets.' );
-	WP_CLI::success( 'Universe profile forms, native creation/limits, choices, invitation approval/rollback, private frozen portraits and explicit legacy repair passed.' );
+	WP_CLI::success( 'Mandatory campaign universes, automatic sole-universe assignment, profile forms, native creation/limits, choices, invitation approval/rollback, private frozen portraits and explicit legacy repair passed.' );
 } finally {
 	wp_set_current_user( $original_user );
 	foreach ( $scopes as $scope_id ) {

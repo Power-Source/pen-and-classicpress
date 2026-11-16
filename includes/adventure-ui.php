@@ -284,6 +284,7 @@ function ps_pen_paper_render_adventure_editor( $campaign, $page_id ) {
 					<?php if ( ! empty( $edge['gm_review'] ) ) : ?><p><?php esc_html_e( 'Diese Entscheidung benötigt ausdrücklich eine Spielleiterfreigabe', 'ps-pen-paper' ); ?></p><?php endif; ?>
 					<?php if ( isset( $edge['reaction'] ) ) : ?><p><?php echo esc_html( __( 'Vorbereitete NPC-Reaktion:', 'ps-pen-paper' ) . ' ' . $edge['reaction']['npc']['name'] .
 						' · ' . $edge['reaction']['expression'] . ' + ' . ( $edge['reaction']['npc']['value']['value'] ?? 0 ) . ' ≥ ' . $edge['reaction']['threshold'] ); ?></p><?php endif; ?>
+					<?php if ( isset( $edge['character_conditions'] ) ) { ps_pen_paper_render_adventure_character_condition_summary( $campaign, $edge['character_conditions'] ); } ?>
 					<?php ps_pen_paper_form_start( 'remove_adventure_edge', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 						<input type="hidden" name="adventure_complete" value="complete"><input type="hidden" name="adventure_id" value="<?php echo esc_attr( $id ); ?>"><input type="hidden" name="adventure_revision" value="<?php echo esc_attr( $state['revision'] ); ?>"><input type="hidden" name="edge_id" value="<?php echo esc_attr( $edge['id'] ); ?>">
 						<button type="submit"><?php esc_html_e( 'Entscheidung entfernen', 'ps-pen-paper' ); ?></button>

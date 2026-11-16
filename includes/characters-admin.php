@@ -179,7 +179,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 			$state = ps_pen_paper_character_state( $campaign, $character );
 			if ( is_wp_error( $state ) ) {
 				echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p>';
-				if ( $management && 'character_condition_conflict' === $state->get_error_code() ) { ps_pen_paper_render_character_conditions( $campaign, $character, $page_id ); }
+				if ( $management && 'character_condition_conflict' === $state->get_error_code() ) { ps_pen_paper_render_character_conditions( $campaign, $character, $page_id, false, true ); }
 				if ( $management && 'resource_limit_conflict' === $state->get_error_code() && ps_pen_paper_can_manage_campaign( $campaign ) ) {
 					$raw = ps_pen_paper_raw_character_state( $character->ID );
 					if ( ! is_wp_error( $raw ) && 'shared' === $raw['context']['mode'] ) {
@@ -220,7 +220,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 				<?php endif; ?>
 				<?php if ( $state['pending'] ) : ?><p><?php esc_html_e( 'Freigabe ausstehend – die gültigen Werte bleiben unverändert.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 				<?php ps_pen_paper_render_character_loadout( $campaign, $character, $state['active'] ? $state['active']['name'] : __( 'Neu', 'ps-pen-paper' ) ); ?>
-				<?php ps_pen_paper_render_character_conditions( $campaign, $character, $page_id ); ?>
+				<?php ps_pen_paper_render_character_conditions( $campaign, $character, $page_id, false, $management ); ?>
 				<?php ps_pen_paper_render_portrait_presets( $campaign, $character, $page_id, $profile ); ?>
 				<?php ps_pen_paper_render_portrait_presentation( $campaign, $character, $page_id ); ?>
 			</section>

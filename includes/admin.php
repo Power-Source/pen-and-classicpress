@@ -158,6 +158,10 @@ function ps_pen_paper_handle_admin_action() {
 			ps_pen_paper_fail( __( 'Bitte gib einen Kampagnennamen ein.', 'ps-pen-paper' ) );
 		}
 		$universe_id = ps_pen_paper_posted_id( 'universe_id' );
+		if ( ! isset( $_POST['universe_id'] ) || '' === $_POST['universe_id'] ) {
+			$universes = ps_pen_paper_get_universes();
+			if ( 1 === count( $universes ) ) { $universe_id = (int) $universes[0]->ID; }
+		}
 		$universe = ps_pen_paper_validate_campaign_universe( $universe_id );
 		if ( is_wp_error( $universe ) ) { ps_pen_paper_fail( $universe->get_error_message() ); }
 		$campaign_id = wp_insert_post(
@@ -503,13 +507,14 @@ function ps_pen_paper_render_campaign_create_form( $page_id = 0 ) {
 			'</p><a class="button button-primary" href="' . esc_url( ps_pen_paper_dashboard_url( 'universes', $page_id ) ) . '">' . esc_html__( 'Universum erstellen', 'ps-pen-paper' ) . '</a>';
 		return;
 	}
+	$selected_universe = 1 === count( $universes ) ? (int) key( $universes ) : 0;
 	?>
 		<h2><?php esc_html_e( 'Neue Kampagne', 'ps-pen-paper' ); ?></h2>
 		<p><?php esc_html_e( 'Name eingeben und anlegen. Danach schreibst du die erste Szene; eine Karte ist optional. Regeln, Charaktere und weitere Einstellungen kannst du anschließend ergänzen.', 'ps-pen-paper' ); ?></p>
 		<?php ps_pen_paper_form_start( 'create', 'pspp_create', 0, $page_id ); ?>
 			<p><label><?php esc_html_e( 'Universum', 'ps-pen-paper' ); ?><select name="universe_id" required>
-				<option value=""><?php esc_html_e( 'Bitte wählen', 'ps-pen-paper' ); ?></option>
-				<?php foreach ( $universes as $universe_id => $name ) : ?><option value="<?php echo esc_attr( $universe_id ); ?>"><?php echo esc_html( $name ); ?></option><?php endforeach; ?>
+				<?php if ( ! $selected_universe ) : ?><option value=""><?php esc_html_e( 'Bitte wählen', 'ps-pen-paper' ); ?></option><?php endif; ?>
+				<?php foreach ( $universes as $universe_id => $name ) : ?><option value="<?php echo esc_attr( $universe_id ); ?>" <?php selected( $selected_universe, $universe_id ); ?>><?php echo esc_html( $name ); ?></option><?php endforeach; ?>
 			</select></label></p>
 			<p><label for="pspp-new-title"><?php esc_html_e( 'Name', 'ps-pen-paper' ); ?></label><br>
 			<input id="pspp-new-title" name="title" type="text" class="regular-text" required></p>

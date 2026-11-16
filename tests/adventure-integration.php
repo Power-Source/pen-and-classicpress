@@ -607,6 +607,14 @@ try {
 	) );
 	$reward_table_id = ps_pen_paper_save_loot_table( $campaign, 0, $table_input, '0' );
 	$check( is_int( $reward_table_id ), 'Reward table failed.' );
+	$nested_input = $table_input; $nested_input['name'] = 'Nested statement reward';
+	$nested_input['rows'][0]['quantity'] = '1'; $nested_input['rows'][0]['money'] = '3';
+	$nested_id = ps_pen_paper_save_loot_table( $campaign, 0, $nested_input, '0' );
+	$check( is_int( $nested_id ), 'Nested statement child fixture failed.' );
+	$nested_input['name'] = 'Combined statement reward'; $nested_input['rows'][0]['quantity'] = '2'; $nested_input['rows'][0]['money'] = '4';
+	$nested_input['rows'][0]['items'] = $reward_item_id . ':1'; $nested_input['rows'][0]['nested_id'] = (string) $nested_id;
+	$nested_table_id = ps_pen_paper_save_loot_table( $campaign, 0, $nested_input, '0' );
+	$check( is_int( $nested_table_id ), 'Nested statement parent fixture failed.' );
 	ob_start(); ps_pen_paper_render_adventure_reward_fields( $campaign ); $reward_fields = ob_get_clean();
 	$check( false !== strpos( $reward_fields, 'value="fixed"' ) && false !== strpos( $reward_fields, 'value="table"' ) &&
 		false !== strpos( $reward_fields, 'value="' . $reward_item_id . '"' ) &&
@@ -623,6 +631,7 @@ try {
 		array( 'name' => 'FAILED_DECISION_REWARD', 'kind' => 'fixed', 'timing' => 'decision', 'expression' => 'W6-1000000', 'grant' => true ),
 		array( 'name' => 'SUCCESS_REWARD', 'kind' => 'fixed', 'timing' => 'success', 'expression' => 'W6+999990', 'grant' => true ),
 		array( 'name' => 'TABLE_REWARD', 'kind' => 'table', 'timing' => 'success', 'expression' => '', 'grant' => true ),
+		array( 'name' => 'NESTED_STATEMENT_REWARD', 'kind' => 'table', 'timing' => 'decision', 'expression' => '', 'grant' => true, 'table_id' => $nested_table_id ),
 	);
 	foreach ( $reward_cases as $case_index => $case ) {
 		wp_set_current_user( $users['gm'] );
@@ -630,6 +639,7 @@ try {
 		$check( is_int( $reward_adventure_id ), 'Reward adventure failed.' );
 		$case_reward = $reward_input; $case_reward['kind'] = $case['kind']; $case_reward['timing'] = $case['timing'];
 		if ( 'table' === $case['kind'] ) { $case_reward['table_id'] = (string) $reward_table_id; $case_reward['item_id'] = '0'; $case_reward['quantity'] = '0'; $case_reward['money'] = '0'; }
+		if ( isset( $case['table_id'] ) ) { $case_reward['table_id'] = (string) $case['table_id']; }
 		$reward_edge_input = array( 'from_scene' => (string) $scenes['START_ORIGINAL'], 'choice' => $case['name'], 'expression' => $case['expression'], 'attribute' => '',
 			'threshold' => '0', 'success_scene' => (string) $scenes['SUCCESS_SCENE'], 'failure_scene' => '0', 'reward' => $case_reward );
 		if ( 0 === $case_index ) { $reward_edge_input['cost_resource'] = $resource; $reward_edge_input['cost_amount'] = '2'; $reward_edge_input['cost_timing'] = 'attempt'; }
@@ -639,7 +649,7 @@ try {
 			$reward_item_input['name'] = 'Edited reward compass'; $reward_item_input['binding'] = 'bound';
 			$check( $reward_item_id === ps_pen_paper_save_item( $campaign, $reward_item_id, $reward_item_input, '1' ), 'Reward template edit failed.' );
 		}
-		if ( 'table' === $case['kind'] ) {
+		if ( 'table' === $case['kind'] && ! isset( $case['table_id'] ) ) {
 			$table_input['rows'][0]['item_id'] = '0'; $table_input['rows'][0]['quantity'] = '0'; $table_input['rows'][0]['money'] = '0';
 			$check( $reward_table_id === ps_pen_paper_save_loot_table( $campaign, $reward_table_id, $table_input, '1' ), 'Reward table edit failed.' );
 		}
@@ -691,10 +701,19 @@ try {
 		$reward_wallet_after = ps_pen_paper_wallet_context( $campaign, $reward_char_id )['wallet'];
 		$reward_gear_after = ps_pen_paper_gear_state( $reward_char_id );
 		$check( ps_pen_paper_valid_adventure_run( $reward_run_after ) && 'completed' === $reward_run_after['status'], 'Reward history invalid.' );
+		$statement = ps_pen_paper_play_result_history_rows( $reward_run_after['snapshot'], $reward_run_after['history'] );
+		$check( ! is_wp_error( $statement ), 'Reward statement rejected valid receipts.' );
+		$statement_items = array_filter( $statement['rows'], static function ( $row ) { return 'item' === $row['kind']; } );
+		$statement_money = array_filter( $statement['rows'], static function ( $row ) { return 'money' === $row['kind']; } );
+		$check( array_sum( array_column( $statement_items, 'amount' ) ) === ( $case['grant'] ? count( $reward_result['item_ids'] ) : 0 ) &&
+			array_sum( array_column( $statement_money, 'amount' ) ) === $reward_wallet_after['balance'] - $reward_wallet_before['balance'],
+			'Statement counted a configured but unissued reward or lost actual item/currency receipts.' );
 		if ( $case['grant'] ) {
+			$expected_money = isset( $case['table_id'] ) ? 7 : $reward_result['money_roll']['total'];
+			$expected_quantity = isset( $case['table_id'] ) ? 4 : $reward_result['quantity_roll']['total'];
 			$check( ps_pen_paper_valid_adventure_reward_result( $reward_edge['reward'], $reward_result, $reward_char_id ) &&
-				$reward_wallet_after['balance'] - $reward_wallet_before['balance'] === $reward_result['money_roll']['total'] &&
-				count( $reward_gear_after['active']['items'] ) - count( $reward_gear_before['active']['items'] ) === $reward_result['quantity_roll']['total'],
+				$reward_wallet_after['balance'] - $reward_wallet_before['balance'] === $expected_money &&
+				count( $reward_gear_after['active']['items'] ) - count( $reward_gear_before['active']['items'] ) === $expected_quantity,
 				'Reward differs from stored result.' );
 			foreach ( $reward_result['item_ids'] as $uuid ) {
 				$expected_item = ps_pen_paper_adventure_reward_rows( $reward_edge['reward'] )[ $reward_result['row'] ]['item'];

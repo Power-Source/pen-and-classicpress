@@ -75,6 +75,8 @@ function ps_pen_paper_render_event_details( $event, $scope = null ) {
 					<?php else : ?>
 						<p><?php esc_html_e( 'Noch kein Durchlauf.', 'ps-pen-paper' ); ?></p>
 					<?php endif; ?>
+				<?php elseif ( 'play_result' === $event['kind'] ) : ?>
+					<p><?php echo esc_html( sprintf( __( 'Gespeicherte Teilnahmeabschnitte: %d', 'ps-pen-paper' ), count( $event[ $key ]['periods'] ) ) ); ?></p>
 				<?php elseif ( 'character_condition_changed' === $event['kind'] ) : ?>
 					<p><?php echo esc_html( implode( ', ', array_column( $event[ $key ]['conditions'] ?? array(), 'label' ) ) ?: __( 'Keine gespeicherten Charakterfolgen', 'ps-pen-paper' ) ); ?></p>
 				<?php elseif ( 'condition_policy_saved' === $event['kind'] ) : ?>
@@ -267,7 +269,7 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 							$snapshot = array( 'name' => $event['character_name'] );
 						} elseif ( 'currency_saved' === $event['kind'] ) {
 							$snapshot = array( 'name' => $event['after']['name'] );
-						} elseif ( in_array( $event['kind'], array( 'play_options', 'play_round', 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved', 'game_round', 'item_action_policy', 'character_policy_saved', 'member_invitation_saved', 'universe_members_saved', 'invitation_saved', 'wiki_links_saved', 'campaign_restored' ), true ) ) {
+						} elseif ( in_array( $event['kind'], array( 'play_result', 'play_options', 'play_round', 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved', 'game_round', 'item_action_policy', 'character_policy_saved', 'member_invitation_saved', 'universe_members_saved', 'invitation_saved', 'wiki_links_saved', 'campaign_restored' ), true ) ) {
 							$snapshot = array( 'name' => $labels[ $event['kind'] ] );
 						} elseif ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) {
 							$snapshot = array( 'name' => $event['after']['draft']['title'] );

@@ -22,6 +22,7 @@ function ps_pen_paper_import_character_valid( $state, $rules ) {
 function ps_pen_paper_import_documents( $parsed ) {
 	$validators = array(
 		'_pspp_condition_policy' => 'ps_pen_paper_valid_condition_policy',
+		'_pspp_play_result' => 'ps_pen_paper_valid_play_result',
 		'_pspp_scene' => 'ps_pen_paper_validate_scene_state', '_pspp_folio' => 'ps_pen_paper_validate_folio_state',
 		'_pspp_npc' => 'ps_pen_paper_valid_npc_state', '_pspp_loot_table' => 'ps_pen_paper_valid_loot_table',
 		'_pspp_loot_run' => 'ps_pen_paper_valid_loot_run', '_pspp_trade' => 'ps_pen_paper_valid_trade',

@@ -299,6 +299,12 @@
 	width: 100%;
 	color: var(--pspp-text);
 }
+.pspp-play-result { width: 100%; margin-bottom: 24px; }
+.pspp-game .pspp-table-stage .pspp-play-result > .pspp-grid { grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 12px; }
+.pspp-play-result > .pspp-grid > div { padding: 12px; border: 1px solid var(--pspp-border); border-radius: 8px; }
+.pspp-game .pspp-play-result h3 { margin-top: 0; font-size: 16px; }
+.pspp-play-result .pspp-actions { margin-top: 20px; flex-wrap: wrap; }
+.pspp-play-result .pspp-fold { margin-bottom: 16px; }
 .pspp-game .pspp-table-adventure h4 { width: fit-content; margin: 0 0 18px; padding: 10px 16px; border-radius: 4px; background: var(--pspp-surface); font: 700 14px/1.4 system-ui, sans-serif; }
 .pspp-game .pspp-table-adventure h5 { margin: 0 0 16px; font: 700 clamp(23px, 3vw, 34px)/1.2 Georgia, serif; }
 .pspp-table-adventure .pspp-multiline { font: 17px/1.65 Georgia, serif; }

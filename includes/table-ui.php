@@ -189,6 +189,7 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 					$backdrop_state = ps_pen_paper_get_backdrop( $campaign->ID );
 					$view_style = ps_pen_paper_image_view_style( $backdrop_state['view'] ?? null, true );
 					?> style="<?php echo esc_attr( '--pspp-table-image:url("' . $backdrop . '");' . $view_style ); ?>"<?php endif; ?>>
+					<?php if ( $round && 'completed' === $round['status'] ) { ps_pen_paper_render_play_result( $campaign, $round, $page_id ); } ?>
 					<?php if ( $automatic ) : ?>
 						<div class="pspp-table-adventure" aria-label="<?php esc_attr_e( 'Laufendes Abenteuer', 'ps-pen-paper' ); ?>">
 						<?php if ( 'lobby' === $round['status'] ) { echo '<p class="pspp-table-story-card" role="status">' . esc_html__( 'Diese Runde wartet noch auf den Spielstart. Öffne „Runde & Teilnahme“, um zum Wartebereich zu gelangen.', 'ps-pen-paper' ) . '</p>'; }

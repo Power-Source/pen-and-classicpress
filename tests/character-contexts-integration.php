@@ -188,7 +188,7 @@ try {
 		8 === ps_pen_paper_character_state( $campaigns[0], $shared_character )['active']['values'][ $attribute ], 'Clearing context did not restore base value.' );
 	$check( $old_roll === get_post_meta( $old_roll_id, '_pspp_roll', true ) && $new_roll === get_post_meta( $new_roll_id, '_pspp_roll', true ), 'Later progress or context changed historical rolls.' );
 	$check( is_wp_error( ps_pen_paper_save_universe_link( $campaigns[0]->ID, 0, '1', '0', 'confirmed' ) ), 'Shared association was orphaned by unlink.' );
-	$check( ! is_wp_error( ps_pen_paper_save_universe_link( $campaigns[1]->ID, 0, '1', '0', 'confirmed' ) ), 'Independent copy prevented harmless unlink.' );
+	$check( is_wp_error( ps_pen_paper_save_universe_link( $campaigns[1]->ID, 0, '1', '0', 'confirmed' ) ), 'Independent copy lost its mandatory universe binding.' );
 	wp_set_current_user( $users['player'] );
 	$copy_input = $base_input;
 	$copy_input['values'][ $attribute ] = '11';
@@ -307,16 +307,17 @@ try {
 	$check( true === $reattach && 'shared' === $reattached['context']['mode'] && 7 === $reattached['context']['overrides'][ $attribute ] &&
 		9 === ps_pen_paper_raw_character_state( $base_id )['active']['values'][ $attribute ], 'Reattachment did not preserve the explicitly selected copy value or changed the source.' );
 	$check( true === ps_pen_paper_copy_shared_character( $campaigns[0]->ID, $ids[0], (string) $reattached['revision'], '5', '1', 'confirmed' ) &&
-		! is_wp_error( ps_pen_paper_save_universe_link( $campaigns[0]->ID, 0, '1', '0', 'confirmed' ) ) &&
-		7 === ps_pen_paper_character_state( $campaigns[0], $shared_character )['active']['values'][ $attribute ], 'Detaching the last shared character did not permit a safe universe unlink.' );
+		is_wp_error( ps_pen_paper_save_universe_link( $campaigns[0]->ID, 0, '1', '0', 'confirmed' ) ) &&
+		7 === ps_pen_paper_character_state( $campaigns[0], $shared_character )['active']['values'][ $attribute ], 'Detaching a shared character orphaned the campaign or changed its values.' );
 	$standalone = ps_pen_paper_export_campaign( $campaigns[0]->ID, 'local' );
 	$check( ! is_wp_error( $standalone ), 'Detached campaign could not be exported.' );
 	$standalone_parsed = ps_pen_paper_parse_import( json_encode( $standalone, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
 	$check( ! is_wp_error( $standalone_parsed ), 'Detached campaign export did not parse.' );
-	$standalone_options = array( 'operation' => 'copy', 'target_id' => 0, 'universe_mode' => 'none', 'universe_id' => 0, 'users' => array(), 'bases' => array() );
+	$standalone_options = array( 'operation' => 'copy', 'target_id' => 0, 'universe_mode' => 'bind', 'universe_id' => $universe_id, 'users' => array(), 'bases' => array() );
 	foreach ( $standalone_parsed['users'] as $source_user => $requirement ) { $standalone_options['users'][ $source_user ] = $source_user; }
 	$standalone_map = array(); $standalone_next = 100000;
 	foreach ( array_keys( $standalone_parsed['records'] ) as $source_id ) { $standalone_map[ $source_id ] = $standalone_next++; }
+	$standalone_map[ $universe_id ] = $universe_id;
 	$standalone_prepared = ps_pen_paper_prepare_import( $standalone_parsed, $standalone_options, $standalone_map, true );
 	$check( ! is_wp_error( $standalone_prepared ), 'Standalone import required the detached universe or base instead of preserving historical provenance.' );
 	$historical_roll = null;
@@ -502,6 +503,88 @@ try {
 	delete_post_meta( $campaigns[0]->ID, '_pspp_player', (string) $users['player'] );
 	wp_set_current_user( $users['player'] );
 	$check( null === ps_pen_paper_get_character( $campaigns[0], $ids[0] ) && is_wp_error( ps_pen_paper_roll_dice( $campaigns[0]->ID, $roll_input, '1' ) ), 'Removed member retained contextual access.' );
+	$scope = $campaigns[3];
+	$save_resource = function ( $values ) use ( $scope, $request_id, $resource ) {
+		$state = ps_pen_paper_raw_character_state( $request_id );
+		$base = ps_pen_paper_raw_character_state( $state['context']['source_id'] );
+		return ps_pen_paper_save_character_context( $scope->ID, $request_id, (string) $state['revision'],
+			(string) $base['revision'], (string) ps_pen_paper_get_rules( $scope->ID )['revision'],
+			array(), 'Resource model test', array( $resource => $values ) );
+	};
+	wp_set_current_user( $users['gm'] );
+	$base_resources_before = ps_pen_paper_raw_character_state( $base_id );
+	$check( true === $save_resource( array( 'mode' => 'local', 'current' => '5', 'maximum' => '12' ) ), 'Local campaign resources could not be configured.' );
+	wp_set_current_user( $users['player'] );
+	$local_cost = ps_pen_paper_character_resource_cost( $scope, $resource_character, $resource, 2 );
+	$check( ! is_wp_error( $local_cost ) && ! isset( $local_cost['shared_base'] ) && 5 === $local_cost['before'], 'Local resource costs used shared stock: ' . wp_json_encode( $local_cost ) );
+	$spend_local = function () use ( $scope, $resource_character, $local_cost ) {
+		return ps_pen_paper_with_character_resource_locks( $scope, $resource_character, $local_cost, function () use ( $scope, $resource_character, $local_cost ) {
+			return ps_pen_paper_atomic_event( $scope->ID, function () use ( $scope, $resource_character, $local_cost ) {
+				return ps_pen_paper_write_character_resource_cost( $scope, $resource_character, $local_cost );
+			} );
+		} );
+	};
+	$check( true === $spend_local() && is_wp_error( $spend_local() ) &&
+		3 === ps_pen_paper_character_state( $scope, $resource_character, false )['active']['values'][ $resource ]['current'] &&
+		$base_resources_before === ps_pen_paper_raw_character_state( $base_id ), 'Local costs changed the base or replayed.' );
+	$resource_history = ps_pen_paper_get_events( $scope );
+	$check( ! is_wp_error( $resource_history ), 'Local resource history cannot be read.' );
+	$local_event = null;
+	foreach ( $resource_history['events'] as $event ) {
+		if ( 'character_resource_spent' === $event['kind'] && $event['resource_cost'] === $local_cost ) { $local_event = $event; break; }
+	}
+	$check( null !== $local_event, 'Local resource cost has no historical event.' );
+	ob_start(); ps_pen_paper_render_event_details( $local_event, $scope ); $resource_details = ob_get_clean();
+	$check( false !== strpos( $resource_details, '5 / 12' ) && false !== strpos( $resource_details, '3 / 12' ), 'Local resource history displayed stale base values.' );
+	$check( is_wp_error( $save_resource( array( 'mode' => 'shared', 'maximum' => '12' ) ) ), 'A player changed the resource model.' );
+	wp_set_current_user( $users['gm'] );
+	$check( true === $save_resource( array( 'mode' => 'shared', 'maximum' => '12' ) ), 'Shared resource maximum could not be configured.' );
+	$check( is_wp_error( $save_resource( array( 'mode' => 'shared', 'maximum' => '0' ) ) ) &&
+		is_wp_error( $save_resource( array( 'mode' => 'local', 'current' => '13', 'maximum' => '12' ) ) ), 'Resource limits silently cut values.' );
+	$effect = function ( $delta ) use ( $scope, $request_id, $base_id, $resource, $resource_character ) {
+		return ps_pen_paper_with_character_context_locks( $scope->ID, $request_id, $base_id, function () use ( $scope, $resource_character, $resource, $delta ) {
+			return ps_pen_paper_atomic_event( $scope->ID, function () use ( $scope, $resource_character, $resource, $delta ) {
+				return ps_pen_paper_write_permanent_item_effect( $scope, $resource_character, array( $resource => $delta ) );
+			} );
+		} );
+	};
+	$check( true === $save_resource( array( 'mode' => 'local', 'current' => '3', 'maximum' => '12' ) ) &&
+		true === $effect( 2 ) && is_wp_error( $effect( 8 ) ) &&
+		5 === ps_pen_paper_character_state( $scope, $resource_character, false )['active']['values'][ $resource ]['current'] &&
+		$base_resources_before === ps_pen_paper_raw_character_state( $base_id ), 'Local healing touched shared stock or exceeded its cap.' );
+	$check( true === $save_resource( array( 'mode' => 'shared', 'maximum' => '12' ) ) &&
+		true === $effect( 2 ) && is_wp_error( $effect( 3 ) ) &&
+		10 === ps_pen_paper_raw_character_state( $base_id )['active']['values'][ $resource ]['current'], 'Shared healing ignored its campaign cap.' );
+	$shared_saved = ps_pen_paper_raw_character_state( $base_id );
+	$over_cap = $shared_saved; $over_cap['active']['values'][ $resource ]['current'] = 13; $over_cap['revision']++;
+	update_post_meta( $base_id, '_pspp_character', wp_slash( $over_cap ) );
+	$conflict = ps_pen_paper_character_state( $scope, $resource_character, false );
+	$check( is_wp_error( $conflict ) && 'resource_limit_conflict' === $conflict->get_error_code(), 'Shared growth silently truncated a campaign resource.' );
+	ob_start(); ps_pen_paper_render_characters( $scope, $request_id ); $repair = ob_get_clean();
+	$check( false !== strpos( $repair, 'value="save_character_context"' ) &&
+		true === $save_resource( array( 'mode' => 'local', 'current' => '5', 'maximum' => '9' ) ), 'Conflicting resource cap cannot be repaired through the character form.' );
+	$resource_export = ps_pen_paper_export_campaign( $scope->ID, 'complete' );
+	$check( ! is_wp_error( $resource_export ) &&
+		! is_wp_error( ps_pen_paper_parse_import( wp_json_encode( $resource_export ) ) ), 'Resource overlays or their history cannot round-trip through a backup.' );
+	$context_state = ps_pen_paper_raw_character_state( $request_id );
+	$check( true === ps_pen_paper_copy_shared_character( $scope->ID, $request_id, (string) $context_state['revision'],
+		(string) $over_cap['revision'], '1', 'confirmed' ), 'Local resource overlay could not be detached.' );
+	foreach ( array( 'copy', 'base' ) as $resolution ) {
+		$preview = ps_pen_paper_preview_character_reattachment( $scope->ID, $request_id );
+		$check( ! is_wp_error( $preview ), 'Resource reattachment preview failed.' );
+		$resolutions = array();
+		foreach ( $preview['conflicts'] as $difference ) { $resolutions[ $difference['field_id'] ] = $difference['copy_override_allowed'] ? $resolution : 'base'; }
+		$check( true === ps_pen_paper_reattach_character( $scope->ID, $request_id, (string) $preview['before']['revision'],
+			(string) $preview['base_revision'], '1', $resolutions, 'confirmed' ), 'Resource reattachment failed.' );
+		$resolved = ps_pen_paper_character_state( $scope, $resource_character, false );
+		$check( ( 'copy' === $resolution ? 5 : 13 ) === $resolved['active']['values'][ $resource ]['current'] &&
+			13 === ps_pen_paper_raw_character_state( $base_id )['active']['values'][ $resource ]['current'], 'Resource conflict resolution retained the wrong stock or changed the base.' );
+		if ( 'copy' === $resolution ) {
+			$check( true === ps_pen_paper_copy_shared_character( $scope->ID, $request_id, (string) $resolved['revision'],
+				(string) $resolved['base_revision'], '1', 'confirmed' ), 'Second resource detachment failed.' );
+		}
+	}
+	$check( ! is_wp_error( ps_pen_paper_get_events( $scope ) ), 'Local resource history cannot be read.' );
 } finally {
 	wp_set_current_user( $original_user );
 	$errors = array();
@@ -514,4 +597,4 @@ try {
 	}
 	if ( $errors ) { WP_CLI::error( implode( '; ', $errors ) ); }
 }
-WP_CLI::success( 'Base templates, shared progress, independent continuation, retained equipment and wallets, context overrides, effective dice snapshots, privacy, conflicts and publication rollback passed.' );
+WP_CLI::success( 'Base templates, shared progress, independent continuation, retained equipment and wallets, context and resource overrides, effective dice snapshots, privacy, conflicts and publication rollback passed.' );

@@ -30,12 +30,16 @@ function ps_pen_paper_handle_access_action( $operation ) {
 	} else {
 		$mode = ps_pen_paper_posted_text( 'backdrop_action' );
 		$file = isset( $_FILES['backdrop'] ) ? $_FILES['backdrop'] : null;
-		if ( ! in_array( $mode, array( 'upload', 'remove' ), true ) || ( 'upload' === $mode &&
+		if ( ! in_array( $mode, array( 'upload', 'remove', 'view' ), true ) || ( 'upload' === $mode &&
 			( ! is_array( $file ) || ! isset( $file['error'], $file['tmp_name'] ) || UPLOAD_ERR_OK !== $file['error'] ||
 			! is_string( $file['tmp_name'] ) || ! is_uploaded_file( $file['tmp_name'] ) ) ) ) {
 			ps_pen_paper_fail( __( 'Das Bild wurde nicht vollständig hochgeladen. Bitte prüfe die Dateigröße und wähle es erneut aus.', 'ps-pen-paper' ) );
 		}
-		$result = ps_pen_paper_save_backdrop( $campaign_id, 'remove' === $mode ? null : $file['tmp_name'], $revision );
+		if ( 'view' === $mode ) {
+			$view = ps_pen_paper_posted_image_view();
+			if ( is_wp_error( $view ) ) { ps_pen_paper_fail( $view->get_error_message() ); }
+			$result = ps_pen_paper_save_backdrop_view( $campaign_id, $revision, $view );
+		} else { $result = ps_pen_paper_save_backdrop( $campaign_id, 'remove' === $mode ? null : $file['tmp_name'], $revision ); }
 	}
 	if ( is_wp_error( $result ) ) {
 		ps_pen_paper_fail( $result->get_error_message() );
@@ -208,6 +212,16 @@ function ps_pen_paper_render_access_settings( $campaign, $page_id = 0 ) {
 			</p>
 		</form>
 	</section>
+	<?php if ( $backdrop['asset_id'] ) :
+		$preview = ps_pen_paper_backdrop_image( $campaign );
+		if ( is_wp_error( $preview ) ) { echo '<p role="alert">' . esc_html( $preview->get_error_message() ) . '</p>'; }
+		else {
+			ps_pen_paper_form_start( 'save_backdrop', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id );
+			echo '<input type="hidden" name="settings_revision" value="' . esc_attr( $backdrop['revision'] ) . '">';
+			ps_pen_paper_render_image_view_fields( $backdrop['view'] ?? null, $preview );
+			echo '<button name="backdrop_action" value="view">' . esc_html__( 'Bildausschnitt speichern', 'ps-pen-paper' ) . '</button></form>';
+		}
+	endif; ?>
 	<details class="pspp-fold">
 		<summary><?php esc_html_e( 'Farben & Lesbarkeit anpassen', 'ps-pen-paper' ); ?></summary>
 		<?php ps_pen_paper_render_style_settings( $campaign, $page_id ); ?>

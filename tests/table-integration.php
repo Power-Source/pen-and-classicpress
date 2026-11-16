@@ -13,6 +13,7 @@ if ( is_multisite() ) {
 }
 ps_pen_paper_register_campaign_type();
 ps_pen_paper_register_event_type();
+ps_pen_paper_register_roll_type();
 
 $original_user = get_current_user_id();
 $users = array();
@@ -80,6 +81,22 @@ try {
 	ps_pen_paper_render_event_details( $events['events'][0] );
 	$details = ob_get_clean();
 	$check( false !== strpos( $details, 'Freies Spiel' ) && false !== strpos( $details, esc_html( get_userdata( $users['player'] )->display_name ) ), 'Turn before/after details missing.' );
+	$campaign = ps_pen_paper_get_campaign( $campaign_id );
+	$roll_rules = ps_pen_paper_save_rules( $campaign_id, array( 'name' => 'Chat dice', 'description' => '', 'dice' => array( '6' ),
+		'roll_visibilities' => array( 'group', 'private', 'gm' ), 'fields' => array() ), '0' );
+	$check( ! is_wp_error( $roll_rules ), 'Chat dice rules failed.' );
+	$public_roll = 0;
+	foreach ( array( 'group', 'private', 'gm' ) as $visibility ) {
+		$roll = ps_pen_paper_roll_dice( $campaign_id, array( 'expression' => 'W6', 'visibility' => $visibility,
+			'recipient' => (string) $users['owner'], 'character' => '', 'attribute' => '', 'label' => $visibility ), '1' );
+		$check( is_int( $roll ), 'Chat dice fixture failed: ' . $visibility );
+		if ( 'group' === $visibility ) { $public_roll = $roll; }
+	}
+	$chat_rolls = ps_pen_paper_chat_rolls( $campaign );
+	$check( array( $public_roll ) === array_column( $chat_rolls, 'id' ), 'GM chat received private or hidden rolls.' );
+	wp_set_current_user( $users['player'] );
+	$check( $chat_rolls === $call( 'GET' )->get_data()['chat_rolls'], 'Player and GM do not receive the same public roll feed.' );
+	wp_set_current_user( $users['gm'] );
 
 	delete_post_meta( $campaign_id, '_pspp_gm', (string) $users['gm'] );
 	$check( ! psource_chat_session_access( $room ) && ! psource_chat_is_moderator( $room ) && 403 === $call( 'GET' )->get_status(), 'Removed GM retained chat or table access.' );
@@ -96,7 +113,7 @@ try {
 	wp_set_current_user( $original_user );
 	$errors = array();
 	if ( $campaign_id && ! is_wp_error( $campaign_id ) ) {
-		foreach ( get_posts( array( 'post_type' => 'pspp_event', 'post_status' => array( 'private', 'draft' ), 'post_parent' => $campaign_id, 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $id ) {
+		foreach ( get_posts( array( 'post_type' => array( 'pspp_event', 'pspp_roll' ), 'post_status' => array( 'private', 'draft' ), 'post_parent' => $campaign_id, 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $id ) {
 			if ( ! wp_delete_post( $id, true ) ) { $errors[] = 'Event cleanup failed.'; }
 		}
 		foreach ( $users as $id ) {

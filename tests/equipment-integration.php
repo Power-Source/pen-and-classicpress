@@ -336,7 +336,41 @@ try {
 		$race_result = ps_pen_paper_save_gear( $linked, $alias_id, 'equip_items', array( 'slots' => array( 'kopf' => $world_instance ) ), '3' );
 	} finally { remove_filter( 'update_post_metadata', $interleave, 10 ); }
 	$check( true === $race_result && is_wp_error( $nested_result ) && 'conflict' === $nested_result->get_error_code() && 7 === ps_pen_paper_character_state( $linked, get_post( $alias_id ) )['active']['values'][ $world_field ], 'Context edit bypassed the equipment consistency lock.' );
-	WP_CLI::success( 'Community gating, real profile API ownership, core portrait approvals/privacy, private images, slots/rarity, frozen issuance, forged/duplicate/type guards, effective bonuses, stale dice tokens, immutable roll provenance, bounds, recovery, journal rollback, image cleanup and cross-document character/equipment conflicts passed.' );
+	$view = array( 'x' => 80, 'y' => 15, 'fit' => 'contain' );
+	$check( true === ps_pen_paper_save_portrait( $campaign, $character_id, (string) ps_pen_paper_portrait_state( $character_id )['revision'], 'upload', $path ), 'Presentation portrait fixture failed.' );
+	$check( array() === ps_pen_paper_table_identity( $campaign, $users['player'], true ), 'Portrait became public without explicit sharing.' );
+	wp_set_current_user( $users['player'] );
+	$presentation_revision = (string) ps_pen_paper_portrait_state( $character_id )['revision'];
+	$check( true === ps_pen_paper_save_portrait( $campaign, $character_id, $presentation_revision, 'presentation', array( 'view' => $view, 'share' => true ) ), 'Owner could not release their character presentation.' );
+	foreach ( get_posts( array( 'post_type' => 'pspp_character', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'author' => $users['player'], 'posts_per_page' => -1 ) ) as $candidate ) {
+		if ( $candidate->ID !== $character_id ) { wp_update_post( array( 'ID' => $candidate->ID, 'post_status' => 'draft' ) ); }
+	}
+	$identity = ps_pen_paper_table_identity( $campaign, $users['player'], true );
+	$check( 'PRIVATE_HERO' === $identity['name'] && 0 === strpos( $identity['image'], 'data:image/png;base64,' ) &&
+		false !== strpos( $identity['portrait_style'], '80% 15%' ) && ! isset( $identity['values'] ), 'Released presentation lost its crop or exposed character values.' );
+	$check( is_wp_error( ps_pen_paper_save_portrait( $campaign, $character_id, $presentation_revision, 'presentation', array( 'view' => $view, 'share' => false ) ) ), 'Stale presentation overwrote sharing.' );
+	$portrait_request = new WP_REST_Request( 'GET', '/ps-pen-paper/v1/campaigns/' . $campaign->ID . '/participants/' . $users['player'] . '/portrait' );
+	$portrait_request->set_param( 'key', $identity['portrait_key'] );
+	$check( 200 === rest_do_request( $portrait_request )->get_status(), 'Released participant portrait could not be loaded.' );
+	wp_set_current_user( $users['outsider'] );
+	$check( is_wp_error( ps_pen_paper_table_identity( $campaign, $users['player'], true ) ) &&
+		403 === rest_do_request( $portrait_request )->get_status(), 'Outsider received a released group portrait.' );
+	wp_set_current_user( $users['player'] );
+	$check( true === ps_pen_paper_save_portrait( $campaign, $character_id, (string) ps_pen_paper_portrait_state( $character_id )['revision'],
+		'presentation', array( 'view' => $view, 'share' => false ) ) &&
+		403 === rest_do_request( $portrait_request )->get_status(), 'Withdrawal left the group portrait accessible.' );
+	$check( is_wp_error( ps_pen_paper_save_sheet_style( $campaign, '1', null, $view ) ), 'Player changed the campaign sheet backdrop.' );
+	wp_set_current_user( $users['gm'] );
+	$sheet_asset = ps_pen_paper_sheet_style( $campaign )['asset_id'];
+	$check( true === ps_pen_paper_save_sheet_style( $campaign, '1', null, $view ) &&
+		$sheet_asset === ps_pen_paper_sheet_style( $campaign )['asset_id'] && get_post( $sheet_asset ) &&
+		is_wp_error( ps_pen_paper_save_sheet_style( $campaign, '1', null, $view ) ), 'Crop update replaced the image or accepted a stale revision.' );
+	$check( ! is_wp_error( ps_pen_paper_save_backdrop( $campaign->ID, $path, '0' ) ) &&
+		true === ps_pen_paper_save_backdrop_view( $campaign->ID, '1', $view ) &&
+		is_wp_error( ps_pen_paper_save_backdrop_view( $campaign->ID, '2', array( 'x' => 101, 'y' => 0, 'fit' => 'cover' ) ) ), 'Backdrop crop validation failed.' );
+	$presentation_export = ps_pen_paper_export_campaign( $campaign->ID, 'complete' );
+	$check( ! is_wp_error( $presentation_export ) && ! is_wp_error( ps_pen_paper_parse_import( wp_json_encode( $presentation_export ) ) ), 'Presentation metadata broke backup validation.' );
+	WP_CLI::success( 'Equipment, portrait approvals, explicit group sharing/revocation, crop revisions, backups, privacy and cross-document conflicts passed.' );
 } finally {
 	wp_set_current_user( $original_user );
 	$_GET = $original_get;

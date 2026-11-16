@@ -38,6 +38,10 @@ function ps_pen_paper_handle_character_policy_action( $operation ) {
 			if ( ! is_array( $file ) || ! isset( $file['error'], $file['tmp_name'] ) || UPLOAD_ERR_OK !== $file['error'] ||
 				! is_string( $file['tmp_name'] ) || ! is_uploaded_file( $file['tmp_name'] ) ) { ps_pen_paper_fail( __( 'Das Porträt wurde nicht vollständig hochgeladen.', 'ps-pen-paper' ) ); }
 			$path = $file['tmp_name'];
+		} elseif ( 'presentation' === $mode ) {
+			$view = ps_pen_paper_posted_image_view();
+			if ( is_wp_error( $view ) ) { ps_pen_paper_fail( $view->get_error_message() ); }
+			$path = array( 'view' => $view, 'share' => '1' === ps_pen_paper_posted_text( 'share_character' ) );
 		}
 		$result = ps_pen_paper_save_portrait( ps_pen_paper_get_character_scope( $id ), ps_pen_paper_posted_id( 'character_id' ),
 			ps_pen_paper_posted_text( 'portrait_revision' ), $mode, $path );
@@ -175,7 +179,7 @@ function ps_pen_paper_render_profile_invitations( $page_id = 0, $management_scop
 	if ( ! $shown ) { echo '<p>' . esc_html__( 'Keine offenen Einladungen.', 'ps-pen-paper' ) . '</p>'; }
 }
 
-function ps_pen_paper_render_portrait_presets( $scope, $character, $page_id = 0 ) {
+function ps_pen_paper_render_portrait_presets( $scope, $character, $page_id = 0, $profile = false ) {
 	if ( ! ps_pen_paper_can_edit_portrait( $scope, $character->ID ) ) { return; }
 	$universe = ps_pen_paper_portrait_policy_scope( $scope );
 	if ( is_wp_error( $universe ) ) { echo '<p role="alert">' . esc_html( $universe->get_error_message() ) . '</p>'; return; }
@@ -198,7 +202,7 @@ function ps_pen_paper_render_portrait_presets( $scope, $character, $page_id = 0 
 			<?php
 		}
 		$actions = array( 'remove' => __( 'Porträt entfernen', 'ps-pen-paper' ) );
-		if ( $state['pending'] && ps_pen_paper_can_manage_character_scope( $scope ) ) {
+		if ( ! $profile && $state['pending'] && ps_pen_paper_can_manage_character_scope( $scope ) ) {
 			$pending_image = $state['pending']['asset_id'] ? ps_pen_paper_private_image_data( $scope, $state['pending']['asset_id'] ) : '';
 			if ( is_wp_error( $pending_image ) ) { echo '<p role="alert">' . esc_html( $pending_image->get_error_message() ) . '</p>'; }
 			if ( $pending_image && ! is_wp_error( $pending_image ) ) { echo '<span class="pspp-portrait"><img src="' . esc_attr( $pending_image ) . '" alt=""></span>'; }

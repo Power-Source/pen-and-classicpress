@@ -132,7 +132,7 @@ function ps_pen_paper_community_content( $html, $tab, $user_id, $atts ) {
 			ps_pen_paper_render_characters( $campaign, $character_id, 0, ps_pen_paper_community_url(), 'profile' );
 		}
 	} elseif ( ! $choices ) {
-		echo '<p>' . esc_html__( 'Du hast noch keine eigenen Charaktere. Wähle ein verfügbares Universum oder nimm unten eine Einladung an.', 'ps-pen-paper' ) . '</p>';
+		echo '<p>' . esc_html__( 'Du hast noch keine eigenen Charaktere. Wähle ein verfügbares Universum. Einladungen und Spielrunden findest du in der Game-Lounge.', 'ps-pen-paper' ) . '</p>';
 	}
 	echo '<section id="pspp-profile-create"><h3>' . esc_html__( 'Charakter erstellen', 'ps-pen-paper' ) . '</h3>';
 	if ( $universes ) : ?>
@@ -149,7 +149,6 @@ function ps_pen_paper_community_content( $html, $tab, $user_id, $atts ) {
 		<p><?php esc_html_e( 'Noch kein Universum verfügbar. Bitte die Spielleitung um eine Einladung; danach kannst du hier deinen Charakter erstellen.', 'ps-pen-paper' ); ?></p>
 	<?php endif;
 	echo '</section>';
-	ps_pen_paper_render_profile_invitations();
 	remove_filter( 'pspp_form_action', 'ps_pen_paper_profile_form_action' );
 	remove_action( 'pspp_form_context', 'ps_pen_paper_profile_form_context' );
 	echo '</div>';
@@ -164,8 +163,19 @@ function ps_pen_paper_profile_form_action( $url ) {
 	return ps_pen_paper_community_url();
 }
 
+function ps_pen_paper_profile_operation_allowed( $operation, $input ) {
+	if ( in_array( $operation, array( 'profile_create_character', 'save_character', 'save_base_character', 'select_portrait_preset', 'equip_items', 'use_item', 'offer_trade' ), true ) ) { return true; }
+	if ( 'profile_portrait' === $operation ) { return in_array( $input['portrait_operation'] ?? '', array( 'upload', 'remove', 'presentation' ), true ); }
+	if ( 'save_portrait' === $operation ) { return in_array( $input['portrait_action'] ?? '', array( 'upload', 'remove' ), true ); }
+	if ( 'change_trade' === $operation ) { return in_array( $input['trade_action'] ?? '', array( 'accept', 'decline', 'cancel', 'counter' ), true ); }
+	return false;
+}
+
 function ps_pen_paper_profile_return( $campaign_id, $character_id ) {
 	if ( ! isset( $_POST['pspp_profile'] ) ) { return ''; }
+	if ( ! ps_pen_paper_profile_operation_allowed( ps_pen_paper_posted_text( 'pspp_operation' ), wp_unslash( $_POST ) ) ) {
+		ps_pen_paper_fail( __( 'Diese Aktion gehört nicht ins Charakterprofil. Öffne dafür die Game-Lounge oder die Spielverwaltung.', 'ps-pen-paper' ) );
+	}
 	$url = ps_pen_paper_get_universe( $campaign_id )
 		? ps_pen_paper_community_url( 0, $character_id, $campaign_id )
 		: ps_pen_paper_community_url( $campaign_id, $character_id );
@@ -186,14 +196,14 @@ function ps_pen_paper_community_prepare() {
 		$campaign_id = ps_pen_paper_posted_id( 'campaign_id' );
 		$character_id = ps_pen_paper_posted_id( 'character_id' );
 		if ( ! ps_pen_paper_profile_return( $campaign_id, $character_id ) ) { ps_pen_paper_fail( __( 'Diese Profilaktion ist nicht erlaubt.', 'ps-pen-paper' ) ); }
-		if ( 'member_invitation' === $operation && ! in_array( ps_pen_paper_posted_text( 'invitation_operation' ), array( 'accept', 'decline' ), true ) ) {
-			ps_pen_paper_fail( __( 'Im Spielerprofil kannst du erhaltene Einladungen annehmen oder ablehnen. Einladungen verwaltest du in der jeweiligen Spielrunde.', 'ps-pen-paper' ) );
+		if ( ! ps_pen_paper_profile_operation_allowed( $operation, wp_unslash( $_POST ) ) ) {
+			ps_pen_paper_fail( __( 'Im Profil verwaltest du nur deinen Charakter. Nutze für Spiele und Einladungen die Game-Lounge und für Leitungsaktionen die Spielverwaltung.', 'ps-pen-paper' ) );
 		}
-		$entry_actions = array( 'profile_create_character', 'member_invitation', 'accept_invitation', 'decline_invitation' );
+		$entry_actions = array( 'profile_create_character' );
 		if ( in_array( $operation, $entry_actions, true ) ) { ps_pen_paper_handle_admin_action(); }
 		$campaign = ps_pen_paper_get_character_scope( $campaign_id );
 		$character = $campaign ? ps_pen_paper_get_character( $campaign, $character_id ) : null;
-		if ( ! in_array( $operation, array( 'save_character', 'save_base_character', 'save_portrait', 'profile_portrait', 'select_portrait_preset', 'equip_items', 'use_item', 'review_item_use', 'end_item_effect', 'offer_trade', 'change_trade', 'start_adventure', 'advance_adventure' ), true ) || ! $character ||
+		if ( ! $character ||
 			(int) $character->post_author !== get_current_user_id() || ! ps_pen_paper_profile_return( $campaign_id, $character_id ) ) {
 			ps_pen_paper_fail( __( 'Diese Profilaktion ist nicht erlaubt. Bitte öffne deinen eigenen Charakter erneut.', 'ps-pen-paper' ) );
 		}

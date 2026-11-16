@@ -30,16 +30,41 @@ beziehungsweise als Spielleitung verwaltbare Bögen.
 
 Mitglieder müssen bereits Benutzer dieser Website sein. Spielleitungen und
 berechtigte Spieler können sie einladen; Annahme und gegebenenfalls Freigabe
-erfolgen im eigenen Profil. Die Aufnahme in eine Netzwerk-Website ist nicht
+erfolgen in der Game-Lounge beziehungsweise in der Spielrunde. Die Aufnahme in eine Netzwerk-Website ist nicht
 implementiert. Der Ersteller
 bleibt Spielleiter seiner Kampagne. Ein Archivkennzeichen markiert Kampagnen
 derzeit nur in der Übersicht; es sperrt keine Aktionen.
 
 Neue Kampagnen benötigen ein vorhandenes Universum. Im eigenen PS-Community-Profil
-stehen die Universumsauswahl zur Charaktererstellung, die Auswahl eigener Bögen
-und Einladungen bereit. Profil und Spieltisch nutzen denselben Charakterbogen
-mit Tabs für Übersicht, Werte, Inventar und Abenteuer. Optionale UI-Farben
+stehen die Universumsauswahl zur Charaktererstellung und die Auswahl eigener Bögen
+bereit. Das Profil enthält nur eigene Charaktere, Werte, Inventar und erlaubte
+Charakteraktionen, keine Einladungen, Abenteuerstarts oder Leitungsfreigaben.
+Profil und Spieltisch nutzen denselben Charakterbogen; Abenteuer bleiben im
+Spielbereich. Universumsbindungen können nicht mehr entfernt werden.
+Auch alte unabhängige Sicherungen benötigen bei der Wiederherstellung ein
+ausdrücklich gewähltes Universum; lokale Regeln und Guthaben bleiben erhalten.
+Optionale UI-Farben
 werden am Universum eingestellt und von dessen Kampagnen übernommen.
+
+Die Kampagnenleitung kann Ressourcen lokal führen oder bei gemeinsamen
+Basisbögen ein kampagnenbezogenes Maximum für denselben Vorrat setzen.
+Verbrauch und Heilung beachten dieses Modell. Unvereinbare Maxima werden
+angezeigt und lassen sich korrigieren; Werte werden nie still abgeschnitten.
+Charakternamen und freigegebene Porträts lassen sich ausdrücklich für die
+Teilnehmerleiste teilen, ohne Werte und Inventar freizugeben. Porträts werden
+bei Bedarf geschützt nachgeladen; bei gemeinsamem Basisstand gilt dessen
+aktuelle Freigabe im Profil.
+Für Porträts, Bogen- und Spieltischhintergründe sind Bildfüllung und Position
+mit Vorschau einstellbar. Der Rundenchat zeigt zusätzlich die letzten
+20 öffentlichen Gruppenwürfe aus dem geschützten Wurfprotokoll, unabhängig
+von PS Chat. Private und verdeckte Würfe bleiben ausgeschlossen; es werden
+keine zusätzlichen PS-Chat-Nachrichten erzeugt.
+
+Die drei Spielarten wurden exemplarisch über echte Browserformulare bis zum
+Abschluss und Austritt geprüft, einschließlich Pause, Wiedereinstieg und
+Figurenwechsel in der Gruppe. Die gezielten nativen Regressionen und
+UI-Tests bestehen. Eine vollständige Plattform- und Variantenmatrix bleibt
+eine getrennte Abnahme; Details stehen in der Roadmap.
 
 Das Plugin kann über die Plugin-Verwaltung aktiviert werden. Angemeldete
 Website-Mitglieder finden ihre Kampagnen unter „Pen & Paper“ im Backend. Es
@@ -568,7 +593,7 @@ ein. Die Administration darf diese Einstellungen ebenfalls verwalten:
   Lokale Bögen und unabhängige Kopien bekommen in diesem Modell kein
   stillschweigendes Ersatzkonto.
 
-Kampagnen ohne Universum konfigurieren ihre eigene Währung unter
+Ältere Kampagnen ohne Universum konfigurieren ihre eigene Währung unter
 **Rundeneinstellungen** und führen getrennte Konten. Zugeordnete Kampagnen
 übernehmen standardmäßig die Währungseinstellungen des Universums. Bei der
 Zuordnung kann die verantwortliche Person ausdrücklich **Lokale Währung und
@@ -649,7 +674,8 @@ Die Spielleitung konfiguriert unter **Gegenstände**:
 - Gegenstandsvorlagen mit Beschreibung, geschützter Grafik, freien
   Eigenschaften und ausdrücklich eingetragenen ganzzahligen Boni.
 - Einen gemeinsamen Universumskatalog und ergänzende lokale Kampagnenvorlagen.
-  Kampagnen konfigurieren ihre Slots selbst; ohne Universum gilt nur ihr Katalog.
+  Kampagnen konfigurieren ihre Slots selbst; bei älteren Kampagnen ohne
+  Universum gilt nur ihr eigener Katalog.
 
 Über den jeweiligen Charakter gibt die Spielleitung **konkrete Exemplare**
 aus. Jedes Exemplar behält seinen damaligen Vorlagenstand; spätere
@@ -889,28 +915,30 @@ Bestätigung unabhängig weiterführen. Kampagnenauflagen werden dabei zu eigene
 Grundwerten; Ausrüstung, Inventar, Notizen und persönliche Konten bleiben erhalten.
 Ausrüstungsboni und offene Basisanträge werden nicht in den Grundstand kopiert.
 Gemeinsame Universumskonten sperren diesen Schritt bis zu einer gesonderten
-Kontenmigration. Nach dem Ablösen aller gemeinsamen Bögen kann die
-Universumszuordnung geändert oder gelöst werden, sofern vorhandene Konten weiter
-zu ihrer Währung passen. Eine automatische Rückverbindung ist nicht verfügbar.
+Kontenmigration. Nach dem Ablösen aller gemeinsamen Bögen kann ein anderes
+Universum zugeordnet werden, sofern vorhandene Konten weiter zu ihrer Währung
+passen. Eine Zuordnung ohne Zieluniversum ist nicht möglich.
 Bei einer fehlenden Basis erscheint ein Fehler; es werden keine veralteten
 Ersatzwerte verwendet.
 Unabhängige Kopien können ohne das ursprüngliche Universum und dessen Basisbogen
-importiert werden; deren Kennungen bleiben reine historische Herkunftsnachweise.
+importiert werden, benötigen aber ein ausdrücklich gewähltes Zieluniversum;
+deren alte Kennungen bleiben reine historische Herkunftsnachweise.
 Unabhängige Kopien können ausdrücklich mit dem aktuellen Basisbogen
 wieder verbunden werden. Die Vorschau verlangt eine Lösung für abweichende
-Werte; Zahlen und Attribute können als lokale Auflagen erhalten bleiben.
+Werte; Zahlen, Attribute und Ressourcen können als lokale Auflagen erhalten bleiben.
 Spieler können in einer zugeordneten Kampagne einen eigenen Universumsbasisbogen
 beantragen. Die Universumsleitung prüft diesen Antrag; die Aufnahme des
 freigegebenen Bogens in eine Kampagne bleibt ein eigener Vorgang.
 Universumsmitgliedschaften, Erfahrungs-/Stufenschwellen und ein verteilbarer
 Level-Punktepool sind inzwischen ergänzt. Ein bloßes Zahlenfeld namens
-„Stufe“ aktiviert diese Regeln nicht. Ressourcenauflagen bleiben offen.
+„Stufe“ aktiviert diese Regeln nicht. Ressourcenauflagen erlauben lokale Vorräte
+oder gemeinsame Vorräte mit kampagneneigenem Maximum.
 
 Die Spielleitung kann einen Teilnehmer als **am Zug** markieren oder
 **Freies Spiel** wählen. Änderungen sind revisionsgeschützt und werden mit
 Vorher/Nachher im gemeinsamen Protokoll gespeichert. AFK schaltet den Zug
-nicht automatisch weiter. Eine getrennte Sitzungsanmeldung gibt es noch nicht:
-Die aktuelle Runde entspricht den eingetragenen Kampagnenmitgliedern.
+nicht automatisch weiter. Spielrunden haben eigene Teilnehmer und werden in
+der Game-Lounge unabhängig von der Kampagnenvorlage gestartet.
 
 **Anwesenheit teilen** aktiviert freiwillige Meldungen aus dem Spielbereich.
 Bei sichtbarer Seite wird alle 30 Sekunden aktualisiert; nach mehr als

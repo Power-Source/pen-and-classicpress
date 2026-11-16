@@ -97,12 +97,46 @@ try {
 		$check( ! ps_pen_paper_can_manage_campaign( $round ), 'Joining granted GM rights.' );
 	}
 	wp_set_current_user( $users['gm'] );
+	ob_start(); ps_pen_paper_render_play_round( $source, $round_a, 0, ps_pen_paper_play_round( $a ) ); $joined_lobby = ob_get_clean();
+	$check( false === strpos( $joined_lobby, ' · player</li>' ), 'Round roster disclosed an unshared character name.' );
 	ob_start(); ps_pen_paper_render_play_directory( $source, 0, 'guided' ); $directory = ob_get_clean();
 	$check( false !== strpos( $directory, esc_html( ps_pen_paper_adventure_group_user_label( $users['player'] ) ) ) &&
 		false !== strpos( $directory, esc_html( $round_a->post_title ) ), 'Round directory failed to render the participant card.' );
 	foreach ( array( $round_a, $round_b ) as $round ) { $success( ps_pen_paper_change_play_round( $round, 'start', '2' ), 'Starting guided round failed' ); }
+	set_error_handler( static function ( $severity, $message, $file, $line ) { throw new ErrorException( $message, 0, $severity, $file, $line ); } );
+	ob_start();
+	try {
+		ps_pen_paper_render_journal( $round_a );
+		$journal = ob_get_contents();
+		$check( false !== strpos( $journal, esc_html( ps_pen_paper_play_statuses()['active'] ) ), 'Round history omitted its lifecycle status.' );
+	} finally {
+		ob_end_clean(); restore_error_handler();
+	}
 	wp_set_current_user( $users['player'] );
 	$alias_id = ps_pen_paper_play_round( $a )['participants'][0]['character_id'];
+	$frontend_page = $success( wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish',
+		'post_author' => $users['gm'], 'post_title' => 'Round sheet routing fixture', 'post_content' => '[ps_pen_paper]' ), true ), 'Frontend page fixture failed' );
+	$saved_query = $GLOBALS['wp_query']; $saved_get = $_GET;
+	try {
+		$GLOBALS['wp_query'] = new WP_Query( array( 'page_id' => $frontend_page ) );
+		$smilies_priority = has_filter( 'the_content', 'convert_smilies' );
+		ps_pen_paper_prepare_frontend();
+		$large_image_data = 'data:image/png;base64,' . str_repeat( 'A', 4 * (int) ceil( 2 * MB_IN_BYTES / 3 ) );
+		$check( false !== strpos( apply_filters( 'the_content', '<img src="' . $large_image_data . '">' ), $large_image_data ), 'Large protected images broke the frontend content pipeline.' );
+		$_GET = array( 'pspp_campaign' => (string) $source_id, 'pspp_round' => (string) $a, 'pspp_character' => (string) $alias_id );
+		wp_set_current_user( $users['gm'] );
+		$sheet = ps_pen_paper_frontend_shortcode();
+		$check( false !== strpos( $sheet, 'value="save_character_context"' ) &&
+			false !== strpos( $sheet, 'context_resources[' . $field . '][mode]' ), 'Selected runtime sheet did not expose resource overrides to its GM.' );
+		wp_set_current_user( $users['player'] );
+		$sheet = ps_pen_paper_frontend_shortcode();
+		$check( false !== strpos( $sheet, 'name="character_id" value="' . $alias_id . '"' ) &&
+			false === strpos( $sheet, 'value="save_character_context"' ), 'Selected runtime sheet was lost or exposed GM overrides to its owner.' );
+	} finally {
+		$GLOBALS['wp_query'] = $saved_query; $_GET = $saved_get;
+		if ( isset( $smilies_priority ) && false !== $smilies_priority ) { add_filter( 'the_content', 'convert_smilies', $smilies_priority ); }
+		wp_set_current_user( $users['player'] );
+	}
 	$check( isset( ps_pen_paper_gear_state( $alias_id )['active']['items'][ $item_uuid ] ) && '' === get_post_meta( $alias_id, '_pspp_gear', true ), 'Joining copied inventory instead of using the same item instance.' );
 	$hero_state = ps_pen_paper_character_state( $round_a, ps_pen_paper_record_post( $alias_id ), false );
 	$use_input = array( 'instance_id' => $item_uuid, 'character_revision' => ps_pen_paper_item_use_character_revision( $hero_state ),
@@ -219,5 +253,6 @@ try {
 		foreach ( $children as $child ) { wp_delete_post( $child->ID, true ); }
 		wp_delete_post( $parent, true );
 	}
+	if ( isset( $frontend_page ) ) { wp_delete_post( $frontend_page, true ); }
 	foreach ( $users as $id ) { if ( is_multisite() ) { wpmu_delete_user( $id ); } else { wp_delete_user( $id ); } }
 }

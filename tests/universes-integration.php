@@ -118,7 +118,7 @@ try {
 	$input['name'] = 'Renamed universe';
 	$check( $universe_id === ps_pen_paper_save_universe( $universe_id, $input, '1' ), 'Revoked creation permission prevented editing an owned universe.' );
 	$check( is_wp_error( ps_pen_paper_save_universe( 0, $input, '0' ) ), 'Revoked creator still created universes.' );
-	$check( 'Renamed universe' === ps_pen_paper_preview_universe_link( $campaign_id, 0 )['source_universe']['name'], 'Preview used a stale source name after rename.' );
+	$check( 'Renamed universe' === ps_pen_paper_preview_universe_link( $campaign_id, $universe_id )['source_universe']['name'], 'Preview used a stale source name after rename.' );
 	$fail_publish = static function ( $data ) {
 		if ( 'pspp_event' === $data['post_type'] && 'private' === $data['post_status'] ) { $data['post_status'] = 'draft'; }
 		return $data;
@@ -127,7 +127,7 @@ try {
 	$universe_baseline = ps_pen_paper_universe_document( $universe_id );
 	add_filter( 'wp_insert_post_data', $fail_publish );
 	try {
-		$check( is_wp_error( ps_pen_paper_save_universe_link( $campaign_id, 0, '1', '0', 'confirmed' ) ) && $link === ps_pen_paper_get_universe_link( $campaign_id ), 'Failed event publication left changed association.' );
+		$check( is_wp_error( ps_pen_paper_save_universe_link( $campaign_id, $universe_id, '1', '2', 'confirmed' ) ) && $link === ps_pen_paper_get_universe_link( $campaign_id ), 'Failed event publication left changed association.' );
 		$check( is_wp_error( ps_pen_paper_save_universe( $universe_id, $input, '2' ) ) && $universe_baseline === ps_pen_paper_universe_document( $universe_id ), 'Failed event publication changed universe.' );
 		wp_set_current_user( $users['other'] );
 		$ids = wp_list_pluck( ps_pen_paper_get_universes(), 'ID' );
@@ -145,7 +145,8 @@ try {
 	$check( ! is_wp_error( ps_pen_paper_save_universe_link( $campaigns['other'], $universe_id, '0', '2', 'confirmed' ) ), 'Administrator could not associate independently owned campaign and universe.' );
 	wp_set_current_user( $users['owner'] );
 	$check( ! ps_pen_paper_can_view_campaign( ps_pen_paper_get_campaign( $campaigns['other'] ) ), 'Universe ownership automatically granted private campaign access.' );
-	$check( ! is_wp_error( ps_pen_paper_save_universe_link( $campaign_id, 0, '1', '0', 'confirmed' ) ) && 0 === ps_pen_paper_get_universe_link( $campaign_id )['universe_id'], 'Confirmed unlink failed.' );
+	$check( is_wp_error( ps_pen_paper_save_universe_link( $campaign_id, 0, '1', '0', 'confirmed' ) ) &&
+		$link === ps_pen_paper_get_universe_link( $campaign_id ), 'A confirmed request removed the mandatory universe binding.' );
 } finally {
 	wp_set_current_user( $original_user );
 	$GLOBALS['wp_query'] = $original_query;

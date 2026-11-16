@@ -41,12 +41,39 @@ function ps_pen_paper_chat_moderator( $moderator, $session ) {
 	return $moderator;
 }
 
+function ps_pen_paper_chat_rolls( $campaign ) {
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_campaign( $campaign ) ) {
+		return new WP_Error( 'forbidden', __( 'Diese Gruppenwürfe sind für dich nicht verfügbar.', 'ps-pen-paper' ) );
+	}
+	$query = new WP_Query( array( 'post_type' => 'pspp_roll', 'post_status' => 'private', 'post_parent' => $campaign->ID,
+		'posts_per_page' => 20, 'orderby' => 'ID', 'order' => 'DESC', 'no_found_rows' => true,
+		'meta_query' => array( array( 'key' => '_pspp_visibility', 'value' => 'group' ) ) ) );
+	$rolls = array();
+	foreach ( array_reverse( $query->posts ) as $post ) {
+		$event = ps_pen_paper_get_roll( $campaign, $post->ID );
+		if ( is_wp_error( $event ) ) { return $event; }
+		if ( 'group' !== $event['visibility'] ) { continue; }
+		$rolls[] = array( 'id' => $post->ID, 'text' => $event['actor_name'] . ' · ' .
+			( $event['label'] ? $event['label'] . ' · ' : '' ) . ps_pen_paper_roll_description( $event ) . ' = ' . $event['total'] );
+	}
+	return $rolls;
+}
+
 function ps_pen_paper_render_chat( $campaign ) {
 	global $psource_chat;
 	?>
 	<details class="pspp-chat-dock" data-table-chat>
 		<summary><?php esc_html_e( 'Rundenchat', 'ps-pen-paper' ); ?> <span data-chat-unread hidden></span></summary>
 		<div class="pspp-chat-body">
+			<section aria-label="<?php esc_attr_e( 'Öffentliche Gruppenwürfe', 'ps-pen-paper' ); ?>">
+				<h2><?php esc_html_e( 'Gruppenwürfe', 'ps-pen-paper' ); ?></h2>
+				<p><?php esc_html_e( 'Die letzten 20 öffentlichen Würfe dieser Runde. Private und verdeckte Würfe erscheinen hier nicht.', 'ps-pen-paper' ); ?></p>
+				<ol data-chat-rolls aria-live="polite" aria-relevant="additions"><?php
+					$rolls = ps_pen_paper_chat_rolls( $campaign );
+					if ( is_wp_error( $rolls ) ) { echo '<li role="alert">' . esc_html( $rolls->get_error_message() ) . '</li>'; }
+					else { foreach ( $rolls as $roll ) { echo '<li data-roll-id="' . esc_attr( $roll['id'] ) . '">' . esc_html( $roll['text'] ) . '</li>'; } }
+				?></ol>
+			</section>
 			<h2><?php esc_html_e( 'Eure Gespräche', 'ps-pen-paper' ); ?></h2>
 			<p class="description"><?php esc_html_e( 'Nur Mitglieder dieser Kampagne. Die Spielleitung moderiert.', 'ps-pen-paper' ); ?></p>
 			<?php if ( ! is_object( $psource_chat ) || ! method_exists( $psource_chat, 'process_chat_shortcode' ) || ! function_exists( 'psource_chat_session_access' ) ) : ?>

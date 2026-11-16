@@ -49,7 +49,7 @@ sind seit 0.13.0 enthalten.
 | Private Inhaltsvorschau und geschützter Kartentisch | Nebel des Krieges und Zeichenwerkzeuge |
 | Frei benennbare Charakterfelder, Basisbögen und Freigaben | Grafischer, frei positionierbarer Slotdesigner |
 | Würfelsummen, optionale Erfolgspools, höchster/niedrigster Einzelwürfel und geschützte Ergebnisse | Explodierende Würfel und Regelskripte |
-| Änderungs- und Wurfprotokoll, Auswahlfelder, Attributpunktepool und feldweise Bearbeitungsrechte | Ressourcenauflagen je Kampagne |
+| Änderungs- und Wurfprotokoll, Auswahlfelder, Attributpunktepool, feldweise Bearbeitungsrechte und Ressourcenauflagen je Kampagne | Automatische Ressourcenregeneration |
 | Spielleitermappe, geschützte Text-/Bild-/PDF-Handouts mit ausgewählten Empfängern | Weitere Dateiformate |
 | Private Porträts sowie Community-gebundene Inventare, Ausrüstung und kontrollierter Handel | Stapelmengen und automatische Gegenstandssynchronisierung |
 | Solo-, hybride und gemeinsame Gruppendurchläufe, Zugang, Wiederholungsregeln und optionale Erfahrungs-/Stufenschwellen | Automatische Klassenentwicklung |
@@ -231,8 +231,8 @@ Zuordnung erfolgt bewusst über die folgende Vorschau.
 
 1. Als Administrator oder mit der Erstellberechtigung unter **Universen**
    einen Namen und eine interne Weltbeschreibung speichern.
-2. Unter **Kampagne zuordnen oder lösen** die eigene Kampagne und das
-   Zieluniversum wählen. **Ohne Universum** löst eine vorhandene Zuordnung.
+2. Unter der Kampagnenzuordnung die eigene Kampagne und das
+   Zieluniversum wählen. Eine Kampagne kann nicht ohne Universum gespeichert werden.
    Unter **Währung und Handelsregeln** wählen, ob die Zieluniversumseinstellungen
    gelten oder **Lokale Währung und Handelsregeln behalten** werden.
    Die lokale Variante erhält vorhandene Kampagnenkonten und Guthaben unverändert.
@@ -334,9 +334,9 @@ Eine automatische Rückverbindung ist nicht möglich.
 
 Ein gemeinsames Universumskonto sperrt die Umstellung bis zu einer gesonderten
 Kontenmigration. Es wird kein Ersatzkonto erstellt und kein Guthaben kopiert.
-Nach dem Ablösen aller gemeinsamen Bögen kann die Universumszuordnung geändert
-oder gelöst werden; die bestehenden Währungs- und Kontenschutzregeln gelten
-weiterhin.
+Nach dem Ablösen aller gemeinsamen Bögen kann die Universumszuordnung zu einem
+anderen Universum geändert, aber nicht entfernt werden; die bestehenden
+Währungs- und Kontenschutzregeln gelten weiterhin.
 
 ### Eigene Universumsbögen beantragen und freigeben
 
@@ -356,7 +356,8 @@ Die beiden Freigaben gewähren keine Teilnahme an anderen Kampagnen.
 Unter **Kampagnenkontext → Mit dem aktuellen Basisbogen wieder verbinden**
 zeigt die Vorschau abweichende Werte. Für jeden Konflikt eine Lösung wählen:
 den Basiswert übernehmen oder bei Zahlen und Attributen den Kopiewert als
-Kampagnenauflage erhalten. Andere abweichende Werte müssen ausdrücklich durch
+Kampagnenauflage erhalten. Ressourcen können als eigene Kampagnenwerte erhalten
+bleiben. Andere abweichende Werte müssen ausdrücklich durch
 den Basiswert ersetzt werden. Inventar und Ausrüstung bleiben erhalten.
 Die Rückverbindung erfolgt nur nach Bestätigung, nie automatisch.
 
@@ -365,7 +366,23 @@ Basisressource einmalig am Universumsbasisbogen verbraucht. Andere damit
 verbundene Runden sehen denselben neuen Stand. Offene Basisanträge und veraltete
 Verbrauchsvorschauen sperren den Vorgang; Wiederholen zahlt nicht nochmals.
 
-Ressourcenauflagen und universumsweite Mitgliedschaften bleiben offen.
+Unter **Kampagnenkontext → Kampagnenauflagen bearbeiten** stellt die Leitung
+für jede Ressource das Modell ein:
+
+- **Grundstand übernehmen:** keine zusätzliche Ressourcenauflage.
+- **Eigene Werte für diese Kampagne:** aktueller Wert und Maximum gehören
+  ausschließlich zu diesem Kampagnenbogen. Verbrauch und Heilung ändern
+  weder Basisbogen noch andere Runden.
+- **Gemeinsamer Vorrat, eigenes Maximum:** bei gemeinsamem Basisbogen bleibt
+  der aktuelle Vorrat gemeinsam; diese Kampagne kann sein Maximum begrenzen.
+  Verbrauch und Heilung ändern den Basisbogen, aber nie über dieses Maximum hinaus.
+
+Ein Maximum darf vorhandene Werte nicht abschneiden oder über dem
+Basismaximum liegen. Ändert sich der Basisstand später unvereinbar, wird
+der Konflikt ausdrücklich angezeigt. Die Leitung kann den betroffenen Bogen
+weiter öffnen und das Maximum korrigieren oder eigene Werte wählen.
+Beim unabhängigen Weiterführen werden Auflagen zu Grundwerten.
+Universumsweite Mitgliedschaften bleiben ein gesondertes Ausbauziel.
 Optionale Erfahrungs-/Stufenschwellen berechnen eine frei benannte numerische
 Stufe aus dem Erfahrungsstand. Eine fehlende gemeinsame Basis erzeugt einen
 sichtbaren Fehler statt eines veralteten Ersatzbogens.
@@ -1053,8 +1070,8 @@ Auswahl eigener Bögen, einschließlich noch nicht freigegebener Figuren.
 Unter **Charakter erstellen** ein verfügbares Universum wählen und **Weiter**
 anklicken. Die dort geltenden Vorgaben und das Charakterlimit bestimmen, ob
 ein neuer Bogen erstellt werden kann. Neue Figuren benötigen gegebenenfalls
-die Freigabe der Spielleitung. Erhaltene Einladungen erscheinen ebenfalls hier;
-Leitungsfreigaben werden dagegen in der betreffenden Spielrunde verwaltet.
+die Freigabe der Spielleitung. Einladungen stehen ausschließlich in der
+Game-Lounge; Leitungsfreigaben werden in der betreffenden Spielrunde verwaltet.
 
 Im Profil wird ein vorhandener eigener Charakter direkt geöffnet. Die Tabs
 **Werte** und **Inventar** zeigen seine Stats, Ressourcen und Gegenstände.
@@ -1062,7 +1079,7 @@ Ein eingerichtetes Universum erlaubt standardmäßig die eigene Erstellung für
 Website-Mitglieder; eine weitere Mitgliedschaft ist nicht vorgeschaltet.
 Nur eine ausdrücklich gespeicherte Zugangsbeschränkung der Leitung begrenzt dies.
 
-**Deine Einladungen** nennt jeweils die Spielrunde beziehungsweise das Universum
+**Deine Einladungen** in der Game-Lounge nennt jeweils die Spielrunde beziehungsweise das Universum
 und den Absender. Hier werden erhaltene Einladungen **angenommen** oder
 **abgelehnt**. Das Spielerprofil enthält keine Mitgliederverwaltung,
 Einladungsfreigaben oder Spieleauswahl.
@@ -1085,9 +1102,31 @@ Profilformulare werden auf der Frontend-Profilseite verarbeitet und bleiben
 nach dem Speichern dort.
 
 Profil und Spiel verwenden dieselbe Bogenansicht: **Charakter**, **Werte**,
-**Inventar**, **Abenteuer** und die erlaubten Bearbeitungsfunktionen. Das
+**Inventar** und die erlaubten Bearbeitungsfunktionen. **Abenteuer** gibt es nur
+im Spielbereich. Auch eine Spielleitung erhält im eigenen Profil keine
+Freigabe-, Mitglieder- oder Verwaltungsformulare. Das
 Charakterbild steht zwischen den Ausrüstungsspalten. Level wird nur bei
 eingestellter Stufenentwicklung angezeigt; Universumsfarben gelten auch hier.
+
+Unter **Charakter** lassen sich Bildfüllung und waagerechte/senkrechte
+Position (0–100 %) mit Vorschau speichern, ohne erneut hochzuladen.
+**Fläche füllen / Ränder zuschneiden** füllt den Rahmen;
+**Ganzes Bild anzeigen** erhält das vollständige Bild.
+Die Spielleitung findet dieselben Einstellungen bei Bogen- und
+Spieltischhintergründen.
+
+Das zusätzliche Freigabefeld teilt nur den freigegebenen Namen und das aktive,
+freigegebene Porträt mit den aktuellen Rundenteilnehmern. Ohne Freigabe zeigt
+die Teilnehmerleiste weiterhin Benutzername und Initiale. Gemeinsame Bögen
+verwenden die aktuelle Freigabe des Basisbogens; unabhängige Kopien ihre eigene.
+Ein Widerruf sperrt weitere Bildabrufe und wird beim nächsten
+Spieltischabruf berücksichtigt. Private Werte und Inventare bleiben geschützt.
+
+Der aufklappbare **Rundenchat** enthält die letzten 20 öffentlichen
+Gruppenwürfe dieser Runde. Die Liste wird aus dem Wurfprotokoll aktualisiert,
+auch ohne PS Chat. Sie ist keine Kopie in dessen Nachrichtenhistorie.
+Private und verdeckte Würfe erscheinen auch für die Leitung nicht in dieser
+gemeinsamen Liste.
 
 Andere Profilbesucher und Freunde erhalten weder fremde Bögen noch Inventare.
 Auch ein direkter Community-AJAX-Aufruf vergibt keine zusätzlichen Rechte.
@@ -1282,7 +1321,7 @@ Spielsystem vor: Name und Kürzel sind frei, Beträge bleiben **ganze Einheiten*
 - **Mit Universum:** Unter **Universen → Regelwerk & Basischaraktere →
   Währung & Guthaben** wählt die Universumsleitung beziehungsweise Administration
   Name, Kürzel und Kontomodell.
-- **Ohne Universum:** Unter **Rundeneinstellungen → Währung & Guthaben**
+- **Ältere Kampagnen ohne Universum:** Unter **Rundeneinstellungen → Währung & Guthaben**
   richtet die Kampagnenleitung eine eigene Währung ein.
 - Zugeordnete Kampagnen übernehmen standardmäßig die Währung und das gewählte
   Modell aus dem Universum. Bei bewusst lokaler Zuordnung bleiben stattdessen
@@ -1411,7 +1450,7 @@ Bild und Geheimnisse mit der Universumsleitung geteilt.**
 
 Wiederholtes Anbieten derselben Figur erzeugt keine weitere Vorlage, auch
 nicht nach einer Umbenennung. Spätere Änderungen werden nicht ungefragt
-übertragen. Eine Kampagne ohne Universum behält ihre Figuren ausschließlich lokal.
+übertragen. Eine ältere Kampagne ohne Universum behält ihre Figuren ausschließlich lokal.
 
 ![Bestätigte Universumsvorlage aus einer separaten temporären Prüfwelt](images/28-universumsvorlage.png)
 
@@ -1662,7 +1701,7 @@ Die Regeln legt die Spielleitung fest, nicht das Plugin für jede Runde gleich.
 
 ### Handelsregeln einstellen
 
-- **Ohne Universum:** **Rundeneinstellungen → Handelsregeln** öffnen.
+- **Ältere Kampagnen ohne Universum:** **Rundeneinstellungen → Handelsregeln** öffnen.
 - **Mit Universum:** Die Universumsleitung öffnet **Universen → Regelwerk &
   Basischaraktere → Handelsregeln**. Kampagnen übernehmen diese Regeln
   unverändert und können sie nicht lokal überschreiben.
@@ -2171,7 +2210,9 @@ herunterladen:
      NPC- und plugininternen Wiki-Kataloge, tatsächlich zugeordnete gemeinsame
      Basisbögen sowie benötigte Bilder und zugehörige Ereignisse. Dafür muss
      die exportierende Person auch das zugeordnete Universum verwalten dürfen.
-     Ohne Universumszuordnung werden nur die Kampagnendaten benötigt.
+     Bei älteren Beständen ohne Universumszuordnung werden nur die
+     Kampagnendaten benötigt. Zur Wiederherstellung ist dennoch ein
+     Zieluniversum ausdrücklich zu wählen.
 3. Bestätigen, dass die Datei private Inhalte enthält und geschützt
    aufbewahrt wird.
 4. **JSON-Sicherung herunterladen** wählen und die Datei an einem geschützten

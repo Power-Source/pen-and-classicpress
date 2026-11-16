@@ -19,10 +19,68 @@ function ps_pen_paper_get_backdrop( $campaign_id ) {
 		return array( 'revision' => 0, 'asset_id' => 0 );
 	}
 	if ( ! is_array( $state ) || ! isset( $state['revision'], $state['asset_id'] ) ||
-		! is_int( $state['revision'] ) || $state['revision'] < 1 || ! is_int( $state['asset_id'] ) || $state['asset_id'] < 0 ) {
+		! is_int( $state['revision'] ) || $state['revision'] < 1 || ! is_int( $state['asset_id'] ) || $state['asset_id'] < 0 ||
+		( isset( $state['view'] ) && ! ps_pen_paper_valid_image_view( $state['view'] ) ) ) {
 		return new WP_Error( 'invalid_backdrop', __( 'Die Hintergrundkonfiguration ist beschädigt. Bitte informiere den Administrator.', 'ps-pen-paper' ) );
 	}
 	return $state;
+}
+
+function ps_pen_paper_valid_image_view( $view ) {
+	return is_array( $view ) && count( $view ) === 3 && isset( $view['x'], $view['y'], $view['fit'] ) &&
+		is_int( $view['x'] ) && $view['x'] >= 0 && $view['x'] <= 100 &&
+		is_int( $view['y'] ) && $view['y'] >= 0 && $view['y'] <= 100 &&
+		in_array( $view['fit'], array( 'cover', 'contain' ), true );
+}
+
+function ps_pen_paper_posted_image_view() {
+	$input = isset( $_POST['image_view'] ) ? wp_unslash( $_POST['image_view'] ) : null;
+	if ( ! is_array( $input ) || ! isset( $input['x'], $input['y'], $input['fit'] ) ) { return new WP_Error( 'invalid_image_view', __( 'Der Bildausschnitt wurde nicht vollständig übertragen.', 'ps-pen-paper' ) ); }
+	foreach ( array( 'x', 'y' ) as $key ) {
+		if ( ! is_string( $input[ $key ] ) || ! preg_match( '/^(?:100|[1-9]?\d)$/D', $input[ $key ] ) ) {
+			return new WP_Error( 'invalid_image_view', __( 'Bildpositionen müssen zwischen 0 und 100 liegen.', 'ps-pen-paper' ) );
+		}
+		$input[ $key ] = (int) $input[ $key ];
+	}
+	return ps_pen_paper_valid_image_view( $input ) ? $input : new WP_Error( 'invalid_image_view', __( 'Die Bildfüllung ist ungültig.', 'ps-pen-paper' ) );
+}
+
+function ps_pen_paper_image_view_style( $view = null, $background = false ) {
+	$view = $view ?? array( 'x' => 50, 'y' => 50, 'fit' => 'cover' );
+	if ( ! ps_pen_paper_valid_image_view( $view ) ) { return new WP_Error( 'invalid_image_view', __( 'Der gespeicherte Bildausschnitt ist ungültig.', 'ps-pen-paper' ) ); }
+	return $background ? 'background-position:' . $view['x'] . '% ' . $view['y'] . '%;background-size:' . $view['fit'] . ';background-repeat:no-repeat;'
+		: 'object-position:' . $view['x'] . '% ' . $view['y'] . '%;object-fit:' . $view['fit'] . ';';
+}
+
+function ps_pen_paper_render_image_view_fields( $view = null, $image = '' ) {
+	$view = $view ?? array( 'x' => 50, 'y' => 50, 'fit' => 'cover' );
+	$style = ps_pen_paper_image_view_style( $view );
+	if ( is_wp_error( $style ) ) { echo '<p role="alert">' . esc_html( $style->get_error_message() ) . '</p>'; return; }
+	echo '<fieldset data-image-view><legend>' . esc_html__( 'Bildausschnitt und Position', 'ps-pen-paper' ) . '</legend>';
+	if ( $image ) { echo '<img data-image-view-preview class="pspp-image-view-preview" src="' . esc_attr( $image ) . '" style="' . esc_attr( $style ) . '" alt="' . esc_attr__( 'Vorschau des Bildausschnitts', 'ps-pen-paper' ) . '">'; }
+	foreach ( array( 'x' => __( 'Waagerechte Position (%)', 'ps-pen-paper' ), 'y' => __( 'Senkrechte Position (%)', 'ps-pen-paper' ) ) as $key => $label ) {
+		echo '<label>' . esc_html( $label ) . '<input type="number" min="0" max="100" step="1" name="image_view[' . esc_attr( $key ) . ']" value="' . esc_attr( $view[ $key ] ) . '" required></label>';
+	}
+	echo '<label>' . esc_html__( 'Bildfüllung', 'ps-pen-paper' ) . '<select name="image_view[fit]">';
+	foreach ( array( 'cover' => __( 'Fläche füllen / Ränder zuschneiden', 'ps-pen-paper' ), 'contain' => __( 'Ganzes Bild anzeigen', 'ps-pen-paper' ) ) as $fit => $label ) {
+		echo '<option value="' . esc_attr( $fit ) . '" ' . selected( $view['fit'], $fit, false ) . '>' . esc_html( $label ) . '</option>';
+	}
+	echo '</select></label></fieldset>';
+}
+
+function ps_pen_paper_save_backdrop_view( $campaign_id, $revision, $view ) {
+	$campaign = ps_pen_paper_get_campaign( $campaign_id );
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ) { return new WP_Error( 'forbidden', __( 'Nur die Spielleitung darf den Hintergrund ändern.', 'ps-pen-paper' ) ); }
+	return ps_pen_paper_scope_write( $campaign, function () use ( $campaign_id, $revision, $view ) {
+		$before = ps_pen_paper_get_backdrop( $campaign_id );
+		if ( is_wp_error( $before ) ) { return $before; }
+		if ( ! is_string( $revision ) || (string) $before['revision'] !== $revision || ! ps_pen_paper_valid_image_view( $view ) || ! $before['asset_id'] ) {
+			return new WP_Error( 'invalid_image_view', __( 'Bild oder Ausschnitt wurde geändert. Bitte lade die Einstellungen neu.', 'ps-pen-paper' ) );
+		}
+		$after = $before; $after['revision']++; $after['view'] = $view;
+		return update_post_meta( $campaign_id, '_pspp_backdrop', $after, $before ) ? true :
+			new WP_Error( 'conflict', __( 'Der Bildausschnitt konnte nicht gespeichert werden.', 'ps-pen-paper' ) );
+	} );
 }
 
 function ps_pen_paper_backdrop_image( $campaign ) {

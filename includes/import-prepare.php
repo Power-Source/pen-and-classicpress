@@ -580,9 +580,8 @@ function ps_pen_paper_prepare_import_validate_event( $event, $record, $parsed ) 
 			! isset( $event['before']['revision'], $event['after']['revision'], $event['before']['active'], $event['after']['active'] ) ||
 			$event['before']['revision'] !== $cost['character_revision'] ||
 			$event['after']['revision'] !== $cost['character_revision'] + 1 ||
-			! isset( $event['before']['active']['values'][ $cost['id'] ]['current'], $event['after']['active']['values'][ $cost['id'] ]['current'] ) ||
-			$event['before']['active']['values'][ $cost['id'] ]['current'] !== $cost['before'] ||
-			$event['after']['active']['values'][ $cost['id'] ]['current'] !== $cost['after'] ) { return false; }
+			ps_pen_paper_resource_snapshot_current( $event['before'], $cost['id'] ) !== $cost['before'] ||
+			ps_pen_paper_resource_snapshot_current( $event['after'], $cost['id'] ) !== $cost['after'] ) { return false; }
 		if ( isset( $cost['shared_base'] ) &&
 			( $cost['shared_base']['character_id'] !== $event['object_id'] ||
 				$cost['shared_base']['universe_id'] !== $record['parent_id'] ||
@@ -628,13 +627,16 @@ function ps_pen_paper_prepare_import_validate_known( $key, $value, $record, $par
 		case '_pspp_backdrop':
 		case '_pspp_sheet_style':
 			return is_array( $value ) && isset( $value['revision'], $value['asset_id'] ) &&
-				is_int( $value['revision'] ) && $value['revision'] > 0 && is_int( $value['asset_id'] ) && $value['asset_id'] >= 0;
+				is_int( $value['revision'] ) && $value['revision'] > 0 && is_int( $value['asset_id'] ) && $value['asset_id'] >= 0 &&
+				( ! isset( $value['view'] ) || ps_pen_paper_valid_image_view( $value['view'] ) );
 		case '_pspp_portrait':
 			if ( ! is_array( $value ) || ! isset( $value['revision'], $value['active'] ) || ! array_key_exists( 'pending', $value ) ||
 				! is_int( $value['revision'] ) || $value['revision'] < 1 ) { return false; }
 			foreach ( array( $value['active'], $value['pending'] ) as $snapshot ) {
 				if ( null !== $snapshot && ( ! is_array( $snapshot ) || ! isset( $snapshot['asset_id'] ) ||
-					! is_int( $snapshot['asset_id'] ) || $snapshot['asset_id'] < 0 ) ) { return false; }
+					! is_int( $snapshot['asset_id'] ) || $snapshot['asset_id'] < 0 ||
+					( isset( $snapshot['view'] ) && ! ps_pen_paper_valid_image_view( $snapshot['view'] ) ) ||
+					( isset( $snapshot['share'] ) && ! is_bool( $snapshot['share'] ) ) ) ) { return false; }
 			}
 			return true;
 		case '_pspp_style':
@@ -1342,8 +1344,8 @@ function ps_pen_paper_prepare_import( $parsed, $options, $id_map, $archive_unkno
 		! is_int( $id_map[ $source_campaign ] ) || $id_map[ $source_campaign ] < 1 ) { return ps_pen_paper_prepare_import_error(); }
 	if ( 'replace' === $options['operation'] && $options['target_id'] !== $id_map[ $source_campaign ] ) { return ps_pen_paper_prepare_import_error(); }
 	if ( 'copy' === $options['operation'] && $options['target_id'] ) { return ps_pen_paper_prepare_import_error(); }
-	if ( 'bind' === $options['universe_mode'] && ( ! $parsed['universe_id'] || ! $options['universe_id'] ||
-		! isset( $id_map[ $parsed['universe_id'] ] ) || $id_map[ $parsed['universe_id'] ] !== $options['universe_id'] ) ) { return ps_pen_paper_prepare_import_error(); }
+	if ( 'bind' === $options['universe_mode'] && ( ! $options['universe_id'] ||
+		( $parsed['universe_id'] && ( ! isset( $id_map[ $parsed['universe_id'] ] ) || $id_map[ $parsed['universe_id'] ] !== $options['universe_id'] ) ) ) ) { return ps_pen_paper_prepare_import_error(); }
 	foreach ( $parsed['users'] as $user_id => $unused ) {
 		if ( ! array_key_exists( $user_id, $options['users'] ) || ! is_int( $options['users'][ $user_id ] ) ||
 			$options['users'][ $user_id ] < -1 ) { return ps_pen_paper_prepare_import_error(); }
@@ -1440,6 +1442,20 @@ function ps_pen_paper_prepare_import( $parsed, $options, $id_map, $archive_unkno
 				$dest['meta'][] = $remapped;
 			} else {
 				$dest['meta'][] = array( 'key' => $key, 'value' => $value );
+			}
+		}
+		if ( $source_id === $source_campaign && $bound ) {
+			$source_link = ps_pen_paper_import_meta( $parsed, $source_campaign, '_pspp_universe_link' );
+			if ( empty( $source_link['universe_id'] ) ) {
+				$universe = ps_pen_paper_get_universe( $options['universe_id'] );
+				if ( ! $universe || ! ps_pen_paper_can_manage_universe( $universe ) ) { return ps_pen_paper_prepare_import_error(); }
+				$document = ps_pen_paper_universe_document( $universe->ID );
+				if ( is_wp_error( $document ) ) { return $document; }
+				$dest['meta'] = array_values( array_filter( $dest['meta'], static function ( $entry ) { return '_pspp_universe_link' !== $entry['key']; } ) );
+				$dest['meta'][] = array( 'key' => '_pspp_universe_link', 'value' => array(
+					'revision' => ( $source_link['revision'] ?? 0 ) + 1, 'universe_id' => (int) $universe->ID,
+					'name' => $document['name'], 'economy_mode' => 'local',
+				) );
 			}
 		}
 		if ( 'pspp_item' === $record['type'] ) {

@@ -726,13 +726,14 @@ function ps_pen_paper_write_item_award_delta( $campaign, $character, $instance, 
 	), false );
 }
 
-function ps_pen_paper_check_character_gear( $scope, $character, $snapshot ) {
+function ps_pen_paper_check_character_gear( $scope, $character, $snapshot, $resolved = false ) {
 	if ( ! $character || ! in_array( $scope->post_type, array( 'pspp_campaign', 'pspp_universe' ), true ) || ! ps_pen_paper_community_available() ) { return true; }
 	$gear = ps_pen_paper_gear_state( $character->ID );
 	if ( is_wp_error( $gear ) ) { return $gear; }
 	$context = get_post_meta( $character->ID, '_pspp_character', true );
-	if ( $snapshot && isset( $context['context']['overrides'] ) ) {
-		foreach ( $context['context']['overrides'] as $id => $value ) { $snapshot['values'][ $id ] = $value; }
+	if ( ! $resolved && $snapshot && isset( $context['context']['overrides'] ) ) {
+		$snapshot = ps_pen_paper_apply_context_values( $snapshot, $context['context'] );
+		if ( is_wp_error( $snapshot ) ) { return $snapshot; }
 	}
 	$bonus = ps_pen_paper_gear_bonus( $scope, $gear['active'], $snapshot );
 	if ( is_wp_error( $bonus ) ) { return $bonus; }

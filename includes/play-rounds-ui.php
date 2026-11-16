@@ -124,7 +124,7 @@ function ps_pen_paper_play_button( $round, $page_id, $state, $action, $label ) {
 	echo '<button type="submit">' . esc_html( $label ) . '</button></form>';
 }
 
-function ps_pen_paper_render_play_round( $source, $round, $page_id, $state ) {
+function ps_pen_paper_render_play_round( $source, $round, $page_id, $state, $character_id = 0 ) {
 	$member = ps_pen_paper_play_participant( $state, get_current_user_id() );
 	$gm = ps_pen_paper_can_manage_campaign( $source );
 	$controller = $gm || ( 'guided' !== $state['mode'] && $state['host_id'] === get_current_user_id() );
@@ -143,11 +143,10 @@ function ps_pen_paper_render_play_round( $source, $round, $page_id, $state ) {
 	<ul>
 		<?php foreach ( $state['participants'] as $participant ) :
 			if ( ! $participant['active'] ) { continue; }
-			$base = ps_pen_paper_raw_character_state( $participant['source_id'] ); ?>
-			<li><?php echo esc_html( ps_pen_paper_adventure_group_user_label( $participant['user_id'] ) ); ?> · <?php
-				if ( is_wp_error( $base ) ) { echo '<span role="alert">' . esc_html( $base->get_error_message() ) . '</span>'; }
-				elseif ( ! $base['active'] ) { echo '<span role="alert">' . esc_html__( 'Dieser Charakter ist nicht freigegeben.', 'ps-pen-paper' ) . '</span>'; }
-				else { echo esc_html( $base['active']['name'] ); } ?></li>
+			$identity = ps_pen_paper_can_view_campaign( $round ) ? ps_pen_paper_table_identity( $round, $participant['user_id'] ) : array(); ?>
+			<li><?php echo esc_html( ps_pen_paper_adventure_group_user_label( $participant['user_id'] ) ); ?><?php
+				if ( is_wp_error( $identity ) ) { echo '<span role="alert">' . esc_html( $identity->get_error_message() ) . '</span>'; }
+				elseif ( isset( $identity['name'] ) ) { echo ' · ' . esc_html( $identity['name'] ); } ?></li>
 		<?php endforeach; ?>
 	</ul>
 	<?php if ( $member ) :
@@ -181,7 +180,9 @@ function ps_pen_paper_render_play_round( $source, $round, $page_id, $state ) {
 		}
 		ps_pen_paper_play_button( $round, $page_id, $state, 'complete', __( 'Runde abschließen', 'ps-pen-paper' ) );
 	}
-	if ( 'lobby' === $state['status'] || 'paused' === $state['status'] ) {
+	if ( $character_id && ( $member || $gm ) ) {
+		ps_pen_paper_render_table( $round, $page_id, $character_id );
+	} elseif ( 'lobby' === $state['status'] || 'paused' === $state['status'] ) {
 		$message = 'lobby' === $state['status']
 			? ( $gm && 'guided' === $state['mode'] ? __( 'Die Spieler wählen ihre Charaktere. Danach kannst du das Spiel starten.', 'ps-pen-paper' ) : __( 'Wähle deinen Charakter. Die Runde beginnt erst mit „Spiel starten“.', 'ps-pen-paper' ) )
 			: __( 'Während der Pause können Spieler beitreten oder ihre Teilnahme beenden.', 'ps-pen-paper' );
@@ -193,6 +194,8 @@ function ps_pen_paper_render_play_round( $source, $round, $page_id, $state ) {
 			$character = ps_pen_paper_get_character( $round, $member['character_id'] );
 			if ( $character ) { ps_pen_paper_render_character_adventures( $round, $character, $page_id ); }
 		}
+	} elseif ( 'completed' === $state['status'] ) {
+		echo '<p>' . esc_html__( 'Diese Runde ist abgeschlossen.', 'ps-pen-paper' ) . '</p>';
 	} else { echo '<p>' . esc_html__( 'Das Spiel läuft. Eine neue Teilnahme ist möglich, sobald die Runde pausiert.', 'ps-pen-paper' ) . '</p>'; }
 	echo '</section>';
 }

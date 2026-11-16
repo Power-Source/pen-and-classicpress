@@ -17,6 +17,14 @@ $hidden = function ( $html, $name ) {
 };
 $failure = static function ( $data ) { if ( 'pspp_event' === $data['post_type'] && 'private' === $data['post_status'] ) { $data['post_status'] = 'draft'; } return $data; };
 try {
+	foreach ( array( 'member_invitation', 'start_adventure', 'advance_adventure', 'review_base_character', 'review_item_use', 'end_item_effect', 'change_wallet' ) as $operation ) {
+		$check( ! ps_pen_paper_profile_operation_allowed( $operation, array() ), 'Non-character operation accepted in profile: ' . $operation );
+	}
+	$check( ps_pen_paper_profile_operation_allowed( 'use_item', array() ) &&
+		ps_pen_paper_profile_operation_allowed( 'change_trade', array( 'trade_action' => 'accept' ) ) &&
+		! ps_pen_paper_profile_operation_allowed( 'change_trade', array( 'trade_action' => 'approve' ) ) &&
+		! ps_pen_paper_profile_operation_allowed( 'profile_portrait', array( 'portrait_operation' => 'approve' ) ),
+		'Profile mixed owner actions with leadership approvals.' );
 	$check( function_exists( 'ps_pen_paper_valid_policy_event' ), 'Policy event validator must be available before the first save/import.' );
 	foreach ( array( 'gm', 'player', 'invited', 'outsider', 'site_player' ) as $role ) {
 		$id = wp_insert_user( array( 'user_login' => 'pspp-policy-' . wp_generate_password( 14, false ), 'user_pass' => wp_generate_password( 40 ), 'role' => 'subscriber' ) );
@@ -102,6 +110,14 @@ try {
 	$invitations = ps_pen_paper_profile_invitations();
 	$check( 'approval' === $invitations['received'][0]['status'] && is_wp_error( ps_pen_paper_change_member_invitation( $universe_id, $users['invited'], 'accept', '3' ) ), 'Member invite bypassed GM or pending status hidden from invitee.' );
 	wp_set_current_user( $users['gm'] );
+	$profile_sheet = $capture( function () use ( $universe, $character_id ) {
+		ps_pen_paper_render_characters( $universe, $character_id, 0, '', 'profile' );
+	} );
+	$check( false === strpos( $profile_sheet, 'data-character-tab="adventures"' ) &&
+		false === strpos( $profile_sheet, 'data-character-panel="adventures"' ) &&
+		false === strpos( $profile_sheet, 'value="review_base_character"' ) &&
+		false === strpos( $profile_sheet, 'value="approve"' ),
+		'Shared profile sheet exposed adventures or leadership approval controls.' );
 	$gm_profile_invitations = $capture( function () { ps_pen_paper_render_profile_invitations(); } );
 	$gm_scope_invitations = $capture( function () use ( $universe ) { ps_pen_paper_render_profile_invitations( 0, $universe ); } );
 	$check( false === strpos( $gm_profile_invitations, 'value="approve"' ) &&

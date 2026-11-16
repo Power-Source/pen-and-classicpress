@@ -36,7 +36,40 @@ function ps_pen_paper_validate_context( $context, $rules ) {
 			return new WP_Error( 'invalid_context', __( 'Eine Kampagnenauflage passt nicht zum Regelwerk. Bitte informiere die Spielleitung.', 'ps-pen-paper' ) );
 		}
 	}
+	if ( isset( $context['resources'] ) ) {
+		if ( ! is_array( $context['resources'] ) || count( $context['resources'] ) > 30 ) {
+			return new WP_Error( 'invalid_context', __( 'Die Ressourcenauflagen sind ungültig.', 'ps-pen-paper' ) );
+		}
+		foreach ( $context['resources'] as $id => $resource ) {
+			if ( ! isset( $fields[ $id ] ) || 'resource' !== $fields[ $id ]['type'] || ! is_array( $resource ) ||
+				! isset( $resource['mode'], $resource['maximum'] ) || ! in_array( $resource['mode'], array( 'local', 'shared' ), true ) ||
+				( 'shared' === $resource['mode'] && 'shared' !== $context['mode'] ) ||
+				! is_int( $resource['maximum'] ) || $resource['maximum'] < $fields[ $id ]['min'] || $resource['maximum'] > $fields[ $id ]['max'] ||
+				count( $resource ) !== ( 'local' === $resource['mode'] ? 3 : 2 ) ||
+				( 'local' === $resource['mode'] && ( ! isset( $resource['current'] ) || ! is_int( $resource['current'] ) ||
+					$resource['current'] < $fields[ $id ]['min'] || $resource['current'] > $resource['maximum'] ) ) ) {
+				return new WP_Error( 'invalid_context', __( 'Bitte prüfe Ressourcenart, aktuellen Wert und Höchstwert der Kampagnenauflage.', 'ps-pen-paper' ) );
+			}
+		}
+	}
 	return $context;
+}
+
+function ps_pen_paper_apply_context_values( $snapshot, $context ) {
+	if ( ! $snapshot ) { return $snapshot; }
+	foreach ( $context['overrides'] as $id => $value ) { $snapshot['values'][ $id ] = $value; }
+	foreach ( $context['resources'] ?? array() as $id => $resource ) {
+		if ( ! isset( $snapshot['values'][ $id ]['current'], $snapshot['values'][ $id ]['maximum'] ) ) {
+			return new WP_Error( 'invalid_context', __( 'Eine Ressourcenauflage passt nicht mehr zum Charakterbogen.', 'ps-pen-paper' ) );
+		}
+		$current = 'local' === $resource['mode'] ? $resource['current'] : $snapshot['values'][ $id ]['current'];
+		if ( $current > $resource['maximum'] ||
+			( 'shared' === $resource['mode'] && $resource['maximum'] > $snapshot['values'][ $id ]['maximum'] ) ) {
+			return new WP_Error( 'resource_limit_conflict', __( 'Der gemeinsame Ressourcenstand passt nicht zum Kampagnenmaximum. Passe die Auflage an oder wähle eigene Kampagnenwerte. Es werden keine Werte abgeschnitten.', 'ps-pen-paper' ) );
+		}
+		$snapshot['values'][ $id ] = array( 'current' => $current, 'maximum' => $resource['maximum'] );
+	}
+	return $snapshot;
 }
 
 function ps_pen_paper_context_snapshot( $snapshot, $rules ) {
@@ -114,11 +147,8 @@ function ps_pen_paper_resolve_character_state( $scope, $character, $with_equipme
 	$snapshot = ps_pen_paper_context_snapshot( $state['active'], $rules );
 	if ( is_wp_error( $snapshot ) ) { return $snapshot; }
 	$state['active'] = $snapshot;
-	if ( $state['active'] ) {
-		foreach ( $context['overrides'] as $id => $value ) {
-			$state['active']['values'][ $id ] = $value;
-		}
-	}
+	$state['active'] = ps_pen_paper_apply_context_values( $state['active'], $context );
+	if ( is_wp_error( $state['active'] ) ) { return $state['active']; }
 	return $with_equipment ? ps_pen_paper_apply_gear( $scope, $character, $state ) : $state;
 }
 
@@ -302,24 +332,37 @@ function ps_pen_paper_attach_base_character_locked( $campaign_id, $source_id, $s
 	return $id;
 }
 
-function ps_pen_paper_save_character_context( $campaign_id, $id, $revision, $base_revision, $rules_revision, $overrides, $note ) {
-	return ps_pen_paper_with_character_lock( $id, function () use ( $campaign_id, $id, $revision, $base_revision, $rules_revision, $overrides, $note ) {
-		return ps_pen_paper_save_character_context_locked( $campaign_id, $id, $revision, $base_revision, $rules_revision, $overrides, $note );
-	} );
+function ps_pen_paper_save_character_context( $campaign_id, $id, $revision, $base_revision, $rules_revision, $overrides, $note, $resources = null ) {
+	$write = function () use ( $campaign_id, $id, $revision, $base_revision, $rules_revision, $overrides, $note, $resources ) {
+		return ps_pen_paper_save_character_context_locked( $campaign_id, $id, $revision, $base_revision, $rules_revision, $overrides, $note, $resources );
+	};
+	$state = ps_pen_paper_raw_character_state( $id );
+	if ( ! is_wp_error( $state ) && isset( $state['context']['mode'] ) && 'shared' === $state['context']['mode'] ) {
+		return ps_pen_paper_with_character_context_locks( $campaign_id, $id, $state['context']['source_id'], $write );
+	}
+	return ps_pen_paper_with_character_lock( $id, $write );
 }
 
-function ps_pen_paper_save_character_context_locked( $campaign_id, $id, $revision, $base_revision, $rules_revision, $overrides, $note ) {
+function ps_pen_paper_save_character_context_locked( $campaign_id, $id, $revision, $base_revision, $rules_revision, $overrides, $note, $resources = null ) {
 	$campaign = ps_pen_paper_get_campaign( $campaign_id );
 	$character = $campaign ? ps_pen_paper_get_character( $campaign, $id ) : null;
 	if ( ! ps_pen_paper_can_access_site() || ! $character || ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
 		return new WP_Error( 'forbidden', __( 'Nur die Spielleitung darf Kampagnenauflagen freigeben.', 'ps-pen-paper' ) );
 	}
 	$effective = ps_pen_paper_character_state( $campaign, $character, false );
-	if ( is_wp_error( $effective ) ) {
+	if ( is_wp_error( $effective ) && 'resource_limit_conflict' !== $effective->get_error_code() ) {
 		return $effective;
 	}
 	$before = ps_pen_paper_raw_character_state( $id );
 	if ( is_wp_error( $before ) ) { return $before; }
+	if ( is_wp_error( $effective ) ) {
+		$effective = $before;
+		if ( 'shared' === $before['context']['mode'] ) {
+			$source = ps_pen_paper_raw_character_state( $before['context']['source_id'] );
+			if ( is_wp_error( $source ) ) { return $source; }
+			$effective['base_revision'] = $source['revision'];
+		}
+	}
 	$rules = ps_pen_paper_get_rules( $campaign_id );
 	if ( $before['revision'] !== $effective['revision'] || ! isset( $before['context'] ) || ! is_string( $revision ) || (string) $before['revision'] !== $revision ||
 		! is_string( $rules_revision ) || (string) $rules['revision'] !== $rules_revision ||
@@ -341,6 +384,24 @@ function ps_pen_paper_save_character_context_locked( $campaign_id, $id, $revisio
 			$context['overrides'][ $field ] = (int) $value;
 		}
 	}
+	if ( null !== $resources ) {
+		if ( ! is_array( $resources ) || count( $resources ) > 30 ) { return new WP_Error( 'invalid_context', __( 'Die Ressourcenauflagen wurden nicht vollständig übertragen.', 'ps-pen-paper' ) ); }
+		$context['resources'] = array();
+		foreach ( $resources as $field => $resource ) {
+			if ( ! is_array( $resource ) || ! isset( $resource['mode'] ) || ! in_array( $resource['mode'], array( 'inherit', 'local', 'shared' ), true ) ) {
+				return new WP_Error( 'invalid_context', __( 'Bitte wähle das Ressourcenmodell.', 'ps-pen-paper' ) );
+			}
+			if ( 'inherit' === $resource['mode'] ) { continue; }
+			$entry = array( 'mode' => $resource['mode'] );
+			foreach ( 'local' === $resource['mode'] ? array( 'current', 'maximum' ) : array( 'maximum' ) as $key ) {
+				if ( ! isset( $resource[ $key ] ) || ! is_string( $resource[ $key ] ) || ! preg_match( '/^-?\d{1,7}$/D', $resource[ $key ] ) ) {
+					return new WP_Error( 'invalid_context', __( 'Ressourcenauflagen benötigen ganze Zahlen.', 'ps-pen-paper' ) );
+				}
+				$entry[ $key ] = (int) $resource[ $key ];
+			}
+			$context['resources'][ $field ] = $entry;
+		}
+	}
 	$validated = ps_pen_paper_validate_context( $context, $rules );
 	if ( is_wp_error( $validated ) ) {
 		return $validated;
@@ -358,9 +419,8 @@ function ps_pen_paper_save_character_context_locked( $campaign_id, $id, $revisio
 		$after['context']['source_revision'] = $source['revision'];
 		$source = $source['active'];
 	}
-	foreach ( $context['overrides'] as $field => $value ) {
-		$source['values'][ $field ] = $value;
-	}
+	$source = ps_pen_paper_apply_context_values( $source, $context );
+	if ( is_wp_error( $source ) ) { return $source; }
 	if ( ps_pen_paper_community_available() ) {
 		$gear = ps_pen_paper_gear_state( $id );
 		if ( is_wp_error( $gear ) ) { return $gear; }
@@ -432,6 +492,7 @@ function ps_pen_paper_copy_shared_character( $campaign_id, $id, $revision, $base
 				$after['context']['mode'] = 'copy';
 				$after['context']['source_revision'] = $preview['effective']['base_revision'];
 				$after['context']['overrides'] = array();
+				unset( $after['context']['resources'] );
 				return ps_pen_paper_write_document_event( $campaign_id, $id, '_pspp_character', $preview['before'], $after, array(
 					'kind' => 'character_context', 'visibility' => 'owner', 'recipient_id' => $preview['owner_id'],
 					'rules_revision' => $preview['rules']['revision'], 'fields' => $preview['rules']['fields'],
@@ -485,7 +546,7 @@ function ps_pen_paper_preview_character_reattachment( $campaign_id, $id ) {
 				'field_id' => $field['id'], 'label' => $field['label'],
 				'copy_value' => $effective['active']['values'][ $field['id'] ],
 				'base_value' => $base_snapshot['values'][ $field['id'] ],
-				'copy_override_allowed' => in_array( $field['type'], array( 'number', 'attribute' ), true ),
+				'copy_override_allowed' => in_array( $field['type'], array( 'number', 'attribute', 'resource' ), true ),
 			);
 		}
 	}
@@ -543,14 +604,18 @@ function ps_pen_paper_reattach_character( $campaign_id, $id, $revision, $base_re
 				$context['overrides'] = array();
 				foreach ( $current['conflicts'] as $conflict ) {
 					if ( 'copy' === $resolutions[ $conflict['field_id'] ] ) {
-						$context['overrides'][ $conflict['field_id'] ] = $conflict['copy_value'];
+						if ( is_array( $conflict['copy_value'] ) ) {
+							$context['resources'][ $conflict['field_id'] ] = array_merge( array( 'mode' => 'local' ), $conflict['copy_value'] );
+						} else { $context['overrides'][ $conflict['field_id'] ] = $conflict['copy_value']; }
+					} else {
+						unset( $context['resources'][ $conflict['field_id'] ] );
 					}
 				}
-				$effective = array( 'name' => $current['base']['name'], 'values' => $current['base']['values'] );
-				foreach ( $context['overrides'] as $field_id => $value ) { $effective['values'][ $field_id ] = $value; }
+				$effective = ps_pen_paper_apply_context_values( $current['base'], $context );
+				if ( is_wp_error( $effective ) ) { return $effective; }
 				$campaign = ps_pen_paper_get_campaign( $campaign_id );
 				$character = ps_pen_paper_get_character( $campaign, $id );
-				$gear_check = ps_pen_paper_check_character_gear( $campaign, $character, $effective );
+				$gear_check = ps_pen_paper_check_character_gear( $campaign, $character, $effective, true );
 				if ( is_wp_error( $gear_check ) ) { return $gear_check; }
 				$after = $current['before'];
 				$after['revision']++;

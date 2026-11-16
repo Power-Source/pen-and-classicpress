@@ -27,6 +27,68 @@ function ps_pen_paper_table_key( $campaign_id, $user_id, $kind, $epoch = null ) 
 	return 'pspp_' . $kind . '_' . get_current_blog_id() . '_' . $campaign_id . '_' . $user_id . ( $epoch ? '_' . md5( $epoch ) : '' );
 }
 
+function ps_pen_paper_table_identity( $campaign, $user_id, $with_image = false ) {
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_campaign( $campaign ) ) { return new WP_Error( 'forbidden', __( 'Diese Runde ist für dich nicht verfügbar.', 'ps-pen-paper' ) ); }
+	$round = ps_pen_paper_play_round( $campaign->ID );
+	if ( is_wp_error( $round ) ) { return $round; }
+	$participant = $round ? ps_pen_paper_play_participant( $round, $user_id ) : null;
+	$characters = $round ? ( $participant ? array( ps_pen_paper_record_post( $participant['character_id'] ) ) : array() ) :
+		get_posts( array( 'post_type' => 'pspp_character', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'author' => $user_id, 'posts_per_page' => 2 ) );
+	if ( count( $characters ) !== 1 ) { return array(); }
+	$character = $characters[0]; $scope = $campaign;
+	if ( ! $character || 'pspp_character' !== $character->post_type || 'private' !== $character->post_status ||
+		(int) $character->post_parent !== (int) $campaign->ID || (int) $character->post_author !== $user_id ) { return array(); }
+	$raw = ps_pen_paper_raw_character_state( $character->ID );
+	if ( is_wp_error( $raw ) ) { return $raw; }
+	if ( ! $raw['active'] ) { return array(); }
+	if ( 'shared' === ( $raw['context']['mode'] ?? '' ) ) {
+		$link = ps_pen_paper_get_universe_link( $campaign->ID );
+		if ( is_wp_error( $link ) ) { return $link; }
+		$source = ps_pen_paper_record_post( $raw['context']['source_id'] );
+		$scope = ps_pen_paper_get_universe( $link['universe_id'] );
+		if ( ! $scope || ! $source || $raw['context']['universe_id'] !== $scope->ID ||
+			'pspp_character' !== $source->post_type || 'private' !== $source->post_status ||
+			(int) $source->post_parent !== (int) $scope->ID || (int) $source->post_author !== $user_id ) { return array(); }
+		$character = $source; $raw = ps_pen_paper_raw_character_state( $character->ID );
+		if ( is_wp_error( $raw ) ) { return $raw; }
+	}
+	$portrait = ps_pen_paper_portrait_state( $character->ID );
+	if ( is_wp_error( $portrait ) ) { return $portrait; }
+	if ( empty( $portrait['active']['share'] ) || ! $raw['active'] ) { return array(); }
+	$style = ps_pen_paper_image_view_style( $portrait['active']['view'] ?? null );
+	if ( is_wp_error( $style ) ) { return $style; }
+	$identity = array( 'name' => $raw['active']['name'], 'portrait_style' => $style,
+		'portrait_key' => $portrait['active']['asset_id'] ? hash( 'sha256', wp_json_encode( array( $character->ID, $portrait ) ) ) : '' );
+	if ( $with_image && $portrait['active']['asset_id'] ) {
+		$image = ps_pen_paper_private_image_data( $scope, $portrait['active']['asset_id'] );
+		if ( is_wp_error( $image ) ) { return $image; }
+		$identity['image'] = $image;
+	}
+	return $identity;
+}
+
+function ps_pen_paper_table_portrait_request( $request ) {
+	return ps_pen_paper_scope_write( (int) $request['id'], function () use ( $request ) {
+		$campaign = ps_pen_paper_get_campaign( (int) $request['id'] );
+		if ( ! $campaign || ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_view_campaign( $campaign ) ) {
+			return new WP_Error( 'forbidden', __( 'Diese Runde ist für dich nicht verfügbar.', 'ps-pen-paper' ), array( 'status' => 403 ) );
+		}
+		$epoch = ps_pen_paper_scope_epoch( $campaign->ID );
+		if ( is_wp_error( $epoch ) ) { return $epoch; }
+		if ( $epoch !== ( $request->get_param( 'scope_epoch' ) ?? '' ) ) { return new WP_Error( 'scope_changed', __( 'Bitte lade den Spieltisch neu.', 'ps-pen-paper' ), array( 'status' => 409 ) ); }
+		$members = ps_pen_paper_table_members( $campaign );
+		if ( ! isset( $members[ (int) $request['user'] ] ) ) { return new WP_Error( 'forbidden', __( 'Diese Person nimmt nicht an der Runde teil.', 'ps-pen-paper' ), array( 'status' => 403 ) ); }
+		$identity = ps_pen_paper_table_identity( $campaign, (int) $request['user'], true );
+		if ( is_wp_error( $identity ) ) { return $identity; }
+		if ( empty( $identity['image'] ) || $identity['portrait_key'] !== $request->get_param( 'key' ) ) {
+			return new WP_Error( 'portrait_not_shared', __( 'Dieses Porträt ist nicht mehr freigegeben. Bitte aktualisiere die Runde.', 'ps-pen-paper' ), array( 'status' => 403 ) );
+		}
+		$response = rest_ensure_response( array( 'image' => $identity['image'] ) );
+		$response->header( 'Cache-Control', 'no-store, private' );
+		return $response;
+	} );
+}
+
 function ps_pen_paper_table_turn( $campaign_id ) {
 	$turn = get_post_meta( $campaign_id, '_pspp_turn', true );
 	return $turn ? $turn : array( 'revision' => 0, 'user_id' => 0, 'name' => __( 'Freies Spiel', 'ps-pen-paper' ) );
@@ -38,6 +100,9 @@ function ps_pen_paper_table_state( $campaign ) {
 	if ( ! ps_pen_paper_scope_observe( $campaign->ID ) ) { return new WP_Error( 'scope_changed', __( 'Die Runde wurde wiederhergestellt. Bitte lade den Spieltisch neu.', 'ps-pen-paper' ), array( 'status' => 409 ) ); }
 	$members = ps_pen_paper_table_members( $campaign );
 	foreach ( $members as &$member ) {
+		$identity = ps_pen_paper_table_identity( $campaign, (int) $member['id'] );
+		if ( is_wp_error( $identity ) ) { return $identity; }
+		$member = array_merge( $member, $identity );
 		$seen = get_transient( ps_pen_paper_table_key( $campaign->ID, $member['id'], 'seen', $epoch ) );
 		$away = get_transient( ps_pen_paper_table_key( $campaign->ID, $member['id'], 'away', $epoch ) );
 		$member['status'] = ! $seen ? 'unreported' : ( time() - (int) $seen > 120 ? 'offline' : ( false !== $away ? 'afk' : 'online' ) );
@@ -45,10 +110,13 @@ function ps_pen_paper_table_state( $campaign ) {
 	}
 	unset( $member );
 	$turn = ps_pen_paper_table_turn( $campaign->ID );
+	if ( isset( $members[ $turn['user_id'] ] ) ) { $turn['name'] = $members[ $turn['user_id'] ]['name']; }
 	$turn['available'] = ! $turn['user_id'] || isset( $members[ $turn['user_id'] ] );
 	$round = ps_pen_paper_game_round( $campaign->ID );
 	if ( is_wp_error( $round ) ) { return $round; }
-	return array( 'members' => array_values( $members ), 'turn' => $turn, 'game_round' => $round );
+	$rolls = ps_pen_paper_chat_rolls( $campaign );
+	if ( is_wp_error( $rolls ) ) { return $rolls; }
+	return array( 'members' => array_values( $members ), 'turn' => $turn, 'game_round' => $round, 'chat_rolls' => $rolls );
 }
 
 function ps_pen_paper_table_permission( $request ) {
@@ -143,6 +211,9 @@ function ps_pen_paper_table_request_locked( $request ) {
 }
 
 function ps_pen_paper_register_table_routes() {
+	register_rest_route( 'ps-pen-paper/v1', '/campaigns/(?P<id>[1-9]\d*)/participants/(?P<user>[1-9]\d*)/portrait', array(
+		'methods' => 'GET', 'callback' => 'ps_pen_paper_table_portrait_request', 'permission_callback' => 'ps_pen_paper_table_permission',
+	) );
 	register_rest_route( 'ps-pen-paper/v1', '/campaigns/(?P<id>[1-9]\d*)/table', array(
 		'methods' => array( 'GET', 'POST' ),
 		'callback' => 'ps_pen_paper_table_request',

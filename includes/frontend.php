@@ -40,6 +40,8 @@ function ps_pen_paper_prepare_frontend() {
 	if ( ! ps_pen_paper_is_frontend_page() ) {
 		return;
 	}
+	// Emoticon parsing can exhaust PCRE limits on protected inline images.
+	remove_filter( 'the_content', 'convert_smilies', 20 );
 	if ( ! defined( 'DONOTCACHEPAGE' ) ) {
 		define( 'DONOTCACHEPAGE', true );
 	}
@@ -154,9 +156,6 @@ function ps_pen_paper_frontend_shortcode() {
 	if ( $campaign_id && ! $campaign ) {
 		return ps_pen_paper_frontend_message( __( 'Diese Kampagne ist für dich nicht verfügbar.', 'ps-pen-paper' ) );
 	}
-	if ( $character_id && ! ps_pen_paper_get_character( $campaign, $character_id ) ) {
-		return ps_pen_paper_frontend_message( __( 'Dieser Charakter ist für dich nicht verfügbar.', 'ps-pen-paper' ) );
-	}
 	$round_id = ps_pen_paper_frontend_id( 'pspp_round' );
 	$mode = $_GET['pspp_mode'] ?? '';
 	if ( is_wp_error( $round_id ) || ! is_string( $mode ) || ( '' !== $mode && 'choose' !== $mode && ! isset( ps_pen_paper_play_modes()[ $mode ] ) ) ||
@@ -169,6 +168,9 @@ function ps_pen_paper_frontend_shortcode() {
 	} elseif ( $round_id ) {
 		$round = ps_pen_paper_get_campaign( $round_id ); $round_state = $round ? ps_pen_paper_play_round( $round_id ) : null;
 		if ( ! $round_state || is_wp_error( $round_state ) || $round_state['source_id'] !== (int) $campaign->ID ) { return ps_pen_paper_frontend_message( ps_pen_paper_play_error()->get_error_message() ); }
+	}
+	if ( $character_id && ! ps_pen_paper_get_character( $round ? $round : $campaign, $character_id ) ) {
+		return ps_pen_paper_frontend_message( __( 'Dieser Charakter ist für dich nicht verfügbar.', 'ps-pen-paper' ) );
 	}
 	$lounge = ! $campaign && 'overview' === $view ? ps_pen_paper_lounge_data() : null;
 	if ( is_wp_error( $lounge ) ) { return ps_pen_paper_frontend_message( $lounge->get_error_message() ); }
@@ -224,7 +226,7 @@ function ps_pen_paper_frontend_shortcode() {
 			<?php ps_pen_paper_render_campaign_create_form( $page_id ); ?>
 			<?php endif; ?>
 		<?php else : ?>
-			<?php if ( $round ) { ps_pen_paper_render_play_round( $campaign, $round, $page_id, $round_state ); }
+			<?php if ( $round ) { ps_pen_paper_render_play_round( $campaign, $round, $page_id, $round_state, $character_id ); }
 			elseif ( $mode ) { ps_pen_paper_render_play_directory( $campaign, $page_id, $mode ); }
 			else { ps_pen_paper_render_table( $campaign, $page_id, $character_id ); } ?>
 		<?php endif; ?>

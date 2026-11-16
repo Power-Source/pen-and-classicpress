@@ -293,9 +293,8 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 		if ( 'owner' !== $event['visibility'] || ! ps_pen_paper_valid_character_resource_cost( $cost ) ||
 			! isset( $event['before']['revision'], $event['after']['revision'], $event['before']['active'], $event['after']['active'] ) ||
 			$event['before']['revision'] !== $cost['character_revision'] || $event['after']['revision'] !== $cost['character_revision'] + 1 ||
-			! isset( $event['before']['active']['values'][ $cost['id'] ]['current'], $event['after']['active']['values'][ $cost['id'] ]['current'] ) ||
-			$event['before']['active']['values'][ $cost['id'] ]['current'] !== $cost['before'] ||
-			$event['after']['active']['values'][ $cost['id'] ]['current'] !== $cost['after'] ) {
+			ps_pen_paper_resource_snapshot_current( $event['before'], $cost['id'] ) !== $cost['before'] ||
+			ps_pen_paper_resource_snapshot_current( $event['after'], $cost['id'] ) !== $cost['after'] ) {
 			return new WP_Error( 'invalid_event', __( 'Der Ressourcenverbrauch im Protokoll ist beschädigt. Bitte informiere den Administrator.', 'ps-pen-paper' ) );
 		}
 	}

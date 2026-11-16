@@ -44,6 +44,23 @@ function ps_pen_paper_render_event_details( $event, $scope = null ) {
 				<h4><?php echo esc_html( $label . ' · ' . sprintf( __( 'Revision %d', 'ps-pen-paper' ), $event[ $key ]['revision'] ) ); ?></h4>
 				<?php if ( in_array( $event['kind'], array( 'trade_policy', 'trade_changed' ), true ) ) : ?>
 					<?php ps_pen_paper_render_trade_snapshot( $event[ $key ] ); ?>
+				<?php elseif ( 'play_options' === $event['kind'] ) : ?>
+					<p><?php echo esc_html( implode( ', ', array_intersect_key( ps_pen_paper_play_modes(), array_flip( $event[ $key ]['modes'] ) ) ) ); ?></p>
+					<p><?php echo esc_html( $event[ $key ]['player_starts'] ? __( 'Spieler dürfen neue Runden beginnen.', 'ps-pen-paper' ) : __( 'Neue Runden beginnt die Spielleitung.', 'ps-pen-paper' ) ); ?></p>
+				<?php elseif ( 'play_round' === $event['kind'] ) : ?>
+					<?php if ( $event[ $key ]['revision'] ) : ?>
+						<p><?php echo esc_html( ps_pen_paper_play_modes()[ $event[ $key ]['mode'] ] . ' · ' . ps_pen_paper_play_statuses()[ $event[ $key ]['status'] ] ); ?></p>
+					<?php else : ?>
+						<p><?php esc_html_e( 'Noch keine Runde angelegt.', 'ps-pen-paper' ); ?></p>
+					<?php endif; ?>
+				<?php elseif ( 'character_resource_spent' === $event['kind'] ) : ?>
+					<?php
+					$snapshot = $event[ $key ]['active'];
+					$snapshot['values'][ $event['resource_cost']['id'] ] = array(
+						'current' => $event['resource_cost'][ $key ], 'maximum' => $event['resource_cost']['maximum'],
+					);
+					ps_pen_paper_render_character_snapshot( $snapshot, array( 'fields' => $event['fields'] ) );
+					?>
 				<?php elseif ( in_array( $event['kind'], array( 'adventure_saved', 'adventure_published' ), true ) ) : ?>
 					<?php $adventure = $event[ $key ]; ?>
 					<p><?php echo esc_html( $adventure['draft']['title'] . ' · ' . array( 'draft' => __( 'Entwurf', 'ps-pen-paper' ), 'published' => __( 'Freigegeben', 'ps-pen-paper' ), 'paused' => __( 'Pausiert', 'ps-pen-paper' ) )[ $adventure['status'] ] ); ?></p>
@@ -215,7 +232,7 @@ function ps_pen_paper_render_journal( $campaign, $page_id = 0 ) {
 							$snapshot = array( 'name' => $event['character_name'] );
 						} elseif ( 'currency_saved' === $event['kind'] ) {
 							$snapshot = array( 'name' => $event['after']['name'] );
-						} elseif ( in_array( $event['kind'], array( 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved', 'game_round', 'item_action_policy', 'character_policy_saved', 'member_invitation_saved', 'universe_members_saved' ), true ) ) {
+						} elseif ( in_array( $event['kind'], array( 'play_options', 'play_round', 'portrait_saved', 'sheet_style_saved', 'equipment_schema', 'item_saved', 'gear_saved', 'game_round', 'item_action_policy', 'character_policy_saved', 'member_invitation_saved', 'universe_members_saved' ), true ) ) {
 							$snapshot = array( 'name' => $labels[ $event['kind'] ] );
 						} elseif ( in_array( $event['kind'], array( 'scene_saved', 'scene_published', 'scene_withdrawn', 'map_moved' ), true ) ) {
 							$snapshot = array( 'name' => $event['after']['draft']['title'] );

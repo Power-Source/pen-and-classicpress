@@ -21,6 +21,38 @@
 	let stopped = false;
 	let initialized = false;
 	let timer;
+	const portraits = new Map();
+
+	function renderPortrait(portrait, member) {
+		if (!member.portrait_key) return;
+		if (!portraits.has(member.portrait_key)) {
+			const url = new URL(endpoint, window.location.href);
+			if (url.searchParams.has('rest_route')) url.searchParams.set('rest_route', url.searchParams.get('rest_route').replace(/\/table\/?$/, '/participants/' + member.id + '/portrait'));
+			else url.pathname = url.pathname.replace(/\/table\/?$/, '/participants/' + member.id + '/portrait');
+			url.searchParams.set('scope_epoch', epoch);
+			url.searchParams.set('key', member.portrait_key);
+			portraits.set(member.portrait_key, fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: { 'X-WP-Nonce': table.dataset.tableNonce } }).then(async function (response) {
+				const data = await response.json();
+				if (!response.ok) throw new Error(data.message || labels.error);
+				return data.image;
+			}));
+		}
+		portraits.get(member.portrait_key).then(function (source) {
+			if (stopped || !portrait.isConnected) return;
+			const image = document.createElement('img');
+			image.src = source;
+			image.alt = '';
+			image.style.cssText = member.portrait_style;
+			portrait.replaceChildren(image);
+		}).catch(function (error) {
+			portraits.delete(member.portrait_key);
+			if (!portrait.isConnected) return;
+			const message = document.createElement('small');
+			message.setAttribute('role', 'alert');
+			message.textContent = error.message || labels.error;
+			portrait.append(message);
+		});
+	}
 
 	table.classList.add('pspp-table-ready');
 	function showView(view) {
@@ -73,6 +105,7 @@
 				portrait.className = 'pspp-portrait';
 				portrait.setAttribute('aria-hidden', 'true');
 				portrait.textContent = Array.from(member.name)[0] || '';
+				renderPortrait(portrait, member);
 				const info = document.createElement('div');
 				const name = document.createElement('strong');
 				name.textContent = member.name;
@@ -105,6 +138,19 @@
 		if (join) join.hidden = sharing;
 		const self = state.members.find(function (member) { return member.id === userId; });
 		if (controls) controls.hidden = !self;
+		const rolls = table.querySelector('[data-chat-rolls]');
+		if (rolls && state.chat_rolls) {
+			const current = new Map(Array.from(rolls.children).map(function (item) { return [Number(item.dataset.rollId), item]; }));
+			const ids = new Set(state.chat_rolls.map(function (roll) { return roll.id; }));
+			Array.from(rolls.children).forEach(function (item) { if (!ids.has(Number(item.dataset.rollId))) item.remove(); });
+			state.chat_rolls.forEach(function (roll) {
+				if (current.has(roll.id)) return;
+				const item = document.createElement('li');
+				item.dataset.rollId = roll.id;
+				item.textContent = roll.text;
+				rolls.append(item);
+			});
+		}
 	}
 
 	async function request(input) {

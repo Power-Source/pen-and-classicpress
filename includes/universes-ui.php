@@ -154,8 +154,8 @@ function ps_pen_paper_render_universes( $page_id = 0 ) {
 				<?php endforeach; ?>
 			</select></label></p>
 		<p><label><?php esc_html_e( 'Zieluniversum', 'ps-pen-paper' ); ?>
-			<select name="pspp_link_universe">
-				<option value="0"><?php esc_html_e( 'Ohne Universum', 'ps-pen-paper' ); ?></option>
+			<select name="pspp_link_universe" required>
+				<option value=""><?php esc_html_e( 'Universum auswählen', 'ps-pen-paper' ); ?></option>
 				<?php foreach ( $universes as $universe ) :
 					$document = ps_pen_paper_universe_document( $universe->ID );
 					if ( is_wp_error( $document ) ) { continue; }

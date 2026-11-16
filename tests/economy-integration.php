@@ -158,12 +158,13 @@ try {
 	};
 	add_filter( 'wp_insert_post_data', $fail_local_link );
 	try {
-		$check( is_wp_error( ps_pen_paper_save_universe_link( $local_campaign_id, 0, '1', '0', 'confirmed', 'local' ) ) &&
-			$local_link === ps_pen_paper_get_universe_link( $local_campaign_id ), 'Failed local unlink left a partial association.' );
+		$check( is_wp_error( ps_pen_paper_save_universe_link( $local_campaign_id, $target_universe_id, '1', $target_revision, 'confirmed', 'local' ) ) &&
+			$local_link === ps_pen_paper_get_universe_link( $local_campaign_id ), 'Failed local association left a partial change.' );
 	} finally { remove_filter( 'wp_insert_post_data', $fail_local_link ); }
-	$check( ! is_wp_error( ps_pen_paper_save_universe_link( $local_campaign_id, 0, '1', '0', 'confirmed', 'local' ) ) &&
+	$check( is_wp_error( ps_pen_paper_save_universe_link( $local_campaign_id, 0, '1', '0', 'confirmed', 'local' ) ) &&
+		$local_link === ps_pen_paper_get_universe_link( $local_campaign_id ) &&
 		22 === ps_pen_paper_wallet_context( $local_campaign, $local_character )['wallet']['balance'],
-		'Unlinking a locally funded campaign lost its account.' );
+		'A locally funded campaign lost its required universe or its account.' );
 	delete_post_meta( $campaign->ID, '_pspp_player', (string) $users['player'] );
 	wp_set_current_user( $users['player'] );
 	$check( is_wp_error( ps_pen_paper_wallet_context( $campaign, $character_id ) ), 'Removed member retained wallet access.' );

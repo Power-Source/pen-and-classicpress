@@ -25,7 +25,9 @@ $encode = function ( $archive ) {
 	$archive['payload_sha256'] = hash( 'sha256', json_encode( $archive['payload'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
 	return json_encode( $archive, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 };
-$preview = function ( $json, $operation, $target = 0, $world_mode = 'none', $world = 0, $bases = array(), $user_map = array() ) use ( &$tokens, &$users, $assert_result, $check ) {
+$restore_world = 0;
+$preview = function ( $json, $operation, $target = 0, $world_mode = 'bind', $world = 0, $bases = array(), $user_map = array() ) use ( &$tokens, &$users, &$restore_world, $assert_result, $check ) {
+	if ( 'bind' === $world_mode && ! $world ) { $world = $restore_world; }
 	$parsed = $assert_result( ps_pen_paper_parse_import( $json ), 'Parse failed' );
 	$token = $assert_result( ps_pen_paper_create_import_preview( $json ), 'Preview failed' ); $tokens[] = $token;
 	$options = array( 'operation' => $operation, 'target_id' => $target, 'universe_mode' => $world_mode, 'universe_id' => $world, 'users' => array(), 'bases' => $bases );
@@ -43,6 +45,7 @@ try {
 	}
 	get_userdata( $users['gm'] )->add_cap( 'ps_pen_paper_create_campaigns' );
 	wp_set_current_user( $users['gm'] );
+	$restore_world = $assert_result( ps_pen_paper_save_universe( 0, array( 'name' => 'Explicit legacy restore destination', 'description' => '' ), '0' ), 'Restore universe failed' );
 	$source = $post( 'pspp_campaign', 0, $users['gm'], 'Restore source' );
 	add_post_meta( $source, '_pspp_gm', (string) $users['gm'] ); add_post_meta( $source, '_pspp_player', (string) $users['player'] );
 	$rules = $assert_result( ps_pen_paper_save_rules( $source, array( 'name' => 'Flexible restore rules', 'description' => '', 'dice' => array( '6' ), 'fields' => array(
@@ -54,8 +57,12 @@ try {
 	$archive = $assert_result( ps_pen_paper_export_campaign( $source, 'local' ), 'Export fixture failed' );
 	$json = $encode( $archive );
 	$copy = $preview( $json, 'copy' );
+	$without_universe = $copy[3]; $without_universe['universe_mode'] = 'none'; $without_universe['universe_id'] = 0;
+	$check( ps_pen_paper_import_configuration( $copy[2], $without_universe )['conflicts'], 'Legacy archive could be restored without an explicit universe.' );
 	$result = $assert_result( ps_pen_paper_restore_campaign( $copy[0], $copy[1], false, 'private' ), 'New campaign restore failed' );
 	$restored = ps_pen_paper_get_campaign( $result['campaign_id'] );
+	$restored_link = ps_pen_paper_get_universe_link( $result['campaign_id'] );
+	$check( $restore_world === $restored_link['universe_id'] && 'local' === $restored_link['economy_mode'], 'Legacy archive lost its selected universe or local economic rules.' );
 	$check( $restored && $restored->ID !== $source && 'private' === ps_pen_paper_get_access( $restored->ID )['visibility'], 'Copy did not create a private independent campaign.' );
 	$children = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM $wpdb->posts WHERE post_parent=%d AND post_type='pspp_character'", $restored->ID ) );
 	$check( 1 === count( $children ) && (int) $children[0] !== $character &&
@@ -330,7 +337,7 @@ try {
 	wp_set_current_user( $users['gm'] ); $group_action( 'approve' );
 	$group_state = get_post_meta( $group_id, '_pspp_adventure_group', true );
 	$group_archive = $assert_result( ps_pen_paper_export_campaign( $group_campaign_id, 'local' ), 'Group export failed' );
-	$group_copy = $preview( $encode( $group_archive ), 'copy', 0, 'none', 0, array(), array( $users['old_owner'] => $users['new_player'] ) );
+	$group_copy = $preview( $encode( $group_archive ), 'copy', 0, 'bind', $restore_world, array(), array( $users['old_owner'] => $users['new_player'] ) );
 	$collapsed = $group_copy[3]; $collapsed['users'][ $users['old_owner'] ] = $users['player'];
 	$check( is_wp_error( ps_pen_paper_prepare_import( $group_copy[2], $collapsed, ps_pen_paper_import_identity_map( $group_copy[2], $collapsed ), false ) ),
 		'Merging group voters silently changed the quorum.' );

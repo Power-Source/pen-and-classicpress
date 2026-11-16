@@ -102,7 +102,8 @@ function ps_pen_paper_handle_character_context_action( $operation ) {
 			isset( $_POST['character_revision'] ) ? $_POST['character_revision'] : null,
 			isset( $_POST['base_revision'] ) ? $_POST['base_revision'] : null,
 			isset( $_POST['character_rules_revision'] ) ? $_POST['character_rules_revision'] : null,
-			isset( $_POST['overrides'] ) ? wp_unslash( $_POST['overrides'] ) : array(), isset( $_POST['context_note'] ) ? wp_unslash( $_POST['context_note'] ) : null );
+			isset( $_POST['overrides'] ) ? wp_unslash( $_POST['overrides'] ) : array(), isset( $_POST['context_note'] ) ? wp_unslash( $_POST['context_note'] ) : null,
+			isset( $_POST['context_resources'] ) ? wp_unslash( $_POST['context_resources'] ) : array() );
 		$url = ps_pen_paper_character_url( $id, $character_id, $page_id );
 	} else {
 		$confirmation = ps_pen_paper_posted_text( 'context_confirmation' );
@@ -276,7 +277,7 @@ function ps_pen_paper_render_character_context( $campaign, $character, $state, $
 	<section class="pspp-card">
 		<h3><?php esc_html_e( 'Kampagnenkontext', 'ps-pen-paper' ); ?></h3>
 		<p><?php echo esc_html( ps_pen_paper_character_context_modes()[ $context['mode'] ] ); ?></p>
-		<p><?php esc_html_e( 'Die angezeigten gültigen Werte enthalten die freigegebenen Kampagnenauflagen. Diese überschreiben weder den Basisbogen noch andere Runden. Leere Auflagenfelder übernehmen den Grundwert. Auflagen ändern keine Ressourcen; ausdrücklich konfigurierte Abenteuerkosten gemeinsamer Bögen werden einmalig am Basisbogen verbucht.', 'ps-pen-paper' ); ?></p>
+		<p><?php esc_html_e( 'Leere Auflagen übernehmen den Grundwert. Ressourcen können eigene Kampagnenwerte verwenden oder den gemeinsamen Vorrat mit einem Kampagnenmaximum. Eigene Werte ändern weder Basisbogen noch andere Runden; beim gemeinsamen Vorrat wirken Verbrauch und Heilung am Basisbogen. Ein Maximum darf den vorhandenen aktuellen Wert nicht abschneiden.', 'ps-pen-paper' ); ?></p>
 		<p class="pspp-multiline"><?php echo esc_html( $context['note'] ); ?></p>
 		<?php if ( ps_pen_paper_can_manage_campaign( $campaign ) ) : ?>
 			<?php if ( 'shared' === $context['mode'] ) :
@@ -309,7 +310,7 @@ function ps_pen_paper_render_character_context( $campaign, $character, $state, $
 							<?php if ( is_wp_error( $preview ) ) : ?>
 								<p role="alert"><?php echo esc_html( $preview->get_error_message() ); ?></p>
 							<?php else : ?>
-								<p><?php esc_html_e( 'Vergleiche jeden abweichenden Wert. Kopiewerte lassen sich nur bei Zahlen und Attributen als Kampagnenauflage behalten; andere Änderungen müssen ausdrücklich durch den Basiswert ersetzt werden. Ausrüstung und Inventar werden nicht kopiert oder entfernt.', 'ps-pen-paper' ); ?></p>
+								<p><?php esc_html_e( 'Vergleiche jeden abweichenden Wert. Zahlen und Attribute können Kampagnenauflagen bleiben, Ressourcen eigene Kampagnenwerte. Andere Änderungen müssen ausdrücklich durch den Basiswert ersetzt werden. Ausrüstung und Inventar werden nicht kopiert oder entfernt.', 'ps-pen-paper' ); ?></p>
 								<?php ps_pen_paper_render_character_snapshot( $preview['base'], $preview['rules'], $campaign ); ?>
 								<?php if ( $preview['conflicts'] ) : ?>
 									<ul>
@@ -354,6 +355,24 @@ function ps_pen_paper_render_character_context( $campaign, $character, $state, $
 								<input type="number" step="1" name="<?php echo esc_attr( 'overrides[' . $field['id'] . ']' ); ?>" min="<?php echo esc_attr( $field['min'] ); ?>" max="<?php echo esc_attr( $field['max'] ); ?>" value="<?php echo esc_attr( isset( $context['overrides'][ $field['id'] ] ) ? $context['overrides'][ $field['id'] ] : '' ); ?>"></label></p>
 						<?php endforeach; ?>
 					</div>
+					<?php foreach ( $rules['fields'] as $field ) :
+						if ( 'resource' !== $field['type'] ) { continue; }
+						$resource = $context['resources'][ $field['id'] ] ?? array( 'mode' => 'inherit' );
+						$prefix = 'context_resources[' . $field['id'] . ']'; ?>
+						<fieldset><legend><?php echo esc_html( $field['label'] ); ?></legend>
+							<label><?php esc_html_e( 'Ressourcenmodell', 'ps-pen-paper' ); ?>
+								<select name="<?php echo esc_attr( $prefix . '[mode]' ); ?>">
+									<?php foreach ( array( 'inherit' => __( 'Grundstand übernehmen', 'ps-pen-paper' ), 'local' => __( 'Eigene Werte für diese Kampagne', 'ps-pen-paper' ), 'shared' => __( 'Gemeinsamer Vorrat, eigenes Maximum', 'ps-pen-paper' ) ) as $mode => $label ) : ?>
+										<?php if ( 'shared' === $mode && 'shared' !== $context['mode'] ) { continue; } ?>
+										<option value="<?php echo esc_attr( $mode ); ?>" <?php selected( $resource['mode'], $mode ); ?>><?php echo esc_html( $label ); ?></option>
+									<?php endforeach; ?>
+								</select>
+							</label>
+							<?php foreach ( array( 'current' => __( 'Aktueller Wert (nur eigene Werte)', 'ps-pen-paper' ), 'maximum' => __( 'Höchstwert', 'ps-pen-paper' ) ) as $key => $label ) : ?>
+								<label><?php echo esc_html( $label ); ?><input type="number" step="1" name="<?php echo esc_attr( $prefix . '[' . $key . ']' ); ?>" min="<?php echo esc_attr( $field['min'] ); ?>" max="<?php echo esc_attr( $field['max'] ); ?>" value="<?php echo esc_attr( $resource[ $key ] ?? '' ); ?>"></label>
+							<?php endforeach; ?>
+						</fieldset>
+					<?php endforeach; ?>
 					<p><label><?php esc_html_e( 'Notiz für Besitzer und Spielleitung', 'ps-pen-paper' ); ?><br>
 						<textarea name="context_note" rows="3"><?php echo esc_textarea( $context['note'] ); ?></textarea></label></p>
 					<input type="hidden" name="context_complete" value="complete">

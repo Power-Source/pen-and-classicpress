@@ -44,8 +44,10 @@ function ps_pen_paper_handle_equipment_action( $operation, $context = 'game' ) {
 	} elseif ( 'save_sheet_style' === $operation ) {
 		$action = ps_pen_paper_posted_text( 'sheet_action' );
 		$path = ps_pen_paper_equipment_upload( 'equipment_image' );
-		if ( ! in_array( $action, array( 'upload', 'remove' ), true ) || ( 'upload' === $action && null === $path ) || ( 'remove' === $action && null !== $path ) ) { ps_pen_paper_fail( __( 'Bitte wähle entweder ein neues Bild oder das Entfernen.', 'ps-pen-paper' ) ); }
-		$result = ps_pen_paper_save_sheet_style( $scope, $revision, $path );
+		if ( ! in_array( $action, array( 'upload', 'remove', 'view' ), true ) || ( 'upload' === $action && null === $path ) || ( 'upload' !== $action && null !== $path ) ) { ps_pen_paper_fail( __( 'Bitte wähle entweder ein neues Bild, den Bildausschnitt oder das Entfernen.', 'ps-pen-paper' ) ); }
+		$view = 'view' === $action ? ps_pen_paper_posted_image_view() : null;
+		if ( is_wp_error( $view ) ) { ps_pen_paper_fail( $view->get_error_message() ); }
+		$result = ps_pen_paper_save_sheet_style( $scope, $revision, $path, $view );
 	} else {
 		$result = ps_pen_paper_save_gear( $scope, $character_id, $operation, $input, $revision, $context );
 	}
@@ -197,7 +199,12 @@ function ps_pen_paper_render_character_loadout( $campaign, $character, $name ) {
 			echo '<div class="pspp-loadout-character">';
 			$image = ps_pen_paper_portrait_image( $campaign, $character );
 			if ( is_wp_error( $image ) ) { echo '<p role="alert">' . esc_html( $image->get_error_message() ) . '</p>'; }
-			elseif ( $image ) { echo '<img class="pspp-loadout-avatar" src="' . esc_attr( $image ) . '" alt="' . esc_attr( $name ) . '">'; }
+			elseif ( $image ) {
+				$portrait = ps_pen_paper_portrait_state( $character->ID );
+				$view = is_wp_error( $portrait ) ? $portrait : ( isset( $portrait['active']['view'] ) ? ps_pen_paper_image_view_style( $portrait['active']['view'] ) : '' );
+				if ( is_wp_error( $view ) ) { echo '<p role="alert">' . esc_html( $view->get_error_message() ) . '</p>'; }
+				else { echo '<img class="pspp-loadout-avatar" src="' . esc_attr( $image ) . '"' . ( $view ? ' style="' . esc_attr( $view ) . '"' : '' ) . ' alt="' . esc_attr( $name ) . '">'; }
+			}
 			else { echo '<div class="pspp-loadout-avatar pspp-loadout-avatar-empty" aria-hidden="true">' . esc_html( wp_html_excerpt( $name, 1, '' ) ) . '</div><p>' . esc_html__( 'Noch kein Charakterbild', 'ps-pen-paper' ) . '</p>'; }
 			echo '<strong>' . esc_html( $name ) . '</strong></div>';
 		}
@@ -224,14 +231,14 @@ function ps_pen_paper_render_character_loadout( $campaign, $character, $name ) {
 
 function ps_pen_paper_render_character_equipment( $campaign, $character, $page_id, $include_adventures = true, $context = 'game' ) {
 	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_get_character( $campaign, $character->ID ) ) { echo '<p role="alert">' . esc_html__( 'Dieser Charakter ist für dich nicht verfügbar.', 'ps-pen-paper' ) . '</p>'; return; }
-	ps_pen_paper_render_wallet( $campaign, $character, $page_id );
+	ps_pen_paper_render_wallet( $campaign, $character, $page_id, $context );
 	$is_campaign = 'pspp_campaign' === $campaign->post_type;
 	if ( ! $is_campaign && 'pspp_universe' !== $campaign->post_type ) { return; }
 	if ( ! ps_pen_paper_community_available() ) {
 		echo '<p>' . esc_html__( 'Inventar, Guthaben und Ausrüstung sind ohne PS Community inaktiv; gespeicherte Bestände bleiben erhalten.', 'ps-pen-paper' ) . '</p>';
 		if ( $is_campaign ) {
-			ps_pen_paper_render_character_trade( $campaign, $character, $page_id );
-			ps_pen_paper_render_character_transfers( $campaign, $character, $page_id );
+			ps_pen_paper_render_character_trade( $campaign, $character, $page_id, $context );
+			if ( 'profile' !== $context ) { ps_pen_paper_render_character_transfers( $campaign, $character, $page_id ); }
 			if ( $include_adventures ) { ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); }
 		}
 		return;
@@ -239,7 +246,7 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 	$gear = ps_pen_paper_gear_state( $character->ID );
 	$schema = ps_pen_paper_equipment_schema( $campaign );
 	if ( is_wp_error( $gear ) || is_wp_error( $schema ) ) { echo '<p role="alert">' . esc_html__( 'Die Ausrüstung ist nicht verfügbar. Bitte informiere die Spielleitung.', 'ps-pen-paper' ) . '</p>'; return; }
-	$is_gm = ps_pen_paper_can_manage_character_scope( $campaign );
+	$is_gm = 'profile' !== $context && ps_pen_paper_can_manage_character_scope( $campaign );
 	$scope_permission = ps_pen_paper_require_equipment_character_scope( $campaign, $character, $context );
 	echo '<h3>' . esc_html__( 'Inventar & Ausrüstung', 'ps-pen-paper' ) . '</h3>';
 	foreach ( $gear['active']['items'] as $instance_id => $instance ) {
@@ -254,7 +261,7 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 		}
 		if ( ! is_wp_error( $scope_permission ) && ( $is_campaign || 'profile' === $context ) ) { ps_pen_paper_render_item_use_actions( $campaign, $character, $instance_id, $gear, $page_id, $context ); }
 	}
-	ps_pen_paper_render_item_effects( $campaign, $character, $gear, $page_id );
+	ps_pen_paper_render_item_effects( $campaign, $character, $gear, $page_id, $context );
 	$can_edit = $is_gm || 'gm_only' !== ps_pen_paper_character_mode( ps_pen_paper_get_rules( $campaign->ID ) );
 	if ( is_wp_error( $scope_permission ) ) { echo '<p>' . esc_html( $scope_permission->get_error_message() ) . '</p>'; $can_edit = false; }
 	if ( 'profile' === $context ) {
@@ -294,7 +301,7 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 	echo '</dl>';
 	if ( $is_campaign ) {
 		if ( $include_adventures ) { ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); }
-		ps_pen_paper_render_character_trade( $campaign, $character, $page_id );
+		ps_pen_paper_render_character_trade( $campaign, $character, $page_id, $context );
 	}
 	if ( $is_gm ) {
 		if ( $gear['active']['items'] ) {
@@ -318,7 +325,7 @@ function ps_pen_paper_render_character_equipment( $campaign, $character, $page_i
 	}
 }
 
-function ps_pen_paper_render_portrait_form( $campaign, $character, $page_id ) {
+function ps_pen_paper_render_portrait_form( $campaign, $character, $page_id, $profile = false ) {
 	if ( 'pspp_campaign' !== $campaign->post_type ) { return; }
 	$state = ps_pen_paper_portrait_state( $character->ID );
 	if ( is_wp_error( $state ) ) { echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p>'; return; }
@@ -336,7 +343,7 @@ function ps_pen_paper_render_portrait_form( $campaign, $character, $page_id ) {
 	ps_pen_paper_equipment_form_start( $campaign, 'save_portrait', $state['revision'], $page_id, $character->ID, true );
 	echo '<input type="file" name="equipment_image" accept="image/png,image/jpeg,image/webp"><p>' . esc_html__( 'PNG, JPEG oder WebP bis 2 MiB und 3000 × 3000 Pixel. Privat für Besitzer und Spielleitung, kein öffentlicher Benutzeravatar. Spieleränderungen folgen der Charakter-Freigabepolitik; Wertefreigaben bleiben getrennt.', 'ps-pen-paper' ) . '</p>';
 	foreach ( array( 'upload' => __( 'Porträt einreichen / speichern', 'ps-pen-paper' ), 'remove' => __( 'Porträt entfernen / beantragen', 'ps-pen-paper' ) ) as $key => $label ) { echo '<button name="portrait_action" value="' . esc_attr( $key ) . '">' . esc_html( $label ) . '</button>'; }
-	if ( null !== $state['pending'] && ps_pen_paper_can_manage_campaign( $campaign ) ) {
+	if ( ! $profile && null !== $state['pending'] && ps_pen_paper_can_manage_campaign( $campaign ) ) {
 		echo '<button name="portrait_action" value="approve">' . esc_html__( 'Porträt freigeben', 'ps-pen-paper' ) . '</button><button name="portrait_action" value="reject">' . esc_html__( 'Porträtantrag verwerfen', 'ps-pen-paper' ) . '</button>';
 	}
 	echo '</form>';
@@ -348,6 +355,13 @@ function ps_pen_paper_render_sheet_style_form( $campaign, $page_id ) {
 	echo '<h3>' . esc_html__( 'Bogenhintergrund der Kampagne', 'ps-pen-paper' ) . '</h3>';
 	ps_pen_paper_equipment_form_start( $campaign, 'save_sheet_style', $style['revision'], $page_id, 0, true );
 	echo '<input type="file" name="equipment_image" accept="image/png,image/jpeg,image/webp"><p>' . esc_html__( 'Dekoratives Bild für alle eigenen Charakterbögen dieser Kampagne. Es erscheint dezent hinter den Werten, nicht im öffentlichen Profil. PNG/JPEG/WebP bis 2 MiB und 3000 × 3000 Pixel.', 'ps-pen-paper' ) . '</p><button name="sheet_action" value="upload">' . esc_html__( 'Bogenhintergrund speichern', 'ps-pen-paper' ) . '</button><button name="sheet_action" value="remove">' . esc_html__( 'Bogenhintergrund entfernen', 'ps-pen-paper' ) . '</button></form>';
+	if ( $style['asset_id'] ) {
+		$image = ps_pen_paper_private_image_data( $campaign, $style['asset_id'] );
+		if ( is_wp_error( $image ) ) { echo '<p role="alert">' . esc_html( $image->get_error_message() ) . '</p>'; return; }
+		ps_pen_paper_equipment_form_start( $campaign, 'save_sheet_style', $style['revision'], $page_id );
+		ps_pen_paper_render_image_view_fields( $style['view'] ?? null, $image );
+		echo '<button name="sheet_action" value="view">' . esc_html__( 'Bildausschnitt speichern', 'ps-pen-paper' ) . '</button></form>';
+	}
 }
 
 function ps_pen_paper_render_equipment_history( $kind, $state ) {

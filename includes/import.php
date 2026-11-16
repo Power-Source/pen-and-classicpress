@@ -322,7 +322,7 @@ function ps_pen_paper_import_configuration( $parsed, $options ) {
 	$link = ps_pen_paper_import_meta( $parsed, $source_id, '_pspp_universe_link' );
 	$needs_universe = is_array( $link ) && ! empty( $link['universe_id'] );
 	if ( '' === $options['universe_mode'] ) { $conflicts[] = __( 'Wähle den Umgang mit Universumsdaten.', 'ps-pen-paper' ); }
-	if ( 'none' === $options['universe_mode'] && $needs_universe ) { $conflicts[] = __( 'Diese Sicherung hat eine Universumszuordnung. Sie darf nicht stillschweigend entfernt werden.', 'ps-pen-paper' ); }
+	if ( 'none' === $options['universe_mode'] ) { $conflicts[] = __( 'Jede wiederhergestellte Kampagne benötigt ein Universum. Ordne ein bestehendes zu oder stelle das enthaltene Universum als Kopie wieder her.', 'ps-pen-paper' ); }
 	if ( 'copy' === $options['universe_mode'] ) {
 		if ( ! $parsed['universe_id'] ) { $conflicts[] = __( 'Die Datei enthält keine Universumsdaten für eine getrennte Wiederherstellung.', 'ps-pen-paper' ); }
 		if ( ! ps_pen_paper_can_create_campaign() ) { $conflicts[] = __( 'Für ein neues Universum fehlt die Erstellungsberechtigung.', 'ps-pen-paper' ); }
@@ -332,14 +332,14 @@ function ps_pen_paper_import_configuration( $parsed, $options ) {
 	}
 	if ( 'bind' === $options['universe_mode'] ) {
 		$universe = ps_pen_paper_get_universe( $options['universe_id'] );
-		if ( ! $needs_universe || ! $universe || ! ps_pen_paper_can_manage_universe( $universe ) ) {
+		if ( ! $universe || ! ps_pen_paper_can_manage_universe( $universe ) ) {
 			$conflicts[] = __( 'Wähle ein benötigtes Universum, das du verwalten darfst.', 'ps-pen-paper' );
 		} else {
 			$rules = ps_pen_paper_get_rules( $universe->ID );
 			$source_rules = ps_pen_paper_import_meta( $parsed, $source_id, '_pspp_rules' );
 			$current_schema = ps_pen_paper_import_rule_schema( $rules );
 			$source_schema = ps_pen_paper_import_rule_schema( $source_rules );
-			if ( is_wp_error( $current_schema ) || is_wp_error( $source_schema ) || $current_schema !== $source_schema ) {
+			if ( $needs_universe && ( is_wp_error( $current_schema ) || is_wp_error( $source_schema ) || $current_schema !== $source_schema ) ) {
 				$conflicts[] = __( 'Die Feldstruktur des bestehenden Universums passt nicht zur Sicherung. Eine Regelmigration ist ein gesonderter Vorgang.', 'ps-pen-paper' );
 			}
 			$documents = array( 'rules' => $rules, 'universe' => ps_pen_paper_universe_document( $universe->ID ),
@@ -362,7 +362,7 @@ function ps_pen_paper_import_configuration( $parsed, $options ) {
 					}
 				}
 			}
-			$wallet_currency = isset( $link['economy_mode'] ) && 'local' === $link['economy_mode']
+			$wallet_currency = ! $needs_universe || ( isset( $link['economy_mode'] ) && 'local' === $link['economy_mode'] )
 				? ps_pen_paper_import_meta( $parsed, $source_id, '_pspp_currency' ) : $documents['currency'];
 			if ( is_wp_error( $wallet_currency ) ) { return $wallet_currency; }
 			foreach ( $parsed['records'] as $id => $record ) {
@@ -373,6 +373,9 @@ function ps_pen_paper_import_configuration( $parsed, $options ) {
 				}
 			}
 			$warnings[] = __( 'Beim Zuordnen bleiben vorhandene Universumsdaten, Basiswerte und gemeinsame Guthaben unverändert. Archivierte gemeinsame Stände werden nicht über sie geschrieben.', 'ps-pen-paper' );
+			if ( ! $needs_universe ) {
+				$warnings[] = __( 'Die bisher unabhängige Kampagne wird ausdrücklich dem gewählten Universum zugeordnet. Ihre Regeln, Charaktere, lokale Währung und Handelsregeln bleiben eigenständig erhalten.', 'ps-pen-paper' );
+			}
 		}
 	}
 	foreach ( $parsed['missing_assets'] as $dependency ) {

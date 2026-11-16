@@ -18,44 +18,89 @@ Echtzeitpflicht oder große Game-Engine nutzbar sein.
 
 ## Aktueller Auftrag: einfacher, zusammenhängender Spieleinstieg
 
-Die folgenden Anforderungen sind bestätigt und werden jetzt umgesetzt.
-Die Versionsübersicht weiter unten beschreibt den bisherigen Bestand;
-ältere optionale Zuordnungen und Verwaltungswege sind nicht das Ziel dieses Umbaus.
-Ein Punkt wird erst nach nativer Prüfung und einem nachvollziehbaren Live-Test
-als abgeschlossen markiert. Es gibt keinen ungeprüften Versionssprung.
+Die folgenden Anforderungen sind bestätigt. Der Abgleich vom **16.11.2026**
+trennt den implementierten Funktionsstand von der vollständigen Bedienabnahme:
+`[x]` bezeichnet vorhandene Funktionen, nicht eine Freigabe für den Produktivbetrieb.
+Noch fehlende Funktionen, Bereinigungen und Prüfungen bleiben `[ ]`.
+Die vollständige native und nachvollziehbare Live-Abnahme steht gesondert in
+Abschnitt 7; einzelne Browseraufrufe ersetzen sie nicht. Es gibt keinen
+ungeprüften Versionssprung. Die Versionsübersicht weiter unten ist historisch.
+
+**Nachweise und tatsächliche Restarbeiten:**
+
+- Zehn gezielte native Regressionen für Charakterkontexte und Ressourcen,
+  Ausrüstung und Darstellung, Spieltisch, Wirtschaft, Charakterpolitik,
+  Gegenstandsnutzung, Spielrunden, Abenteuer, Wiederherstellung und Universen
+  sind nach der Umsetzung bestanden
+  (`tests/character-contexts-integration.php`, `tests/equipment-integration.php`,
+  `tests/table-integration.php`, `tests/economy-integration.php`,
+  `tests/universe-character-policy-integration.php`, `tests/item-use-integration.php`,
+  `tests/play-rounds-integration.php`, `tests/adventure-integration.php`,
+  `tests/import-write-integration.php`, `tests/universes-integration.php`).
+  Auch die UI-Regressionen
+  `tests/character-ui.js` und `tests/table-epoch-ui.js` sind bestanden.
+  Das ist kein erneuter Gesamtlauf aller Tests und keine Plattformmatrix.
+- Alle drei Spielarten wurden mit eigenen temporären Konten über echte
+  Browserformulare angelegt, betreten, gestartet, pausiert, fortgesetzt und
+  abgeschlossen; der Austritt wurde ebenfalls geprüft. Beim Gruppenabenteuer
+  wurde während der Pause tatsächlich die Figur gewechselt. Solo- und
+  Gruppenentscheidungen haben Ressourcenkosten und Verlauf gespeichert.
+- Zusätzlich geprüft: reine Charakteransicht im Profil, Ressourcenauflagen
+  über den Rundenbogen, geteiltes Porträt über den geschützten Bildabruf,
+  öffentlicher Wurf im Chatpanel sowie Bilddarstellung ohne erneuten Upload.
+  Bei 390 × 844 Pixeln wurden Bildformulare visuell und per Tastatur geprüft,
+  ohne horizontalen Seitenüberlauf. Ein Hintergrund mit rund 1,3 MiB lädt
+  vollständig; die Inhaltspipeline ist zusätzlich mit dem maximalen
+  Bilddatenumfang von 2 MiB nativ geprüft.
+- Das Profil ist auf eigene Charaktere und erlaubte Charakteraktionen
+  begrenzt. Einladungen, Abenteuer und Leitungsfreigaben sind entfernt;
+  profilmarkierte Verwaltungsaktionen werden auch serverseitig abgelehnt.
+- Neue Zuordnungen und Wiederherstellungen verlangen ein Universum.
+  Alte unabhängige Sicherungen können ausdrücklich zugeordnet werden, ohne
+  lokale Regeln oder Guthaben zu ersetzen. Altbestände bleiben lesbar und
+  werden nicht ungefragt umgeschrieben.
+- Ressourcenauflagen, explizit geteilte Teilnehmerdarstellungen,
+  Bildfüllung/Position mit Vorschau und öffentliche Würfe im Chatpanel sind
+  implementiert. Eine freie grafische Bildbearbeitung und die vollständige
+  Plattformmatrix sind dadurch nicht abgenommen.
 
 ### 1. Universum als verpflichtende Grundlage
 
-- [ ] Vor der ersten Kampagne muss mindestens ein Universum existieren.
-- [ ] Neue Kampagnen müssen einem bestehenden Universum zugeordnet werden.
-- [ ] Bestehende unzugeordnete Kampagnen bekommen einen ausdrücklichen
+- [x] Vor der ersten regulären Kampagnenanlage muss mindestens ein Universum existieren.
+- [x] Neue Kampagnen müssen bei der regulären Anlage einem bestehenden,
+  für die erstellende Person verwaltbaren Universum zugeordnet werden.
+- [x] Bestehende unzugeordnete Kampagnen bekommen einen ausdrücklichen
   Zuordnungsweg. Keine automatische Wahl einer Welt, kein Löschen von Spielständen
   und keine ungefragte Umwandlung bestehender Charaktere.
-- [ ] Optionale UI-Farben stellt die Universumsleitung ein. Kampagnen,
+- [x] Optionale UI-Farben stellt die Universumsleitung ein. Kampagnen,
   Profilbögen und SpielUI übernehmen sie; ohne eigene Auswahl gelten Standardfarben.
+- [x] Verbleibendes Lösen der Universumsbindung und Importwege mit dem
+  verpflichtenden Zielmodell abstimmen, ohne Altbestände still umzuwandeln.
 
 ### 2. Profil und SpielUI als echter Einstieg
 
-- Das Spielerprofil ist ausschließlich Charakterverwaltung: Universum wählen,
+- [x] Das Spielerprofil auf reine Charakterverwaltung begrenzen: Universum wählen,
   eigene Figuren erstellen und auswählen, Stats und Inventar sehen sowie
   erlaubte Charakteraktionen ausführen. Keine Spieleauswahl, Mitgliederverwaltung
   oder Leitungsfreigaben im Profil.
-- [ ] Im privaten Pen-&-Paper-Profil ein Universum wählen und direkt einen
+- [x] Im privaten Pen-&-Paper-Profil ein Universum wählen und direkt einen
   eigenen Charakter erstellen beziehungsweise zur Freigabe einreichen.
   Standardmäßig ohne zusätzliche Universumsmitgliedschaft; ausdrücklich
   konfigurierte Zugangsbeschränkungen der Leitung bleiben erhalten.
-- [ ] Eigene Charaktere einschließlich offener Erstfreigaben per Dropdown wählen.
+- [x] Eigene Charaktere einschließlich offener Erstfreigaben per Dropdown wählen.
   Leere Kampagnen und fremde Figuren gehören nicht in diese Auswahl.
-- [ ] Erhaltene Einladungen mit benannter Spielrunde beziehungsweise Universum
-  und Absender im Profil anzeigen, annehmen oder ablehnen.
+- [x] Erhaltene Einladungen mit benannter Kampagne beziehungsweise Universum
+  und Absender anzeigen, annehmen oder ablehnen; in der Lounge vorhanden.
   Einladen und Leitungsfreigaben gehören zur jeweiligen Spielrunde, nicht ins
   Spielerprofil. Vorschläge durch Mitspieler benötigen zunächst die Zustimmung
   der Leitung.
-- [ ] Im Spielbereich eine klare Aktion zum Spielen beziehungsweise Fortsetzen
+- [x] Im Spielbereich eine klare Aktion zum Spielen beziehungsweise Fortsetzen
   anbieten. Spieleauswahl, Vorbereitung und Verwaltung bleiben dort getrennt
   und eindeutig auffindbar.
-- [ ] Ersetzte Menü- und Formularwege entfernen, nicht parallel als zweite
+- [x] Ersetzte Profil-Menü- und Formularwege entfernen, nicht parallel als zweite
   Oberfläche weiterpflegen. Bestehende Rechte und gespeicherte Inhalte erhalten.
+  Alte direkte Abenteuerstarts verweisen auf die Lounge. Einladungen,
+  Abenteuerbereich und Leitungsaktionen werden im Profil nicht mehr angeboten.
 
 ### Game-Lounge und wiederverwendbare Kampagnen
 
@@ -82,23 +127,24 @@ als abgeschlossen markiert. Es gibt keinen ungeprüften Versionssprung.
 
 ### 3. Charaktererstellung durch die Leitung konfigurieren
 
-- [ ] Anzahl eigener Charaktere je Spieler festlegen; auch offene Erstanträge
+- [x] Anzahl eigener Charaktere je Spieler festlegen; auch offene Erstanträge
   berücksichtigen und Grenzen serverseitig prüfen.
-- [ ] Klassen, Rassen und andere Auswahlfelder frei vorgeben oder weglassen.
+- [x] Klassen, Rassen und andere Auswahlfelder frei vorgeben oder weglassen.
   Keine vorgeschriebenen Klassen, Rassen oder Attributboni.
-- [ ] Eigene Charakterbilder erlauben oder sperren und/oder geschützte Bilder
+- [x] Eigene Charakterbilder erlauben oder sperren und/oder geschützte Bilder
   zum Auswählen bereitstellen. Charakterbilder sind keine öffentlichen Profilavatare.
 
 ### 4. Gemeinsame, videogameartige Charakteransicht
 
-- [ ] Im Profil und im Spiel dieselbe Bogenoberfläche verwenden.
-- [ ] Charakterbild mittig; standardmäßig drei Slots links und drei rechts:
+- [x] Im Profil und im Spiel dieselbe Bogenoberfläche verwenden.
+- [x] Charakterbild mittig; standardmäßig drei Slots links und drei rechts:
   Kopf, Beine, Füße, Brust, Arme und Hände.
-- [ ] Leitung kann Slots hinzufügen, entfernen, umbenennen, ausblenden,
-  platzieren und mit eigenen beschrifteten Grafiken versehen.
-- [ ] Beim Entfernen belegter Slots Belegung, Boni und offene Anträge kontrolliert
+- [x] Leitung kann Slots hinzufügen, entfernen, umbenennen, ausblenden,
+  links/rechts anordnen und mit eigenen beschrifteten Grafiken versehen.
+  Kein freier Drag-and-drop-Designer.
+- [x] Beim Entfernen belegter Slots Belegung, Boni und offene Anträge kontrolliert
   aktualisieren; Gegenstände im Inventar und frühere Nachweise erhalten.
-- [ ] Stufe nur bei aktiviertem Stufensystem sichtbar hervorheben.
+- [x] Stufe nur bei aktiviertem Stufensystem sichtbar hervorheben.
 - [x] Bei eigener Erstellung keine frei erfundenen Zahlenwerte: Ressourcen,
   Maxima, Erfahrung und Level aus den Leitungs-Vorgaben übernehmen.
 - [x] Level-Punktepool: Startpunkte auf Level 1 und zusätzliche Punkte je
@@ -108,43 +154,48 @@ als abgeschlossen markiert. Es gibt keinen ungeprüften Versionssprung.
   auch nicht durch Leitungskonten im Spielerprofil. Bewusste Korrekturen
   erfolgen getrennt in der Spielverwaltung.
   Werte, Ressourcen, Inventar, Abenteuer und Bearbeitung über klare Tabs anbieten.
-- [ ] Gegenstände haben passende Slotarten oder gelten als Verbrauchsgüter.
+- [x] Gegenstände haben passende Slotarten oder gelten als Verbrauchsgüter.
 
 ### 5. Verbrauch und frei konfigurierte Gegenstandswirkungen
 
-- [ ] Spieler können freigegebene Gegenstände benutzen. Verbrauch, Kosten,
+- [x] Spieler können freigegebene Gegenstände benutzen. Verbrauch, Kosten,
   Voraussetzungen und tatsächliche Wirkungen werden serverseitig geprüft
   und gemeinsam protokolliert; Wiederholen darf nicht doppelt wirken.
-- [ ] Leitung definiert temporäre oder dauerhafte Wirkungen auf Attribute
+- [x] Leitung definiert temporäre oder dauerhafte Wirkungen auf Attribute
   und Ressourcen/Statuswerte. Spätere Änderungen dürfen beim Beenden eines
   temporären Effekts nicht versehentlich zurückgesetzt werden.
-- [ ] Nutzungsbedingungen je Gegenstand: sofort, Freigabe der Leitung,
+- [x] Nutzungsbedingungen je Gegenstand: sofort, Freigabe der Leitung,
   bestandene Probe oder eine Spielrunde aussetzen.
-- [ ] Echte Spielrunden werden durch die Leitung gesteuert; AFK, Seitenaufrufe
-  und vergangene Echtzeit ersetzen keine Runde.
-- [ ] Gold und andere Währungen bleiben in den konfigurierten Geldkonten;
+- [x] Spielzüge werden im geleiteten Spiel ausdrücklich durch die Leitung
+  gezählt, in automatischen Abenteuern durch ausgeführte Entscheidungen.
+  AFK, Seitenaufrufe und vergangene Echtzeit ersetzen keinen Spielzug.
+- [x] Gold und andere Währungen bleiben in den konfigurierten Geldkonten;
   Heil- und Manatränke sind Beispiele, keine fest eingebauten Spielregeln.
 
 ### 6. Spielaktionen und Aktionen außerhalb des Spiels trennen
 
-- [ ] Leitung bestimmt, ob Spieler außerhalb des Spiels im PS-Community-Profil
+- [x] Leitung bestimmt, ob Spieler außerhalb des Spiels im PS-Community-Profil
   ausrüsten, heilen, Ressourcen auffüllen oder andere erlaubte Aktionen ausführen.
-- [ ] Rechte beziehungsweise Einschränkungen für einzelne Slots, Gegenstände
+- [x] Rechte beziehungsweise Einschränkungen für einzelne Slots, Gegenstände
   und Aktionsarten vorsehen, nicht nur einen pauschalen Profilzugriff.
-- [ ] Erlaubte Profilaktionen ohne Würfel- oder Rundenwartezwang ausführen;
+- [x] Erlaubte Profilaktionen ohne Würfel- oder Rundenwartezwang ausführen;
   Kosten, Verbrauch, Freigaben und Protokoll bleiben wirksam.
-- [ ] Ein Wechsel der URL oder ein manipulierter Kontextparameter darf
+- [x] Ein Wechsel der URL oder ein manipulierter Kontextparameter darf
   Bedingungen einer laufenden Spielsitzung nicht umgehen.
 
 ### 7. Abschluss und Bereinigung
 
-- [ ] Betroffene native Integrationstests und UI-Regressionen ausführen.
-- [ ] Mit dem bestehenden Demokonto echte Formulare, Charakterauswahl,
-  Einladungen, Slots und Gegenstandsaktionen im geteilten Browser prüfen.
-  Bestehende fremde Demos nicht als Testdaten umschreiben.
-- [ ] Handbuch, README und Übersetzungskatalog an die tatsächlichen Abläufe anpassen.
-- [ ] Überholten Code erst nach Ersetzung seiner Funktion entfernen; keine
-  Bestandsdaten, Importnachweise oder noch benötigten Berechtigungen löschen.
+- [x] Die oben benannten zehn nativen Integrationstests und zwei
+  UI-Regressionen ausführen, einschließlich der zuvor noch offenen
+  Abenteuer- und Import-Write-Gesamtläufe.
+- [x] Vollständige exemplarische Spielabläufe aller drei Spielarten mit eigenen
+  temporären Konten und Daten im Browser prüfen. Fremde Demos unverändert lassen.
+- [ ] Die breitere Browsermatrix für Einladungsvarianten, Slots und sämtliche
+  Gegenstandsaktionen sowie weitere WordPress-/ClassicPress-Konfigurationen
+  bleibt gesonderte Abnahme; native Rechte- und Aktionsregressionen ersetzen sie nicht.
+- [x] Handbuch, README und Übersetzungskatalog mit dem geprüften Stand abgleichen.
+- [x] Überholte Profil-Verwaltungswege ersetzen und entfernen; Bestandsdaten,
+  Importnachweise und weiterhin benötigte Altbestandsleser erhalten.
 
 ## Entwicklungsstand
 
@@ -156,17 +207,18 @@ als abgeschlossen markiert. Es gibt keinen ungeprüften Versionssprung.
   pro Kampagne direkte Spielerbearbeitung, Freigabepflicht oder ausschließliche
   Spielleiterbearbeitung. Gültige Werte und offene Anträge werden getrennt
   gespeichert; Charaktere sind nur für Besitzer und Spielleiter sichtbar.
-- Änderungen an verwendeten Feldstrukturen sind zunächst gesperrt. Eine
-  kontrollierte Übernahme solcher Änderungen folgt später.
+- Änderungen verwendeter Feldstrukturen besitzen eine Vorschau und
+  bestätigte Konfliktauflösung für bestehende Werte und offene Anträge;
+  ungeprüfte direkte Strukturänderungen bleiben gesperrt.
 - Die Verwaltung verwendet responsives CSS und Vanilla JavaScript; die
   Einrichtung auf Handy und Tablet wird bei weiteren Schritten mitgeprüft.
 - Der geschützte Frontend-Spielbereich per `[ps_pen_paper]` zeigt Kampagnen,
   Regeln und Charaktere mit denselben Bearbeitungs- und Freigaberechten.
   Eine optionale Spielbereich-Seitenvorlage ist unabhängig vom Theme-Layout.
-- Bisher konnten Spielleiter Farben pro Kampagne über „Style“ einstellen.
-  Der aktuelle Umbau verlagert diese Einstellung ins Universum und übernimmt
-  sie in Profil und SpielUI. Live-Vorschau, Standardfarben und Kontrasthinweise
-  bleiben erhalten; freies CSS ist dafür nicht nötig.
+- Universumsgebundene Kampagnen, Profil und SpielUI übernehmen die Farben
+  des Universums. Lokale Altstile bleiben gespeichert; unabhängige
+  Altkampagnen behalten ihre bisherige Einstellung. Live-Vorschau,
+  Standardfarben und Kontrasthinweise sind vorhanden; freies CSS ist nicht nötig.
 - Die erste Würfelmechanik unterstützt begrenzte W-/D-Ausdrücke, optionale
   freigegebene Attributwerte und ein geschütztes Wurfprotokoll. Spielleiter
   bestimmen erlaubte Gruppen-, Privat- und verdeckte Würfe pro Kampagne.
@@ -218,7 +270,8 @@ als abgeschlossen markiert. Es gibt keinen ungeprüften Versionssprung.
   Universums-Gegenstandskataloge, frei benannte Slots/Seltenheiten, konkrete
   Inventarexemplare und freigabefähige Ausrüstung mit additiven Boni.
   Ohne Community bleiben Bestände erhalten und Boni inaktiv.
-  Handel ergänzt Version 0.20.0; ein grafischer Slotdesigner fehlt weiterhin.
+  Handel ergänzt Version 0.20.0. Slotlayout und geschützte Slotgrafiken sind
+  konfigurierbar; ein frei positionierbarer Drag-and-drop-Designer fehlt.
 - Version 0.15.0 ergänzt den privaten Abenteuerplan mit Kapitelreihenfolge,
   aktueller/nächster Szene und szenenbezogener Regie.
 - Version 0.16.0 ergänzt Währungsname und Kürzel, ganzzahlige Guthaben,
@@ -308,16 +361,20 @@ als abgeschlossen markiert. Es gibt keinen ungeprüften Versionssprung.
   die Universumsleitung und anschließende Kampagnenaufnahme getrennt halten.
 - [x] Gemeinsame Basisressourcen bei Abenteuerentscheidungen einmalig am
   maßgeblichen Basisbogen verbrauchen; veraltete Anträge und Wiederholungen sperren.
-- Konfigurierbare universumsweite Teilnahme und zusätzliche kampagnenbezogene
-  Freigaben. Aktuell entscheidet weiterhin jede Kampagne über ihre Mitglieder;
-  eine spätere Universumsmitgliedschaft darf keine Geschichten ungefragt öffnen.
+- [x] Universumsmitgliedschaft, Einladungen und konfigurierbarer Zugang zur
+  Charaktererstellung. Kampagnen und Spielrunden prüfen ihre Teilnahme
+  zusätzlich; Universumsmitgliedschaft öffnet keine privaten Geschichten.
 - [x] Feldweise Spielerrechte: direkt, mit Freigabe oder nur Spielleitung;
   unveränderte Vorgabe für bestehende Felder und getrennte aktive/beantragte Werte.
 - [x] Optionale Erfahrungs-/Stufenschwellen mit frei gewählten Feldern,
   bestätigter Migration und ohne Klassen oder automatische Attributboni.
 - [x] Optionale Würfelpools mit Erfolgszählung sowie höchster/niedrigster
   Einzelwürfel auf der Würfelbühne; bestehende Summen bleiben unverändert.
-- Ressourcenauflagen und getrennte Spielsitzungen bleiben offen.
+- [x] Getrennte Spielrunden mit eigener Teilnahme, Szene, Uhr und Fortschritt
+  für dieselbe vorbereitete Kampagne.
+- [x] Kampagnenbezogene Ressourcenauflagen: eigene aktuelle/maximale Werte
+  oder gemeinsamer Vorrat mit lokalem Maximum. Verbrauch, Heilung,
+  Konfliktreparatur und Sicherungsvalidierung berücksichtigen die Auflage.
 
 ## Grundprinzipien
 
@@ -342,17 +399,17 @@ als abgeschlossen markiert. Es gibt keinen ungeprüften Versionssprung.
 
 ### 1. Regeländerungen ohne Datenverlust
 
-Stabile Feldkennungen und eine Sperre für Änderungen an verwendeten
-Feldstrukturen schützen bestehende Charaktere bereits. Umbenennungen ändern
+Stabile Feldkennungen und kontrollierte Änderungen verwendeter
+Feldstrukturen schützen bestehende Charaktere. Umbenennungen ändern
 keine Feldkennung; neue Startwerte überschreiben keine bestehenden Werte.
 Neue Regeländerungen besitzen inzwischen zusätzlich einen Vorher-/Nachher-Verlauf.
-Eine Änderungsvorschau und kontrollierte strukturelle Übernahme stehen noch aus.
+Änderungsvorschau und bestätigte strukturelle Übernahme sind vorhanden.
 
 - Vor Änderungen an Wertebereichen, Feldtypen oder der Feldliste betroffene
   Charaktere und offene Freigabeanträge in einer Änderungsvorschau zeigen.
 - Ungültig werdende Werte ausdrücklich auflösen lassen, statt sie automatisch
-  abzuschneiden, zurückzusetzen oder zu löschen. Bis eine kontrollierte
-  Übernahme vorhanden ist, bleibt die bestehende Sperre erhalten.
+  abzuschneiden, zurückzusetzen oder zu löschen. Direkte Änderungen ohne
+  die erforderliche Vorschau und Bestätigung bleiben gesperrt.
 - Regeländerungen mit Revision und verantwortlichem Spielleiter dokumentieren.
   Bereits gespeicherte Würfe behalten ihre damaligen Werte und Bezeichnungen.
 
@@ -396,8 +453,9 @@ und ausgewählte Handoutempfänger sind ergänzt.
 
 Oberfläche, Zugsteuerung, Anwesenheit, AFK, eigene Bildhintergründe und Chat-Anbindung
 sind vorhanden. Seit 0.12.0 ist die Spielfläche mit freigegebenen Szenen und einem
-schlanken Kartentisch verbunden. Bild-Avatare, Bogen-Hintergründe, optionale
-Levelautomatik und der weitere Story-Builder-Ausbau bleiben Entwicklungsziele.
+schlanken Kartentisch verbunden. Private Charakterporträts, Bogen-Hintergründe
+und optionale Levelautomatik sind vorhanden. Gemeinsame Teilnehmerporträts,
+Bildbearbeitung und weiterer redaktioneller Komfort bleiben Entwicklungsziele.
 Vorbereitung und Spiel werden getrennt: Im Spielbereich stehen
 Gruppe, eigener Charakterbogen, Würfel und die freigegebene Szene im
 Vordergrund, nicht dauerhaft geöffnete Einstellungsformulare.
@@ -441,7 +499,7 @@ regelabhängige Kampfautomatik.
   vorsehen; Texte und Bedienelemente müssen unabhängig vom Bild lesbar bleiben.
 - Eine schlichte Darstellung ohne Hintergrundbild anbieten. Kleine,
   passende Bildgrößen und mobile Alternativen vermeiden unnötige Ladezeiten.
-- Ein internes Porträtsystem pro Charakter schaffen, unabhängig vom
+- Ein internes Porträtsystem pro Charakter verwenden, unabhängig vom
   Benutzeravatar und ohne verpflichtenden externen Avatar-Dienst.
 - Spieler dürfen im Rahmen der Kampagnenrechte eigene Porträts wählen;
   gegebenenfalls gilt die Freigabe durch die Spielleitung.
@@ -455,9 +513,10 @@ regelabhängige Kampfautomatik.
 
 - Level beziehungsweise frei benennbare Ränge als optionale Kampagnenregel
   anbieten; nicht jedes Spielsystem verwendet Stufen.
-- Zunächst nachvollziehbare Änderungen durch die Spielleitung oder einen
-  Freigabeantrag ermöglichen. Erfahrungspunkte und automatische Schwellen
-  sind ein späterer Ausbau, keine fest eingebaute Fortschrittskurve.
+- Nachvollziehbare Änderungen durch die Spielleitung oder einen
+  Freigabeantrag ermöglichen. Frei konfigurierte Erfahrungsschwellen,
+  abgeleitete Stufen und Start-/Levelpunkte sind vorhanden; keine fest
+  eingebaute Fortschrittskurve.
 - Entwicklung im Spielprotokoll dokumentieren; ein höherer Level verändert
   nicht automatisch Attribute, Ressourcen oder andere Regeln.
 
@@ -486,11 +545,13 @@ regelabhängige Kampfautomatik.
   Häufigkeit der Aktualisierung und Ablaufzeit vor der Umsetzung festlegen.
 
 **Weiterer Ausbau:** Private Charakterporträts und Bogen-Hintergründe sind
-seit 0.14.0 geschützt vorhanden; gemeinsame Teilnehmeravatare sowie ein
-Bildpositions-/Ausschnitteditor bleiben offen. Bilder für die Spielfläche sind seit 0.9.0
+seit 0.14.0 geschützt vorhanden. Ausdrücklich freigegebene Teilnehmerporträts
+sowie Bildfüllung und Position mit Vorschau sind inzwischen ergänzt;
+ein freier grafischer Ausschnitt-/Zoomeditor bleibt offen.
+Bilder für die Spielfläche sind seit 0.9.0
 geschützt möglich. Die zentrale Szenenfläche ist seit 0.12.0 angebunden;
 Kapitel und Text-/Bild-Handouts sind seit 0.13.0 vorhanden. Das optionale
-Levelsystem bleibt ein gesonderter Ausbau.
+Levelsystem einschließlich Startpunkten und Punkten je Aufstieg ist optional vorhanden.
 Das Handbuch beschreibt bereits die erste Spieltisch-Oberfläche.
 
 ## Module
@@ -528,7 +589,10 @@ Seit 0.27.0 steht die private Importvorschau mit frei wählbaren,
 berechtigungsgeprüften Zuordnungen bereit. Seit 0.29.0 können die geprüften
 Zuordnungen atomar als neue Kampagne oder bestätigter Ersatz gespeichert werden.
 
-Import/Export ist abgeschlossen, nicht der gesamte geplante Funktionsumfang.
+Import/Export einzelner Kampagnen ist implementiert, nicht der gesamte
+geplante Funktionsumfang. Neue Rundensicherungen archivieren Laufzeitautorität
+und Herkunft, statt alte aktive Runden ungeprüft wieder anzumelden; das ist
+keine vollständige Wiederherstellung der Lounge samt aller Rundenbeziehungen.
 Vorhandene Funktionen müssen auch über ihre tatsächlichen Bedienelemente
 nutzbar sein. Gemeldete Fehler in grundlegenden Abläufen, etwa der
 Universumszuordnung, werden vor darauf aufbauenden Erweiterungen behoben.
@@ -555,7 +619,9 @@ ist weiterhin kein Ziel.
    an anderen Kampagnen. Den Umgang mit gemeinsam genutzten Universumsdaten
    und optionalen Integrationen vor der Wiederherstellung festlegen; keine
    fremden oder nicht zum Export freigegebenen Daten übernehmen.
-2. **Vorhandene Kernabläufe tatsächlich bedienbar machen — unmittelbar:**
+2. **Game-Lounge und Profiltrennung fertig abnehmen — unmittelbar:**
+   Lounge, Spielmodi, unabhängige Runden und reine Charakterprofile sind
+   implementiert.
    Gemeldete Zuordnungs-, Formular- und Navigationsfehler auf der Testseite
    nachvollziehen und beheben. Anlegen, Zuordnen, Bearbeiten, Freigeben und
    Spielen über echte Backend-/Frontend-Bedienelemente prüfen. Direkte
@@ -578,7 +644,7 @@ ist weiterhin kein Ziel.
    Vorschau und Konfliktauflösung, Rückverbindungen, Basisbogenanträge und
    Freigaben, Auswahlfelder, Punkteverteilung und gemeinsamer Ressourcenverbrauch.
    Feldweise Rechte, optionale Erfahrungs-/Stufenschwellen und zusätzliche
-   Würfelmechaniken sind ergänzt. Ressourcenauflagen bleiben offen.
+   Würfelmechaniken und Ressourcenauflagen sind ergänzt.
 5. **Spielwelt — beauftragte Grundlagen umgesetzt:** Mehrere Beuteempfänger,
    Gegenstandsgruppen, verschachtelte Tabellen einschließlich Wiederherstellung,
    Wiki-Verknüpfungen, geschützte PDF-/Text-Handouts, Empfängerkreise und
@@ -652,9 +718,12 @@ sie stellen die noch fehlenden Kernfunktionen nicht pauschal zurück:
   und automatische Wiederverbindungen sind während der Speicherung gesperrt.
   Tests prüfen getrennte Leser, Fehler, Ausnahmen und separate Prozesse, die
   vor beziehungsweise nach dem Commit enden.
-- [ ] Mehrparteientransfers und deren Wiederholbarkeit gesondert absichern.
-  Die Dokumenttransaktion ist keine atomare Übertragung zwischen mehreren
-  Charakteren und deckt keine externen Hook-Nebenwirkungen ab.
+- [x] Atomaren Zweiparteienhandel sowie ausdrücklich bestätigte Transfers
+  zwischen Kampagnen desselben Universums einschließlich Wiederholungsabwehr
+  implementieren.
+- [ ] Echte Mehrparteienvorgänge mit mehr als zwei Parteien gesondert absichern,
+  sofern beauftragt. Vorhandene Fachtransaktionen sind kein allgemeiner
+  Transfermechanismus und decken keine beliebigen externen Hook-Nebenwirkungen ab.
 - [ ] Echte Mehrprozess- und Zwei-Subsite-Tests sowie die unterstützte
   WordPress-/ClassicPress-/PHP-Matrix ergänzen.
 - [x] Seit 0.26.0 versionierten Kampagnenexport mit Regeln, Charakteren,
@@ -685,7 +754,8 @@ sie stellen die noch fehlenden Kernfunktionen nicht pauschal zurück:
 Gemeinsamer Basisfortschritt aus einem Universum bleibt ein eigener Vorgang:
 Er kann weiterhin eine lokale Ausrüstungsanpassung erfordern. Die Sperre
 verspricht weder atomare universumsweite Änderungen noch einen sicheren
-Geld- oder Gegenstandstransfer zwischen mehreren Charakteren.
+beliebigen Geld- oder Gegenstandstransfer. Dafür sind die eigenen geprüften
+Handels- und Transferwriter zu verwenden.
 
 ## Phase 0: Grundlagen und Entscheidungen
 
@@ -732,8 +802,8 @@ Nichtmitglieder erhalten keinen Zugriff auf geschützte Inhalte.
 - Alle Eingaben und Punkteverteilungen serverseitig prüfen.
 - Regeländerungen entsprechend den obigen Prioritäten nachvollziehbar machen.
   Umbenennungen von strukturellen Änderungen unterscheiden; bestehende Werte
-  und offene Freigaben nicht stillschweigend verändern. Die Sperre verwendeter
-  Feldstrukturen erst durch eine geprüfte Übernahme mit Änderungsvorschau ersetzen.
+  und offene Freigaben nicht stillschweigend verändern. Verwendete Feldstrukturen
+  ausschließlich über die vorhandene Vorschau und bestätigte Übernahme ändern.
 
 **Beispiel:** Eine Kampagne verteilt 30 Punkte auf vier selbst benannte
 Attribute; eine andere nutzt stattdessen eigene Werte und eine Ressource „Wut“.
@@ -786,9 +856,14 @@ frei. Die Gruppe kann die Szene ansehen und würfeln.
 ### PS Chat
 
 PS Chat ist über ergänzte Zugangs- und Moderationsschnittstellen als
-optionale Chatbox in den Spieltisch integriert. Die Runde entspricht derzeit
-den eingetragenen Kampagnenmitgliedern, nicht einer separaten Sitzungsanmeldung.
-Eine Übertragung freigegebener Gruppenwürfe ist noch nicht vorhanden.
+optionale Chatbox in den Spieltisch integriert. Neue Spielrunden besitzen
+eigene Chatraumkennungen und prüfen ihre Rundenteilnahme zusätzlich zur
+Quellkampagnenmitgliedschaft; die Spielleitung behält ihren Leitungszugang.
+Bei alten Kampagnen ohne Rundenscope gilt weiterhin die Kampagnenmitgliedschaft.
+Die letzten 20 öffentlichen Gruppenwürfe erscheinen zusätzlich in einer
+eigenen Liste im Chatpanel und werden aus dem geschützten Wurfprotokoll
+aktualisiert. Private und verdeckte Würfe bleiben ausgeschlossen, auch für
+die Leitung. Es werden keine PS-Chat-Nachrichten dupliziert.
 PS Chat übernimmt Nachrichten und Moderation; das
 Pen-&-Paper-Plugin ergänzt die grafische Einbettung und die Zuordnung der
 Rundenteilnehmer.
@@ -827,7 +902,7 @@ Rundenteilnehmer.
 **Grundlage seit 0.14.0, Währung und Bindung seit 0.16.0, Handel seit 0.20.0:**
 
 - Ein eigener Profil-Tab „Pen & Paper“ bündelt die eigenen Charaktere mit
-  ausdrücklicher Auswahl des Kampagnenkontexts. Charakterbearbeitung verwendet
+  Figurenwahl und Universumswahl für neue Charaktere. Charakterbearbeitung verwendet
   weiterhin dieselben Besitzerrechte und Freigaben wie der Spielbereich.
 - Profilbesucher und Freunde erhalten nicht automatisch Zugriff auf Bögen,
   Inventare oder private Spielinhalte. Freundschaften ersetzen keine
@@ -854,7 +929,7 @@ beziehungsweise charaktergebunden gekennzeichnete Exemplare sind seit
 0.16.0 vorhanden. **Seit 0.20.0 vorhanden:** revisionsgeschützte Handelsangebote. Beteiligte
 stimmen ausdrücklich zu; eine zusätzliche Spielleiterfreigabe ist einstellbar
 und standardmäßig erforderlich. Handelsgrundregeln gehören zum Universum;
-Kampagnen ohne Universum besitzen eine eigene Einstellung. Universumsregeln
+Ältere Kampagnen ohne Universum besitzen eine eigene Einstellung. Universumsregeln
 werden standardmäßig übernommen; eine ausdrücklich lokale Wirtschaftszuordnung
 erhält stattdessen die Kampagnenregeln. Zunächst ist nur
 Handel derselben Kampagne zwischen unterschiedlichen Besitzern möglich.
@@ -917,7 +992,7 @@ ausdrücklich gemeldet und lassen sich durch Ablegen reparieren.
   NPCs und Gegner mit freien Eigenschaften und Werten die Spielleitermappe.
 - Begegnungen, Gegner und Ereignisse für Szenen vorbereiten.
 - Gegenstandsvorlagen in einem gemeinsamen Universumskatalog sowie ergänzend
-  kampagneneigenen Katalogen verwalten. Kampagnen ohne Universum verwenden
+  kampagneneigenen Katalogen verwalten. Ältere Kampagnen ohne Universum verwenden
   ausschließlich ihren eigenen Katalog. Gemeinsame Vorlagen erlauben keinen
   automatischen Handel zwischen Kampagnen.
 - Die Spielleitung erstellt Gegenstände mit Name, Beschreibung, geschützter
@@ -949,7 +1024,7 @@ ausdrücklich gemeldet und lassen sich durch Ablegen reparieren.
 **Währung, Guthaben, Bindung und erster kontrollierter Handel implementiert.**
 Die Universumsleitung beziehungsweise Administration wählt in den Einstellungen
 getrennte Kampagnenkonten oder ein gemeinsames Konto am Universumscharakter.
-Kampagnen ohne Universum konfigurieren ihre Währung lokal.
+Ältere Kampagnen ohne Universum konfigurieren ihre Währung lokal.
 
 - [x] Frei benennbare Währung mit Kürzel, ausschließlich ganze Einheiten.
   Kontostände von 0 bis 999999999, keine Nachkommastellen oder Überziehung;
@@ -1076,8 +1151,8 @@ oder Guthaben allein erteilen keine Übertragungsfreigabe.
 1. **Seit 0.16.0 umgesetzt:** Einstellbare Geltungsbereiche, passende
    Buchungsrechte, Währung, Guthaben und eingefrorene Gegenstandsbindung.
 2. **Gegner-/NPC-Vorlagen seit 0.17.0 und erste kontrollierte Beutetabellen
-   seit 0.18.0 umgesetzt.** Gruppen, verschachtelte Tabellen und Aufteilung
-   bleiben spätere Erweiterungen.
+   seit 0.18.0 umgesetzt.** Gegenstandsgruppen, verschachtelte Tabellen und
+   Aufteilung auf mehrere Empfänger sind ebenfalls vorhanden.
 3. **Seit 0.19.0 umgesetzt:** Optionale öffentliche PS-Wiki-Anbindung mit
    geschützter Verwaltung, stabiler Zuordnung und bewusst veröffentlichten Texten.
 4. **Seit 0.20.0 umgesetzt:** Kontrollierter Handel mit konfigurierbaren Arten,
@@ -1085,9 +1160,9 @@ oder Guthaben allein erteilen keine Übertragungsfreigabe.
 5. **Soloausbau bis 0.25.0 vorhanden:** Mindestwerte, Ressourcenkosten,
    Belohnungen und UND-/ODER-Wertebedingungen. Kampagnenimport/-export ist
    seit 0.29.0 vorhanden, die funktionale Abenteuerplanung aber noch nicht fertig.
-6. Als nächsten Funktionsblock Begegnungen sowie weitere Solo-, Gruppen- und
-   hybride Abläufe ausbauen; Entscheidungsverfahren und Teilnahmeverhalten
-   je Abenteuer konfigurierbar machen.
+6. Begegnungsphasen, Solo-, Gruppen- und hybride Abläufe sowie konfigurierbare
+   Entscheidungsverfahren sind vorhanden. Vorrang haben jetzt die vollständige
+   Lounge-/Profiltrennung und die Bedienabnahme des neuen Rundeneinstiegs.
 
 ## Phase 7: Geleitete, hybride und automatisierte Abenteuer
 
@@ -1096,9 +1171,9 @@ behält die Kontrolle über Vorbereitung und Freigabe. Mindestwerte und
 optionale Ressourcenkosten ergänzen den Ablauf seit 0.22.0 beziehungsweise
 0.23.0; seit 0.24.0 folgen konfigurierbare einmalige Belohnungen.
 Hybride Freigabeschritte und gemeinsame Gruppendurchläufe mit konfigurierbaren
-Entscheidungen, Teilnahme und Wiedereinstieg sind ergänzt. Weitere Voraussetzungen,
-Begegnungen bleiben Funktionsausbau;
-sie werden nicht pauschal hinter eine abschließende Stabilisierungsphase zurückgestellt.
+Entscheidungen, Teilnahme und Wiedereinstieg sind ergänzt. Gegenstands- und
+Fortschrittsvoraussetzungen, Abenteuerzustände und geordnete Begegnungsphasen
+sind vorhanden. Weitere Erweiterungen werden nach konkretem Bedarf priorisiert.
 
 - [x] Pro Charakter einen eigenen Durchlauf aus einem ausdrücklich
   freigegebenen Szenenstand speichern; der Durchlauf friert Szenen und
@@ -1119,8 +1194,8 @@ sie werden nicht pauschal hinter eine abschließende Stabilisierungsphase zurüc
   bezahlen oder nur bei Erfolg; ohne Probe immer. Ausreichenden freigegebenen
   Bestand vor jedem Versuch prüfen, Untergrenzen erhalten und Verbrauch,
   Fortschritt sowie private Pflichtereignisse gemeinsam speichern.
-  Kostenpflichtige Versuche vorläufig auf lokale Bögen und unabhängige Kopien
-  ohne offenen Werteantrag begrenzen; kostenfreie Alternativen bleiben möglich.
+  Gemeinsame Basisressourcen sind ebenfalls eingebunden; offene beziehungsweise
+  veraltete Werteanträge dürfen die maßgeblichen freigegebenen Bestände nicht umgehen.
 - [x] Teamdurchläufe mit eigenem gemeinsamen Fortschritt, frei wählbarer
   Einzelentscheidung, Mehrheit, Einstimmigkeit oder Spielleiterfreigabe anbieten.
   Echte Besitzer führen persönliche Aktionen aus; Teilnahmewechsel, Pausen und
@@ -1252,8 +1327,9 @@ Spielwelterweiterungen werden dadurch nicht wieder zurückgestellt:
   Attributpunkten je Level sind vorhanden. Weiterführende
   Rangregeln und Freigabeabläufe bleiben mögliche spätere Erweiterungen.
 - Sitzungsnotizen, Terminübersicht und Zusammenfassungen vergangener Sitzungen.
-- Import und Export eigener Kampagnen- oder Regelvorlagen mit klaren Optionen
-  für private Inhalte und personenbezogene Daten.
+- Den vorhandenen Kampagnenimport/-export bei Bedarf um eigenständige
+  Regelvorlagen erweitern, mit klaren Optionen für private Inhalte und
+  personenbezogene Daten.
 - Druckansicht oder PDF-Export für Charakterbögen und Spielleiternotizen.
 - Optionale Benachrichtigungen bei Einladungen, Freigaben und neuen Szenen.
 - Den seit 0.12.0 vorhandenen Kartentisch mit Markern bei Bedarf um einen
@@ -1288,7 +1364,7 @@ Optionen bereit, statt eine einzige globale Spielweise festzulegen.
 3. Charakterfreigaben und Würfelsichtbarkeit sind bereits pro Kampagne
    konfigurierbar. Universumsbasisbögen besitzen Spieleranträge und getrennte
    Freigaben durch die Universumsleitung.
-4. Änderungen verwendeter Feldstrukturen benötigen eine Vorschau und
+4. Änderungen verwendeter Feldstrukturen besitzen eine Vorschau und
    ausdrückliche Konfliktlösungen für bestehende Charaktere und offene Anträge.
 5. Welche Wiki- und Chat-Zugriffsrechte sind bereits vorhanden, und wo werden
    gegebenenfalls Erweiterungen der anderen Plugins benötigt?
@@ -1305,5 +1381,6 @@ Optionen bereit, statt eine einzige globale Spielweise festzulegen.
    ausschließlich zwischen Kampagnen desselben Universums. Die zuständige
    Spielleitung bestimmt die Freigabe; Abenteuerdurchläufe umgehen diese
    Kontrolle nicht. Keine Übertragungen zwischen getrennten Universen.
-10. Wie werden Entscheidungen, Proben, Wiedereinstieg und Belohnungen in
-    automatisch spielenden Gruppen geregelt?
+10. Entscheidungsverfahren, Teilnahme, Wiedereinstieg, persönliche Proben,
+    Kosten und Belohnungen automatischer Gruppen sind konfigurierbar.
+    Die vollständige Bedienabnahme über die Game-Lounge bleibt offen.

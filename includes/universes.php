@@ -112,7 +112,7 @@ function ps_pen_paper_preview_universe_link( $campaign_id, $universe_id, $econom
 	if ( ! ps_pen_paper_can_access_site() || ! $campaign || ! ps_pen_paper_can_manage_campaign( $campaign ) ) {
 		return new WP_Error( 'forbidden', __( 'Nur die Kampagnenleitung darf eine Universumszuordnung prüfen.', 'ps-pen-paper' ) );
 	}
-	if ( ! is_int( $universe_id ) || $universe_id < 0 || ! in_array( $economy_mode, array( 'universe', 'local' ), true ) ) {
+	if ( ! is_int( $universe_id ) || $universe_id < 1 || ! in_array( $economy_mode, array( 'universe', 'local' ), true ) ) {
 		return new WP_Error( 'invalid_universe', __( 'Bitte wähle ein gültiges Universum.', 'ps-pen-paper' ) );
 	}
 	$before = ps_pen_paper_get_universe_link( $campaign_id );

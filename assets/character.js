@@ -1,6 +1,21 @@
 (function () {
 	'use strict';
 
+	document.querySelectorAll('[data-image-view]').forEach(function (fields) {
+		const image = fields.querySelector('[data-image-view-preview]');
+		if (!image) return;
+		function update() {
+			const x = fields.querySelector('[name="image_view[x]"]');
+			const y = fields.querySelector('[name="image_view[y]"]');
+			const fit = fields.querySelector('[name="image_view[fit]"]');
+			if (!x.checkValidity() || !y.checkValidity()) return;
+			image.style.objectPosition = x.value + '% ' + y.value + '%';
+			image.style.objectFit = fit.value;
+		}
+		fields.addEventListener('input', update);
+		fields.addEventListener('change', update);
+	});
+
 	document.querySelectorAll('[data-character-allocation]').forEach(function (counter) {
 		const inputs = Array.from(counter.closest('form').querySelectorAll('[data-character-allocation-field] input'));
 		const budget = Number(counter.dataset.pointBudget);

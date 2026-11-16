@@ -95,11 +95,11 @@ function ps_pen_paper_render_trade_items( $campaign, $character_id ) {
 	echo '</fieldset>';
 }
 
-function ps_pen_paper_render_character_trade( $campaign, $character, $page_id ) {
+function ps_pen_paper_render_character_trade( $campaign, $character, $page_id, $context = 'game' ) {
 	if ( ! ps_pen_paper_can_access_site() || 'pspp_campaign' !== $campaign->post_type || ! ps_pen_paper_get_character( $campaign, $character->ID ) ) { return; }
 	$policy = ps_pen_paper_trade_policy( $campaign ); $records = ps_pen_paper_trade_records( $campaign ); $gear = ps_pen_paper_gear_state( $character->ID );
 	if ( is_wp_error( $policy ) || is_wp_error( $records ) || is_wp_error( $gear ) ) { echo '<p role="alert">' . esc_html( ps_pen_paper_trade_error()->get_error_message() ) . '</p>'; return; }
-	$actor = get_current_user_id(); $gm = ps_pen_paper_can_manage_campaign( $campaign ); $p = $policy['policy'];
+	$actor = get_current_user_id(); $gm = 'profile' !== $context && ps_pen_paper_can_manage_campaign( $campaign ); $p = $policy['policy'];
 	?>
 	<section id="pspp-trade-<?php echo esc_attr( $character->ID ); ?>" data-character-trade="<?php echo esc_attr( $character->ID ); ?>"><h3><?php esc_html_e( 'Handel', 'ps-pen-paper' ); ?></h3>
 	<p><?php esc_html_e( 'Nur handelbare, weder aktiv noch in einem Antrag angelegte Exemplare. Angebote reservieren Gegenstände, nicht Geld. Fremde Inventare und Guthaben bleiben privat. Bei einem Tausch wählt die Gegenseite ihre Exemplare; erst danach bestätigt der Anbieter die konkreten Bedingungen.', 'ps-pen-paper' ); ?></p>

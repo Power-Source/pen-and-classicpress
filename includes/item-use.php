@@ -503,7 +503,9 @@ function ps_pen_paper_write_permanent_item_effect( $campaign, $character, $delta
 		$value = $current + $delta;
 		$maximum = $resource ? min( $fields[ $id ]['max'], $state['active']['values'][ $id ]['maximum'] ) : $fields[ $id ]['max'];
 		if ( ! is_int( $current ) || $value < $fields[ $id ]['min'] || $value > $maximum ) { return ps_pen_paper_equipment_error( 'effect_range' ); }
-		if ( isset( $before['context'] ) && ! $resource ) {
+		if ( $resource && 'local' === ( $before['context']['resources'][ $id ]['mode'] ?? '' ) ) {
+			$after['context']['resources'][ $id ]['current'] = $value;
+		} elseif ( isset( $before['context'] ) && ! $resource ) {
 			$after['context']['overrides'][ $id ] = $value;
 		} elseif ( isset( $before['context'] ) && 'shared' === $before['context']['mode'] && $resource ) {
 			if ( ! $source ) {

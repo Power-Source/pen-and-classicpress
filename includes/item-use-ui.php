@@ -82,7 +82,7 @@ function ps_pen_paper_render_item_use_actions( $campaign, $character, $uuid, $ge
 	ps_pen_paper_render_item_use_summary( $campaign, $item['use_rule'], $action_context, is_wp_error( $permission ) ? 'approval' : $permission );
 	if ( is_wp_error( $permission ) ) {
 		echo '<p>' . esc_html( $permission->get_error_message() ) . '</p>';
-		if ( ! $request || 'approval' !== $request['condition'] || ! ps_pen_paper_can_manage_character_scope( $campaign ) ) { return; }
+		if ( 'profile' === $context || ! $request || 'approval' !== $request['condition'] || ! ps_pen_paper_can_manage_character_scope( $campaign ) ) { return; }
 		if ( ps_pen_paper_item_use_form_start( $campaign, $character, 'review_item_use', $gear, $page_id, $uuid ) ) { echo '<button name="equipment[decision]" value="reject">' . esc_html__( 'Gesperrten Verbrauchsantrag ablehnen', 'ps-pen-paper' ) . '</button></form>'; }
 		return;
 	}
@@ -90,7 +90,7 @@ function ps_pen_paper_render_item_use_actions( $campaign, $character, $uuid, $ge
 	if ( $request ) {
 		echo '<p>' . esc_html__( 'Verbrauch beantragt; bisher keine Wirkung und kein Verbrauch.', 'ps-pen-paper' ) . '</p>';
 		if ( 'approval' === $request['condition'] ) {
-			if ( ps_pen_paper_can_manage_character_scope( $campaign ) && ps_pen_paper_item_use_form_start( $campaign, $character, 'review_item_use', $gear, $page_id, $uuid ) ) {
+			if ( 'profile' !== $context && ps_pen_paper_can_manage_character_scope( $campaign ) && ps_pen_paper_item_use_form_start( $campaign, $character, 'review_item_use', $gear, $page_id, $uuid ) ) {
 				echo '<button name="equipment[decision]" value="approve">' . esc_html__( 'Verbrauch und Wirkung freigeben', 'ps-pen-paper' ) . '</button><button name="equipment[decision]" value="reject">' . esc_html__( 'Ablehnen (Versuch beenden)', 'ps-pen-paper' ) . '</button></form>';
 			}
 			return;
@@ -104,11 +104,11 @@ function ps_pen_paper_render_item_use_actions( $campaign, $character, $uuid, $ge
 	}
 }
 
-function ps_pen_paper_render_item_effects( $campaign, $character, $gear, $page_id ) {
+function ps_pen_paper_render_item_effects( $campaign, $character, $gear, $page_id, $context = 'game' ) {
 	foreach ( $gear['uses']['effects'] ?? array() as $uuid => $effect ) {
 		if ( ! $effect['temporary'] || $effect['ended'] ) { continue; }
 		echo '<p>' . esc_html( __( 'Aktiver temporärer Effekt:', 'ps-pen-paper' ) . ' ' . $effect['name'] . ( $effect['expires'] ? ' · ' . __( 'Endrunde:', 'ps-pen-paper' ) . ' ' . $effect['expires'] : '' ) ) . '</p>';
-		if ( ps_pen_paper_can_manage_character_scope( $campaign ) && ps_pen_paper_item_use_form_start( $campaign, $character, 'end_item_effect', $gear, $page_id, $uuid ) ) { echo '<button>' . esc_html__( 'Effekt ausdrücklich beenden', 'ps-pen-paper' ) . '</button></form>'; }
+		if ( 'profile' !== $context && ps_pen_paper_can_manage_character_scope( $campaign ) && ps_pen_paper_item_use_form_start( $campaign, $character, 'end_item_effect', $gear, $page_id, $uuid ) ) { echo '<button>' . esc_html__( 'Effekt ausdrücklich beenden', 'ps-pen-paper' ) . '</button></form>'; }
 	}
 }
 

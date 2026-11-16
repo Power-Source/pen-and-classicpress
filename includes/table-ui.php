@@ -136,7 +136,10 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 						<?php ps_pen_paper_render_member_invitation_form( $campaign, $page_id ); ?>
 					</details>
 				</aside>
-				<section id="pspp-play" class="pspp-table-panel pspp-table-stage pspp-scene" data-table-panel="play"<?php if ( ! is_wp_error( $backdrop ) && $backdrop ) : ?> style="<?php echo esc_attr( '--pspp-table-image:url("' . $backdrop . '")' ); ?>"<?php endif; ?>>
+				<section id="pspp-play" class="pspp-table-panel pspp-table-stage pspp-scene" data-table-panel="play"<?php if ( ! is_wp_error( $backdrop ) && $backdrop ) :
+					$backdrop_state = ps_pen_paper_get_backdrop( $campaign->ID );
+					$view_style = ps_pen_paper_image_view_style( $backdrop_state['view'] ?? null, true );
+					?> style="<?php echo esc_attr( '--pspp-table-image:url("' . $backdrop . '");' . $view_style ); ?>"<?php endif; ?>>
 					<div class="pspp-table-prompts">
 						<a href="#pspp-group-adventures"><?php esc_html_e( 'Abenteuer starten / fortsetzen', 'ps-pen-paper' ); ?></a>
 						<a href="#pspp-dice"><?php esc_html_e( 'Würfeln', 'ps-pen-paper' ); ?></a>

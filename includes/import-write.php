@@ -72,7 +72,7 @@ function ps_pen_paper_import_identity_map( $parsed, $options ) {
 	}
 	if ( 'bind' === $options['universe_mode'] ) {
 		$link = ps_pen_paper_import_meta( $parsed, $parsed['archive']['payload']['source']['campaign_id'], '_pspp_universe_link' );
-		$map[ $link['universe_id'] ] = $options['universe_id'];
+		if ( ! empty( $link['universe_id'] ) ) { $map[ $link['universe_id'] ] = $options['universe_id']; }
 		foreach ( $options['bases'] as $source => $target ) { $map[ $source ] = $target; }
 	}
 	$used = array_fill_keys( array_values( $map ), true ); $next = 1;
@@ -154,11 +154,11 @@ function ps_pen_paper_restore_campaign_locked( $token, $fingerprint, $archive_un
 		$map = array( $source_id => $target_id );
 		if ( 'bind' === $options['universe_mode'] ) {
 			$link = ps_pen_paper_import_meta( $parsed, $source_id, '_pspp_universe_link' );
-			$map[ $link['universe_id'] ] = $options['universe_id'];
+			if ( ! empty( $link['universe_id'] ) ) { $map[ $link['universe_id'] ] = $options['universe_id']; }
 			foreach ( $options['bases'] as $source => $target_base ) { $map[ $source ] = $target_base; }
 		}
 		foreach ( $parsed['records'] as $id => $record ) {
-			if ( isset( $map[ $id ] ) || ( 'bind' === $options['universe_mode'] && $record['parent_id'] === $parsed['universe_id'] ) ) { continue; }
+			if ( isset( $map[ $id ] ) || ( 'bind' === $options['universe_mode'] && $parsed['universe_id'] && $record['parent_id'] === $parsed['universe_id'] ) ) { continue; }
 			$mapped = ps_pen_paper_import_insert_post( $record, 0, get_current_user_id() );
 			if ( is_wp_error( $mapped ) ) { return $mapped; }
 			$map[ $id ] = $mapped; $allocated[] = $mapped;

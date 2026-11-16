@@ -165,7 +165,6 @@ function ps_pen_paper_render_import_preview( $token, $page_id = 0 ) {
 		<p><label for="pspp-import-universe-mode"><?php esc_html_e( 'Universumsdaten', 'ps-pen-paper' ); ?></label>
 			<select id="pspp-import-universe-mode" name="import[universe_mode]">
 				<option value=""><?php esc_html_e( 'Bitte auswählen', 'ps-pen-paper' ); ?></option>
-				<option value="none" <?php selected( $options['universe_mode'], 'none' ); ?>><?php esc_html_e( 'Eigenständige Kampagne ohne Universum', 'ps-pen-paper' ); ?></option>
 				<option value="copy" <?php selected( $options['universe_mode'], 'copy' ); ?>><?php esc_html_e( 'Enthaltenes Universum getrennt wiederherstellen', 'ps-pen-paper' ); ?></option>
 				<option value="bind" <?php selected( $options['universe_mode'], 'bind' ); ?>><?php esc_html_e( 'Bestehendes Universum und Basisbögen zuordnen', 'ps-pen-paper' ); ?></option>
 			</select>

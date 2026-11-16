@@ -80,6 +80,9 @@ function ps_pen_paper_handle_admin_action() {
 	}
 
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
+	if ( isset( $_POST['pspp_profile'] ) && ! ps_pen_paper_profile_operation_allowed( $operation, wp_unslash( $_POST ) ) ) {
+		ps_pen_paper_fail( __( 'Diese Aktion gehört nicht ins Charakterprofil. Öffne dafür die Game-Lounge oder die Spielverwaltung.', 'ps-pen-paper' ) );
+	}
 	$page_id = ps_pen_paper_posted_id( 'pspp_frontend_page' );
 	if ( in_array( $operation, array( 'create', 'update', 'save_rules', 'save_rules_migration', 'add_member', 'remove_member' ), true ) ) {
 		if ( ! ps_pen_paper_can_access_site() ) {

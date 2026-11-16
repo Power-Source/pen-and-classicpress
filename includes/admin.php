@@ -103,6 +103,7 @@ function ps_pen_paper_handle_admin_action() {
 		}
 	}
 	if ( in_array( $operation, array( 'save_play_options', 'create_play_round', 'change_play_round' ), true ) ) { ps_pen_paper_handle_play_action( $operation, $page_id, $scope_id ); }
+	if ( 'change_booking_link' === $operation ) { ps_pen_paper_handle_booking_action( $page_id, $scope_id ); }
 	if ( 'group_adventure' === $operation ) { ps_pen_paper_handle_adventure_group_action(); }
 	if ( 'leave_campaign' === $operation ) {
 		if ( ! ps_pen_paper_frontend_page( $page_id ) ) { ps_pen_paper_fail( __( 'Die Spielbereich-Seite ist nicht mehr verfügbar.', 'ps-pen-paper' ) ); }

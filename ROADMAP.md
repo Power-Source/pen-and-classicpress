@@ -64,6 +64,26 @@ ungeprüften Versionssprung. Die Versionsübersicht weiter unten ist historisch.
   implementiert. Eine freie grafische Bildbearbeitung und die vollständige
   Plattformmatrix sind dadurch nicht abgenommen.
 
+### Optionale Terminplanung mit PS Events
+
+- [x] Vorhandenes `events-and-bookings` optional verwenden, statt einen
+  eigenen Terminplaner oder parallele Anmeldelisten zu entwickeln.
+- [x] Spielleitungen verknüpfen bearbeitbare Veranstaltungen mit Kampagnen
+  und einzelnen Spielrunden; Verknüpfungen lassen sich wieder lösen.
+- [x] Anstehende Termine universumsübergreifend in Lounge und
+  Verwaltungsübersicht sowie im passenden Kampagnen-/Rundenkontext anzeigen.
+  Zu-/Absagen und Veranstaltungsverwaltung bleiben auf der nativen
+  PS-Events-Veranstaltungsseite.
+- [x] Terminzusage, Spielzugang und Charakterwahl bleiben getrennt.
+  Deaktivierung oder Terminabsage verändert keine Spielstände.
+- [x] Veranstaltungsrechte, private Solo-Runden, gelöschte Termine und
+  veraltete Zuordnungsformulare beachten. Lokale Veranstaltungs-IDs werden
+  weder in neue Runden kopiert noch in Kampagnensicherungen exportiert.
+- Die gezielte Regression verwendet das echte Nachbarplugin mit
+  verbindungslokalen temporären Buchungstabellen; vorhandene Anmeldungen und
+  der Aktivierungszustand werden nicht verändert. Eine umfassende
+  Browser-/Plattformprüfung aller PS-Events-Zusatzmodule ist damit nicht erledigt.
+
 ### 1. Universum als verpflichtende Grundlage
 
 - [x] Vor der ersten regulären Kampagnenanlage muss mindestens ein Universum existieren.
@@ -1326,7 +1346,9 @@ Spielwelterweiterungen werden dadurch nicht wieder zurückgestellt:
 - Optionale Erfahrungs-/Stufenschwellen und Startpunkte mit zusätzlichen
   Attributpunkten je Level sind vorhanden. Weiterführende
   Rangregeln und Freigabeabläufe bleiben mögliche spätere Erweiterungen.
-- Sitzungsnotizen, Terminübersicht und Zusammenfassungen vergangener Sitzungen.
+- Sitzungsnotizen und Zusammenfassungen vergangener Sitzungen.
+  Terminplanung und Zu-/Absagen übernimmt optional PS Events; die Anbindung
+  ist vorhanden, ein eigener Terminplaner ist nicht vorgesehen.
 - Den vorhandenen Kampagnenimport/-export bei Bedarf um eigenständige
   Regelvorlagen erweitern, mit klaren Optionen für private Inhalte und
   personenbezogene Daten.

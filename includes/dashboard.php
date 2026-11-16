@@ -35,6 +35,7 @@ function ps_pen_paper_render_dashboard( $page_id = 0 ) {
 	<h2><?php esc_html_e( 'Vorbereiten & verwalten', 'ps-pen-paper' ); ?></h2>
 	<?php $game_page = ps_pen_paper_find_frontend_page( $page_id ); ?>
 	<?php if ( $game_page ) : ?><p><a href="<?php echo esc_url( ps_pen_paper_game_url( $game_page->ID ) ); ?>"><?php esc_html_e( 'Zur Game-Lounge', 'ps-pen-paper' ); ?></a></p><?php endif; ?>
+	<?php ps_pen_paper_render_booking_agenda( $game_page ? $game_page->ID : 0 ); ?>
 	<?php
 }
 

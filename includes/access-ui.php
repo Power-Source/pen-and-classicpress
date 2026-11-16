@@ -137,6 +137,7 @@ function ps_pen_paper_render_access_settings( $campaign, $page_id = 0 ) {
 	<?php ps_pen_paper_render_currency_settings( $campaign, $page_id ); ?>
 	<?php ps_pen_paper_render_trade_policy( $campaign, $page_id ); ?>
 	<?php ps_pen_paper_render_export_settings( $campaign, $page_id ); ?>
+	<?php ps_pen_paper_render_booking_settings( $campaign, $page_id ); ?>
 	<section class="pspp-settings-section">
 		<h3><?php esc_html_e( 'Zugang & Privatsphäre', 'ps-pen-paper' ); ?></h3>
 		<?php ps_pen_paper_form_start( 'save_access', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>

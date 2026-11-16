@@ -79,7 +79,8 @@ function ps_pen_paper_export_campaign( $campaign_id, $mode ) {
 				'meta' => array(),
 			);
 		}
-		if ( null !== $row['meta_key'] && 0 === strpos( $row['meta_key'], '_pspp_' ) ) {
+		// Event IDs belong to the local scheduling service, not a portable game backup.
+		if ( null !== $row['meta_key'] && '_pspp_booking_links' !== $row['meta_key'] && 0 === strpos( $row['meta_key'], '_pspp_' ) ) {
 			$records[ $id ]['meta'][] = array( 'key' => $row['meta_key'], 'value' => $row['meta_value'] );
 		}
 	}

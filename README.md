@@ -60,6 +60,14 @@ mit Vorschau einstellbar. Der Rundenchat zeigt zusätzlich die letzten
 von PS Chat. Private und verdeckte Würfe bleiben ausgeschlossen; es werden
 keine zusätzlichen PS-Chat-Nachrichten erzeugt.
 
+Mit installiertem und aktiviertem **PS Events / Events & Bookings**
+(`events-and-bookings`) können Spielleitungen Veranstaltungen mit Kampagnen
+und einzelnen Spielrunden verknüpfen. Anstehende Spieltermine erscheinen
+universumsübergreifend in der Lounge und Verwaltungsübersicht. Termine,
+Anmeldungen und Zu-/Absagen bleiben in PS Events; eine Terminzusage erteilt
+keinen Spielzugang und wählt keinen Charakter. Ohne PS Events läuft das Spiel
+unverändert weiter. [Einrichtung und Grenzen](docs/handbuch.md#23-spieltermine-mit-ps-events).
+
 Die drei Spielarten wurden exemplarisch über echte Browserformulare bis zum
 Abschluss und Austritt geprüft, einschließlich Pause, Wiedereinstieg und
 Figurenwechsel in der Gruppe. Die gezielten nativen Regressionen und

@@ -70,6 +70,7 @@ function ps_pen_paper_render_play_directory( $source, $page_id, $mode = 'choose'
 	<section class="pspp-play-directory"><h2><?php echo esc_html( $source->post_title ); ?></h2>
 		<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id ) ); ?>"><?php esc_html_e( 'Zur Game-Lounge', 'ps-pen-paper' ); ?></a>
 		<?php ps_pen_paper_render_notice(); ps_pen_paper_render_lounge_modes( $source, $page_id ); ?>
+		<?php ps_pen_paper_render_bookings( $source ); ?>
 		<h3><?php esc_html_e( 'Runden', 'ps-pen-paper' ); ?></h3>
 		<div class="pspp-grid">
 			<?php $found = false;
@@ -109,6 +110,7 @@ function ps_pen_paper_render_play_directory( $source, $page_id, $mode = 'choose'
 			<?php endif;
 		endif; ?>
 		<?php ps_pen_paper_render_play_options( $source, $page_id ); ?>
+		<?php ps_pen_paper_render_booking_settings( $source, $page_id ); ?>
 	</section>
 	<?php
 }
@@ -138,6 +140,9 @@ function ps_pen_paper_render_play_round( $source, $round, $page_id, $state, $cha
 		<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id ) ); ?>"><?php esc_html_e( 'Zur Game-Lounge', 'ps-pen-paper' ); ?></a>
 	</header>
 	<?php ps_pen_paper_render_notice(); ?>
+	<?php ps_pen_paper_render_bookings( $source ); ?>
+	<?php ps_pen_paper_render_bookings( $round ); ?>
+	<?php ps_pen_paper_render_booking_settings( $round, $page_id ); ?>
 	<h3><?php esc_html_e( 'Teilnehmer', 'ps-pen-paper' ); ?></h3>
 	<?php if ( ! $active ) : ?><p><?php esc_html_e( 'Noch kein Charakter ausgewählt.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 	<ul>

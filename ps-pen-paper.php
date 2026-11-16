@@ -34,6 +34,8 @@ require_once __DIR__ . '/includes/npcs.php';
 require_once __DIR__ . '/includes/npcs-ui.php';
 require_once __DIR__ . '/includes/wiki.php';
 require_once __DIR__ . '/includes/wiki-ui.php';
+require_once __DIR__ . '/includes/bookings.php';
+require_once __DIR__ . '/includes/bookings-ui.php';
 require_once __DIR__ . '/includes/community.php';
 require_once __DIR__ . '/includes/equipment.php';
 require_once __DIR__ . '/includes/item-use.php';

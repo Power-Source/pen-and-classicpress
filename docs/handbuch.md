@@ -34,6 +34,7 @@ Eine fremde Partnerprogramm-Debugleiste wurde nur für diese Aufnahmen ausgeblen
 20. [Geschenke, Verkauf und Tausch](#20-geschenke-verkauf-und-tausch)
 21. [Soloabenteuer](#21-soloabenteuer)
 22. [Kampagne sichern](#22-kampagne-sichern)
+23. [Spieltermine mit PS Events](#23-spieltermine-mit-ps-events)
 
 ## 1. Ist das schon spielbar?
 
@@ -44,7 +45,7 @@ sind seit 0.13.0 enthalten.
 
 | Bereits nutzbar | Noch nicht vorhanden |
 |---|---|
-| Getrennte Kampagnen, Mitgliedschaften und Kapitel mit Szenenfolge | Sitzungsplanung und öffentliche Zusammenfassungen |
+| Getrennte Kampagnen, Mitgliedschaften, Kapitel und optionale Spieltermine über PS Events | Sitzungsnotizen und öffentliche Zusammenfassungen |
 | Szenenentwürfe, getrennte Geheimnisse, NPCs und geordnete Begegnungsphasen | Automatische Kampf-Engine |
 | Private Inhaltsvorschau und geschützter Kartentisch | Nebel des Krieges und Zeichenwerkzeuge |
 | Frei benennbare Charakterfelder, Basisbögen und Freigaben | Grafischer, frei positionierbarer Slotdesigner |
@@ -61,6 +62,71 @@ Die Kampagnenbeschreibung eignet sich weiter für eine gemeinsame Einleitung,
 PS Chat lässt sich mit den ergänzten Spieltisch-Schnittstellen geschützt
 einbetten. Seit 0.19.0 ergänzt PS Wiki ein ausdrücklich freigegebenes
 öffentliches Weltlexikon; private Kampagnen-Wikis sind nicht enthalten.
+
+## 23. Spieltermine mit PS Events
+
+Die Terminplanung übernimmt optional **PS Events / Events & Bookings**
+(`events-and-bookings`). Es muss auf derselben Website installiert und
+aktiviert sein, in einem Netzwerk also auf der betreffenden Unterwebsite.
+Ohne dieses Plugin bleibt das Rollenspiel vollständig nutzbar; es erscheinen
+keine leeren Kalender oder dauernden Installationshinweise.
+
+### Einen Termin zuordnen
+
+1. In **PS Events → Veranstaltungen** eine Veranstaltung mit gültigen Start-
+   und Endzeiten anlegen und veröffentlichen oder privat speichern.
+2. In Pen & Paper die Kampagnenübersicht oder eine konkrete Runde öffnen.
+   Unter **Spieltermine verwalten** die Veranstaltung auswählen und
+   **Termin verknüpfen** drücken. In den Kampagneneinstellungen ist derselbe
+   Bereich erreichbar.
+3. Die Spielleitung braucht sowohl die Verwaltungsrechte für die Kampagne
+   als auch die Bearbeitungsrechte für die Veranstaltung. Diese Rechte
+   werden nicht automatisch gegenseitig vergeben.
+4. Bei wiederkehrenden Veranstaltungen den einzelnen veröffentlichten
+   Veranstaltungstermin wählen, nicht die übergeordnete Serienvorlage.
+5. **Verknüpfung lösen** entfernt nur die Zuordnung. Veranstaltung,
+   Anmeldungen, Figuren und Spielstände bleiben erhalten. Auch Verweise auf
+   inzwischen gelöschte oder unzugängliche Veranstaltungen lassen sich lösen.
+
+Kampagnentermine gelten für die Kampagne und erscheinen auch beim Öffnen
+ihrer Runden. Termine einer konkreten Runde bleiben an diese Runde gebunden.
+Neue Runden übernehmen keine Terminverknüpfungen aus ihrer Kampagnenvorlage.
+
+### Termine und Teilnahme
+
+Die Game-Lounge und die Verwaltungsübersicht zeigen anstehende Spieltermine
+über alle Universen hinweg mit Links zur Veranstaltung und zum Spiel.
+Die Kampagnen-/Rundenansicht enthält auch vergangene verknüpfte Termine.
+Veranstaltungen werden nur innerhalb eines zugänglichen Spielkontexts und
+unter Beachtung ihrer eigenen Veröffentlichungs-, Privat- und Passwortrechte
+angezeigt. Termine fremder privater Solo-Runden bleiben verborgen.
+
+**Termin & Teilnahme öffnen** führt auf die originale Veranstaltungsseite.
+Dort gelten die Anmeldung, Zu-/Absage, Plätze, gegebenenfalls Zahlungsregeln
+und aktivierten Zusatzfunktionen von PS Events. Pen & Paper liest nur die
+eigene Terminantwort; es legt keine zweite Anmeldeliste an.
+
+**Eine Terminzusage ist kein Rundenbeitritt.** Den Spielzugang und die passende
+Figur wählt man weiterhin in der Runde. Eine Terminabsage oder abgesagte
+Veranstaltung beendet keine Spielteilnahme und löscht keinen Spielstand.
+
+Die Veranstaltung hat **eine eigene Sichtbarkeit**: Eine geschlossene
+Kampagne macht eine öffentliche Veranstaltung nicht privat. Deshalb keine
+Spielgeheimnisse in öffentliche Veranstaltungstexte schreiben.
+
+### Deaktivierung und Sicherungen
+
+Wird PS Events deaktiviert, verschwinden Terminanzeigen und
+Zuordnungsformulare, nicht aber die gespeicherten Zuordnungen oder Spielstände.
+Nach erneuter Aktivierung werden vorhandene gültige Verknüpfungen wieder
+verwendet. Gelöschte, unveröffentlichte oder nicht lesbare Veranstaltungen
+werden Spielern nicht ausgegeben.
+
+Veranstaltungen und Anmeldungen werden von PS Events verwaltet und gesichert.
+Lokale Veranstaltungs-IDs und ihre Verknüpfungen sind bewusst **nicht Teil
+einer exportierten Kampagnensicherung**. Nach einem Import oder ersetzenden
+Wiederherstellen müssen passende lokale Veranstaltungen neu verknüpft werden;
+fremde Veranstaltungs-IDs werden nicht ungeprüft übernommen.
 
 ## 2. Installation und Spielbereich
 

@@ -147,6 +147,7 @@ function ps_pen_paper_render_lounge( $page_id, $data, $universe_id ) {
 				<?php if ( ps_pen_paper_community_url() ) : ?><a href="<?php echo esc_url( ps_pen_paper_community_url() ); ?>"><?php esc_html_e( 'Meine Charaktere', 'ps-pen-paper' ); ?></a><?php endif; ?>
 			</nav>
 		</header>
+		<?php ps_pen_paper_render_booking_agenda( $page_id ); ?>
 		<?php if ( count( $data['universes'] ) > 1 ) : ?>
 			<form method="get" action="<?php echo esc_url( get_permalink( $page_id ) ); ?>" class="pspp-lounge-picker">
 				<?php if ( ! get_option( 'permalink_structure' ) ) : ?><input type="hidden" name="page_id" value="<?php echo esc_attr( $page_id ); ?>"><?php endif; ?>

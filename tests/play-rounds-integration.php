@@ -79,7 +79,9 @@ try {
 	$success( ps_pen_paper_publish_adventure( $source, $next_adventure, '3', 'confirmed' ), 'Dependent publication failed' );
 	$success( ps_pen_paper_save_play_options( $source, array( 'guided', 'solo', 'group' ), true, '0' ), 'Mode options failed' );
 	$token = wp_generate_uuid4();
+	add_post_meta( $source_id, '_pspp_booking_links', array( 'revision' => 1, 'events' => array( 123 ) ) );
 	$a = $success( ps_pen_paper_create_play_round( $source, 'guided', 0, $token, '1' ), 'First guided round failed' ); $parents[] = $a;
+	$check( array() === ps_pen_paper_booking_links( $a )['events'], 'New round inherited scheduling references from the template.' );
 	$check( $a === ps_pen_paper_create_play_round( $source, 'guided', 0, $token, '1' ), 'Repeated create produced a second round.' );
 	$check( is_wp_error( ps_pen_paper_create_play_round( $source, 'solo', $adventure_id, $token, '1' ) ), 'Changed create payload reused an action token.' );
 	$b = $success( ps_pen_paper_create_play_round( $source, 'guided', 0, wp_generate_uuid4(), '1' ), 'Second guided round failed' ); $parents[] = $b;

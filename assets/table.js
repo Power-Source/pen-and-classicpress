@@ -58,6 +58,7 @@
 	function showView(view) {
 		if (!panels.some(function (panel) { return panel.dataset.tablePanel === view; })) view = 'play';
 		const stage = view === 'group' ? 'play' : view;
+		table.classList.toggle('pspp-table-group-open', view === 'group');
 		const playing = ['play', 'adventures', 'sheet', 'dice', 'log', 'handouts', 'group'].includes(view);
 		panels.forEach(function (panel) {
 			const name = panel.dataset.tablePanel;
@@ -73,11 +74,11 @@
 		});
 	}
 
-	const hashes = { '#pspp-play': 'play', '#pspp-sheet': 'sheet', '#pspp-group': 'group', '#pspp-group-adventures': 'adventures', '#pspp-dice': 'dice', '#pspp-log': 'log', '#pspp-rulebook': 'rules', '#pspp-settings': 'settings', '#pspp-story': 'story', '#pspp-folio': 'folio', '#pspp-handouts': 'handouts', '#pspp-equipment': 'equipment' };
+	const hashes = { '#pspp-play': 'play', '#pspp-sheet': 'sheet', '#pspp-group': 'group', '#pspp-group-adventures': 'play', '#pspp-dice': 'dice', '#pspp-log': 'log', '#pspp-rulebook': 'rules', '#pspp-settings': 'settings', '#pspp-story': 'story', '#pspp-folio': 'folio', '#pspp-handouts': 'handouts', '#pspp-equipment': 'equipment' };
 	function followHash() {
 		const target = document.getElementById(window.location.hash.slice(1));
 		const panel = target && table.contains(target) ? target.closest('[data-table-panel]') : null;
-		showView(hashes[window.location.hash] || (panel ? panel.dataset.tablePanel : 'play'));
+		showView(hashes[window.location.hash] || (panel ? panel.dataset.tablePanel : table.dataset.tableInitialView || 'play'));
 		if (panel && target !== panel) target.scrollIntoView({ block: 'start' });
 	}
 	if (panels.length) {

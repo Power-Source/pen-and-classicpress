@@ -116,6 +116,17 @@ try {
 	$check( false !== strpos( $history, 'GM_SECRET' ), 'GM history lost private preparation.' );
 	wp_set_current_user( $users['player'] );
 	$check( 'PRIVATE_DRAFT' === $call( $campaign->ID )->get_data()['scene']['title'] && 403 === $call( $campaign->ID, '/maps/' . $scene_id . '/images/' . $new_asset )->get_status(), 'Unpublished draft/image change reached player.' );
+	ob_start(); ps_pen_paper_render_adventure_scene_image( $campaign, $scene['published'] ); $table_image = ob_get_clean();
+	$check( false !== strpos( $table_image, 'class="pspp-table-scene-image"' ) &&
+		false !== strpos( $table_image, 'alt="PRIVATE_DRAFT"' ) && false !== strpos( $table_image, 'data:image/png;base64,' ) &&
+		false === strpos( $table_image, 'UNRELEASED_CHANGE' ), 'Adventure table lost its saved scene image or selected the newer draft.' );
+	ob_start(); ps_pen_paper_render_adventure_scene_image( ps_pen_paper_get_campaign( $parents[1] ), $scene['published'] ); $foreign_image = ob_get_clean();
+	$check( false !== strpos( $foreign_image, 'role="alert"' ) && false === strpos( $foreign_image, '<img' ),
+		'Adventure table exposed an image from another campaign or silently hid its error.' );
+	ob_start(); ps_pen_paper_render_table( $campaign, 0, 0 ); $guided_table = ob_get_clean();
+	$check( false !== strpos( $guided_table, 'data-map-endpoint=' ) && false !== strpos( $guided_table, 'data-map-fallback' ) &&
+		false === strpos( $guided_table, 'UNRELEASED_TEXT' ) && false === strpos( $guided_table, 'GM_SECRET' ),
+		'Shared guided table lost its interactive map or exposed draft/secret content.' );
 	wp_set_current_user( $users['gm'] );
 	$before = ps_pen_paper_get_scene( $campaign, $scene_id );
 	$asset_count = count( get_posts( array( 'post_type' => 'pspp_asset', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'posts_per_page' => -1, 'fields' => 'ids' ) ) );

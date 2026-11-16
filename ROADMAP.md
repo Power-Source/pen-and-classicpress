@@ -25,6 +25,30 @@ Nachweis einer vollständig vorbereitbaren Solo-/Gruppenautomatik.
 Die folgenden Produktziele bleiben bis zur jeweiligen End-to-End-Abnahme offen.
 Bestehende Universen, Kampagnen, Charaktere und Spielstände bleiben erhalten.
 
+### Gemeinsamer Spieltisch statt paralleler Textansichten
+
+Die frühere Abnahme des direkten Solo- und Gruppeneinstiegs belegte nur den
+funktionalen Ablauf, nicht die zugesagte Spieltischdarstellung. Diese
+Unterscheidung gilt auch für die weiter unten aufgeführten technischen Nachweise.
+
+- [x] Gestartete, pausierte und abgeschlossene Solo-, Gruppen- und geleitete
+  Runden auf denselben Spieltisch führen; Wartebereiche bleiben erhalten.
+- [x] Ohne Grafik eine Holzfläche zeigen; automatische Szenen und freigegebene
+  Bilder aus ihrem gespeicherten Abenteuerstand verwenden.
+- [x] Szene, letzte öffentliche NPC-Antwort und Aktionen als getrennte Karten
+  darstellen; Teilnahmeverwaltung, Durchlaufregeln und Gesamtverlauf einklappen.
+- [x] Eigene Werte kompakt anzeigen. Die gewählte Rundenfigur unter **Mein Bogen**
+  ohne erneute Auswahl mit Porträtbereich und Ausrüstungsslots öffnen;
+  **Bogen schließen** kehrt direkt zum Tisch zurück.
+- [x] Native Prüfungen für alle drei Modi, Pause/Fortsetzen, Abschluss,
+  Spielerprojektion und Bilder ergänzen; Bogen- und Hashnavigation prüfen.
+- [x] Bestehende Solo-Demo im Browser ohne weitere Spielentscheidung prüfen und
+  aktuelle große sowie schmale Aufnahmen und den direkten Bogen im Handbuch
+  ergänzen. Stand bleibt Wartungsbrücke, Ausdauer 10.
+- [ ] Eine vollständige visuelle Browserabnahme sämtlicher Gruppen-,
+  Leitungs- und seltenen Fehlerzustände durchführen. Der Solo-Sichttest ersetzt
+  diese noch nicht.
+
 ### A. Getrennte Frontend-Arbeitsbereiche – schrittweise Umsetzung
 
 - [x] Die Game-Lounge ist der Spielereinstieg, auch für Administratoren.

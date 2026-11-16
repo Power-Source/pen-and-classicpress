@@ -27,6 +27,14 @@ $success = static function ( $value, $message ) use ( $check ) {
 	$check( ! is_wp_error( $value ), $message . ( is_wp_error( $value ) ? ': ' . $value->get_error_code() . ': ' . $value->get_error_message() : '' ) );
 	return $value;
 };
+$render_round = static function ( $source, $round ) {
+	set_error_handler( static function ( $severity, $message, $file, $line ) { throw new ErrorException( $message, 0, $severity, $file, $line ); } );
+	ob_start();
+	try {
+		ps_pen_paper_render_play_round( $source, $round, 0, ps_pen_paper_play_round( $round->ID ) );
+		return ob_get_contents();
+	} finally { ob_end_clean(); restore_error_handler(); }
+};
 try {
 	foreach ( array( 'gm', 'player', 'other', 'outsider' ) as $role ) {
 		$users[ $role ] = $success( wp_insert_user( array( 'user_login' => 'pspp-round-' . $role . '-' . wp_generate_password( 12, false, false ),
@@ -130,6 +138,12 @@ try {
 		ob_end_clean(); restore_error_handler();
 	}
 	wp_set_current_user( $users['player'] );
+	$guided_table = $render_round( $source, $round_a );
+	$check( 1 === substr_count( $guided_table, 'class="pspp-table"' ) &&
+		false !== strpos( $guided_table, 'data-table-panel="play"' ) &&
+		false !== strpos( $guided_table, '<details class="pspp-table-round-controls">' ) &&
+		false !== strpos( $guided_table, 'class="pspp-table-character-status"' ) &&
+		false === strpos( $guided_table, 'SECRET_ROUND_NOTE' ), 'Guided play lost its shared table, compact own character or private projection.' );
 	$alias_id = ps_pen_paper_play_round( $a )['participants'][0]['character_id'];
 	$frontend_page = $success( wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish',
 		'post_author' => $users['gm'], 'post_title' => 'Round sheet routing fixture', 'post_content' => '[ps_pen_paper]' ), true ), 'Frontend page fixture failed' );
@@ -298,6 +312,39 @@ try {
 		$success( ps_pen_paper_change_play_round( $round, 'start', (string) ps_pen_paper_play_round( $id )['revision'] ), 'Automatic start failed' );
 		$state = ps_pen_paper_play_round( $id );
 		$check( 'active' === $state['status'] && $state['run_id'] && $state['adventure_id'] !== $adventure_id, 'Automatic round did not start a separate snapshot.' );
+		$table = $render_round( $source, $round );
+		$run_anchor = 'id="pspp-adventure-' . ( 'solo' === $mode ? 'run-' : 'group-' ) . $state['run_id'] . '"';
+		$check( 1 === substr_count( $table, 'class="pspp-table"' ) && 1 === substr_count( $table, $run_anchor ) &&
+			preg_match( '~data-table-panel="play"[^>]*>.*?' . preg_quote( $run_anchor, '~' ) . '.*?id="pspp-sheet"~s', $table ) &&
+			false === strpos( $table, 'data-table-panel="adventures"' ) &&
+			false !== strpos( $table, 'Visible story' ) && false === strpos( $table, 'SECRET_ROUND_NOTE' ) &&
+			false === strpos( $table, 'REACTION_PRIVATE_SECRET' ), 'Automatic play bypassed the central table, duplicated its run or exposed preparation.' );
+		$check( false !== strpos( $table, '<details class="pspp-table-round-controls">' ) &&
+			preg_match( '~class="pspp-table-character-status".*?<dt>Mana</dt>.*?</section>~s', $table ) &&
+			false !== strpos( $table, 'data-table-panel="dice"' ) && false !== strpos( $table, 'data-table-panel="log"' ),
+			'Automatic table lost collapsed participation controls, own resources, dice or history.' );
+		$check( false !== strpos( $table, 'class="pspp-character-loadout"' ) &&
+			false !== strpos( $table, 'data-equipment-slot="hand"' ) &&
+			false !== strpos( $table, 'Bogen schließen' ) &&
+			false === strpos( $table, 'data-character-panel="adventures"' ) &&
+			false === strpos( $table, '<select name="pspp_character"' ),
+			'Round sheet did not directly show its own character with portrait/slots and close control, or duplicated gameplay.' );
+		if ( 'solo' === $mode ) {
+			wp_set_current_user( $users['gm'] );
+			$lead_table = $render_round( $source, $round );
+			$check( false !== strpos( $lead_table, 'Visible story' ) && false !== strpos( $lead_table, $run_anchor ) &&
+				false === strpos( $lead_table, 'value="advance_adventure"' ), 'Leadership lost read-only solo inspection or could decide for its player.' );
+			wp_set_current_user( $users['player'] );
+		}
+		$success( ps_pen_paper_change_play_round( $round, 'pause', (string) ps_pen_paper_play_round( $id )['revision'] ), 'Automatic table pause failed' );
+		$paused_table = $render_round( $source, $round );
+		$check( false !== strpos( $paused_table, 'class="pspp-table"' ) &&
+			false !== strpos( $paused_table, 'class="pspp-table-character-status"' ) &&
+			false !== strpos( $paused_table, 'name="play_action" value="start"' ) &&
+			false === strpos( $paused_table, 'value="advance_adventure"' ) &&
+			false === strpos( $paused_table, 'name="group_action" value="propose"' ),
+			'Pausing left the table, lost character selection/resume or retained adventure actions.' );
+		$success( ps_pen_paper_change_play_round( $round, 'start', (string) ps_pen_paper_play_round( $id )['revision'] ), 'Automatic table resume failed' );
 		wp_set_current_user( $users['gm'] );
 		set_error_handler( static function ( $severity, $message, $file, $line ) { throw new ErrorException( $message, 0, $severity, $file, $line ); } );
 		ob_start();
@@ -347,7 +394,7 @@ try {
 			$group = get_post_meta( $state['run_id'], '_pspp_adventure_group', true );
 			$check( 2 === $group['participants'][0]['scenario_attempt'] && 1 === $group['participants'][1]['scenario_attempt'],
 				'A new round reset the prior player attempt count.' );
-			$success( ps_pen_paper_write_adventure_group( $round, $state['run_id'], '1', 'propose',
+			$success( ps_pen_paper_write_adventure_group( $round, $state['run_id'], (string) $group['revision'], 'propose',
 				array( 'character_id' => $state['participants'][0]['character_id'], 'edge_id' => $group['snapshot']['edges'][0]['id'] ) ), 'Single-click group decision failed' );
 			$group = get_post_meta( $state['run_id'], '_pspp_adventure_group', true );
 			$check( 1 === count( $group['history'] ) && null === $group['proposal'] && 'completed' === $group['status'], 'Group action still needed a second execute click.' );
@@ -364,6 +411,13 @@ try {
 		$check( false === $decision['reaction']['success'] && 'Watcher waits' === $decision['reaction']['text'] &&
 			$decision['reaction']['total'] >= 5 && $decision['reaction']['total'] <= 10,
 			'Prepared NPC value, die or failure response was lost in solo/group execution.' );
+		$completed_table = $render_round( $source, $round );
+		$check( false !== strpos( $completed_table, 'class="pspp-table"' ) &&
+			false !== strpos( $completed_table, '<details class="pspp-table-history">' ) &&
+			preg_match( '~class="pspp-table-result".*?Watcher waits.*?</aside>~s', $completed_table ) &&
+			false === strpos( $completed_table, 'value="advance_adventure"' ) &&
+			false === strpos( $completed_table, 'name="group_action" value="propose"' ),
+			'Completed table lost its visible latest NPC response, collapsed history or kept playable actions.' );
 	}
 	$entry_revision = (string) ps_pen_paper_play_options( $source_id )['revision'];
 	$base_revision = (string) ps_pen_paper_raw_character_state( $characters['player'] )['revision'];

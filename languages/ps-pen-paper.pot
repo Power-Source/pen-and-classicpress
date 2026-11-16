@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-16T19:10:42+00:00\n"
+"POT-Creation-Date: 2026-11-16T19:53:51+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: ps-pen-paper\n"
@@ -652,7 +652,7 @@ msgstr ""
 #: includes/admin.php:563
 #: includes/events-ui.php:226
 #: includes/frontend.php:173
-#: includes/table-ui.php:78
+#: includes/table-ui.php:121
 msgid "Spielprotokoll"
 msgstr ""
 
@@ -663,7 +663,7 @@ msgstr ""
 
 #: includes/admin.php:565
 #: includes/lounge.php:115
-#: includes/table-ui.php:79
+#: includes/table-ui.php:122
 msgid "Regelwerk"
 msgstr ""
 
@@ -696,7 +696,7 @@ msgstr ""
 #: includes/admin.php:627
 #: includes/admin.php:647
 #: includes/events-ui.php:130
-#: includes/table-ui.php:62
+#: includes/table-ui.php:98
 msgid "Spieler"
 msgstr ""
 
@@ -823,122 +823,145 @@ msgid "Szenen und Verlauf sind erst nach eigener Teilnahme sichtbar."
 msgstr ""
 
 #: includes/adventure-groups-ui.php:90
+msgid "Entscheidungsregel"
+msgstr ""
+
+#: includes/adventure-groups-ui.php:91
 msgid "Jeder Teilnehmer kann mit seinem Charakter eine Aktion ausführen."
 msgstr ""
 
-#: includes/adventure-groups-ui.php:93
+#: includes/adventure-groups-ui.php:95
 msgid "Nimmt teil"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:93
+#: includes/adventure-groups-ui.php:95
 msgid "Abwesend"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:97
+#: includes/adventure-groups-ui.php:99
 msgid "Teilnahme beenden"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:110
+#: includes/adventure-groups-ui.php:109
+#: includes/adventure-ui.php:429
+#: includes/maps-ui.php:63
+msgid "Aktuelle Szene"
+msgstr ""
+
+#: includes/adventure-groups-ui.php:117
+#: includes/adventure-ui.php:450
+msgid "Ergebnis"
+msgstr ""
+
+#: includes/adventure-groups-ui.php:117
+#: includes/adventure-ui.php:450
+msgid "Deine Aktionen"
+msgstr ""
+
+#: includes/adventure-groups-ui.php:120
 msgid "Gruppendurchlauf pausieren"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:110
+#: includes/adventure-groups-ui.php:120
 msgid "Gruppendurchlauf fortsetzen"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:111
+#: includes/adventure-groups-ui.php:121
 msgid "Entscheidungsregel anpassen"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:113
+#: includes/adventure-groups-ui.php:123
 msgid "Entscheidungsregel ändern"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:115
+#: includes/adventure-groups-ui.php:125
 msgid "Entscheidungsregel speichern"
 msgstr ""
 
 #. translators: 1: votes, 2: active participants.
-#: includes/adventure-groups-ui.php:127
+#: includes/adventure-groups-ui.php:137
 #, php-format
 msgid "Zustimmungen: %1$d von %2$d aktiven Teilnehmern."
 msgstr ""
 
-#: includes/adventure-groups-ui.php:128
+#: includes/adventure-groups-ui.php:138
 msgid "Spielleiterfreigabe vorhanden."
 msgstr ""
 
-#: includes/adventure-groups-ui.php:128
+#: includes/adventure-groups-ui.php:138
 msgid "Aktuelle Spielleiterfreigabe benötigt."
 msgstr ""
 
-#: includes/adventure-groups-ui.php:133
+#: includes/adventure-groups-ui.php:143
 msgid "Zustimmung zurückziehen"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:133
+#: includes/adventure-groups-ui.php:143
 msgid "Vorschlag zustimmen"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:137
+#: includes/adventure-groups-ui.php:147
 msgid "Gruppenentscheidung freigeben"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:141
+#: includes/adventure-groups-ui.php:151
 msgid "Gruppenvorschlag verwerfen"
 msgstr ""
 
 #. translators: 1: resource name, 2: cost, 3: available points, 4: cost timing.
-#: includes/adventure-groups-ui.php:155
-#: includes/adventure-ui.php:473
+#: includes/adventure-groups-ui.php:165
+#: includes/adventure-ui.php:500
 #, php-format
 msgid "Kosten: %1$s %2$d; verfügbar %3$d. %4$s."
 msgstr ""
 
-#: includes/adventure-groups-ui.php:166
+#: includes/adventure-groups-ui.php:176
 msgid "Vereinbarte Gruppenentscheidung ausführen"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:174
+#: includes/adventure-groups-ui.php:184
 msgid "Ausführen:"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:174
+#: includes/adventure-groups-ui.php:184
 msgid "Vorschlagen:"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:175
-#: includes/adventure-ui.php:483
+#: includes/adventure-groups-ui.php:185
+#: includes/adventure-ui.php:510
 msgid "Serverprobe:"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:175
-#: includes/adventure-ui.php:483
+#: includes/adventure-groups-ui.php:185
+#: includes/adventure-ui.php:510
 msgid "Erfolg ab"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:176
+#: includes/adventure-groups-ui.php:186
 msgid "Persönliche Ressourcenkosten:"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:181
+#: includes/adventure-groups-ui.php:193
+#: includes/adventure-groups-ui.php:194
 msgid "Gemeinsamer Verlauf"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:187
+#: includes/adventure-groups-ui.php:200
 #: includes/adventure-reactions.php:116
-#: includes/adventure-ui.php:497
+#: includes/adventure-ui.php:364
+#: includes/adventure-ui.php:528
 msgid "Erfolg"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:187
+#: includes/adventure-groups-ui.php:200
 #: includes/adventure-reactions.php:116
-#: includes/adventure-ui.php:497
+#: includes/adventure-ui.php:364
+#: includes/adventure-ui.php:528
 msgid "Misserfolg"
 msgstr ""
 
-#: includes/adventure-groups-ui.php:193
-#: includes/adventure-ui.php:494
+#: includes/adventure-groups-ui.php:206
+#: includes/adventure-ui.php:525
 #: includes/events-ui.php:105
 msgid "Bei Misserfolg keine Kosten"
 msgstr ""
@@ -1664,79 +1687,92 @@ msgstr ""
 msgid "Neue Durchläufe wieder erlauben"
 msgstr ""
 
-#: includes/adventure-ui.php:374
+#: includes/adventure-ui.php:360
+msgid "Letzte Aktion"
+msgstr ""
+
+#: includes/adventure-ui.php:395
 #: includes/import-ui.php:135
 msgid "Soloabenteuer"
 msgstr ""
 
-#: includes/adventure-ui.php:377
+#: includes/adventure-ui.php:398
 msgid "Neue Solo-Runde in der Game-Lounge auswählen"
 msgstr ""
 
-#: includes/adventure-ui.php:378
+#: includes/adventure-ui.php:399
 msgid "Es ist keine veröffentlichte Spielbereich-Seite eingerichtet. Bitte wende dich an den Website-Betreiber."
 msgstr ""
 
-#: includes/adventure-ui.php:379
+#: includes/adventure-ui.php:400
 msgid "Derzeit sind keine freigegebenen Soloabenteuer vorhanden."
 msgstr ""
 
-#: includes/adventure-ui.php:389
+#: includes/adventure-ui.php:410
 msgid "Neue Durchläufe sind pausiert. Laufende Durchläufe bleiben unabhängig fortsetzbar."
 msgstr ""
 
-#: includes/adventure-ui.php:390
+#: includes/adventure-ui.php:411
 msgid "Nur der Besitzer startet den eigenen Durchlauf."
 msgstr ""
 
+#: includes/adventure-ui.php:422
+msgid "Durchlauf & Spielregeln"
+msgstr ""
+
 #. translators: %d: saved attempt number for this player.
-#: includes/adventure-ui.php:403
+#: includes/adventure-ui.php:425
 #, php-format
 msgid "Dein Durchlauf: %d"
 msgstr ""
 
-#: includes/adventure-ui.php:408
+#: includes/adventure-ui.php:433
 msgid "Spielleiterentscheidung ausstehend. Der Durchlauf und alle Ressourcen bleiben unverändert."
 msgstr ""
 
-#: includes/adventure-ui.php:409
+#: includes/adventure-ui.php:434
 msgid "Entscheidung freigegeben. Der Besitzer kann sie jetzt ausführen; Voraussetzungen werden erneut geprüft."
 msgstr ""
 
-#: includes/adventure-ui.php:414
+#: includes/adventure-ui.php:439
 msgid "Anfrage oder Freigabe zurückziehen"
 msgstr ""
 
-#: includes/adventure-ui.php:422
+#: includes/adventure-ui.php:448
 msgid "Abenteuer beendet"
 msgstr ""
 
-#: includes/adventure-ui.php:424
+#: includes/adventure-ui.php:451
 msgid "Durchlauf abgeschlossen."
 msgstr ""
 
-#: includes/adventure-ui.php:457
+#: includes/adventure-ui.php:484
 msgid "Spielleiterfreigabe vorhanden – Entscheidung ausführen."
 msgstr ""
 
-#: includes/adventure-ui.php:457
+#: includes/adventure-ui.php:484
 msgid "Diese Auswahl fragt zuerst eine Spielleiterentscheidung an."
 msgstr ""
 
-#: includes/adventure-ui.php:461
-#: includes/adventure-ui.php:466
+#: includes/adventure-ui.php:488
+#: includes/adventure-ui.php:493
 msgid "Entscheidung gesperrt. Nach einer Wertefreigabe den Bogen neu laden."
 msgstr ""
 
-#: includes/adventure-ui.php:475
+#: includes/adventure-ui.php:502
 msgid "Ressource reicht nicht aus oder würde ihre Untergrenze unterschreiten. Entscheidung gesperrt."
 msgstr ""
 
-#: includes/adventure-ui.php:486
+#: includes/adventure-ui.php:514
+msgid "Die Runde ist pausiert. Nach dem Fortsetzen kannst du wieder handeln."
+msgstr ""
+
+#: includes/adventure-ui.php:515
 msgid "Der Durchlauf gehört dem Charakterbesitzer. Die Spielleitung kann ihn einsehen, aber nicht an seiner Stelle entscheiden."
 msgstr ""
 
-#: includes/adventure-ui.php:488
+#: includes/adventure-ui.php:518
+#: includes/adventure-ui.php:519
 msgid "Bisheriger Verlauf"
 msgstr ""
 
@@ -3652,13 +3688,13 @@ msgid "Verwaltungsbereiche"
 msgstr ""
 
 #: includes/dashboard.php:35
-#: includes/table-ui.php:76
+#: includes/table-ui.php:119
 msgid "Vorbereiten & verwalten"
 msgstr ""
 
 #: includes/dashboard.php:37
 #: includes/play-rounds-ui.php:126
-#: includes/play-rounds-ui.php:255
+#: includes/play-rounds-ui.php:268
 msgid "Zur Game-Lounge"
 msgstr ""
 
@@ -5307,7 +5343,7 @@ msgstr ""
 
 #: includes/folio-ui.php:88
 #: includes/frontend.php:171
-#: includes/table-ui.php:81
+#: includes/table-ui.php:124
 msgid "Spielleitermappe"
 msgstr ""
 
@@ -5529,7 +5565,7 @@ msgstr ""
 
 #: includes/frontend.php:152
 #: includes/frontend.php:288
-#: includes/table-ui.php:62
+#: includes/table-ui.php:98
 msgid "Spielleitung"
 msgstr ""
 
@@ -5567,13 +5603,13 @@ msgid "NPCs & Gegner"
 msgstr ""
 
 #: includes/frontend.php:171
-#: includes/table-ui.php:25
-#: includes/table-ui.php:166
+#: includes/table-ui.php:33
+#: includes/table-ui.php:218
 msgid "Bögen & Freigaben"
 msgstr ""
 
 #: includes/frontend.php:172
-#: includes/table-ui.php:84
+#: includes/table-ui.php:127
 #: includes/wiki.php:13
 msgid "Gegenstände"
 msgstr ""
@@ -5617,7 +5653,8 @@ msgid "Für diesen Spielleitungsbereich hast du keine Berechtigung."
 msgstr ""
 
 #: includes/frontend.php:261
-#: includes/play-rounds-ui.php:248
+#: includes/play-rounds-ui.php:247
+#: includes/play-rounds-ui.php:261
 msgid "Diese Freundesgruppe ist nur für eingeladene Personen verfügbar."
 msgstr ""
 
@@ -6708,7 +6745,7 @@ msgid "Story / Einleitung"
 msgstr ""
 
 #: includes/lounge.php:116
-#: includes/table-ui.php:80
+#: includes/table-ui.php:123
 msgid "Handouts"
 msgstr ""
 
@@ -6833,10 +6870,6 @@ msgstr ""
 
 #: includes/maps-ui.php:63
 msgid "Private Spielervorschau – gespeicherter Entwurf"
-msgstr ""
-
-#: includes/maps-ui.php:63
-msgid "Aktuelle Szene"
 msgstr ""
 
 #: includes/maps-ui.php:69
@@ -7458,7 +7491,7 @@ msgid "PS-Community-Freunde einladen"
 msgstr ""
 
 #: includes/play-rounds-ui.php:112
-#: includes/play-rounds-ui.php:287
+#: includes/play-rounds-ui.php:300
 msgid "Mein Charakter"
 msgstr ""
 
@@ -7557,91 +7590,92 @@ msgstr ""
 msgid "Der Gastgeber startet, sobald die offenen Einladungen beantwortet oder ausdrücklich zurückgezogen wurden."
 msgstr ""
 
-#: includes/play-rounds-ui.php:249
+#: includes/play-rounds-ui.php:248
+#: includes/play-rounds-ui.php:262
 msgid "Diese Solo-Runde ist privat."
 msgstr ""
 
-#: includes/play-rounds-ui.php:254
+#: includes/play-rounds-ui.php:267
 msgid "Zu den Runden dieser Kampagne"
 msgstr ""
 
-#: includes/play-rounds-ui.php:262
+#: includes/play-rounds-ui.php:275
 msgid "Teilnehmer"
 msgstr ""
 
-#: includes/play-rounds-ui.php:263
+#: includes/play-rounds-ui.php:276
 msgid "Noch kein Charakter ausgewählt."
 msgstr ""
 
-#: includes/play-rounds-ui.php:276
+#: includes/play-rounds-ui.php:289
 msgid "Mein Charakter · Werte und Inventar"
 msgstr ""
 
-#: includes/play-rounds-ui.php:278
+#: includes/play-rounds-ui.php:291
 msgid "Runde verlassen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:291
+#: includes/play-rounds-ui.php:304
 msgid "Charakter wechseln"
 msgstr ""
 
-#: includes/play-rounds-ui.php:291
+#: includes/play-rounds-ui.php:304
 msgid "Einladung annehmen und mit diesem Charakter teilnehmen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:291
+#: includes/play-rounds-ui.php:304
 msgid "Mit diesem Charakter teilnehmen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:293
+#: includes/play-rounds-ui.php:306
 msgid "Du brauchst einen eigenen freigegebenen Charakter mit passenden Regeln."
 msgstr ""
 
-#: includes/play-rounds-ui.php:296
+#: includes/play-rounds-ui.php:309
 msgid "Meine Charaktere dieses Universums öffnen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:300
+#: includes/play-rounds-ui.php:313
 msgid "Pause · Teilnehmer ändern"
 msgstr ""
 
-#: includes/play-rounds-ui.php:304
+#: includes/play-rounds-ui.php:317
 msgid "Spiel starten"
 msgstr ""
 
-#: includes/play-rounds-ui.php:304
+#: includes/play-rounds-ui.php:317
 msgid "Spiel fortsetzen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:306
+#: includes/play-rounds-ui.php:319
 msgid "Runde abschließen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:312
+#: includes/play-rounds-ui.php:323
 msgid "Dein Charakter ist ausgewählt. Sobald alle bereit sind, kannst du das Spiel starten."
 msgstr ""
 
-#: includes/play-rounds-ui.php:313
+#: includes/play-rounds-ui.php:324
 msgid "Dein Charakter ist ausgewählt. Der Gastgeber startet das gemeinsame Spiel."
 msgstr ""
 
-#: includes/play-rounds-ui.php:314
+#: includes/play-rounds-ui.php:325
 msgid "Die Spieler wählen ihre Charaktere. Danach kannst du das Spiel starten."
 msgstr ""
 
-#: includes/play-rounds-ui.php:314
+#: includes/play-rounds-ui.php:325
 msgid "Wähle deinen Charakter. Die Runde beginnt erst mit „Spiel starten“."
 msgstr ""
 
-#: includes/play-rounds-ui.php:315
+#: includes/play-rounds-ui.php:326
 msgid "Während der Pause können Spieler beitreten oder ihre Teilnahme beenden."
 msgstr ""
 
-#: includes/play-rounds-ui.php:325
+#: includes/play-rounds-ui.php:329
 msgid "Diese Runde ist abgeschlossen."
 msgstr ""
 
-#: includes/play-rounds-ui.php:326
+#: includes/play-rounds-ui.php:330
 msgid "Das Spiel läuft. Eine neue Teilnahme ist möglich, sobald die Runde pausiert."
 msgstr ""
 
@@ -8307,239 +8341,268 @@ msgstr ""
 msgid "Diese Universumsverwaltung ist nicht verfügbar."
 msgstr ""
 
-#: includes/table-ui.php:25
+#: includes/table-ui.php:33
 msgid "Mein Charakterbogen"
 msgstr ""
 
-#: includes/table-ui.php:26
+#: includes/table-ui.php:34
 msgid "Nur du und die Spielleitung sehen deine Werte."
 msgstr ""
 
-#: includes/table-ui.php:29
+#: includes/table-ui.php:37
 msgid "Dein erster Bogen wartet noch auf dich. Öffne unten „Neuen Charakter erstellen“."
 msgstr ""
 
-#: includes/table-ui.php:29
+#: includes/table-ui.php:37
 msgid "In dieser Runde erstellt die Spielleitung deinen Charakter. Bitte wende dich an sie."
 msgstr ""
 
-#: includes/table-ui.php:31
+#: includes/table-ui.php:39
 msgid "Neuen Charakter erstellen"
 msgstr ""
 
-#: includes/table-ui.php:35
+#: includes/table-ui.php:43
 msgid "Die Spielleitung muss zuerst das Regelwerk einrichten."
 msgstr ""
 
-#: includes/table-ui.php:40
+#: includes/table-ui.php:48
 msgid "Regeln dieses Universums übernehmen"
 msgstr ""
 
-#: includes/table-ui.php:54
+#: includes/table-ui.php:76
+msgid "Charakterbogen öffnen"
+msgstr ""
+
+#: includes/table-ui.php:90
 msgid "Am Tisch"
 msgstr ""
 
-#: includes/table-ui.php:54
+#: includes/table-ui.php:90
 msgid "Offline"
 msgstr ""
 
-#: includes/table-ui.php:55
+#: includes/table-ui.php:91
 msgid "Kurze Pause"
 msgstr ""
 
-#: includes/table-ui.php:55
+#: includes/table-ui.php:91
 msgid "Nicht gemeldet"
 msgstr ""
 
-#: includes/table-ui.php:56
-#: includes/table-ui.php:132
+#: includes/table-ui.php:92
+#: includes/table-ui.php:174
 #: includes/table.php:94
 #: includes/table.php:156
 msgid "Freies Spiel"
 msgstr ""
 
-#: includes/table-ui.php:56
+#: includes/table-ui.php:92
 msgid "Am Zug:"
 msgstr ""
 
-#: includes/table-ui.php:57
+#: includes/table-ui.php:93
 msgid "Zugzuordnung nicht mehr verfügbar"
 msgstr ""
 
-#: includes/table-ui.php:58
+#: includes/table-ui.php:94
 msgid "Die Runde konnte nicht aktualisiert werden. Bitte erneut versuchen."
 msgstr ""
 
-#: includes/table-ui.php:59
+#: includes/table-ui.php:95
 msgid "Anwesenheit wird geteilt"
 msgstr ""
 
-#: includes/table-ui.php:60
+#: includes/table-ui.php:96
 msgid "Anwesenheitsanzeige beendet"
 msgstr ""
 
-#: includes/table-ui.php:61
+#: includes/table-ui.php:97
 msgid "Neue Nachrichten"
 msgstr ""
 
-#: includes/table-ui.php:67
+#: includes/table-ui.php:103
 msgid "PS Pen & Paper / Spielleitung"
 msgstr ""
 
-#: includes/table-ui.php:67
+#: includes/table-ui.php:103
 msgid "PS Pen & Paper / Spieltisch"
 msgstr ""
 
-#: includes/table-ui.php:72
-#: includes/table-ui.php:96
+#: includes/table-ui.php:107
+#: includes/table-ui.php:135
+msgid "Automatische Spielleitung"
+msgstr ""
+
+#: includes/table-ui.php:110
+#: includes/table-ui.php:137
 msgid "Spieltisch"
 msgstr ""
 
-#: includes/table-ui.php:73
+#: includes/table-ui.php:111
 msgid "Spiele wechseln"
 msgstr ""
 
-#: includes/table-ui.php:74
+#: includes/table-ui.php:112
 msgid "Zurück zum Spieltisch"
 msgstr ""
 
-#: includes/table-ui.php:76
-msgid "Weitere Informationen"
-msgstr ""
-
-#: includes/table-ui.php:82
-msgid "Rundeneinstellungen"
-msgstr ""
-
-#: includes/table-ui.php:83
-msgid "Szenen, Karten & Abenteuer vorbereiten"
-msgstr ""
-
-#: includes/table-ui.php:85
-msgid "Mein Charakterprofil"
-msgstr ""
-
-#: includes/table-ui.php:94
-msgid "Spieltisch-Bereiche"
-msgstr ""
-
-#: includes/table-ui.php:97
-msgid "Abenteuer spielen"
-msgstr ""
-
-#: includes/table-ui.php:98
-msgid "Bögen"
-msgstr ""
-
-#: includes/table-ui.php:98
-msgid "Mein Bogen"
-msgstr ""
-
-#: includes/table-ui.php:99
-msgid "Würfel"
-msgstr ""
-
-#: includes/table-ui.php:103
-msgid "Am Spieltisch"
-msgstr ""
-
-#: includes/table-ui.php:104
-msgid "Anwesenheit & Pause"
-msgstr ""
-
-#: includes/table-ui.php:117
-msgid "Anwesenheit, Pausen & Zugsteuerung"
-msgstr ""
-
-#: includes/table-ui.php:117
-msgid "Anwesenheit & kurze Pause"
+#: includes/table-ui.php:114
+msgid "Runde & Teilnahme"
 msgstr ""
 
 #: includes/table-ui.php:119
-msgid "Anwesenheit teilen"
-msgstr ""
-
-#: includes/table-ui.php:121
-msgid "Pausennotiz (optional)"
-msgstr ""
-
-#: includes/table-ui.php:122
-msgid "Kurz in der Küche …"
-msgstr ""
-
-#: includes/table-ui.php:123
-msgid "Kurze Pause / AFK"
-msgstr ""
-
-#: includes/table-ui.php:124
-msgid "Wieder da"
+msgid "Weitere Informationen"
 msgstr ""
 
 #: includes/table-ui.php:125
-msgid "Status nicht mehr teilen"
+msgid "Rundeneinstellungen"
 msgstr ""
 
-#: includes/table-ui.php:127
-msgid "Freiwillig. Nach zwei Minuten ohne Meldung erscheint dein Status als offline. Keine Anwesenheitshistorie."
+#: includes/table-ui.php:126
+msgid "Szenen, Karten & Abenteuer vorbereiten"
 msgstr ""
 
-#: includes/table-ui.php:131
-msgid "Wer ist am Zug?"
+#: includes/table-ui.php:128
+msgid "Mein Charakterprofil"
 msgstr ""
 
-#: includes/table-ui.php:135
-msgid "Zug festlegen"
+#: includes/table-ui.php:134
+msgid "Spieltisch-Bereiche"
+msgstr ""
+
+#: includes/table-ui.php:138
+msgid "Bögen"
+msgstr ""
+
+#: includes/table-ui.php:138
+msgid "Mein Bogen"
+msgstr ""
+
+#: includes/table-ui.php:139
+msgid "Würfel"
 msgstr ""
 
 #: includes/table-ui.php:140
-msgid "Mitspieler zu dieser Runde einladen"
+msgid "Mitspieler"
 msgstr ""
 
-#: includes/table-ui.php:149
-msgid "Abenteuer starten / fortsetzen"
+#: includes/table-ui.php:145
+msgid "Am Spieltisch"
 msgstr ""
 
-#: includes/table-ui.php:150
-msgid "Würfeln"
+#: includes/table-ui.php:146
+msgid "Anwesenheit & Pause"
 msgstr ""
 
-#: includes/table-ui.php:152
-msgid "Hier zeigt die Spielleitung die aktuelle Szene – mit Karte, wenn eine vorbereitet wurde. Für gespeicherte Abenteuerentscheidungen öffne „Abenteuer spielen“."
+#: includes/table-ui.php:159
+msgid "Anwesenheit, Pausen & Zugsteuerung"
 msgstr ""
 
-#: includes/table-ui.php:155
-msgid "Eure Welt. Eure Geschichte."
-msgstr ""
-
-#: includes/table-ui.php:158
-msgid "Vollständige Rundeneinleitung lesen"
+#: includes/table-ui.php:159
+msgid "Anwesenheit & kurze Pause"
 msgstr ""
 
 #: includes/table-ui.php:161
-msgid "Diese Kampagne ist als archiviert gekennzeichnet."
+msgid "Anwesenheit teilen"
+msgstr ""
+
+#: includes/table-ui.php:163
+msgid "Pausennotiz (optional)"
 msgstr ""
 
 #: includes/table-ui.php:164
-msgid "Ersten Charakter erstellen"
+msgid "Kurz in der Küche …"
+msgstr ""
+
+#: includes/table-ui.php:165
+msgid "Kurze Pause / AFK"
 msgstr ""
 
 #: includes/table-ui.php:166
-msgid "Meinen Charakterbogen öffnen"
+msgid "Wieder da"
 msgstr ""
 
-#: includes/table-ui.php:168
-msgid "Probe würfeln"
+#: includes/table-ui.php:167
+msgid "Status nicht mehr teilen"
 msgstr ""
 
 #: includes/table-ui.php:169
+msgid "Freiwillig. Nach zwei Minuten ohne Meldung erscheint dein Status als offline. Keine Anwesenheitshistorie."
+msgstr ""
+
+#: includes/table-ui.php:173
+msgid "Wer ist am Zug?"
+msgstr ""
+
+#: includes/table-ui.php:177
+msgid "Zug festlegen"
+msgstr ""
+
+#: includes/table-ui.php:182
+msgid "Mitspieler zu dieser Runde einladen"
+msgstr ""
+
+#: includes/table-ui.php:191
+msgid "Laufendes Abenteuer"
+msgstr ""
+
+#: includes/table-ui.php:192
+msgid "Diese Runde wartet noch auf den Spielstart. Öffne „Runde & Teilnahme“, um zum Wartebereich zu gelangen."
+msgstr ""
+
+#: includes/table-ui.php:197
+msgid "Der Charakter dieser Runde ist nicht mehr verfügbar."
+msgstr ""
+
+#: includes/table-ui.php:198
+msgid "Der Solodurchlauf ist nur für seinen Teilnehmer sichtbar."
+msgstr ""
+
+#: includes/table-ui.php:202
+msgid "Abenteuer starten / fortsetzen"
+msgstr ""
+
+#: includes/table-ui.php:203
+msgid "Würfeln"
+msgstr ""
+
+#: includes/table-ui.php:207
+msgid "Eure Welt. Eure Geschichte."
+msgstr ""
+
+#: includes/table-ui.php:210
+msgid "Vollständige Rundeneinleitung lesen"
+msgstr ""
+
+#: includes/table-ui.php:213
+msgid "Diese Kampagne ist als archiviert gekennzeichnet."
+msgstr ""
+
+#: includes/table-ui.php:216
+msgid "Ersten Charakter erstellen"
+msgstr ""
+
+#: includes/table-ui.php:218
+msgid "Meinen Charakterbogen öffnen"
+msgstr ""
+
+#: includes/table-ui.php:220
+msgid "Probe würfeln"
+msgstr ""
+
+#: includes/table-ui.php:221
 msgid "Was bisher geschah"
 msgstr ""
 
-#: includes/table-ui.php:172
+#: includes/table-ui.php:228
 msgid "Spielsitzung und Runden steuern"
 msgstr ""
 
-#: includes/table-ui.php:187
+#: includes/table-ui.php:231
+msgid "Bogen schließen"
+msgstr ""
+
+#: includes/table-ui.php:245
 msgid "Ohne JavaScript stehen die Bereiche untereinander zur Verfügung. Anwesenheit und Zugsteuerung benötigen JavaScript."
 msgstr ""
 

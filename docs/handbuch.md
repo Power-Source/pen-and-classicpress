@@ -83,7 +83,7 @@ Standardmäßig erhalten Gäste eine Anmeldeaufforderung. Die Spielleitung kann
 einen separaten Teaser ausdrücklich freigeben; der Spieltisch bleibt trotzdem
 geschützt. Eine öffentliche Spielseite macht interne Kampagnendaten nicht öffentlich.
 
-![Spielertisch mit Gruppe, Kampagnenbeschreibung und eigenem Charakterbogen](images/09-spieltisch.png)
+![Automatisches Soloabenteuer auf dem Holztisch mit Szenenkarte, Maras Antwort und zwei Aktionen](images/35-solo-spieltisch.png)
 
 *Ausschnitt aus Maras echter Spieleransicht. Zusätzliche Einstellungen für
 Spielleiter sind dort nicht eingeblendet.*
@@ -118,6 +118,41 @@ vereinfachten Spielerwege sind noch offen. Der direkte Soloeinstieg, Freundesgru
 ansichtsbezogene Chatmoderation sowie vorbereitete NPC-Reaktionen sind umgesetzt;
 siehe [Roadmap](../ROADMAP.md).
 Die älteren Abbildungen weiter unten zeigen teilweise noch die gemischte Ansicht.
+
+#### Gemeinsame Spielfläche
+
+Soloabenteuer, automatische Gruppen und geleitete Runden öffnen denselben
+Spieltisch. Ohne hinterlegte Grafik bleibt eine Holzfläche sichtbar.
+Im automatischen Abenteuer liegen die aktuelle Szene, die letzte öffentliche
+NPC-Antwort und **Deine Aktionen** als getrennte Karten auf dem Tisch.
+Eine Szenengrafik stammt aus dem gespeicherten freigegebenen Abenteuerstand,
+nicht aus einem später bearbeiteten Entwurf. Geleitete Runden verwenden weiterhin
+ihre freigegebene interaktive Karte, sofern eine ausgewählt wurde.
+
+Eigene Werte und Ressourcen bleiben kompakt erreichbar; **Würfel**,
+**Mitspieler** und **Rundenchat** öffnen die zugehörigen Werkzeuge.
+**Runde & Teilnahme** enthält unter anderem Pause, Fortsetzen und Austritt.
+Die vollständigen Verläufe und Durchlaufregeln sind zunächst eingeklappt.
+
+**Mein Bogen** öffnet direkt die bereits gewählte Rundenfigur mit ihrem
+Porträtbereich und den eingerichteten Ausrüstungsslots. Eine erneute
+Charakterauswahl ist nicht nötig. **Bogen schließen** führt unmittelbar zum
+selben Tisch zurück. Werte, Inventar und Bearbeitung bleiben eigene Bogenreiter.
+Ohne hinterlegtes Porträt erscheint ein Platzhalter; leere Slots bleiben als
+solche erkennbar. Berechtigte können im Leitungsbereich weiterhin fremde
+Charaktere auswählen.
+
+![Direkt geöffnete Rundenfigur mit Bogen-schließen-Schaltfläche und sechs leeren Ausrüstungsslots; Jona hat noch kein Porträt](images/37-rundencharakter.png)
+
+Bei schmalerem Browser stehen die eigenen Werte als kompakte Leiste über dem
+Tisch; die Teilnehmerliste lässt sich über **Mitspieler** öffnen.
+Die folgende Aufnahme zeigt den unveränderten Demostand bei 767 Pixeln
+Browserbreite. Globale Debug-Einblendungen wurden nur für die Aufnahmen
+ausgeblendet, nicht am Plugin oder an der Website abgeschaltet.
+
+![Schmale Spieltischansicht mit kompakter Charakterleiste und getrennten Szenen- und Aktionskarten](images/36-solo-spieltisch-schmal.png)
+
+#### Ein Spiel beginnen
 
 - **Meine Charaktere** öffnet dein Charakterprofil.
 - **Weltwiki öffnen** erscheint, wenn ein Weltlexikon verknüpft ist.

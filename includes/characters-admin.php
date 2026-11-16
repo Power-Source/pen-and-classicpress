@@ -154,7 +154,7 @@ function ps_pen_paper_render_character_form( $campaign, $rules, $character = nul
 	<?php
 }
 
-function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id = 0, $overview_url = '', $item_context = 'game' ) {
+function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id = 0, $overview_url = '', $item_context = 'game', $on_table = false ) {
 	$rules = ps_pen_paper_get_rules( $campaign->ID );
 	$profile = 'profile' === $item_context;
 	$management = ! $profile && ps_pen_paper_management_view( $page_id );
@@ -179,6 +179,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 			$state = ps_pen_paper_character_state( $campaign, $character );
 			if ( is_wp_error( $state ) ) {
 				echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p>';
+				if ( $management && 'character_condition_conflict' === $state->get_error_code() ) { ps_pen_paper_render_character_conditions( $campaign, $character, $page_id ); }
 				if ( $management && 'resource_limit_conflict' === $state->get_error_code() && ps_pen_paper_can_manage_campaign( $campaign ) ) {
 					$raw = ps_pen_paper_raw_character_state( $character->ID );
 					if ( ! is_wp_error( $raw ) && 'shared' === $raw['context']['mode'] ) {
@@ -188,7 +189,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 					}
 					if ( ! is_wp_error( $raw ) ) { ps_pen_paper_render_character_context( $campaign, $character, $raw, $page_id ); }
 				}
-				ps_pen_paper_render_character_equipment( $campaign, $character, $page_id, ! $profile, $item_context );
+				ps_pen_paper_render_character_equipment( $campaign, $character, $page_id, ! $profile && ! $on_table, $item_context );
 				echo '</section>';
 				return;
 			}
@@ -197,7 +198,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 			}
 			$owner = get_userdata( (int) $character->post_author );
 			?>
-			<p class="pspp-navigation"><a href="<?php echo esc_url( $overview_url ? $overview_url : ( 'pspp_universe' === $campaign->post_type ? ps_pen_paper_universe_url( $campaign->ID, $page_id ) : ( $page_id ? ps_pen_paper_game_url( $page_id, $campaign->ID ) : ps_pen_paper_admin_url( $campaign->ID ) ) ) ); ?>"><?php esc_html_e( 'Zur Bogenübersicht', 'ps-pen-paper' ); ?></a></p>
+			<?php if ( ! $on_table ) : ?><p class="pspp-navigation"><a href="<?php echo esc_url( $overview_url ? $overview_url : ( 'pspp_universe' === $campaign->post_type ? ps_pen_paper_universe_url( $campaign->ID, $page_id ) : ( $page_id ? ps_pen_paper_game_url( $page_id, $campaign->ID ) : ps_pen_paper_admin_url( $campaign->ID ) ) ) ); ?>"><?php esc_html_e( 'Zur Bogenübersicht', 'ps-pen-paper' ); ?></a></p><?php endif; ?>
 			<p><strong><?php esc_html_e( 'Besitzer:', 'ps-pen-paper' ); ?></strong> <?php echo esc_html( $owner ? $owner->display_name : __( 'Gelöschter Benutzer', 'ps-pen-paper' ) ); ?></p>
 			<?php $tab_id = 'pspp-character-' . $character->ID; ?>
 			<div class="pspp-character-tabs" data-character-tabs>
@@ -206,7 +207,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 					'overview' => __( 'Charakter', 'ps-pen-paper' ), 'stats' => __( 'Werte', 'ps-pen-paper' ),
 					'inventory' => __( 'Inventar', 'ps-pen-paper' ), 'adventures' => __( 'Abenteuer', 'ps-pen-paper' ),
 					'edit' => __( 'Bearbeiten', 'ps-pen-paper' ),
-				) as $tab => $label ) : if ( $profile && 'adventures' === $tab ) { continue; } ?>
+				) as $tab => $label ) : if ( ( $profile || $on_table ) && 'adventures' === $tab ) { continue; } ?>
 					<a id="<?php echo esc_attr( $tab_id . '-tab-' . $tab ); ?>" href="#<?php echo esc_attr( $tab_id . '-' . $tab ); ?>" data-character-tab="<?php echo esc_attr( $tab ); ?>"><?php echo esc_html( $label ); ?></a>
 				<?php endforeach; ?>
 			</nav>
@@ -219,6 +220,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 				<?php endif; ?>
 				<?php if ( $state['pending'] ) : ?><p><?php esc_html_e( 'Freigabe ausstehend – die gültigen Werte bleiben unverändert.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 				<?php ps_pen_paper_render_character_loadout( $campaign, $character, $state['active'] ? $state['active']['name'] : __( 'Neu', 'ps-pen-paper' ) ); ?>
+				<?php ps_pen_paper_render_character_conditions( $campaign, $character, $page_id ); ?>
 				<?php ps_pen_paper_render_portrait_presets( $campaign, $character, $page_id, $profile ); ?>
 				<?php ps_pen_paper_render_portrait_presentation( $campaign, $character, $page_id ); ?>
 			</section>
@@ -253,7 +255,7 @@ function ps_pen_paper_render_characters( $campaign, $character_id = 0, $page_id 
 			<section id="<?php echo esc_attr( $tab_id . '-inventory' ); ?>" data-character-panel="inventory">
 				<?php ps_pen_paper_render_character_equipment( $campaign, $character, $page_id, false, $item_context ); ?>
 			</section>
-			<?php if ( ! $profile ) : ?><section id="<?php echo esc_attr( $tab_id . '-adventures' ); ?>" data-character-panel="adventures">
+			<?php if ( ! $profile && ! $on_table ) : ?><section id="<?php echo esc_attr( $tab_id . '-adventures' ); ?>" data-character-panel="adventures">
 				<?php ps_pen_paper_render_character_adventures( $campaign, $character, $page_id ); ?>
 			</section><?php endif; ?>
 			<section id="<?php echo esc_attr( $tab_id . '-edit' ); ?>" data-character-panel="edit">

@@ -4,8 +4,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-function ps_pen_paper_render_table_sheet( $campaign, $page_id ) {
+function ps_pen_paper_render_table_sheet( $campaign, $page_id, $character_id = 0 ) {
 	$management = ps_pen_paper_management_view( $page_id );
+	$round = ps_pen_paper_play_round( $campaign->ID );
+	if ( is_wp_error( $round ) ) { echo '<p role="alert">' . esc_html( $round->get_error_message() ) . '</p>'; return; }
+	$participant = $round ? ps_pen_paper_play_participant( $round, get_current_user_id() ) : null;
+	if ( $participant && ! ( $management && ps_pen_paper_can_manage_campaign( $campaign ) ) ) { $character_id = $participant['character_id']; }
+	if ( $character_id ) {
+		ps_pen_paper_render_characters( $campaign, $character_id, $page_id, '', 'game', (bool) $round );
+		return;
+	}
 	$rules = ps_pen_paper_get_rules( $campaign->ID );
 	$characters = ps_pen_paper_get_characters( $campaign );
 	$link = ps_pen_paper_get_universe_link( $campaign->ID );
@@ -44,7 +52,37 @@ function ps_pen_paper_render_table_sheet( $campaign, $page_id ) {
 	<?php
 }
 
+function ps_pen_paper_render_table_character_status( $campaign, $participant ) {
+	if ( ! $participant ) { return; }
+	$character = ps_pen_paper_get_character( $campaign, $participant['character_id'] );
+	if ( ! $character || (int) $character->post_author !== get_current_user_id() ) { return; }
+	$state = ps_pen_paper_character_state( $campaign, $character );
+	if ( is_wp_error( $state ) ) { echo '<p role="alert">' . esc_html( $state->get_error_message() ) . '</p>'; return; }
+	if ( ! $state['active'] ) { return; }
+	$rules = ps_pen_paper_get_rules( $campaign->ID );
+	echo '<section class="pspp-table-character-status"><h3>' . esc_html( $state['active']['name'] ) . '</h3><dl>';
+	foreach ( $rules['fields'] as $field ) {
+		if ( ! in_array( $field['type'], array( 'resource', 'attribute', 'number' ), true ) || ! isset( $state['active']['values'][ $field['id'] ] ) ) { continue; }
+		$value = $state['active']['values'][ $field['id'] ];
+		echo '<div><dt>' . esc_html( $field['label'] ) . '</dt><dd>';
+		if ( 'resource' === $field['type'] ) {
+			echo esc_html( $value['current'] . ' / ' . $value['maximum'] );
+			if ( $value['maximum'] > $field['min'] ) {
+				echo '<meter min="' . esc_attr( $field['min'] ) . '" max="' . esc_attr( $value['maximum'] ) . '" value="' . esc_attr( $value['current'] ) . '" aria-label="' . esc_attr( $field['label'] ) . '"></meter>';
+			}
+		} else { echo esc_html( $value ); }
+		echo '</dd></div>';
+	}
+	echo '</dl>';
+	ps_pen_paper_render_character_conditions( $campaign, $character, 0, true );
+	echo '<a href="#pspp-sheet">' . esc_html__( 'Charakterbogen öffnen', 'ps-pen-paper' ) . '</a></section>';
+}
+
 function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
+	$round = ps_pen_paper_play_round( $campaign->ID );
+	if ( is_wp_error( $round ) ) { echo '<p role="alert">' . esc_html( $round->get_error_message() ) . '</p>'; return; }
+	$participant = $round ? ps_pen_paper_play_participant( $round, get_current_user_id() ) : null;
+	$automatic = $round && 'guided' !== $round['mode'];
 	$state = ps_pen_paper_table_state( $campaign );
 	$epoch = ps_pen_paper_scope_epoch( $campaign->ID );
 	if ( is_wp_error( $state ) || is_wp_error( $epoch ) ) { echo '<p role="alert">' . esc_html( is_wp_error( $state ) ? $state->get_error_message() : $epoch->get_error_message() ) . '</p>'; return; }
@@ -62,16 +100,23 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 		'gm' => __( 'Spielleitung', 'ps-pen-paper' ), 'player' => __( 'Spieler', 'ps-pen-paper' ),
 	);
 	?>
-	<div class="pspp-table" data-table-endpoint="<?php echo esc_url( rest_url( 'ps-pen-paper/v1/campaigns/' . $campaign->ID . '/table' ) ); ?>" data-table-epoch="<?php echo esc_attr( $epoch ); ?>" data-table-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>" data-table-user="<?php echo esc_attr( get_current_user_id() ); ?>" data-table-labels="<?php echo esc_attr( wp_json_encode( $labels ) ); ?>">
+	<div class="pspp-table" data-table-initial-view="<?php echo $character_id ? 'sheet' : 'play'; ?>" data-table-endpoint="<?php echo esc_url( rest_url( 'ps-pen-paper/v1/campaigns/' . $campaign->ID . '/table' ) ); ?>" data-table-epoch="<?php echo esc_attr( $epoch ); ?>" data-table-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>" data-table-user="<?php echo esc_attr( get_current_user_id() ); ?>" data-table-labels="<?php echo esc_attr( wp_json_encode( $labels ) ); ?>">
 		<header class="pspp-table-header">
 			<div><span class="pspp-eyebrow"><?php echo esc_html( $is_gm ? __( 'PS Pen & Paper / Spielleitung', 'ps-pen-paper' ) : __( 'PS Pen & Paper / Spieltisch', 'ps-pen-paper' ) ); ?></span>
-				<h2><?php echo esc_html( $campaign->post_title ); ?></h2>
+				<h2><?php echo esc_html( $round ? get_post_field( 'post_title', $round['source_id'] ) . ' · ' . $campaign->post_title : $campaign->post_title ); ?></h2>
+				<?php if ( $round ) : ?><p><?php echo esc_html( ps_pen_paper_play_modes()[ $round['mode'] ] . ' · ' . ps_pen_paper_play_statuses()[ $round['status'] ] ); ?></p><?php endif; ?>
 			</div>
-			<div class="pspp-turn-banner" data-table-turn><?php echo esc_html( $state['turn']['available'] ? ( $state['turn']['user_id'] ? $labels['turn'] . ' ' : '' ) . $state['turn']['name'] : $labels['unavailable'] ); ?></div>
+			<div class="pspp-turn-banner"<?php if ( ! $automatic ) { echo ' data-table-turn'; } ?>><?php echo esc_html( $automatic ? __( 'Automatische Spielleitung', 'ps-pen-paper' ) :
+				( $state['turn']['available'] ? ( $state['turn']['user_id'] ? $labels['turn'] . ' ' : '' ) . $state['turn']['name'] : $labels['unavailable'] ) ); ?></div>
 		</header>
 		<nav class="pspp-table-tools" aria-label="<?php esc_attr_e( 'Spieltisch', 'ps-pen-paper' ); ?>">
 			<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id ) ); ?>"><?php esc_html_e( 'Spiele wechseln', 'ps-pen-paper' ); ?></a>
-			<?php if ( $character_id ) : ?><a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id, $campaign->ID ) . '#pspp-play' ); ?>"><?php esc_html_e( 'Zurück zum Spieltisch', 'ps-pen-paper' ); ?></a><?php endif; ?>
+			<?php if ( $character_id ) : ?><a href="#pspp-play" data-table-view="play"><?php esc_html_e( 'Zurück zum Spieltisch', 'ps-pen-paper' ); ?></a><?php endif; ?>
+			<?php if ( $round ) : ?>
+				<details class="pspp-table-round-controls"><summary><?php esc_html_e( 'Runde & Teilnahme', 'ps-pen-paper' ); ?></summary>
+					<?php ps_pen_paper_render_play_round_controls( ps_pen_paper_get_campaign( $round['source_id'] ), $campaign, $page_id, $round ); ?>
+				</details>
+			<?php endif; ?>
 			<details data-table-management>
 			<summary><?php echo esc_html( $is_gm ? __( 'Vorbereiten & verwalten', 'ps-pen-paper' ) : __( 'Weitere Informationen', 'ps-pen-paper' ) ); ?></summary>
 			<div class="pspp-table-tools">
@@ -88,18 +133,17 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 		<?php ps_pen_paper_render_notice(); ?>
 		<?php if ( is_wp_error( $backdrop ) ) : ?><p role="alert"><?php echo esc_html( $backdrop->get_error_message() ); ?></p><?php endif; ?>
 		<p role="status" class="pspp-table-feedback" data-table-feedback></p>
-		<?php if ( $character_id ) : ?>
-			<?php ps_pen_paper_render_characters( $campaign, $character_id, $page_id ); ?>
-		<?php else : ?>
 			<nav class="pspp-table-tabs" aria-label="<?php esc_attr_e( 'Spieltisch-Bereiche', 'ps-pen-paper' ); ?>">
-				<span class="pspp-mobile-turn" data-table-turn><?php echo esc_html( $state['turn']['available'] ? ( $state['turn']['user_id'] ? $labels['turn'] . ' ' : '' ) . $state['turn']['name'] : $labels['unavailable'] ); ?></span>
+				<span class="pspp-mobile-turn"<?php if ( ! $automatic ) { echo ' data-table-turn'; } ?>><?php echo esc_html( $automatic ? __( 'Automatische Spielleitung', 'ps-pen-paper' ) :
+					( $state['turn']['available'] ? ( $state['turn']['user_id'] ? $labels['turn'] . ' ' : '' ) . $state['turn']['name'] : $labels['unavailable'] ) ); ?></span>
 				<a href="#pspp-play" data-table-view="play"><?php esc_html_e( 'Spieltisch', 'ps-pen-paper' ); ?></a>
-				<a href="#pspp-group-adventures" data-table-view="adventures"><?php esc_html_e( 'Abenteuer spielen', 'ps-pen-paper' ); ?></a>
 				<a href="#pspp-sheet" data-table-view="sheet"><?php echo esc_html( $is_gm ? __( 'Bögen', 'ps-pen-paper' ) : __( 'Mein Bogen', 'ps-pen-paper' ) ); ?></a>
 				<a href="#pspp-dice" data-table-view="dice"><?php esc_html_e( 'Würfel', 'ps-pen-paper' ); ?></a>
+				<a href="#pspp-group" data-table-view="group"><?php esc_html_e( 'Mitspieler', 'ps-pen-paper' ); ?></a>
 			</nav>
 			<div class="pspp-table-layout">
 				<aside id="pspp-group" class="pspp-table-panel pspp-table-group" data-table-panel="group">
+					<?php ps_pen_paper_render_table_character_status( $campaign, $participant ); ?>
 					<div class="pspp-party-heading"><h2><?php esc_html_e( 'Am Spieltisch', 'ps-pen-paper' ); ?></h2>
 						<a href="#pspp-group" data-group-toggle data-table-view="group"><?php esc_html_e( 'Anwesenheit & Pause', 'ps-pen-paper' ); ?></a>
 					</div>
@@ -136,20 +180,36 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 						</form>
 					<?php endif; ?>
 					</details>
-					<details class="pspp-fold">
+					<?php if ( ! $automatic ) : ?><details class="pspp-fold">
 						<summary><?php esc_html_e( 'Mitspieler zu dieser Runde einladen', 'ps-pen-paper' ); ?></summary>
 						<?php ps_pen_paper_render_member_invitation_form( $campaign, $page_id ); ?>
-					</details>
+					</details><?php endif; ?>
 				</aside>
 				<section id="pspp-play" class="pspp-table-panel pspp-table-stage pspp-scene" data-table-panel="play"<?php if ( ! is_wp_error( $backdrop ) && $backdrop ) :
 					$backdrop_state = ps_pen_paper_get_backdrop( $campaign->ID );
 					$view_style = ps_pen_paper_image_view_style( $backdrop_state['view'] ?? null, true );
 					?> style="<?php echo esc_attr( '--pspp-table-image:url("' . $backdrop . '");' . $view_style ); ?>"<?php endif; ?>>
+					<?php if ( $automatic ) : ?>
+						<div class="pspp-table-adventure" aria-label="<?php esc_attr_e( 'Laufendes Abenteuer', 'ps-pen-paper' ); ?>">
+						<?php if ( 'lobby' === $round['status'] ) { echo '<p class="pspp-table-story-card" role="status">' . esc_html__( 'Diese Runde wartet noch auf den Spielstart. Öffne „Runde & Teilnahme“, um zum Wartebereich zu gelangen.', 'ps-pen-paper' ) . '</p>'; }
+						elseif ( 'group' === $round['mode'] ) { ps_pen_paper_render_adventure_groups( $campaign, $page_id, true ); }
+						elseif ( $participant || $is_gm ) {
+							$adventure_character_id = $participant['character_id'] ?? 0;
+							if ( ! $adventure_character_id && $is_gm ) {
+								foreach ( $round['participants'] as $entry ) {
+									if ( $entry['user_id'] === $round['host_id'] ) { $adventure_character_id = $entry['character_id']; break; }
+								}
+							}
+							$character = ps_pen_paper_get_character( $campaign, $adventure_character_id );
+							if ( $character ) { ps_pen_paper_render_character_adventures( $campaign, $character, $page_id, true ); }
+							else { echo '<p role="alert">' . esc_html__( 'Der Charakter dieser Runde ist nicht mehr verfügbar.', 'ps-pen-paper' ) . '</p>'; }
+						} else { echo '<p>' . esc_html__( 'Der Solodurchlauf ist nur für seinen Teilnehmer sichtbar.', 'ps-pen-paper' ) . '</p>'; } ?>
+						</div>
+					<?php else : ?>
 					<div class="pspp-table-prompts">
-						<a href="#pspp-group-adventures"><?php esc_html_e( 'Abenteuer starten / fortsetzen', 'ps-pen-paper' ); ?></a>
+						<?php if ( ! $round ) : ?><a href="#pspp-group-adventures"><?php esc_html_e( 'Abenteuer starten / fortsetzen', 'ps-pen-paper' ); ?></a><?php endif; ?>
 						<a href="#pspp-dice"><?php esc_html_e( 'Würfeln', 'ps-pen-paper' ); ?></a>
 					</div>
-					<p class="description"><?php esc_html_e( 'Hier zeigt die Spielleitung die aktuelle Szene – mit Karte, wenn eine vorbereitet wurde. Für gespeicherte Abenteuerentscheidungen öffne „Abenteuer spielen“.', 'ps-pen-paper' ); ?></p>
 					<?php ps_pen_paper_render_map( $campaign, ps_pen_paper_map_state( $campaign, ! $is_gm ), false, $page_id ); ?>
 					<div class="pspp-scene-caption" data-map-fallback>
 					<span class="pspp-eyebrow"><?php esc_html_e( 'Eure Welt. Eure Geschichte.', 'ps-pen-paper' ); ?></span>
@@ -169,12 +229,18 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 						<a href="#pspp-log"><?php esc_html_e( 'Was bisher geschah', 'ps-pen-paper' ); ?></a>
 					</div>
 					</div>
+					<?php if ( ! $round ) : ?><div id="pspp-group-adventures" class="pspp-table-adventure">
+						<?php ps_pen_paper_render_scenario_character_links( $campaign, $page_id ); ps_pen_paper_render_adventure_groups( $campaign, $page_id, true ); ?>
+					</div><?php endif; ?>
+					<?php endif; ?>
 					<?php if ( $is_gm ) : ?><details class="pspp-fold"><summary><?php esc_html_e( 'Spielsitzung und Runden steuern', 'ps-pen-paper' ); ?></summary><?php ps_pen_paper_render_game_round_controls( $campaign, $page_id ); ?></details><?php endif; ?>
 				</section>
-				<section id="pspp-sheet" class="pspp-table-panel pspp-table-character" data-table-panel="sheet"><?php ps_pen_paper_render_table_sheet( $campaign, $page_id ); ?></section>
-				<section id="pspp-group-adventures" class="pspp-table-panel pspp-table-stage" data-table-panel="adventures"><?php ps_pen_paper_render_scenario_character_links( $campaign, $page_id ); ps_pen_paper_render_adventure_groups( $campaign, $page_id ); ?></section>
+				<section id="pspp-sheet" class="pspp-table-panel pspp-table-character" data-table-panel="sheet">
+					<div class="pspp-table-sheet-tools"><a class="button" href="#pspp-play" data-table-view="play"><?php esc_html_e( 'Bogen schließen', 'ps-pen-paper' ); ?></a></div>
+					<?php ps_pen_paper_render_table_sheet( $campaign, $page_id, $character_id ); ?>
+				</section>
 				<div class="pspp-table-panel pspp-table-stage" data-table-panel="dice"><?php ps_pen_paper_render_dice( $campaign, $page_id, false ); ?></div>
-				<section class="pspp-table-panel pspp-table-stage" data-table-panel="log"><?php ps_pen_paper_render_journal( $campaign, $page_id ); ?></section>
+				<section id="pspp-log" class="pspp-table-panel pspp-table-stage" data-table-panel="log"><?php ps_pen_paper_render_journal( $campaign, $page_id ); ?></section>
 				<section id="pspp-rulebook" class="pspp-table-panel pspp-table-stage" data-table-panel="rules"><?php ps_pen_paper_render_rules( $campaign, $is_gm, $page_id ); ?></section>
 				<section id="pspp-handouts" class="pspp-table-panel pspp-table-stage" data-table-panel="handouts"><?php ps_pen_paper_render_handouts( $campaign, $page_id ); ?></section>
 				<?php if ( $is_gm ) : ?>
@@ -185,7 +251,6 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 				<?php endif; ?>
 			</div>
 			<noscript><p><?php esc_html_e( 'Ohne JavaScript stehen die Bereiche untereinander zur Verfügung. Anwesenheit und Zugsteuerung benötigen JavaScript.', 'ps-pen-paper' ); ?></p></noscript>
-		<?php endif; ?>
 		<?php ps_pen_paper_render_chat( $campaign, $page_id ); ?>
 	</div>
 	<?php

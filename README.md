@@ -778,6 +778,18 @@ grafischen Slotdesigner. Die erste Slotoberfläche verwendet zugängliche Auswah
 
 ## Digitaler Spieltisch
 
+Solo, automatische Gruppen und geleitete Runden verwenden denselben Spieltisch.
+Ohne Grafik dient eine Holzoberfläche als Hintergrund. Automatische Abenteuer
+zeigen ihre gespeicherte Szene, die letzte öffentliche NPC-Antwort und die
+erlaubten Aktionen direkt auf dem Tisch statt in einer getrennten Textansicht.
+Szenengrafiken stammen aus dem freigegebenen Abenteuersnapshot; die interaktive
+Karte geleiteter Runden bleibt erhalten.
+Teilnahmeverwaltung und vollständige Verläufe sind eingeklappt.
+**Mein Bogen** öffnet direkt die gewählte Rundenfigur mit Porträtbereich und
+Ausrüstungsslots; **Bogen schließen** kehrt zum Tisch zurück.
+Aktuelle [Screenshots und Bedienhinweise](docs/handbuch.md#gemeinsame-spielfläche)
+stehen im Handbuch.
+
 ### Abenteuerplan und Spielleitung seit Version 0.15.0
 
 Unter **Abenteuer & Szenen** sieht die Spielleitung Kapitel mit ihrer gespeicherten

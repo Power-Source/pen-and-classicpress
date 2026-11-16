@@ -40,13 +40,13 @@ async function check(epoch) {
 }
 
 async function checkGroupLink() {
-	const panels = ['play', 'adventures'].map(name => ({ dataset: { tablePanel: name }, hidden: false }));
+	const panels = ['play', 'sheet'].map(name => ({ dataset: { tablePanel: name }, hidden: false }));
 	const feedback = { textContent: '' };
 	let scrolled = false;
-	const target = { closest() { return panels[1]; }, scrollIntoView() { scrolled = true; } };
+	const target = { closest() { return panels[0]; }, scrollIntoView() { scrolled = true; } };
 	const table = {
 		dataset: { tableEndpoint: 'https://example.test/table', tableLabels: '{}', tableUser: '7' },
-		classList: { add() {} },
+		classList: { add() {}, toggle() {} },
 		querySelector(selector) { return selector === '[data-table-feedback]' ? feedback : null; },
 		querySelectorAll(selector) { return selector === '[data-table-panel]' ? panels : []; },
 		contains(node) { return node === target; },
@@ -59,9 +59,41 @@ async function checkGroupLink() {
 		async fetch() { return { ok: false, status: 409, async json() { return { code: 'scope_changed', message: 'Reload' }; } }; }
 	});
 	await new Promise(resolve => setImmediate(resolve));
-	assert.equal(panels[0].hidden, true);
-	assert.equal(panels[1].hidden, false);
+	assert.equal(panels[0].hidden, false);
+	assert.equal(panels[1].hidden, true);
 	assert.equal(scrolled, true);
+}
+
+async function checkSheetNavigation() {
+	const feedback = { textContent: '' };
+	const panels = ['play', 'sheet'].map(name => ({
+		dataset: { tablePanel: name }, hidden: false,
+		closest() { return this; }
+	}));
+	let followHash;
+	const location = { hash: '' };
+	const table = {
+		dataset: { tableEndpoint: 'https://example.test/table', tableLabels: '{}', tableInitialView: 'sheet' },
+		classList: { add() {}, toggle() {} },
+		querySelector(selector) { return selector === '[data-table-feedback]' ? feedback : null; },
+		querySelectorAll(selector) { return selector === '[data-table-panel]' ? panels : []; },
+		contains(node) { return panels.includes(node); },
+		addEventListener() {}
+	};
+	vm.runInNewContext(fs.readFileSync(require.resolve('../assets/table.js'), 'utf8'), {
+		URL,
+		document: { querySelector() { return table; }, getElementById(id) { return panels.find(panel => id === 'pspp-' + panel.dataset.tablePanel); }, hidden: true },
+		window: { location, addEventListener(name, callback) { if (name === 'hashchange') followHash = callback; }, setInterval() { return 1; }, clearInterval() {} },
+		async fetch() { return { ok: false, status: 409, async json() { return { code: 'scope_changed', message: 'Reload' }; } }; }
+	});
+	assert.equal(panels[1].hidden, false, 'A direct character URL must open its sheet.');
+	location.hash = '#pspp-play';
+	followHash();
+	assert.equal(panels[0].hidden, false, 'Closing the sheet must return to the same table.');
+	assert.equal(panels[1].hidden, true);
+	location.hash = '#pspp-sheet';
+	followHash();
+	assert.equal(panels[1].hidden, false, 'The own sheet must reopen without navigation or character selection.');
 }
 
 async function checkPortrait(endpoint) {
@@ -119,6 +151,7 @@ async function checkPortrait(endpoint) {
 	await check('11111111-1111-4111-8111-111111111111');
 	await check('');
 	await checkGroupLink();
+	await checkSheetNavigation();
 	await checkPortrait('https://example.test/?rest_route=/ps-pen-paper/v1/campaigns/5/table');
 	await checkPortrait('https://example.test/ps-pen-paper/v1/campaigns/5/table');
 	console.log('Table requests retain REST query parameters and epoch; replaced contexts stop polling and edits.');

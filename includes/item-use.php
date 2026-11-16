@@ -230,7 +230,7 @@ function ps_pen_paper_character_sitting_out( $campaign, $character_id ) {
 	return false;
 }
 
-function ps_pen_paper_require_character_game_action( $campaign, $character_id ) {
+function ps_pen_paper_require_character_game_action( $campaign, $character_id, $condition_access = array() ) {
 	$round = ps_pen_paper_play_round( $campaign->ID );
 	if ( is_wp_error( $round ) ) { return $round; }
 	if ( $round && 'active' !== $round['status'] ) {
@@ -239,6 +239,8 @@ function ps_pen_paper_require_character_game_action( $campaign, $character_id ) 
 	if ( $round && ! in_array( (int) $character_id, array_column( array_filter( $round['participants'], static function ( $participant ) { return $participant['active']; } ), 'character_id' ), true ) ) {
 		return ps_pen_paper_play_error( __( 'Dieser Charakter nimmt nicht an der laufenden Runde teil.', 'ps-pen-paper' ) );
 	}
+	$allowed = ps_pen_paper_require_character_conditions( $campaign, $character_id, 'actions', $condition_access['allows'] ?? array(), $condition_access['requires'] ?? array() );
+	if ( is_wp_error( $allowed ) ) { return $allowed; }
 	$blocked = ps_pen_paper_character_sitting_out( $campaign, $character_id );
 	return is_wp_error( $blocked ) ? $blocked : ( $blocked ? new WP_Error( 'character_sitting_out', __( 'Dieser Charakter setzt für einen Gegenstandsverbrauch die aktuelle Spielrunde aus. Erst die ausdrücklich weitergezählte Spielrunde gibt Spielaktionen wieder frei.', 'ps-pen-paper' ), array( 'status' => 409 ) ) : true );
 }

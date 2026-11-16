@@ -226,7 +226,7 @@ function ps_pen_paper_write_adventure_group_locked( $campaign, $id, $revision, $
 					$after = $before; $after['revision']++;
 					$member = ps_pen_paper_adventure_group_member( $campaign, $before, $user_id );
 					if ( $member && in_array( $operation, array( 'propose', 'vote', 'execute' ), true ) ) {
-						$allowed = ps_pen_paper_require_character_game_action( $campaign, $member['character_id'] );
+						$allowed = ps_pen_paper_require_character_game_action( $campaign, $member['character_id'], ps_pen_paper_group_condition_access( $before, $operation, $input ) );
 						if ( is_wp_error( $allowed ) ) { return $allowed; }
 					}
 					if ( in_array( $operation, array( 'pause', 'resume', 'configure' ), true ) ) {
@@ -241,6 +241,8 @@ function ps_pen_paper_write_adventure_group_locked( $campaign, $id, $revision, $
 					} elseif ( 'join' === $operation ) {
 						$character = ps_pen_paper_adventure_character( $campaign, $input['character_id'], true );
 						if ( $member || 'completed' === $before['status'] || is_wp_error( $character ) ) { return ps_pen_paper_adventure_group_error(); }
+						$allowed = ps_pen_paper_require_character_conditions( $campaign, $input['character_id'], 'join' );
+						if ( is_wp_error( $allowed ) ) { return $allowed; }
 						$enrolled = false; $attempt = 0;
 						foreach ( $before['participants'] as $participant ) {
 							if ( $participant['owner_id'] === $user_id ) { $enrolled = true; $attempt = $participant['scenario_attempt'] ?? 0; }

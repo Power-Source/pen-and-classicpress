@@ -63,6 +63,10 @@ function ps_pen_paper_valid_adventure_edge( $edge ) {
 		$keys[] = 'reaction';
 		if ( ! ps_pen_paper_valid_adventure_reaction( $edge['reaction'] ) ) { return false; }
 	}
+	if ( is_array( $edge ) && array_key_exists( 'character_conditions', $edge ) ) {
+		$keys[] = 'character_conditions';
+		if ( ! ps_pen_paper_valid_adventure_character_conditions( $edge['character_conditions'] ) ) { return false; }
+	}
 	if ( ! is_array( $edge ) || $keys !== array_keys( $edge ) ||
 		! is_string( $edge['id'] ) || ! wp_is_uuid( $edge['id'] ) ||
 		! is_int( $edge['from_scene'] ) || $edge['from_scene'] < 1 ||
@@ -523,6 +527,11 @@ function ps_pen_paper_save_adventure_edge( $campaign, $id, $input, $revision, $r
 				$edge['reaction'] = ps_pen_paper_prepare_adventure_reaction( $campaign, $input['reaction'], $before['draft']['states'] ?? array(), $rules );
 				if ( is_wp_error( $edge['reaction'] ) ) { return $edge['reaction']; }
 			}
+			if ( array_key_exists( 'character_conditions', $input ) ) {
+				$value = ps_pen_paper_prepare_adventure_character_conditions( $campaign, $input['character_conditions'] );
+				if ( is_wp_error( $value ) ) { return $value; }
+				if ( null !== $value ) { $edge['character_conditions'] = $value; }
+			}
 			if ( ! ps_pen_paper_valid_adventure_edge( $edge ) ) { return ps_pen_paper_adventure_error(); }
 			$after['draft']['edges'][] = $edge;
 		}
@@ -788,6 +797,8 @@ function ps_pen_paper_start_adventure_run_locked( $campaign, $adventure_id, $cha
 				! is_string( $adventure_revision ) || (string) $adventure['revision'] !== $adventure_revision ||
 				! is_string( $character_revision ) || (string) $character['state']['revision'] !== $character_revision ) { return ps_pen_paper_adventure_error(); }
 			$allowed = ps_pen_paper_require_character_game_action( $campaign, (int) $character_id );
+			if ( is_wp_error( $allowed ) ) { return $allowed; }
+			$allowed = ps_pen_paper_require_character_conditions( $campaign, (int) $character_id, 'join' );
 			if ( is_wp_error( $allowed ) ) { return $allowed; }
 			foreach ( get_posts( array( 'post_type' => 'pspp_adventure_run', 'post_status' => 'private', 'post_parent' => $campaign->ID, 'posts_per_page' => -1 ) ) as $existing ) {
 				$state = get_post_meta( $existing->ID, '_pspp_adventure_run', true );

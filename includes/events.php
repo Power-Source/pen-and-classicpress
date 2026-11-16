@@ -6,6 +6,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 function ps_pen_paper_event_labels() {
 	return array(
+		'condition_policy_saved' => __( 'Universumsregeln für Charakterfolgen geändert', 'ps-pen-paper' ),
+		'character_condition_changed' => __( 'Charakterfolgen geändert', 'ps-pen-paper' ),
 		'rules_saved'         => __( 'Regelwerk gespeichert', 'ps-pen-paper' ),
 		'invitation_saved'    => __( 'Einladung geändert', 'ps-pen-paper' ),
 		'character_policy_saved' => __( 'Charaktervorgaben geändert', 'ps-pen-paper' ),
@@ -263,6 +265,9 @@ function ps_pen_paper_get_event( $campaign, $id, $player_view = false ) {
 		return $error;
 	}
 	$event['id'] = $post->ID;
+	if ( in_array( $event['kind'], array( 'condition_policy_saved', 'character_condition_changed' ), true ) && ! ps_pen_paper_valid_condition_event( $event ) ) {
+		return ps_pen_paper_condition_error();
+	}
 	if ( in_array( $event['kind'], array( 'play_options', 'play_round' ), true ) ) {
 		$validator = 'play_options' === $event['kind'] ? 'ps_pen_paper_valid_play_options' : 'ps_pen_paper_valid_play_round';
 		$visibility = 'play_options' === $event['kind'] ? 'gm' : 'group';

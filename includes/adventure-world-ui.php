@@ -4,6 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 function ps_pen_paper_render_adventure_world_editor( $campaign, $id, $state, $page_id ) {
 	$draft = $state['draft'];
+	ps_pen_paper_render_condition_policy( $campaign, $page_id );
 	$npcs = ps_pen_paper_npc_records( $campaign );
 	if ( is_wp_error( $npcs ) ) { echo '<p role="alert">' . esc_html( $npcs->get_error_message() ) . '</p>'; return; }
 	?>

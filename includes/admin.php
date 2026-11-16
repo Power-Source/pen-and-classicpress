@@ -114,6 +114,7 @@ function ps_pen_paper_handle_admin_action() {
 		wp_safe_redirect( ps_pen_paper_game_url( $page_id ) ); exit;
 	}
 	if ( 'save_universe_style' === $operation ) { ps_pen_paper_handle_universe_style_action(); }
+	if ( in_array( $operation, array( 'save_condition_policy', 'change_character_condition' ), true ) ) { ps_pen_paper_handle_condition_action( $operation, $page_id, $scope_id ); }
 	if ( in_array( $operation, array( 'profile_create_character', 'save_character_policy', 'member_invitation', 'upload_portrait_preset', 'select_portrait_preset', 'profile_portrait' ), true ) ) {
 		ps_pen_paper_handle_character_policy_action( $operation );
 	}

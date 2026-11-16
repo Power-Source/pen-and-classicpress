@@ -203,6 +203,7 @@ function ps_pen_paper_render_universe_characters( $universe, $page_id ) {
 		<details class="pspp-fold">
 			<summary><?php esc_html_e( 'Charaktervorgaben, Einladungen und Porträts', 'ps-pen-paper' ); ?></summary>
 			<?php ps_pen_paper_render_character_policy( $universe, $page_id ); ?>
+			<?php ps_pen_paper_render_condition_policy( $universe, $page_id ); ?>
 		</details>
 		<details class="pspp-fold">
 			<summary><?php esc_html_e( 'Universumsregelwerk bearbeiten', 'ps-pen-paper' ); ?></summary>

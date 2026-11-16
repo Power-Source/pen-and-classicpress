@@ -294,6 +294,11 @@ function ps_pen_paper_play_characters( $source, $rules_id = 0 ) {
 		if ( ! $state['active'] || isset( $state['context'] ) ||
 			ps_pen_paper_character_schema( $rules ) !== ps_pen_paper_character_schema( ps_pen_paper_get_rules( $link['universe_id'] ) ) ) { continue; }
 		$choices[ $character->ID ] = array( 'post' => $character, 'state' => $state );
+		$allowed = ps_pen_paper_require_character_conditions( ps_pen_paper_record_post( $link['universe_id'] ), (int) $character->ID, 'join' );
+		if ( is_wp_error( $allowed ) ) {
+			if ( 'character_condition_blocked' !== $allowed->get_error_code() ) { return $allowed; }
+			$choices[ $character->ID ]['unavailable'] = $allowed->get_error_message();
+		}
 	}
 	return $choices;
 }
@@ -301,6 +306,8 @@ function ps_pen_paper_play_characters( $source, $rules_id = 0 ) {
 function ps_pen_paper_write_play_participant( $round, $choice ) {
 	$base = $choice['state']; $base_post = $choice['post']; $user_id = get_current_user_id();
 	if ( (int) $base_post->post_author !== $user_id ) { return ps_pen_paper_play_error(); }
+	$allowed = ps_pen_paper_require_character_conditions( ps_pen_paper_record_post( $base_post->post_parent ), (int) $base_post->ID, 'join' );
+	if ( is_wp_error( $allowed ) ) { return $allowed; }
 	$rules = ps_pen_paper_get_rules( $round->ID );
 	$snapshot = ps_pen_paper_context_snapshot( $base['active'], $rules );
 	if ( is_wp_error( $snapshot ) ) { return $snapshot; }

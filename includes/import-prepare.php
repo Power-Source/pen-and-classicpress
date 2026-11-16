@@ -10,6 +10,7 @@ function ps_pen_paper_prepare_import_error( $message = null ) {
 
 function ps_pen_paper_prepare_import_known_meta() {
 	return array(
+		'_pspp_condition_policy',
 		'_pspp_gm', '_pspp_player', '_pspp_access', '_pspp_membership', '_pspp_archived', '_pspp_rules',
 		'_pspp_universe_link', '_pspp_universe', '_pspp_turn', '_pspp_scene_selection', '_pspp_backdrop',
 		'_pspp_style', '_pspp_sheet_style', '_pspp_equipment_schema', '_pspp_currency', '_pspp_wallet',
@@ -27,12 +28,12 @@ function ps_pen_paper_prepare_import_known_meta() {
 }
 
 function ps_pen_paper_prepare_import_type_meta() {
-	$campaign = array( '_pspp_gm', '_pspp_player', '_pspp_access', '_pspp_membership', '_pspp_archived',
+	$campaign = array( '_pspp_condition_policy', '_pspp_gm', '_pspp_player', '_pspp_access', '_pspp_membership', '_pspp_archived',
 		'_pspp_rules', '_pspp_invitations', '_pspp_wiki_links', '_pspp_universe_link', '_pspp_turn', '_pspp_scene_selection', '_pspp_backdrop',
 		'_pspp_style', '_pspp_sheet_style', '_pspp_equipment_schema', '_pspp_currency', '_pspp_trade_policy',
 		'_pspp_import_epoch', '_pspp_import_receipt', '_pspp_import_backup', '_pspp_import_archive', '_pspp_member_invitations', '_pspp_game_round', '_pspp_item_action_policy',
 		'_pspp_play_options', '_pspp_play_round', '_pspp_play_token' );
-	$universe = array( '_pspp_rules', '_pspp_universe', '_pspp_style', '_pspp_sheet_style', '_pspp_equipment_schema',
+	$universe = array( '_pspp_condition_policy', '_pspp_rules', '_pspp_universe', '_pspp_style', '_pspp_sheet_style', '_pspp_equipment_schema',
 		'_pspp_currency', '_pspp_trade_policy', '_pspp_wiki', '_pspp_import_epoch', '_pspp_import_receipt',
 		'_pspp_import_backup', '_pspp_import_archive', '_pspp_character_policy', '_pspp_member_invitations', '_pspp_universe_members', '_pspp_item_action_policy' );
 	return array(
@@ -368,6 +369,7 @@ function ps_pen_paper_prepare_import_event_snapshot_valid( $kind, $snapshot, $ev
 		'character_requested' => '_pspp_character', 'character_approved' => '_pspp_character',
 		'character_rejected' => '_pspp_character', 'character_context' => '_pspp_character',
 		'character_resource_spent' => '_pspp_character',
+		'character_condition_changed' => '_pspp_character', 'condition_policy_saved' => '_pspp_condition_policy',
 		'scene_saved' => '_pspp_scene', 'scene_published' => '_pspp_scene', 'scene_withdrawn' => '_pspp_scene',
 		'map_moved' => '_pspp_scene', 'scene_selected' => '_pspp_scene_selection',
 		'folio_saved' => '_pspp_folio', 'folio_published' => '_pspp_folio', 'folio_withdrawn' => '_pspp_folio',
@@ -532,6 +534,7 @@ function ps_pen_paper_prepare_import_validate_event( $event, $record, $parsed ) 
 		'character_created' => 'owner', 'character_saved' => 'owner', 'character_requested' => 'owner',
 		'character_approved' => 'owner', 'character_rejected' => 'owner', 'character_context' => 'owner',
 		'character_resource_spent' => 'owner', 'scene_saved' => 'gm', 'scene_published' => 'gm',
+		'character_condition_changed' => 'owner', 'condition_policy_saved' => 'gm',
 		'scene_withdrawn' => 'gm', 'scene_selected' => 'group', 'map_moved' => 'gm',
 		'folio_saved' => 'gm', 'folio_published' => 'gm', 'folio_withdrawn' => 'gm',
 		'portrait_saved' => 'owner', 'sheet_style_saved' => 'gm', 'equipment_schema' => 'gm',
@@ -563,6 +566,7 @@ function ps_pen_paper_prepare_import_validate_event( $event, $record, $parsed ) 
 		! ps_pen_paper_valid_membership_snapshot( $event['member_before'] ) || ! ps_pen_paper_valid_membership_snapshot( $event['member_after'] ) ) ) { return false; }
 	if ( in_array( $kind, array( 'character_policy_saved', 'member_invitation_saved', 'universe_members_saved' ), true ) &&
 		! ps_pen_paper_valid_policy_event( $event ) ) { return false; }
+	if ( in_array( $kind, array( 'character_condition_changed', 'condition_policy_saved' ), true ) && ! ps_pen_paper_valid_condition_event( $event ) ) { return false; }
 	if ( in_array( $kind, array( 'game_round', 'item_action_policy', 'play_options', 'play_round' ), true ) &&
 		( 0 !== $event['recipient_id'] || $event['after']['revision'] !== $event['before']['revision'] + 1 ) ) { return false; }
 	if ( in_array( $kind, array( 'turn_changed', 'access_saved', 'universe_saved', 'universe_linked', 'character_created',
@@ -613,6 +617,7 @@ function ps_pen_paper_prepare_import_validate_event( $event, $record, $parsed ) 
 function ps_pen_paper_prepare_import_validate_known( $key, $value, $record, $parsed ) {
 	$parent_id = $record['parent_id'];
 	switch ( $key ) {
+		case '_pspp_condition_policy': return ps_pen_paper_valid_condition_policy( $value );
 		case '_pspp_rules': return ps_pen_paper_import_rules_valid( $value );
 		case '_pspp_universe':
 			return is_array( $value ) && isset( $value['revision'], $value['name'], $value['description'] ) &&

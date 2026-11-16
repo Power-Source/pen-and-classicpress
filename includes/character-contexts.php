@@ -15,6 +15,9 @@ function ps_pen_paper_raw_character_state( $id ) {
 		( null !== $state['active'] && ! is_array( $state['active'] ) ) || ( null !== $state['pending'] && ! is_array( $state['pending'] ) ) ) {
 		return new WP_Error( 'invalid_character', __( 'Der Charakterstand ist beschädigt. Bitte informiere die Spielleitung.', 'ps-pen-paper' ) );
 	}
+	if ( array_key_exists( 'conditions', $state ) && ! ps_pen_paper_valid_character_conditions( $state['conditions'] ) ) {
+		return ps_pen_paper_condition_error();
+	}
 	return $state;
 }
 
@@ -99,6 +102,11 @@ function ps_pen_paper_character_state( $scope, $character, $with_equipment = tru
 
 // Internal resolver; public callers must first check access to the character.
 function ps_pen_paper_resolve_character_state( $scope, $character, $with_equipment = true ) {
+	$state = ps_pen_paper_resolve_character_values( $scope, $character, $with_equipment );
+	return $with_equipment ? ps_pen_paper_apply_character_conditions( $scope, $character, $state ) : $state;
+}
+
+function ps_pen_paper_resolve_character_values( $scope, $character, $with_equipment = true ) {
 	$state = ps_pen_paper_raw_character_state( $character->ID );
 	if ( is_wp_error( $state ) ) {
 		return $state;

@@ -4,6 +4,9 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 function ps_pen_paper_adventure_action_locks( $campaign, $character_id, $edge, $snapshot = array(), $attempt = 0 ) {
 	$locks = array( (int) $campaign->ID, (int) $character_id );
+	$condition_locks = ps_pen_paper_condition_lock_ids( $campaign, ps_pen_paper_record_post( $character_id ) );
+	if ( is_wp_error( $condition_locks ) ) { return $condition_locks; }
+	$locks = array_merge( $locks, $condition_locks );
 	if ( isset( $edge['resource_cost'] ) ) {
 		$character = ps_pen_paper_get_character( $campaign, $character_id );
 		if ( ! $character ) { return ps_pen_paper_adventure_error(); }
@@ -57,7 +60,7 @@ function ps_pen_paper_adventure_action_transaction( $campaign, $locks, $object_i
 function ps_pen_paper_execute_adventure_edge( $campaign, $character, $snapshot, $edge, $history, $locks, $event_id, $review = null, $attempt = 0 ) {
 	if ( (int) $character['post']->post_author !== get_current_user_id() || ! ps_pen_paper_can_access_site() ||
 		! ps_pen_paper_can_view_campaign( $campaign ) ) { return ps_pen_paper_adventure_error(); }
-	$allowed = ps_pen_paper_require_character_game_action( $campaign, (int) $character['post']->ID );
+	$allowed = ps_pen_paper_require_character_game_action( $campaign, (int) $character['post']->ID, $edge['character_conditions'] ?? array() );
 	if ( is_wp_error( $allowed ) ) { return $allowed; }
 	if ( ! empty( $edge['gm_review'] ) && ( ! ps_pen_paper_valid_adventure_review( $review, get_current_user_id() ) ||
 		$review['edge_id'] !== $edge['id'] || 'approved' !== $review['status'] ||
@@ -145,5 +148,6 @@ function ps_pen_paper_execute_adventure_edge( $campaign, $character, $snapshot, 
 		$entry['reaction'] = ps_pen_paper_adventure_reaction_result( $edge['reaction'], $snapshot, $history, $entry );
 		if ( is_wp_error( $entry['reaction'] ) ) { return $entry['reaction']; }
 	}
-	return $entry;
+	$consequences = ps_pen_paper_write_adventure_character_conditions( $campaign, $character['post'], $edge, $roll, $locks );
+	return is_wp_error( $consequences ) ? $consequences : $entry;
 }

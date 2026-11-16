@@ -75,6 +75,10 @@ function ps_pen_paper_render_event_details( $event, $scope = null ) {
 					<?php else : ?>
 						<p><?php esc_html_e( 'Noch kein Durchlauf.', 'ps-pen-paper' ); ?></p>
 					<?php endif; ?>
+				<?php elseif ( 'character_condition_changed' === $event['kind'] ) : ?>
+					<p><?php echo esc_html( implode( ', ', array_column( $event[ $key ]['conditions'] ?? array(), 'label' ) ) ?: __( 'Keine gespeicherten Charakterfolgen', 'ps-pen-paper' ) ); ?></p>
+				<?php elseif ( 'condition_policy_saved' === $event['kind'] ) : ?>
+					<p><?php echo esc_html( implode( ', ', array_column( $event[ $key ]['definitions'], 'label' ) ) ?: __( 'Keine Zustandsvorlagen', 'ps-pen-paper' ) ); ?></p>
 				<?php elseif ( 'character_resource_spent' === $event['kind'] ) : ?>
 					<?php
 					$snapshot = $event[ $key ]['active'];

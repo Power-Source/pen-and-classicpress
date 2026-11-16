@@ -11,6 +11,7 @@ function ps_pen_paper_import_rules_valid( $rules ) {
 function ps_pen_paper_import_character_valid( $state, $rules ) {
 	if ( ! is_array( $state ) || ! isset( $state['revision'] ) || ! is_int( $state['revision'] ) || $state['revision'] < 1 ||
 		! array_key_exists( 'active', $state ) || ! array_key_exists( 'pending', $state ) ) { return false; }
+	if ( array_key_exists( 'conditions', $state ) && ! ps_pen_paper_valid_character_conditions( $state['conditions'] ) ) { return false; }
 	foreach ( array( 'active', 'pending' ) as $key ) {
 		if ( null === $state[ $key ] ) { continue; }
 		if ( ! ps_pen_paper_valid_character_snapshot( $state[ $key ], $rules ) ) { return false; }
@@ -20,6 +21,7 @@ function ps_pen_paper_import_character_valid( $state, $rules ) {
 
 function ps_pen_paper_import_documents( $parsed ) {
 	$validators = array(
+		'_pspp_condition_policy' => 'ps_pen_paper_valid_condition_policy',
 		'_pspp_scene' => 'ps_pen_paper_validate_scene_state', '_pspp_folio' => 'ps_pen_paper_validate_folio_state',
 		'_pspp_npc' => 'ps_pen_paper_valid_npc_state', '_pspp_loot_table' => 'ps_pen_paper_valid_loot_table',
 		'_pspp_loot_run' => 'ps_pen_paper_valid_loot_run', '_pspp_trade' => 'ps_pen_paper_valid_trade',

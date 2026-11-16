@@ -225,15 +225,25 @@ Weltbeschreibung. Die Lounge und Kampagnenkarten übernehmen die Universumsfarbe
 Einladungen lassen sich hier annehmen oder ablehnen; sie gewähren vorher keine
 internen Inhalte. Eigene Charaktere bleiben im Charakterprofil.
 
-Unter **Spielmodus wählen** führt **Mit Spielleiter** zum bestehenden Spieltisch.
-Solo- und Gruppenabenteuer werden anhand der freigegebenen Abenteuer angeboten.
-Eigene laufende Abenteuer besitzen direkte Fortsetzen-Links. Der Gruppenstart
-führt jetzt zum konkret angelegten Durchlauf, auch bei Aufrufen aus dem Backend.
-Eine getrennte Warte-Lobby und unabhängig geführte Spielleiterrunden derselben
-Kampagne sind noch nicht umgesetzt.
+Unter **Spielarten anbieten** legt die Leitung fest, ob die Kampagne geleitet,
+solo oder als automatisches Gruppenabenteuer gespielt werden darf und ob Spieler
+selbst neue automatische Runden anlegen dürfen. Automatische Abenteuer benötigen
+eine passende Veröffentlichung ohne erforderliche Spielleiterentscheidungen.
+Nach der Moduswahl öffnest du eine bestehende Runde oder legst einen Wartebereich
+an. Dort wählst du deinen eigenen freigegebenen Universumscharakter. Erst
+**Spiel starten** beginnt das Spiel; ein leerer Wartebereich startet nicht.
+
+Dieselbe vorbereitete Kampagne kann mehrere unabhängige Runden haben:
+Szenenauswahl, Karten, Spielzüge, Abenteuer und Protokolle bleiben getrennt.
+Charakterwerte, Ressourcen und Inventar bleiben mit dem Universumsbogen verbunden;
+Gegenstände werden beim Beitritt nicht kopiert. Geleitete Runden startet die
+Spielleitung. Automatische Gruppen organisiert der jeweilige Gastgeber, ohne
+Spielleiterrechte zu erhalten; eine Abenteuerentscheidung wird direkt ausgeführt.
+In einer Pause sind Beitritt und Charakterwechsel möglich. Derselbe Charakter
+kann nicht gleichzeitig in mehreren laufenden Runden spielen.
 
 Mitglieder können **Kampagne verlassen** ausdrücklich bestätigen. Das beendet
-auch ihre aktiven Gruppenteilnahmen und verwirft offene Gruppenvorschläge,
+auch ihre aktiven Rundenteilnahmen und verwirft offene Gruppenvorschläge,
 ohne Charaktere oder bisherigen Fortschritt zu löschen. Der Kampagnenersteller
 bleibt verantwortlich und kann sich nicht selbst entfernen.
 Spielleiter können Charaktere für Mitglieder

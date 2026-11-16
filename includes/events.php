@@ -265,7 +265,8 @@ function ps_pen_paper_get_event( $campaign, $id ) {
 	$event['id'] = $post->ID;
 	if ( in_array( $event['kind'], array( 'play_options', 'play_round' ), true ) ) {
 		$validator = 'play_options' === $event['kind'] ? 'ps_pen_paper_valid_play_options' : 'ps_pen_paper_valid_play_round';
-		if ( ! $validator( $event['before'] ) || ! $validator( $event['after'] ) ||
+		$visibility = 'play_options' === $event['kind'] ? 'gm' : 'group';
+		if ( $visibility !== $event['visibility'] || 0 !== $event['recipient_id'] || ! $validator( $event['before'] ) || ! $validator( $event['after'] ) ||
 			$event['after']['revision'] !== $event['before']['revision'] + 1 ) { return ps_pen_paper_play_error(); }
 	}
 	if ( in_array( $event['kind'], array( 'game_round', 'item_action_policy' ), true ) ) {

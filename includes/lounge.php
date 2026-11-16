@@ -16,7 +16,8 @@ function ps_pen_paper_lounge_data() {
 		if ( 'pspp_campaign' === $invitation['scope_type'] ) { $invited[ $invitation['scope_id'] ] = $invitation; }
 		elseif ( 'offered' === $invitation['status'] ) { $data['universes'][ $invitation['scope_id'] ] = $invitation['name']; }
 	}
-	foreach ( get_posts( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'posts_per_page' => -1, 'orderby' => 'title', 'order' => 'ASC' ) ) as $campaign ) {
+	foreach ( get_posts( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'posts_per_page' => -1, 'orderby' => 'title', 'order' => 'ASC',
+		'meta_query' => array( array( 'key' => '_pspp_play_round', 'compare' => 'NOT EXISTS' ) ) ) ) as $campaign ) {
 		$accessible = ps_pen_paper_can_view_campaign( $campaign );
 		if ( ! $accessible && ! isset( $invited[ $campaign->ID ] ) ) { continue; }
 		$link = ps_pen_paper_get_universe_link( $campaign->ID );
@@ -51,7 +52,7 @@ function ps_pen_paper_lounge_running_adventures( $campaign ) {
 	foreach ( $rounds as $row ) {
 		$state = $row['state'];
 		if ( 'completed' === $state['status'] || ( ! ps_pen_paper_play_participant( $state, get_current_user_id() ) &&
-			$state['host_id'] !== get_current_user_id() && 'gm' !== ps_pen_paper_campaign_role( $campaign ) ) ) { continue; }
+			$state['host_id'] !== get_current_user_id() && 'gm' !== ps_pen_paper_campaign_role( $campaign, get_current_user_id() ) ) ) { continue; }
 		$result[] = array( 'round_id' => (int) $row['post']->ID, 'title' => $row['post']->post_title,
 			'mode' => ps_pen_paper_play_modes()[ $state['mode'] ], 'status' => ps_pen_paper_play_statuses()[ $state['status'] ] );
 	}
@@ -60,7 +61,7 @@ function ps_pen_paper_lounge_running_adventures( $campaign ) {
 	foreach ( $groups as $id => $record ) {
 		if ( 'completed' === $record['status'] || ! $record['state'] ) { continue; }
 		$member = ps_pen_paper_adventure_group_member( $campaign, $record['state'], get_current_user_id() );
-		$leading = 'gm' === ps_pen_paper_campaign_role( $campaign ) && ps_pen_paper_adventure_group_electorate( $record['state'] );
+		$leading = 'gm' === ps_pen_paper_campaign_role( $campaign, get_current_user_id() ) && ps_pen_paper_adventure_group_electorate( $record['state'] );
 		if ( ! $member && ! $leading ) { continue; }
 		$result[] = array( 'title' => $record['title'], 'character_id' => 0, 'anchor' => 'pspp-adventure-group-' . $id,
 			'mode' => __( 'Automatische Gruppe', 'ps-pen-paper' ), 'paused' => 'paused' === $record['status'] );

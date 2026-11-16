@@ -68,14 +68,17 @@ als abgeschlossen markiert. Es gibt keinen ungeprüften Versionssprung.
   Kampagnen nach Bestätigung verlassen, ohne Charaktere oder Verlauf zu löschen.
 - [x] Eigene laufende Abenteuer direkt öffnen; Gruppenstart zum neu angelegten
   Durchlauf zurückführen statt zur allgemeinen Übersicht.
-- [ ] Drei ausdrücklich konfigurierbare Angebote: geleitet, solo und automatische
-  Gruppe. Der Lounge-Einstieg nutzt derzeit Spieltisch und veröffentlichte
-  Abenteuer; die eigenständige Modusfreigabe durch die Leitung ist noch offen.
-- [ ] Vorbereitete Kampagnen von Spielrunden trennen: dieselbe Kampagne mit
+- [x] Drei ausdrücklich konfigurierbare Angebote: geleitet, solo und automatische
+  Gruppe; Leitung entscheidet zusätzlich über neue automatische Spielerstarts.
+- [x] Vorbereitete Kampagnen von Spielrunden trennen: dieselbe Kampagne mit
   unterschiedlichen Gruppen und getrennten Spielständen wiederverwenden,
   auch für geleitetes Spiel.
-- [ ] Warte-Lobby mit Teilnehmern, Charakterwahl und ausdrücklichem Rundenstart.
+- [x] Warte-Lobby mit Teilnehmern, Charakterwahl und ausdrücklichem Rundenstart.
   „Neue Runde anlegen“, „Beitreten“ und „Fortsetzen“ dürfen nicht verwechselt werden.
+- [x] Neue Runden nutzen freigegebene Universumsfiguren samt unvervielfachtem
+  Inventar; Ressourcenverbrauch, Gegenstandsverbrauch und Handel bleiben im Profil.
+  Austritt bereinigt aktive Teilnahmen und offene Reservierungen, ohne Figuren
+  oder Geschichte zu löschen. Bestehende Spiele bleiben unverändert nutzbar.
 
 ### 3. Charaktererstellung durch die Leitung konfigurieren
 

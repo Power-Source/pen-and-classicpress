@@ -1244,8 +1244,9 @@ try {
 		$solo['mode'] = 'group'; $group_only = $create( 'Group only', $solo );
 		$check( is_wp_error( $start( $group_only ) ), 'Group-only scenario allowed solo entry.' );
 		ob_start(); ps_pen_paper_render_character_adventures( $scope, get_post( $chars['player'] ), 0 ); $html = ob_get_clean();
-		$check( false !== strpos( $html, 'Chapter One' ) && false !== strpos( $html, 'Szenario wiederholen' ) &&
-			false === strpos( $html, 'PRIVATE_CHAPTER_' ), 'Chapter/continue UI missing or private chapter content leaked.' );
+		$check( false !== strpos( $html, 'Chapter One' ) && false !== strpos( $html, 'Game-Lounge' ),
+			'Chapter or lounge navigation missing.' );
+		$check( false === strpos( $html, 'PRIVATE_CHAPTER_' ), 'Private chapter content leaked.' );
 		wp_set_current_user( $users['gm'] );
 		ob_start(); ps_pen_paper_render_scenario_editor( $scope, $next, ps_pen_paper_get_adventure( $scope, $next ),
 			ps_pen_paper_adventure_records( $scope ), $rules, 0 ); $html = ob_get_clean();

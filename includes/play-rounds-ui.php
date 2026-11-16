@@ -128,6 +128,7 @@ function ps_pen_paper_render_play_round( $source, $round, $page_id, $state ) {
 	$member = ps_pen_paper_play_participant( $state, get_current_user_id() );
 	$gm = ps_pen_paper_can_manage_campaign( $source );
 	$controller = $gm || ( 'guided' !== $state['mode'] && $state['host_id'] === get_current_user_id() );
+	$active = array_filter( $state['participants'], static function ( $participant ) { return $participant['active']; } );
 	if ( 'solo' === $state['mode'] && ! $controller ) { echo '<p role="alert">' . esc_html__( 'Diese Solo-Runde ist privat.', 'ps-pen-paper' ) . '</p>'; return; }
 	?>
 	<section class="pspp-play-round"><header>
@@ -137,6 +138,8 @@ function ps_pen_paper_render_play_round( $source, $round, $page_id, $state ) {
 		<a href="<?php echo esc_url( ps_pen_paper_game_url( $page_id ) ); ?>"><?php esc_html_e( 'Zur Game-Lounge', 'ps-pen-paper' ); ?></a>
 	</header>
 	<?php ps_pen_paper_render_notice(); ?>
+	<h3><?php esc_html_e( 'Teilnehmer', 'ps-pen-paper' ); ?></h3>
+	<?php if ( ! $active ) : ?><p><?php esc_html_e( 'Noch kein Charakter ausgewählt.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 	<ul>
 		<?php foreach ( $state['participants'] as $participant ) :
 			if ( ! $participant['active'] ) { continue; }
@@ -157,6 +160,7 @@ function ps_pen_paper_render_play_round( $source, $round, $page_id, $state ) {
 	if ( in_array( $state['status'], array( 'lobby', 'paused' ), true ) && ( 'solo' !== $state['mode'] || $state['host_id'] === get_current_user_id() ) ) :
 		$choices = ps_pen_paper_play_characters( $source, $round->ID );
 		if ( is_wp_error( $choices ) ) : ?><p role="alert"><?php echo esc_html( $choices->get_error_message() ); ?></p>
+		<?php elseif ( $member && 1 === count( $choices ) && isset( $choices[ $member['source_id'] ] ) ) : ?>
 		<?php elseif ( $choices ) :
 			ps_pen_paper_form_start( 'change_play_round', 'pspp_campaign_' . $round->ID, $round->ID, $page_id ); ?>
 			<input type="hidden" name="play_revision" value="<?php echo esc_attr( $state['revision'] ); ?>"><input type="hidden" name="play_action" value="join">
@@ -165,20 +169,23 @@ function ps_pen_paper_render_play_round( $source, $round, $page_id, $state ) {
 			</select></label>
 			<?php foreach ( $choices as $id => $choice ) : ?><input type="hidden" name="play_character_revisions[<?php echo esc_attr( $id ); ?>]" value="<?php echo esc_attr( $choice['state']['revision'] ); ?>"><?php endforeach; ?>
 			<button type="submit"><?php echo esc_html( $member ? __( 'Charakter wechseln', 'ps-pen-paper' ) : __( 'Mit diesem Charakter teilnehmen', 'ps-pen-paper' ) ); ?></button></form>
-		<?php else : ?>
+		<?php elseif ( ! $gm || 'guided' !== $state['mode'] ) : ?>
 			<p><?php esc_html_e( 'Du brauchst einen eigenen freigegebenen Charakter mit passenden Regeln.', 'ps-pen-paper' ); ?></p>
 			<?php if ( ps_pen_paper_community_url() ) : ?><a href="<?php echo esc_url( ps_pen_paper_community_url() ); ?>"><?php esc_html_e( 'Meine Charaktere öffnen', 'ps-pen-paper' ); ?></a><?php endif; ?>
 		<?php endif;
 	endif;
 	if ( $controller && 'completed' !== $state['status'] ) {
 		if ( 'active' === $state['status'] ) { ps_pen_paper_play_button( $round, $page_id, $state, 'pause', __( 'Pause · Teilnehmer ändern', 'ps-pen-paper' ) ); }
-		elseif ( 'solo' !== $state['mode'] || $state['host_id'] === get_current_user_id() ) {
+		elseif ( $active && ( 'solo' !== $state['mode'] || $state['host_id'] === get_current_user_id() ) ) {
 			ps_pen_paper_play_button( $round, $page_id, $state, 'start', 'lobby' === $state['status'] ? __( 'Spiel starten', 'ps-pen-paper' ) : __( 'Spiel fortsetzen', 'ps-pen-paper' ) );
 		}
 		ps_pen_paper_play_button( $round, $page_id, $state, 'complete', __( 'Runde abschließen', 'ps-pen-paper' ) );
 	}
 	if ( 'lobby' === $state['status'] || 'paused' === $state['status'] ) {
-		echo '<p>' . esc_html( 'lobby' === $state['status'] ? __( 'Wähle deinen Charakter. Die Runde beginnt erst mit „Spiel starten“.', 'ps-pen-paper' ) : __( 'Während der Pause können Spieler beitreten oder ihre Teilnahme beenden.', 'ps-pen-paper' ) ) . '</p>';
+		$message = 'lobby' === $state['status']
+			? ( $gm && 'guided' === $state['mode'] ? __( 'Die Spieler wählen ihre Charaktere. Danach kannst du das Spiel starten.', 'ps-pen-paper' ) : __( 'Wähle deinen Charakter. Die Runde beginnt erst mit „Spiel starten“.', 'ps-pen-paper' ) )
+			: __( 'Während der Pause können Spieler beitreten oder ihre Teilnahme beenden.', 'ps-pen-paper' );
+		echo '<p>' . esc_html( $message ) . '</p>';
 	} elseif ( $member || $gm ) {
 		if ( 'guided' === $state['mode'] ) { ps_pen_paper_render_table( $round, $page_id, 0 ); }
 		elseif ( 'group' === $state['mode'] ) { ps_pen_paper_render_adventure_groups( $round, $page_id ); }

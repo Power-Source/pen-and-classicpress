@@ -356,14 +356,13 @@ function ps_pen_paper_render_character_adventures( $campaign, $character, $page_
 	<?php $game_page = ps_pen_paper_find_frontend_page( $page_id ); ?>
 	<?php if ( $game_page && ! $round ) : ?>
 		<p><a href="<?php echo esc_url( ps_pen_paper_play_url( $game_page->ID, $campaign->ID, 'solo' ) ); ?>"><?php esc_html_e( 'Neue Solo-Runde in der Game-Lounge auswählen', 'ps-pen-paper' ); ?></a></p>
-	<?php elseif ( $game_page ) : ?>
-	<?php else : ?><p role="alert"><?php esc_html_e( 'Es ist keine veröffentlichte Spielbereich-Seite eingerichtet. Bitte wende dich an den Website-Betreiber.', 'ps-pen-paper' ); ?></p><?php endif; ?>
+	<?php elseif ( ! $game_page ) : ?><p role="alert"><?php esc_html_e( 'Es ist keine veröffentlichte Spielbereich-Seite eingerichtet. Bitte wende dich an den Website-Betreiber.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 	<?php if ( ! $adventures ) : ?><p><?php esc_html_e( 'Derzeit sind keine freigegebenen Soloabenteuer vorhanden.', 'ps-pen-paper' ); ?></p><?php endif; ?>
 	<?php foreach ( $adventures as $adventure_id => $adventure ) :
 		if ( $round && $adventure_id !== $round['adventure_id'] ) { continue; }
 		$existing = isset( $by_adventure[ $adventure_id ] ) ? $by_adventure[ $adventure_id ] : null;
 		$access = $state['active'] ? ps_pen_paper_scenario_access( $campaign, $adventure_id, $adventure['published'], array( 'post' => $character, 'state' => $state ), 'solo' ) : ps_pen_paper_scenario_error();
-		$can_start = ! is_wp_error( $access ) && $access['met'] && ( ! $existing || ( 'completed' === $existing['state']['status'] && isset( $adventure['published']['scenario'] ) ) ); ?>
+		?>
 		<article class="pspp-solo-adventure" data-adventure-id="<?php echo esc_attr( $adventure_id ); ?>">
 			<h4><?php echo esc_html( $adventure['published']['title'] ); ?></h4>
 			<?php if ( ! $existing || 'completed' === $existing['state']['status'] ) { ps_pen_paper_render_scenario_access( $adventure['published'], $access ); } ?>

@@ -96,14 +96,18 @@ Universen** bleibt unabhängig von dieser Auswahl sichtbar.
 - **Weltwiki öffnen** erscheint, wenn ein Weltlexikon verknüpft ist.
 - An den Kampagnen findest du **Story / Einleitung**, **Regelwerk**, **Handouts**
   und **Spielverlauf**.
-- **Spielmodus wählen** bietet den Spieltisch mit Spielleiter und die passenden
-  freigegebenen Solo-/Gruppenabenteuer. Für Solo wählst du deinen freigegebenen
-  Kampagnencharakter.
+- **Spielmodus wählen** zeigt nur die von der Leitung angebotenen Spielarten:
+  **Mit Spielleiter**, **Solo-Abenteuer** und **Automatisches Gruppenabenteuer**.
+  Automatische Abenteuer müssen für den jeweiligen Modus veröffentlicht sein.
+- Öffne eine bestehende Runde oder lege einen **Wartebereich** an, wenn du dazu
+  berechtigt bist. Wähle dort deinen eigenen freigegebenen Universumscharakter.
+  **Spiel starten** beginnt anschließend das Abenteuer; ein leerer Wartebereich
+  ist noch kein laufendes Spiel.
 - **Einladungen** kannst du annehmen oder ablehnen. Vor der Annahme erhältst du
   keine internen Kampagnendaten.
 - **Kampagne verlassen** beendet nach Bestätigung deine Mitgliedschaft und
-  aktiven Gruppenteilnahmen. Charaktere und bisheriger Verlauf bleiben erhalten.
-  Eine einzelne Gruppenrunde verlässt du dort über **Teilnahme beenden**.
+  aktiven Rundenteilnahmen. Charaktere und bisheriger Verlauf bleiben erhalten.
+  Eine einzelne neue Runde verlässt du dort über **Runde verlassen**.
 
 Die Universumsleitung kann unter **Welt vorbereiten → Universum bearbeiten**
 eine optionale **Welteinleitung für die Game-Lounge** eintragen. Diese ist für
@@ -111,8 +115,25 @@ alle angemeldeten Personen sichtbar, denen die Welt angeboten wird. Geheimnisse
 gehören ausschließlich in die getrennte **Interne Weltbeschreibung**.
 Die Lounge übernimmt die optionalen Farben des ausgewählten Universums.
 
-Die Lounge bündelt den bestehenden Spieleinstieg. Eine getrennte Warte-Lobby
-und mehrere unabhängig geleitete Runden derselben Kampagne sind noch offen.
+Unter **Spielarten anbieten** stellt die Leitung die angebotenen Modi ein und
+erlaubt oder verbietet neue automatische Runden durch Spieler. Geleitete Runden
+startet die Spielleitung; Solo spielt der Besitzer des gewählten Charakters.
+Eine automatische Gruppe organisiert ihr Gastgeber, ohne dadurch Charaktere,
+Regeln oder Geheimnisse verwalten zu dürfen. Jeder Teilnehmer kann eine
+angebotene Abenteuerentscheidung direkt ausführen.
+
+Die vorbereitete Kampagne bleibt eine Vorlage. Jede Runde erhält ihren eigenen
+Spielstand, ihre Szenen, Karten, Spielzüge und Protokolle. Werte, Ressourcen und
+Inventar deiner Figur bleiben mit ihrem Universumsbogen verbunden; beim Beitritt
+entstehen keine Gegenstandskopien. Ein Charakter kann nur an einer laufenden
+Runde gleichzeitig teilnehmen. Während einer Pause können Spieler beitreten,
+austreten oder einen anderen passenden Charakter auswählen. Das Abschließen
+einer Runde ersetzt nicht den tatsächlichen Erfolg eines unvollendeten Abenteuers.
+
+Bereits vorhandene Spiele werden nicht automatisch umgebaut. Bei der
+Wiederherstellung einer Rundensicherung werden frühere Rundenverknüpfungen
+archiviert: Die importierte Kampagne wird nicht automatisch als laufende Runde
+einer möglicherweise fremden Vorlage aktiviert.
 
 Die kompakte Gruppenleiste steht oberhalb der großen Spielfläche.
 „Mein Bogen“ öffnet den gegliederten Charakterbogen mit Profil, Attributen

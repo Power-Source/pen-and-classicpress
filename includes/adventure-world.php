@@ -48,6 +48,7 @@ function ps_pen_paper_valid_adventure_world( $graph ) {
 	foreach ( $graph['edges'] ?? array() as $edge ) {
 		if ( ! ps_pen_paper_valid_adventure_edge( $edge ) ) { return false; }
 		foreach ( $edge['effects'] ?? array() as $effect ) { if ( ! isset( $ids[ $effect['state'] ] ) ) { return false; } }
+		foreach ( $edge['reaction']['effects'] ?? array() as $effect ) { if ( ! isset( $ids[ $effect['state'] ] ) ) { return false; } }
 		foreach ( $edge['conditions']['rows'] ?? array() as $condition ) {
 			if ( 'state' === $condition['part'] && ! isset( $ids[ $condition['field'] ] ) ) { return false; }
 		}
@@ -202,7 +203,7 @@ function ps_pen_paper_adventure_state_values( $snapshot, $history ) {
 	if ( ! ps_pen_paper_valid_adventure_world( $snapshot ) || ! is_array( $history ) ) { return ps_pen_paper_adventure_world_error(); }
 	$values = array_column( $snapshot['states'] ?? array(), 'initial', 'id' );
 	foreach ( $history as $entry ) {
-		foreach ( $entry['effects'] ?? array() as $effect ) {
+		foreach ( array_merge( $entry['effects'] ?? array(), $entry['reaction']['effects'] ?? array() ) as $effect ) {
 			if ( ! is_array( $effect ) || ! isset( $effect['state'], $effect['after'] ) || ! array_key_exists( $effect['state'], $values ) || ! is_string( $effect['after'] ) ) { return ps_pen_paper_adventure_world_error(); }
 			$values[ $effect['state'] ] = $effect['after'];
 		}

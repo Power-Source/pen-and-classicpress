@@ -24,7 +24,13 @@ function ps_pen_paper_handle_adventure_action( $operation ) {
 			: ps_pen_paper_review_adventure_run( $campaign, $run_id, ps_pen_paper_posted_text( 'adventure_edge' ), ps_pen_paper_posted_text( 'run_revision' ),
 				'request_adventure_review' === $operation ? 'request' : ( 'cancel_adventure_review' === $operation ? 'cancel' : ps_pen_paper_posted_text( 'decision' ) ) );
 		$url = ps_pen_paper_profile_return( $campaign_id, $character_id );
-		if ( ! $url ) { $url = ps_pen_paper_character_url( $campaign_id, $character_id, $page_id ); }
+		if ( ! $url ) {
+			$round = ps_pen_paper_play_round( $campaign_id );
+			if ( is_wp_error( $round ) ) { ps_pen_paper_fail( $round->get_error_message() ); }
+			$url = $page_id && $round && 'solo' === $round['mode']
+				? ps_pen_paper_play_url( $page_id, $round['source_id'], 'solo', $campaign_id )
+				: ps_pen_paper_character_url( $campaign_id, $character_id, $page_id );
+		}
 		$url .= '#pspp-adventure-run-' . $run_id;
 	} else {
 		if ( ! ps_pen_paper_can_manage_campaign( $campaign ) || 'complete' !== ps_pen_paper_posted_text( 'adventure_complete' ) ) { ps_pen_paper_fail( ps_pen_paper_adventure_error()->get_error_message() ); }
@@ -276,6 +282,8 @@ function ps_pen_paper_render_adventure_editor( $campaign, $page_id ) {
 						<?php endforeach; ?></ul>
 					<?php endif; ?>
 					<?php if ( ! empty( $edge['gm_review'] ) ) : ?><p><?php esc_html_e( 'Diese Entscheidung benötigt ausdrücklich eine Spielleiterfreigabe', 'ps-pen-paper' ); ?></p><?php endif; ?>
+					<?php if ( isset( $edge['reaction'] ) ) : ?><p><?php echo esc_html( __( 'Vorbereitete NPC-Reaktion:', 'ps-pen-paper' ) . ' ' . $edge['reaction']['npc']['name'] .
+						' · ' . $edge['reaction']['expression'] . ' + ' . ( $edge['reaction']['npc']['value']['value'] ?? 0 ) . ' ≥ ' . $edge['reaction']['threshold'] ); ?></p><?php endif; ?>
 					<?php ps_pen_paper_form_start( 'remove_adventure_edge', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 						<input type="hidden" name="adventure_complete" value="complete"><input type="hidden" name="adventure_id" value="<?php echo esc_attr( $id ); ?>"><input type="hidden" name="adventure_revision" value="<?php echo esc_attr( $state['revision'] ); ?>"><input type="hidden" name="edge_id" value="<?php echo esc_attr( $edge['id'] ); ?>">
 						<button type="submit"><?php esc_html_e( 'Entscheidung entfernen', 'ps-pen-paper' ); ?></button>
@@ -290,6 +298,7 @@ function ps_pen_paper_render_adventure_editor( $campaign, $page_id ) {
 					<label><?php esc_html_e( 'Entscheidungstext', 'ps-pen-paper' ); ?><input type="text" name="adventure_edge[choice]" maxlength="120" required></label>
 					<?php ps_pen_paper_render_adventure_condition_fields( $rules, $draft['edges'], $draft['states'] ?? array() ); ?>
 					<?php ps_pen_paper_render_adventure_world_fields( $campaign, $draft ); ?>
+					<?php ps_pen_paper_render_adventure_reaction_fields( $campaign, $draft ); ?>
 					<label class="pspp-check"><input type="checkbox" name="adventure_edge[gm_review]" value="1"><?php esc_html_e( 'Diese Entscheidung benötigt ausdrücklich eine Spielleiterfreigabe', 'ps-pen-paper' ); ?></label>
 					<p><?php esc_html_e( 'Der Besitzer fragt die Entscheidung an. Erst nach Freigabe kann er sie ausführen; bis dahin gibt es weder Würfelwurf noch Verbrauch oder Belohnung. Die Freigabe gilt einmalig für diese Entscheidung und diesen Durchlauf.', 'ps-pen-paper' ); ?></p>
 					<label><?php esc_html_e( 'Optionale Ressourcenkosten', 'ps-pen-paper' ); ?><select name="adventure_edge[cost_resource]"><option value=""><?php esc_html_e( 'Keine Ressourcenkosten', 'ps-pen-paper' ); ?></option>
@@ -322,6 +331,16 @@ function ps_pen_paper_render_adventure_editor( $campaign, $page_id ) {
 				</form>
 			</details>
 			<?php endif; ?>
+			<aside class="pspp-card"><h4><?php esc_html_e( 'Automatikprüfung des Entwurfs', 'ps-pen-paper' ); ?></h4>
+				<?php $manual_edges = array_filter( $draft['edges'], static function ( $edge ) { return ! empty( $edge['gm_review'] ); } );
+				$reaction_edges = array_filter( $draft['edges'], static function ( $edge ) { return isset( $edge['reaction'] ); } ); ?>
+				<p><?php
+					/* translators: 1: decision count, 2: prepared reaction count, 3: manual approval count. */
+					echo esc_html( sprintf( __( 'Entscheidungen: %1$d · vorbereitete NPC-Reaktionen: %2$d · notwendige Spielleiterfreigaben: %3$d', 'ps-pen-paper' ), count( $draft['edges'] ), count( $reaction_edges ), count( $manual_edges ) ) );
+				?></p>
+				<p><?php echo esc_html( $manual_edges ? __( 'Dieser Entwurf braucht eine anwesende Spielleitung und wird nicht für automatische Solo-/Gruppenstarts angeboten.', 'ps-pen-paper' ) :
+					__( 'Keine manuelle Entscheidungsfreigabe vorgesehen. Beim Veröffentlichen werden Würfel, Zustandsverweise und Szenenpfade geprüft. Nur ausdrücklich eingerichtete NPC-Reaktionen werden ausgeführt; eine Begegnungszuordnung allein löst nichts aus.', 'ps-pen-paper' ) ); ?></p>
+			</aside>
 			<p><?php echo esc_html( __( 'Status:', 'ps-pen-paper' ) . ' ' . array( 'draft' => __( 'Entwurf', 'ps-pen-paper' ), 'published' => __( 'Für Einzelabenteuer freigegeben', 'ps-pen-paper' ), 'paused' => __( 'Pausiert – laufende Durchläufe können fortgesetzt werden', 'ps-pen-paper' ) )[ $state['status'] ] ); ?></p>
 			<?php foreach ( array( 'publish_adventure' => __( 'Abenteuer ausdrücklich freigeben', 'ps-pen-paper' ), 'pause_adventure' => __( 'Neue Durchläufe pausieren', 'ps-pen-paper' ), 'resume_adventure' => __( 'Neue Durchläufe wieder erlauben', 'ps-pen-paper' ) ) as $operation => $label ) :
 				if ( ( 'publish_adventure' === $operation && in_array( $state['status'], array( 'published', 'paused' ), true ) ) || ( 'pause_adventure' === $operation && 'published' !== $state['status'] ) ||
@@ -476,6 +495,7 @@ function ps_pen_paper_render_adventure_run( $campaign, $character, $page_id, $ru
 			}
 			if ( array_key_exists( 'reward', $entry ) ) { $detail .= ' · ' . ps_pen_paper_adventure_reward_history_label( $snapshot, $entry ); }
 			if ( $entry['roll'] ) { $detail .= ' · ' . $entry['roll']['total'] . ' / ' . $entry['roll']['threshold'] . ' · ' . ( $entry['roll']['success'] ? __( 'Erfolg', 'ps-pen-paper' ) : __( 'Misserfolg', 'ps-pen-paper' ) ); }
+			if ( isset( $entry['reaction'] ) ) { $detail .= ' · ' . ps_pen_paper_adventure_reaction_label( $entry['reaction'] ); }
 			echo '<li>' . esc_html( $detail ) . '</li>';
 		}
 		echo '</ol>';

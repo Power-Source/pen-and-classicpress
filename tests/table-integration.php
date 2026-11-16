@@ -71,6 +71,19 @@ try {
 
 	wp_set_current_user( $users['gm'] );
 	$check( psource_chat_is_moderator( $room ), 'Campaign GM is not room moderator.' );
+	$saved_view = $_SERVER['HTTP_X_PSPP_VIEW'] ?? null;
+	try {
+		$_SERVER['HTTP_X_PSPP_VIEW'] = 'overview';
+		$check( psource_chat_session_access( $room ) && ! psource_chat_is_moderator( $room ), 'Player chat workspace retained GM moderation or lost access.' );
+		$_SERVER['HTTP_X_PSPP_VIEW'] = 'lead';
+		$check( psource_chat_is_moderator( $room ), 'Leadership chat workspace lost moderation.' );
+		wp_set_current_user( $users['player'] );
+		$check( ! psource_chat_is_moderator( $room ), 'Forged leadership context grants chat moderation.' );
+	} finally {
+		if ( null === $saved_view ) { unset( $_SERVER['HTTP_X_PSPP_VIEW'] ); }
+		else { $_SERVER['HTTP_X_PSPP_VIEW'] = $saved_view; }
+		wp_set_current_user( $users['gm'] );
+	}
 	$check( 400 === $call( 'POST', array( 'operation' => 'turn', 'user_id' => $users['outsider'], 'revision' => 0 ) )->get_status(), 'Outsider can be assigned a turn.' );
 	$turn = $call( 'POST', array( 'operation' => 'turn', 'user_id' => $users['player'], 'revision' => 0 ) );
 	$check( 200 === $turn->get_status() && 1 === $turn->get_data()['turn']['revision'], 'GM turn assignment did not persist.' );

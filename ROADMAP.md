@@ -44,8 +44,13 @@ Bestehende Universen, Kampagnen, Charaktere und Spielstände bleiben erhalten.
     Wurfansichten ohne erweiterte Leitungsleserechte ausgeben.
   - [x] Gruppenstände nur für eigene Teilnahme ausgeben und Kartenbewegungen
     sowie Bildfreigaben auch bei REST-Aktualisierungen im Spielerbereich begrenzen.
-  - [ ] Übrige Unteransichten und Fremdplugin-Oberflächen einschließlich
-    Chatmoderation abschließend prüfen.
+  - [x] Die Liste laufender Spiele auf eigene Beteiligung begrenzen und fremde
+    Solo-Runden im Spielerbereich auch bei Leitungskonten ausblenden.
+  - [x] Chatmoderation je Frontend-Ansicht und Anfrage begrenzen; gemeinsamer
+    Raum und fachliche Rollen bleiben erhalten. Native Rechteprüfungen,
+    JavaScript-Transporttests und echter PS-Chat-AJAX-Aufruf im Browser geprüft.
+  - [ ] Abschließende Abnahme sämtlicher Altansichten und seltener
+    Freigabe-/Fehlerzustände durchführen.
 
 **Nachweis der ersten Etappe:** Gezielte native Regressionen für Spielrunden,
 Spieltisch und PS Events bestanden. Im Browser mit einem eigenen temporären
@@ -75,22 +80,43 @@ der vier Spielerwege.
   Voraussetzungen, Proben, Wirkungen, Folgeaktionen und Abschluss vorbereiten.
   NPCs/Gegner und deren Reaktionen werden dort eingebunden, wo vorgesehen.
   Kein fest eingebautes Regelwerk und keine Pflicht zu Kampfbegegnungen.
-- [ ] NPC-/Gegnerdaten mit der regelgesteuerten Ausführung verbinden;
+- [x] NPC-/Gegnerdaten mit der regelgesteuerten Ausführung verbinden;
   Beschreibungen und Begegnungszuordnungen allein reichen nicht aus.
+  Pro Entscheidung eine ausdrücklich freigegebene, versionierte Reaktion:
+  ausgewählter NPC-Zahlenwert, optionale Serverprobe, Auslösebedingung,
+  öffentliche Antwort und vorbereitete Zustandsfolgen. Solo und Gruppen
+  verwenden dieselbe Ausführung. Keine eigenständige Kampfengine,
+  Initiative oder direkten NPC-Ressourcenänderungen damit behaupten.
 - [ ] Vor der Freigabe erkennbar prüfen, welche Abläufe ohne anwesende
   Spielleitung ausführbar sind und wo noch manuelle Entscheidungen fehlen.
-- [ ] Einen vollständigen vertikalen Ablauf nachweisen: vorbereiten,
+  - [x] Entwurfsprüfung zeigt Anzahl der Entscheidungen, eingerichteten
+    NPC-Reaktionen und manuellen Freigaben; erforderliche Leitungsentscheidungen
+    schließen automatische Starts weiterhin aus. Die vollständige
+    Vollständigkeits-/Erreichbarkeitsprüfung aller bedingten Wege bleibt offen.
+- [x] Einen vollständigen vertikalen Ablauf nachweisen: vorbereiten,
   für Solo freigeben, als Spieler Charakter wählen und das Spielfeld erreichen,
   erlaubte Aktion samt vorbereiteter Reaktion ausführen, Fortschritt speichern
   und nach erneuter Anmeldung fortsetzen.
+
+**Nachweis der NPC-Reaktionen:** Native Solo-/Gruppenprüfungen einschließlich
+gespeicherter NPC-Probe und Misserfolg, unveränderlicher NPC-Kopie,
+zustandsabhängiger Folgeaktion, manipulierter Belege und vollständiger Rücknahme
+bei einem Protokollfehler bestanden. Im Browser als temporäre Spielleitung
+zwei Entscheidungen mit NPC-Reaktion vorbereitet und veröffentlicht. Als
+normaler Spieler direkt gestartet: W6 = 6 plus NPC-Wert 4 ergab 10; die
+Torwache öffnete den Zustand „Tor“, die nächste Aktion wurde ausführbar,
+Ausdauer sank exakt von 10 auf 8. Nach Ab-/Anmeldung denselben Beleg und
+Zustand über die Lounge wiedergefunden und das Abenteuer abgeschlossen.
+Keine NPC-Geheimnisse im Spieler-HTML. Die eigenen 42 Testposts und beide
+Konten wurden entfernt; Browser wieder abgemeldet.
 
 ### C. Vier verständliche Spielereinstiege je Kampagne
 
 Nur tatsächlich freigegebene und verfügbare Angebote anzeigen:
 
-- [ ] **Solo spielen:** vorbereitetes Abenteuer wählen, eigenen passenden
+- [x] **Solo spielen:** vorbereitetes Abenteuer wählen, eigenen passenden
   Charakter auswählen und ohne technische Rundenverwaltung ins Spiel gelangen.
-- [ ] **Mit Freunden spielen:** automatische Gruppenrunde mit Einladungen über
+- [x] **Mit Freunden spielen:** automatische Gruppenrunde mit Einladungen über
   **PS Community**, Annahme durch Freunde, Charakterwahl und gemeinsamem Start.
 - [ ] **Spieltermin auswählen:** über **PS Events** anmelden und die zugehörige
   Runde eindeutig erreichen. Terminzusage, Spielzugang und Charakterwahl
@@ -100,6 +126,43 @@ Nur tatsächlich freigegebene und verfügbare Angebote anzeigen:
   Das ist nicht dasselbe wie eine allgemeine Kampagnen-Beitrittsanfrage.
 - [ ] Fehlenden Charakter mit passendem Erstellweg und Rückweg zum gewählten
   Spiel behandeln. Wartezustände nennen konkret, worauf gewartet wird.
+
+**Nachweis des Freundesgruppen-Einstiegs:** PS-Community-Freundschaften werden
+wiederverwendet; Blockierungen gelten in beiden Richtungen. Gruppenerstellung,
+eigene Charakterteilnahme und gegebenenfalls die bestehende Kampagneneinladung
+werden atomar gespeichert. Erforderliche Leitungsfreigabe und persönliche
+Annahme des Kampagnenzugangs bleiben vorgeschaltet. Native Tests prüfen zudem
+ausstehende Freundschaften, Ablehnung, Zurückziehen, fremde Besitzer, veraltete
+Bögen und Figuren aus einem anderen Universum trotz identischer Regeln.
+Bestehende offene Runden behalten ihr bisheriges Verhalten.
+Im Browser mit zwei normalen Spielerkonten eine Gruppe angelegt, die Einladung
+nach Anmeldung in der Lounge geöffnet und ausschließlich die eigene passende
+Universumsfigur angeboten bekommen. Nach Annahme gemeinsam gestartet, erneut
+angemeldet und über die Lounge fortgesetzt. Der eingeladene Freund führte die
+vorbereitete Aktion samt NPC-Reaktion aus; die Runde wurde abgeschlossen.
+Nativ nachgeprüft: zwei Teilnehmer, ein gültiger gemeinsamer Verlauf,
+Ausdauer des Gastgebers unverändert 10, beim handelnden Freund 10 auf 8.
+Dasselbe Leitungskonto konnte die fremde Runde unter **Spielen** nicht öffnen,
+im ausdrücklichen Leitungsbereich dagegen verwalten. Die eigenen 46 Testposts
+und drei Konten wurden entfernt; Posts, Postmeta, Benutzer und Benutzermeta
+der Browserfixture sind rückstandsfrei, der Browser ist wieder abgemeldet.
+
+**Nachweis des direkten Soloeinstiegs:** Erstellung, Charakterteilnahme und Start
+laufen in einer Transaktion. Gezielte native Prüfungen decken fremde/veraltete
+oder bereits belegte Figuren, doppelte Absendeversuche, fehlgeschlagene
+Veröffentlichung und vollständig zurückgenommene Teilstände ab.
+Im Browser mit einem normalen Spieler- und einem Leitungskonto unter Spielen
+jeweils Abenteuer und eigene Figur gewählt, direkt die erste Szene erreicht
+und zwei vorbereitete Aktionen bis zum Abschluss ausgeführt. Die Ressource
+blieb exakt von 10 auf 7 reduziert. Beim normalen Konto zusätzlich abgemeldet,
+neu angemeldet und über die Lounge die zweite Szene samt Verlauf wieder geöffnet.
+Rückleitungen bleiben im Abenteuer statt in der alten Bogenansicht.
+PS Chat zeigte für dasselbe Leitungskonto unter Spielen keine Moderation,
+unter Spielleitung dagegen Moderation; echte AJAX-Anfragen trugen den jeweiligen
+Ansichtskontext. Die eigenen 75 Testposts, beide Konten und Testchatdaten wurden
+entfernt, der Browser ist wieder abgemeldet.
+Der Solotest allein weist die anderen Einstiege oder eine vollständige
+NPC-Simulationsengine nicht nach.
 
 ### D. Abnahme aus Spielersicht
 

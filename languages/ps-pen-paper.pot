@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-16T16:02:44+00:00\n"
+"POT-Creation-Date: 2026-11-16T19:10:42+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: ps-pen-paper\n"
@@ -113,7 +113,7 @@ msgid "Kampagne"
 msgstr ""
 
 #: includes/access-ui.php:142
-#: includes/events-ui.php:276
+#: includes/events-ui.php:277
 msgid "Zugang & Privatsphäre"
 msgstr ""
 
@@ -182,7 +182,6 @@ msgid "Einladen"
 msgstr ""
 
 #: includes/access-ui.php:175
-#: includes/character-policy-ui.php:179
 msgid "Keine offenen Einladungen."
 msgstr ""
 
@@ -298,7 +297,7 @@ msgid "Die Einladung ist nicht mehr offen oder die Person ist bereits Mitglied."
 msgstr ""
 
 #: includes/access.php:121
-#: includes/universe-members.php:110
+#: includes/universe-members.php:115
 msgid "Es können höchstens 500 Einladungen offen sein."
 msgstr ""
 
@@ -307,7 +306,7 @@ msgid "Die Mitgliederverwaltung wurde geändert. Bitte lade die Einladung neu."
 msgstr ""
 
 #: includes/access.php:137
-#: includes/universe-members.php:101
+#: includes/universe-members.php:106
 msgid "Die Mitgliedschaft konnte nicht gespeichert werden."
 msgstr ""
 
@@ -651,7 +650,7 @@ msgid "Würfel / Protokoll"
 msgstr ""
 
 #: includes/admin.php:563
-#: includes/events-ui.php:225
+#: includes/events-ui.php:226
 #: includes/frontend.php:173
 #: includes/table-ui.php:78
 msgid "Spielprotokoll"
@@ -690,13 +689,13 @@ msgstr ""
 
 #: includes/admin.php:627
 #: includes/admin.php:648
-#: includes/events-ui.php:129
+#: includes/events-ui.php:130
 msgid "Spielleiter"
 msgstr ""
 
 #: includes/admin.php:627
 #: includes/admin.php:647
-#: includes/events-ui.php:129
+#: includes/events-ui.php:130
 #: includes/table-ui.php:62
 msgid "Spieler"
 msgstr ""
@@ -719,7 +718,7 @@ msgid "Die Runde oder das Universum wurde inzwischen wiederhergestellt. Bitte la
 msgstr ""
 
 #: includes/adventure-actions.php:65
-#: includes/adventure.php:847
+#: includes/adventure.php:862
 msgid "Diese Entscheidung benötigt eine aktuelle Freigabe der Spielleitung. Es wurden weder Kosten noch Fortschritt gespeichert."
 msgstr ""
 
@@ -760,13 +759,13 @@ msgstr ""
 #: includes/adventure-groups-ui.php:51
 #: includes/events-ui.php:88
 #: includes/lounge.php:205
-#: includes/play-rounds-ui.php:121
+#: includes/play-rounds-ui.php:182
 msgid "Pausiert"
 msgstr ""
 
 #: includes/adventure-groups-ui.php:51
 #: includes/events-ui.php:96
-#: includes/play-rounds-ui.php:121
+#: includes/play-rounds-ui.php:182
 #: includes/trade.php:17
 msgid "Abgeschlossen"
 msgstr ""
@@ -891,7 +890,7 @@ msgstr ""
 
 #. translators: 1: resource name, 2: cost, 3: available points, 4: cost timing.
 #: includes/adventure-groups-ui.php:155
-#: includes/adventure-ui.php:454
+#: includes/adventure-ui.php:473
 #, php-format
 msgid "Kosten: %1$s %2$d; verfügbar %3$d. %4$s."
 msgstr ""
@@ -909,12 +908,12 @@ msgid "Vorschlagen:"
 msgstr ""
 
 #: includes/adventure-groups-ui.php:175
-#: includes/adventure-ui.php:464
+#: includes/adventure-ui.php:483
 msgid "Serverprobe:"
 msgstr ""
 
 #: includes/adventure-groups-ui.php:175
-#: includes/adventure-ui.php:464
+#: includes/adventure-ui.php:483
 msgid "Erfolg ab"
 msgstr ""
 
@@ -927,17 +926,19 @@ msgid "Gemeinsamer Verlauf"
 msgstr ""
 
 #: includes/adventure-groups-ui.php:187
-#: includes/adventure-ui.php:478
+#: includes/adventure-reactions.php:116
+#: includes/adventure-ui.php:497
 msgid "Erfolg"
 msgstr ""
 
 #: includes/adventure-groups-ui.php:187
-#: includes/adventure-ui.php:478
+#: includes/adventure-reactions.php:116
+#: includes/adventure-ui.php:497
 msgid "Misserfolg"
 msgstr ""
 
 #: includes/adventure-groups-ui.php:193
-#: includes/adventure-ui.php:475
+#: includes/adventure-ui.php:494
 #: includes/events-ui.php:105
 msgid "Bei Misserfolg keine Kosten"
 msgstr ""
@@ -960,6 +961,16 @@ msgstr ""
 
 #: includes/adventure-groups.php:23
 msgid "Die Spielleitung gibt die Entscheidung frei"
+msgstr ""
+
+#: includes/adventure-reactions.php:6
+msgid "Prüfe NPC-Auswahl, aktuellen Zahlenwert, Würfelregeln, Zustandsfolgen und ausdrückliche Freigabe der Reaktion. Es wurde nichts übernommen."
+msgstr ""
+
+#. translators: 1: NPC name, 2: reaction total, 3: outcome.
+#: includes/adventure-reactions.php:115
+#, php-format
+msgid "%1$s reagiert: %2$d · %3$s"
 msgstr ""
 
 #: includes/adventure-review-ui.php:8
@@ -1151,7 +1162,6 @@ msgid "Du brauchst einen eigenen freigegebenen Charakter für diese Kampagne."
 msgstr ""
 
 #: includes/adventure-scenarios-ui.php:117
-#: includes/play-rounds-ui.php:179
 msgid "Meine Charaktere öffnen"
 msgstr ""
 
@@ -1182,7 +1192,7 @@ msgstr ""
 
 #: includes/adventure-scenarios.php:201
 #: includes/adventure-scenarios.php:210
-#: includes/adventure-ui.php:91
+#: includes/adventure-ui.php:97
 msgid "erfüllt"
 msgstr ""
 
@@ -1195,516 +1205,538 @@ msgstr ""
 msgid "Beginne das Abenteuer über die Game-Lounge und wähle dort deinen Charakter."
 msgstr ""
 
-#: includes/adventure-ui.php:56
-#: includes/adventure-ui.php:313
+#: includes/adventure-ui.php:62
+#: includes/adventure-ui.php:322
 msgid "Abenteuer beenden"
 msgstr ""
 
 #. translators: 1: field name, 2: approved value, 3: required minimum.
-#: includes/adventure-ui.php:68
+#: includes/adventure-ui.php:74
 #, php-format
 msgid "Voraussetzung: %1$s – freigegeben %2$d, mindestens %3$d."
 msgstr ""
 
-#: includes/adventure-ui.php:73
+#: includes/adventure-ui.php:79
 msgid "mindestens (≥)"
 msgstr ""
 
-#: includes/adventure-ui.php:73
+#: includes/adventure-ui.php:79
 msgid "größer als (>)"
 msgstr ""
 
-#: includes/adventure-ui.php:74
+#: includes/adventure-ui.php:80
 msgid "höchstens (≤)"
 msgstr ""
 
-#: includes/adventure-ui.php:74
+#: includes/adventure-ui.php:80
 msgid "kleiner als (<)"
 msgstr ""
 
-#: includes/adventure-ui.php:75
+#: includes/adventure-ui.php:81
 msgid "gleich (=)"
 msgstr ""
 
-#: includes/adventure-ui.php:75
+#: includes/adventure-ui.php:81
 msgid "ungleich (≠)"
 msgstr ""
 
-#: includes/adventure-ui.php:76
+#: includes/adventure-ui.php:82
 msgid "enthält Text"
 msgstr ""
 
-#: includes/adventure-ui.php:76
+#: includes/adventure-ui.php:82
 msgid "enthält Text nicht"
 msgstr ""
 
-#: includes/adventure-ui.php:80
+#: includes/adventure-ui.php:86
 msgid "Wert"
 msgstr ""
 
-#: includes/adventure-ui.php:80
+#: includes/adventure-ui.php:86
 msgid "aktueller Wert"
 msgstr ""
 
-#: includes/adventure-ui.php:80
+#: includes/adventure-ui.php:86
 #: includes/rules-admin.php:46
 msgid "Maximum"
 msgstr ""
 
-#: includes/adventure-ui.php:81
+#: includes/adventure-ui.php:87
 #: includes/styles.php:134
 msgid "Text"
 msgstr ""
 
-#: includes/adventure-ui.php:81
+#: includes/adventure-ui.php:87
 msgid "vorher ausgeführte Entscheidung (0/1)"
 msgstr ""
 
-#: includes/adventure-ui.php:81
+#: includes/adventure-ui.php:87
 msgid "Abenteuerzustand"
 msgstr ""
 
 #. translators: 1: field, 2: value component, 3: approved value, 4: comparison, 5: required value, 6: result.
-#: includes/adventure-ui.php:88
+#: includes/adventure-ui.php:94
 #, php-format
 msgid "%1$s (%2$s): freigegeben %3$s, %4$s %5$s — %6$s"
 msgstr ""
 
-#: includes/adventure-ui.php:91
+#: includes/adventure-ui.php:97
 msgid "nicht erfüllt"
 msgstr ""
 
-#: includes/adventure-ui.php:93
-#: includes/adventure-ui.php:271
+#: includes/adventure-ui.php:99
+#: includes/adventure-ui.php:277
 msgid "Alle Bedingungen (UND):"
 msgstr ""
 
-#: includes/adventure-ui.php:93
-#: includes/adventure-ui.php:271
+#: includes/adventure-ui.php:99
+#: includes/adventure-ui.php:277
 msgid "Mindestens eine Bedingung (ODER):"
 msgstr ""
 
-#: includes/adventure-ui.php:100
+#: includes/adventure-ui.php:106
 msgid "Feld und Wert"
 msgstr ""
 
-#: includes/adventure-ui.php:101
+#: includes/adventure-ui.php:107
 msgid "Keine Bedingung"
 msgstr ""
 
-#: includes/adventure-ui.php:108
+#: includes/adventure-ui.php:114
 msgid "Vorherige Entscheidung:"
 msgstr ""
 
-#: includes/adventure-ui.php:109
+#: includes/adventure-ui.php:115
 msgid "Abenteuerzustand:"
 msgstr ""
 
-#: includes/adventure-ui.php:111
+#: includes/adventure-ui.php:117
 msgid "Vergleich"
 msgstr ""
 
-#: includes/adventure-ui.php:114
+#: includes/adventure-ui.php:120
 msgid "Vergleichswert (ohne Bedingung: 0)"
 msgstr ""
 
-#: includes/adventure-ui.php:115
+#: includes/adventure-ui.php:121
 msgid "Bedingung entfernen"
 msgstr ""
 
-#: includes/adventure-ui.php:122
+#: includes/adventure-ui.php:128
 msgid "Optionale Wertebedingungen"
 msgstr ""
 
-#: includes/adventure-ui.php:123
+#: includes/adventure-ui.php:129
 msgid "Bedingungen verknüpfen"
 msgstr ""
 
-#: includes/adventure-ui.php:124
+#: includes/adventure-ui.php:130
 msgid "Alle müssen erfüllt sein (UND)"
 msgstr ""
 
-#: includes/adventure-ui.php:125
+#: includes/adventure-ui.php:131
 msgid "Mindestens eine muss erfüllt sein (ODER)"
 msgstr ""
 
-#: includes/adventure-ui.php:129
+#: includes/adventure-ui.php:135
 msgid "Weitere Bedingung"
 msgstr ""
 
-#: includes/adventure-ui.php:130
+#: includes/adventure-ui.php:136
 msgid "Bis zu 20 Wertebedingungen je Entscheidung. Geprüft werden aktuelle freigegebene Werte einschließlich aktiver Ausrüstungsboni, nicht offene Anträge. Ressourcenbedingungen prüfen aktuellen Wert oder Maximum und verbrauchen nichts. Ohne Bedingung den Vergleichswert auf 0 lassen."
 msgstr ""
 
-#: includes/adventure-ui.php:131
+#: includes/adventure-ui.php:137
 msgid "Textfelder unterstützen gleich, ungleich, enthält und enthält nicht (Groß-/Kleinschreibung beachten). Vorherige Entscheidungen prüfen ausschließlich diesen Durchlauf: 1 = ausgeführt, 0 = nicht ausgeführt. Zahlenwerte bleiben ganze Zahlen zwischen −1000000 und 1000000."
 msgstr ""
 
-#: includes/adventure-ui.php:137
+#: includes/adventure-ui.php:143
 msgid "Bei jedem ausgeführten Versuch, auch bei Misserfolg"
 msgstr ""
 
-#: includes/adventure-ui.php:138
-#: includes/adventure-ui.php:149
+#: includes/adventure-ui.php:144
+#: includes/adventure-ui.php:155
 msgid "Nur bei Erfolg; ohne Würfelprobe immer"
 msgstr ""
 
 #. translators: 1: resource name, 2: cost, 3: previous value, 4: remaining value.
-#: includes/adventure-ui.php:143
+#: includes/adventure-ui.php:149
 #, php-format
 msgid "Ressource: %1$s – Kosten %2$d, vorher %3$d, danach %4$d."
 msgstr ""
 
-#: includes/adventure-ui.php:148
+#: includes/adventure-ui.php:154
 msgid "Nach jeder ausgeführten Entscheidung, auch bei Misserfolg"
 msgstr ""
 
-#: includes/adventure-ui.php:154
+#: includes/adventure-ui.php:160
 msgid "Belohnung aus Beutetabelle:"
 msgstr ""
 
-#: includes/adventure-ui.php:169
+#: includes/adventure-ui.php:175
 msgid "Belohnung:"
 msgstr ""
 
-#: includes/adventure-ui.php:169
+#: includes/adventure-ui.php:175
 msgid "Keine Beute ermittelt"
 msgstr ""
 
-#: includes/adventure-ui.php:170
+#: includes/adventure-ui.php:176
 msgid "Tabellenwurf:"
 msgstr ""
 
-#: includes/adventure-ui.php:175
+#: includes/adventure-ui.php:181
 msgid "Keine Belohnung nach der festgelegten Erfolgs- und Wiederholungsregel"
 msgstr ""
 
-#: includes/adventure-ui.php:176
+#: includes/adventure-ui.php:182
 msgid "Bei Misserfolg keine Belohnung"
 msgstr ""
 
-#: includes/adventure-ui.php:186
+#: includes/adventure-ui.php:192
 msgid "Gegenstands- und Währungsbelohnungen benötigen PS Community. Entscheidungen ohne Belohnung bleiben unabhängig davon nutzbar."
 msgstr ""
 
-#: includes/adventure-ui.php:193
+#: includes/adventure-ui.php:199
 msgid "Optionale Wiederholungsbelohnung"
 msgstr ""
 
-#: includes/adventure-ui.php:193
+#: includes/adventure-ui.php:199
 msgid "Optionale Abenteuerbelohnung"
 msgstr ""
 
-#: includes/adventure-ui.php:194
+#: includes/adventure-ui.php:200
 msgid "Belohnungsart"
 msgstr ""
 
-#: includes/adventure-ui.php:195
+#: includes/adventure-ui.php:201
 msgid "Keine Belohnung"
 msgstr ""
 
-#: includes/adventure-ui.php:196
+#: includes/adventure-ui.php:202
 msgid "Feste Gegenstände und/oder Währung"
 msgstr ""
 
-#: includes/adventure-ui.php:197
+#: includes/adventure-ui.php:203
 msgid "Vorhandene Beutetabelle"
 msgstr ""
 
-#: includes/adventure-ui.php:199
+#: includes/adventure-ui.php:205
 msgid "Wann wird die Belohnung vergeben?"
 msgstr ""
 
-#: includes/adventure-ui.php:202
+#: includes/adventure-ui.php:208
 msgid "Beutetabelle (nur bei Tabellenbelohnung)"
 msgstr ""
 
-#: includes/adventure-ui.php:203
+#: includes/adventure-ui.php:209
 msgid "Keine Tabelle"
 msgstr ""
 
-#: includes/adventure-ui.php:206
+#: includes/adventure-ui.php:212
 msgid "Gegenstand (nur bei fester Belohnung)"
 msgstr ""
 
-#: includes/adventure-ui.php:207
+#: includes/adventure-ui.php:213
 msgid "Kein Gegenstand"
 msgstr ""
 
-#: includes/adventure-ui.php:210
+#: includes/adventure-ui.php:216
 msgid "Feste Anzahl (ohne Gegenstand: 0)"
 msgstr ""
 
-#: includes/adventure-ui.php:211
+#: includes/adventure-ui.php:217
 msgid "Fester Währungsbetrag (ohne Geld: 0)"
 msgstr ""
 
-#: includes/adventure-ui.php:212
+#: includes/adventure-ui.php:218
 msgid "Nicht verwendete Auswahlen und Beträge auf 0 lassen. Beim Speichern wird der gewählte Gegenstands- oder Tabellenstand eingefroren. Mit der Abenteuerfreigabe wird dieser Stand Teil des für berechtigte Spieler lesbaren Soloabenteuers; andere Beutetabellen bleiben privat."
 msgstr ""
 
-#: includes/adventure-ui.php:213
+#: includes/adventure-ui.php:219
 msgid "Einmalige Vergabe je Entscheidung im Durchlauf; die Szenarioeinstellung bestimmt, ob Wiederholungen erneut oder anders belohnt werden. Für eine Abschlussbelohnung die letzte Entscheidung verwenden. Vor dem Würfeln müssen Inventar und Guthaben jedes mögliche Ergebnis aufnehmen können. Gemeinsame Guthaben benötigen die Freigabe der Universumsleitung."
 msgstr ""
 
-#: includes/adventure-ui.php:233
+#: includes/adventure-ui.php:239
 msgid "Abenteuer und Szenarien vorbereiten"
 msgstr ""
 
-#: includes/adventure-ui.php:234
+#: includes/adventure-ui.php:240
 msgid "Einzeldurchläufe zeigen nur freigegebene Szenentexte. Entscheidungen und Proben öffnen private Folgeszenen für genau diese Figur. Ressourcenverbrauch und Belohnungen erfolgen nur nach ausdrücklich freigegebenen Regeln; die Kampagnenszene bleibt unverändert."
 msgstr ""
 
-#: includes/adventure-ui.php:235
+#: includes/adventure-ui.php:241
 msgid "Veröffentliche zuerst mindestens zwei Szenen. Danach kannst du hier einen Pfad aus Entscheidung, optionaler Probe und Folgeszene vorbereiten."
 msgstr ""
 
-#: includes/adventure-ui.php:237
+#: includes/adventure-ui.php:243
 msgid "Neues Soloabenteuer"
 msgstr ""
 
-#: includes/adventure-ui.php:242
+#: includes/adventure-ui.php:248
 msgid "Abenteuertitel"
 msgstr ""
 
-#: includes/adventure-ui.php:243
+#: includes/adventure-ui.php:249
 msgid "Eröffnungsszene"
 msgstr ""
 
-#: includes/adventure-ui.php:244
+#: includes/adventure-ui.php:250
 msgid "Abenteuerentwurf speichern"
 msgstr ""
 
-#: includes/adventure-ui.php:249
+#: includes/adventure-ui.php:255
 msgid "Entscheidungen und Folgeszenen"
 msgstr ""
 
-#: includes/adventure-ui.php:250
+#: includes/adventure-ui.php:256
 msgid "Noch keine Entscheidung angelegt."
 msgstr ""
 
-#: includes/adventure-ui.php:252
+#: includes/adventure-ui.php:258
 msgid "Ungültige Szene"
 msgstr ""
 
-#: includes/adventure-ui.php:254
-#: includes/adventure-ui.php:255
+#: includes/adventure-ui.php:260
+#: includes/adventure-ui.php:261
 msgid "Ende"
 msgstr ""
 
-#: includes/adventure-ui.php:259
+#: includes/adventure-ui.php:265
 msgid "Mindestwert:"
 msgstr ""
 
-#: includes/adventure-ui.php:264
+#: includes/adventure-ui.php:270
 msgid "Ressourcenkosten:"
 msgstr ""
 
-#: includes/adventure-ui.php:267
+#: includes/adventure-ui.php:273
 msgid "Bei Wiederholung:"
 msgstr ""
 
-#: includes/adventure-ui.php:268
+#: includes/adventure-ui.php:274
 msgid "Bei Szenarioende:"
 msgstr ""
 
-#: includes/adventure-ui.php:278
-#: includes/adventure-ui.php:293
+#: includes/adventure-ui.php:284
+#: includes/adventure-ui.php:302
 msgid "Diese Entscheidung benötigt ausdrücklich eine Spielleiterfreigabe"
 msgstr ""
 
-#: includes/adventure-ui.php:281
-msgid "Entscheidung entfernen"
-msgstr ""
-
-#: includes/adventure-ui.php:286
-msgid "Entscheidung oder Probe ergänzen"
+#: includes/adventure-ui.php:285
+msgid "Vorbereitete NPC-Reaktion:"
 msgstr ""
 
 #: includes/adventure-ui.php:289
-msgid "Ausgangsszene"
-msgstr ""
-
-#: includes/adventure-ui.php:290
-msgid "Entscheidungstext"
+msgid "Entscheidung entfernen"
 msgstr ""
 
 #: includes/adventure-ui.php:294
-msgid "Der Besitzer fragt die Entscheidung an. Erst nach Freigabe kann er sie ausführen; bis dahin gibt es weder Würfelwurf noch Verbrauch oder Belohnung. Die Freigabe gilt einmalig für diese Entscheidung und diesen Durchlauf."
+msgid "Entscheidung oder Probe ergänzen"
 msgstr ""
 
-#: includes/adventure-ui.php:295
-msgid "Optionale Ressourcenkosten"
-msgstr ""
-
-#: includes/adventure-ui.php:295
-msgid "Keine Ressourcenkosten"
+#: includes/adventure-ui.php:297
+msgid "Ausgangsszene"
 msgstr ""
 
 #: includes/adventure-ui.php:298
-msgid "Kosten in ganzen Punkten (ohne Ressource: 0)"
+msgid "Entscheidungstext"
 msgstr ""
 
-#: includes/adventure-ui.php:299
-msgid "Wann werden Kosten abgezogen?"
-msgstr ""
-
-#: includes/adventure-ui.php:302
-msgid "Nur lokale Bögen und unabhängige Kopien unterstützen derzeit Verbrauch. Offene Werteanträge sperren kostenpflichtige Versuche. Die Ressource muss vor dem Versuch reichen; ihr Maximum und andere Werte bleiben unverändert."
+#: includes/adventure-ui.php:303
+msgid "Der Besitzer fragt die Entscheidung an. Erst nach Freigabe kann er sie ausführen; bis dahin gibt es weder Würfelwurf noch Verbrauch oder Belohnung. Die Freigabe gilt einmalig für diese Entscheidung und diesen Durchlauf."
 msgstr ""
 
 #: includes/adventure-ui.php:304
-msgid "Andere Belohnung bei Wiederholung"
+msgid "Optionale Ressourcenkosten"
+msgstr ""
+
+#: includes/adventure-ui.php:304
+msgid "Keine Ressourcenkosten"
 msgstr ""
 
 #: includes/adventure-ui.php:307
-msgid "Optionaler Würfelausdruck (leer = Entscheidung ohne Probe)"
+msgid "Kosten in ganzen Punkten (ohne Ressource: 0)"
 msgstr ""
 
 #: includes/adventure-ui.php:308
-msgid "Optionaler freigegebener Zahlenwert"
-msgstr ""
-
-#: includes/adventure-ui.php:308
-msgid "Kein Attribut addieren"
+msgid "Wann werden Kosten abgezogen?"
 msgstr ""
 
 #: includes/adventure-ui.php:311
-msgid "Erfolg ab Gesamtwert (ohne Probe: 0)"
-msgstr ""
-
-#: includes/adventure-ui.php:312
-msgid "Folgeszene bei Erfolg (oder bei Entscheidung ohne Probe)"
+msgid "Nur lokale Bögen und unabhängige Kopien unterstützen derzeit Verbrauch. Offene Werteanträge sperren kostenpflichtige Versuche. Die Ressource muss vor dem Versuch reichen; ihr Maximum und andere Werte bleiben unverändert."
 msgstr ""
 
 #: includes/adventure-ui.php:313
-msgid "Folgeszene bei Misserfolg"
+msgid "Andere Belohnung bei Wiederholung"
 msgstr ""
 
-#: includes/adventure-ui.php:314
-msgid "Ergebnis bei Ende über den Erfolgsweg oder ohne Probe"
+#: includes/adventure-ui.php:316
+msgid "Optionaler Würfelausdruck (leer = Entscheidung ohne Probe)"
 msgstr ""
 
-#: includes/adventure-ui.php:314
-msgid "Ergebnis bei Ende über den Misserfolgsweg"
+#: includes/adventure-ui.php:317
+msgid "Optionaler freigegebener Zahlenwert"
 msgstr ""
 
-#: includes/adventure-ui.php:319
-msgid "Das Ergebnis zählt nur, wenn dieser Weg das Szenario beendet. Ein bestandener Würfelwurf ist nicht automatisch ein Szenariosieg."
+#: includes/adventure-ui.php:317
+msgid "Kein Attribut addieren"
 msgstr ""
 
 #: includes/adventure-ui.php:320
-msgid "Der Server würfelt einmal, addiert den gewählten freigegebenen Zahlenwert und vergleicht mit dem Zielwert. Optional festgelegte Kosten werden nach der gespeicherten Kostenregel zusammen mit dem Fortschritt abgerechnet."
+msgid "Erfolg ab Gesamtwert (ohne Probe: 0)"
 msgstr ""
 
 #: includes/adventure-ui.php:321
+msgid "Folgeszene bei Erfolg (oder bei Entscheidung ohne Probe)"
+msgstr ""
+
+#: includes/adventure-ui.php:322
+msgid "Folgeszene bei Misserfolg"
+msgstr ""
+
+#: includes/adventure-ui.php:323
+msgid "Ergebnis bei Ende über den Erfolgsweg oder ohne Probe"
+msgstr ""
+
+#: includes/adventure-ui.php:323
+msgid "Ergebnis bei Ende über den Misserfolgsweg"
+msgstr ""
+
+#: includes/adventure-ui.php:328
+msgid "Das Ergebnis zählt nur, wenn dieser Weg das Szenario beendet. Ein bestandener Würfelwurf ist nicht automatisch ein Szenariosieg."
+msgstr ""
+
+#: includes/adventure-ui.php:329
+msgid "Der Server würfelt einmal, addiert den gewählten freigegebenen Zahlenwert und vergleicht mit dem Zielwert. Optional festgelegte Kosten werden nach der gespeicherten Kostenregel zusammen mit dem Fortschritt abgerechnet."
+msgstr ""
+
+#: includes/adventure-ui.php:330
 msgid "Entscheidung speichern"
 msgstr ""
 
-#: includes/adventure-ui.php:325
+#: includes/adventure-ui.php:334
+msgid "Automatikprüfung des Entwurfs"
+msgstr ""
+
+#. translators: 1: decision count, 2: prepared reaction count, 3: manual approval count.
+#: includes/adventure-ui.php:339
+#, php-format
+msgid "Entscheidungen: %1$d · vorbereitete NPC-Reaktionen: %2$d · notwendige Spielleiterfreigaben: %3$d"
+msgstr ""
+
+#: includes/adventure-ui.php:341
+msgid "Dieser Entwurf braucht eine anwesende Spielleitung und wird nicht für automatische Solo-/Gruppenstarts angeboten."
+msgstr ""
+
+#: includes/adventure-ui.php:342
+msgid "Keine manuelle Entscheidungsfreigabe vorgesehen. Beim Veröffentlichen werden Würfel, Zustandsverweise und Szenenpfade geprüft. Nur ausdrücklich eingerichtete NPC-Reaktionen werden ausgeführt; eine Begegnungszuordnung allein löst nichts aus."
+msgstr ""
+
+#: includes/adventure-ui.php:344
 msgid "Status:"
 msgstr ""
 
-#: includes/adventure-ui.php:325
+#: includes/adventure-ui.php:344
 #: includes/events-ui.php:88
-#: includes/events-ui.php:137
+#: includes/events-ui.php:138
 #: includes/folio-ui.php:104
 msgid "Entwurf"
 msgstr ""
 
-#: includes/adventure-ui.php:325
+#: includes/adventure-ui.php:344
 msgid "Für Einzelabenteuer freigegeben"
 msgstr ""
 
-#: includes/adventure-ui.php:325
+#: includes/adventure-ui.php:344
 msgid "Pausiert – laufende Durchläufe können fortgesetzt werden"
 msgstr ""
 
-#: includes/adventure-ui.php:326
+#: includes/adventure-ui.php:345
 msgid "Abenteuer ausdrücklich freigeben"
 msgstr ""
 
-#: includes/adventure-ui.php:326
+#: includes/adventure-ui.php:345
 msgid "Neue Durchläufe pausieren"
 msgstr ""
 
-#: includes/adventure-ui.php:326
+#: includes/adventure-ui.php:345
 msgid "Neue Durchläufe wieder erlauben"
 msgstr ""
 
-#: includes/adventure-ui.php:355
+#: includes/adventure-ui.php:374
 #: includes/import-ui.php:135
 msgid "Soloabenteuer"
 msgstr ""
 
-#: includes/adventure-ui.php:358
+#: includes/adventure-ui.php:377
 msgid "Neue Solo-Runde in der Game-Lounge auswählen"
 msgstr ""
 
-#: includes/adventure-ui.php:359
+#: includes/adventure-ui.php:378
 msgid "Es ist keine veröffentlichte Spielbereich-Seite eingerichtet. Bitte wende dich an den Website-Betreiber."
 msgstr ""
 
-#: includes/adventure-ui.php:360
+#: includes/adventure-ui.php:379
 msgid "Derzeit sind keine freigegebenen Soloabenteuer vorhanden."
 msgstr ""
 
-#: includes/adventure-ui.php:370
+#: includes/adventure-ui.php:389
 msgid "Neue Durchläufe sind pausiert. Laufende Durchläufe bleiben unabhängig fortsetzbar."
 msgstr ""
 
-#: includes/adventure-ui.php:371
+#: includes/adventure-ui.php:390
 msgid "Nur der Besitzer startet den eigenen Durchlauf."
 msgstr ""
 
 #. translators: %d: saved attempt number for this player.
-#: includes/adventure-ui.php:384
+#: includes/adventure-ui.php:403
 #, php-format
 msgid "Dein Durchlauf: %d"
 msgstr ""
 
-#: includes/adventure-ui.php:389
+#: includes/adventure-ui.php:408
 msgid "Spielleiterentscheidung ausstehend. Der Durchlauf und alle Ressourcen bleiben unverändert."
 msgstr ""
 
-#: includes/adventure-ui.php:390
+#: includes/adventure-ui.php:409
 msgid "Entscheidung freigegeben. Der Besitzer kann sie jetzt ausführen; Voraussetzungen werden erneut geprüft."
 msgstr ""
 
-#: includes/adventure-ui.php:395
+#: includes/adventure-ui.php:414
 msgid "Anfrage oder Freigabe zurückziehen"
 msgstr ""
 
-#: includes/adventure-ui.php:403
+#: includes/adventure-ui.php:422
 msgid "Abenteuer beendet"
 msgstr ""
 
-#: includes/adventure-ui.php:405
+#: includes/adventure-ui.php:424
 msgid "Durchlauf abgeschlossen."
 msgstr ""
 
-#: includes/adventure-ui.php:438
+#: includes/adventure-ui.php:457
 msgid "Spielleiterfreigabe vorhanden – Entscheidung ausführen."
 msgstr ""
 
-#: includes/adventure-ui.php:438
+#: includes/adventure-ui.php:457
 msgid "Diese Auswahl fragt zuerst eine Spielleiterentscheidung an."
 msgstr ""
 
-#: includes/adventure-ui.php:442
-#: includes/adventure-ui.php:447
+#: includes/adventure-ui.php:461
+#: includes/adventure-ui.php:466
 msgid "Entscheidung gesperrt. Nach einer Wertefreigabe den Bogen neu laden."
 msgstr ""
 
-#: includes/adventure-ui.php:456
+#: includes/adventure-ui.php:475
 msgid "Ressource reicht nicht aus oder würde ihre Untergrenze unterschreiten. Entscheidung gesperrt."
 msgstr ""
 
-#: includes/adventure-ui.php:467
+#: includes/adventure-ui.php:486
 msgid "Der Durchlauf gehört dem Charakterbesitzer. Die Spielleitung kann ihn einsehen, aber nicht an seiner Stelle entscheiden."
 msgstr ""
 
-#: includes/adventure-ui.php:469
+#: includes/adventure-ui.php:488
 msgid "Bisheriger Verlauf"
 msgstr ""
 
@@ -1869,19 +1901,87 @@ msgstr ""
 msgid "Zustandsfolge entfernen"
 msgstr ""
 
+#: includes/adventure-world-ui.php:116
+msgid "Vorbereitete NPC-/Gegnerreaktion (optional)"
+msgstr ""
+
+#: includes/adventure-world-ui.php:117
+msgid "Die Reaktion folgt auf diese Spielerentscheidung. NPC-Wert plus optionaler Serverwurf werden mit deinem Zielwert verglichen. Ohne Würfel wird nur der ausgewählte Wert verglichen; ohne Zahlenwert zählt 0. Es gibt keine vorgeschriebene Kampfregel."
+msgstr ""
+
+#: includes/adventure-world-ui.php:118
+msgid "NPC und freizugebender Zahlenwert"
+msgstr ""
+
+#: includes/adventure-world-ui.php:119
+msgid "Keine automatische Reaktion"
+msgstr ""
+
+#: includes/adventure-world-ui.php:122
+msgid "Ohne Zahlenwert"
+msgstr ""
+
+#: includes/adventure-world-ui.php:128
+msgid "Reaktion auslösen"
+msgstr ""
+
+#: includes/adventure-world-ui.php:129
+msgid "Nach jeder Ausführung"
+msgstr ""
+
+#: includes/adventure-world-ui.php:130
+msgid "Nur nach erfolgreicher Spielerprobe (auch ohne Probe)"
+msgstr ""
+
+#: includes/adventure-world-ui.php:131
+msgid "Nur nach gescheiterter Spielerprobe"
+msgstr ""
+
+#: includes/adventure-world-ui.php:133
+msgid "Optionaler NPC-Würfelausdruck"
+msgstr ""
+
+#: includes/adventure-world-ui.php:134
+msgid "NPC-Reaktion erfolgreich ab"
+msgstr ""
+
+#: includes/adventure-world-ui.php:135
+msgid "Öffentliche Reaktion bei NPC-Erfolg"
+msgstr ""
+
+#: includes/adventure-world-ui.php:136
+msgid "Öffentliche Reaktion bei NPC-Misserfolg"
+msgstr ""
+
+#: includes/adventure-world-ui.php:137
+msgid "Zustandsfolgen der NPC-Reaktion"
+msgstr ""
+
+#: includes/adventure-world-ui.php:138
+msgid "Erfolg und Misserfolg beziehen sich hier auf die NPC-Probe. Diese Folgen gelten nach den normalen Entscheidungsfolgen. Weitere Spieleraktionen können die Zustände als Voraussetzungen nutzen."
+msgstr ""
+
+#: includes/adventure-world-ui.php:141
+msgid "Weitere Reaktionsfolge"
+msgstr ""
+
+#: includes/adventure-world-ui.php:143
+msgid "NPC-Name, ausgewählter Zahlenwert und Reaktion dürfen im Abenteuer erscheinen. Geheimnisse und andere NPC-Werte werden nicht übernommen. Die Auswahl wird als feste Kopie gespeichert; spätere NPC-Änderungen verändern sie nicht."
+msgstr ""
+
 #. translators: 1: item name, 2: owned quantity, 3: minimum quantity.
-#: includes/adventure-world-ui.php:115
+#: includes/adventure-world-ui.php:152
 #, php-format
 msgid "%1$s: vorhanden %2$d, benötigt %3$d"
 msgstr ""
 
 #. translators: 1: encounter title, 2: current phase, 3: phase count.
-#: includes/adventure-world-ui.php:125
+#: includes/adventure-world-ui.php:162
 #, php-format
 msgid "%1$s – Phase %2$d von %3$d"
 msgstr ""
 
-#: includes/adventure-world-ui.php:131
+#: includes/adventure-world-ui.php:168
 msgid "Abenteuerzustände"
 msgstr ""
 
@@ -1893,7 +1993,7 @@ msgstr ""
 msgid "Dieser Abenteuerstand ist ungültig oder wurde inzwischen geändert. Prüfe Freigaben, Würfelregeln und Charakter und lade neu. Es wurde kein Teilfortschritt gespeichert."
 msgstr ""
 
-#: includes/adventure.php:105
+#: includes/adventure.php:109
 msgid "Die Wertebedingungen sind ungültig oder passen nicht mehr zum freigegebenen Charakter. Prüfe Felder, Vergleiche und Werte. Es wurde kein Fortschritt gespeichert."
 msgstr ""
 
@@ -2081,7 +2181,7 @@ msgid "Beendet"
 msgstr ""
 
 #: includes/bookings-ui.php:23
-#: includes/frontend.php:312
+#: includes/frontend.php:315
 #: includes/lounge.php:111
 msgid "Archiviert"
 msgstr ""
@@ -2864,7 +2964,7 @@ msgid "Offene Einladungen verwalten"
 msgstr ""
 
 #: includes/character-policy-ui.php:146
-msgid "Deine Einladungen"
+msgid "Universums- und Kampagneneinladungen"
 msgstr ""
 
 #: includes/character-policy-ui.php:154
@@ -2907,6 +3007,10 @@ msgstr ""
 
 #: includes/character-policy-ui.php:164
 msgid "Annehmen"
+msgstr ""
+
+#: includes/character-policy-ui.php:179
+msgid "Keine offenen Universums- oder Kampagneneinladungen."
 msgstr ""
 
 #: includes/character-policy-ui.php:191
@@ -3170,7 +3274,7 @@ msgid "Du darfst diesen Charakter nicht ansehen."
 msgstr ""
 
 #: includes/characters-admin.php:176
-#: includes/frontend.php:264
+#: includes/frontend.php:267
 msgid "Fremde Charaktere öffnest du im Bereich Spielleitung."
 msgstr ""
 
@@ -3200,7 +3304,8 @@ msgid "Inventar"
 msgstr ""
 
 #: includes/characters-admin.php:207
-#: includes/play-rounds-ui.php:106
+#: includes/play-rounds-ui.php:104
+#: includes/play-rounds-ui.php:167
 msgid "Abenteuer"
 msgstr ""
 
@@ -3223,7 +3328,7 @@ msgstr ""
 
 #: includes/characters-admin.php:228
 #: includes/equipment-ui.php:402
-#: includes/events-ui.php:195
+#: includes/events-ui.php:196
 msgid "Gültiger Stand"
 msgstr ""
 
@@ -3232,7 +3337,7 @@ msgid "Angezeigte Werte enthalten freigegebene Ausrüstungsboni."
 msgstr ""
 
 #: includes/characters-admin.php:234
-#: includes/events-ui.php:198
+#: includes/events-ui.php:199
 msgid "Offener Antrag"
 msgstr ""
 
@@ -3271,7 +3376,7 @@ msgstr ""
 #: includes/characters-admin.php:291
 #: includes/community.php:62
 #: includes/dashboard.php:74
-#: includes/events-ui.php:178
+#: includes/events-ui.php:179
 msgid "Freigabe ausstehend"
 msgstr ""
 
@@ -3420,36 +3525,36 @@ msgstr ""
 msgid "Der Wiederherstellungsstand der Runde konnte nicht sicher geprüft werden. Bitte informiere die Administration."
 msgstr ""
 
-#: includes/chat.php:46
+#: includes/chat.php:56
 msgid "Diese Gruppenwürfe sind für dich nicht verfügbar."
 msgstr ""
 
-#: includes/chat.php:66
-#: includes/chat.php:97
+#: includes/chat.php:76
+#: includes/chat.php:108
 msgid "Rundenchat"
 msgstr ""
 
-#: includes/chat.php:68
+#: includes/chat.php:78
 msgid "Öffentliche Gruppenwürfe"
 msgstr ""
 
-#: includes/chat.php:69
+#: includes/chat.php:79
 msgid "Gruppenwürfe"
 msgstr ""
 
-#: includes/chat.php:70
+#: includes/chat.php:80
 msgid "Die letzten 20 öffentlichen Würfe dieser Runde. Private und verdeckte Würfe erscheinen hier nicht."
 msgstr ""
 
-#: includes/chat.php:77
+#: includes/chat.php:87
 msgid "Eure Gespräche"
 msgstr ""
 
-#: includes/chat.php:78
+#: includes/chat.php:88
 msgid "Nur Mitglieder dieser Kampagne. Die Spielleitung moderiert."
 msgstr ""
 
-#: includes/chat.php:80
+#: includes/chat.php:90
 msgid "Der Rundenchat benötigt PS Chat mit der Spieltisch-Schnittstelle. Bitte wende dich an die Website-Administration."
 msgstr ""
 
@@ -3552,8 +3657,8 @@ msgid "Vorbereiten & verwalten"
 msgstr ""
 
 #: includes/dashboard.php:37
-#: includes/play-rounds-ui.php:71
-#: includes/play-rounds-ui.php:141
+#: includes/play-rounds-ui.php:126
+#: includes/play-rounds-ui.php:255
 msgid "Zur Game-Lounge"
 msgstr ""
 
@@ -4222,7 +4327,7 @@ msgid "Leer"
 msgstr ""
 
 #: includes/equipment-ui.php:233
-#: includes/frontend.php:261
+#: includes/frontend.php:264
 msgid "Dieser Charakter ist für dich nicht verfügbar."
 msgstr ""
 
@@ -4365,7 +4470,7 @@ msgid "Geschütztes Hintergrundbild:"
 msgstr ""
 
 #: includes/equipment-ui.php:393
-#: includes/events-ui.php:163
+#: includes/events-ui.php:164
 msgid "Geschütztes Bild:"
 msgstr ""
 
@@ -4579,180 +4684,180 @@ msgstr ""
 msgid "Läuft"
 msgstr ""
 
-#: includes/events-ui.php:120
+#: includes/events-ui.php:121
 msgid "Der Figurenverlauf ist nicht verfügbar."
 msgstr ""
 
-#: includes/events-ui.php:122
+#: includes/events-ui.php:123
 msgid "Noch keine Figur vorhanden."
 msgstr ""
 
-#: includes/events-ui.php:129
+#: includes/events-ui.php:130
 msgid "Kein Kampagnenmitglied"
 msgstr ""
 
-#: includes/events-ui.php:130
+#: includes/events-ui.php:131
 msgid "Keine Anfrage"
 msgstr ""
 
-#: includes/events-ui.php:130
+#: includes/events-ui.php:131
 msgid "Offene Anfrage"
 msgstr ""
 
-#: includes/events-ui.php:130
+#: includes/events-ui.php:131
 msgid "Anfrage angenommen"
 msgstr ""
 
-#: includes/events-ui.php:130
+#: includes/events-ui.php:131
 msgid "Anfrage abgelehnt"
 msgstr ""
 
-#: includes/events-ui.php:137
+#: includes/events-ui.php:138
 msgid "Freigegebener Stand"
 msgstr ""
 
-#: includes/events-ui.php:142
-#: includes/events-ui.php:154
+#: includes/events-ui.php:143
+#: includes/events-ui.php:155
 msgid "Nicht freigegeben"
 msgstr ""
 
-#: includes/events-ui.php:146
+#: includes/events-ui.php:147
 #: includes/maps-ui.php:267
 #: includes/npcs-ui.php:64
 msgid "Geheimnisse – nur Spielleitung"
 msgstr ""
 
-#: includes/events-ui.php:147
+#: includes/events-ui.php:148
 msgid "Kartenbild:"
 msgstr ""
 
-#: includes/events-ui.php:147
+#: includes/events-ui.php:148
 msgid "Raster:"
 msgstr ""
 
-#: includes/events-ui.php:152
+#: includes/events-ui.php:153
 #: includes/maps-ui.php:164
 msgid "Privater Entwurf"
 msgstr ""
 
-#: includes/events-ui.php:152
+#: includes/events-ui.php:153
 msgid "Freigegebenes Handout"
 msgstr ""
 
-#: includes/events-ui.php:159
+#: includes/events-ui.php:160
 msgid "Sortiernummer:"
 msgstr ""
 
-#: includes/events-ui.php:160
+#: includes/events-ui.php:161
 msgid "Kapitel / Szene:"
 msgstr ""
 
-#: includes/events-ui.php:161
+#: includes/events-ui.php:162
 msgid "Szenenfolge:"
 msgstr ""
 
-#: includes/events-ui.php:172
+#: includes/events-ui.php:173
 #, php-format
 msgid "Maximal %d Charaktere je Spieler"
 msgstr ""
 
-#: includes/events-ui.php:173
+#: includes/events-ui.php:174
 msgid "Erstellung nur für Mitglieder"
 msgstr ""
 
-#: includes/events-ui.php:173
+#: includes/events-ui.php:174
 msgid "Erstellung für Website-Mitglieder"
 msgstr ""
 
-#: includes/events-ui.php:174
+#: includes/events-ui.php:175
 msgid "Eigene Charakterbilder erlaubt"
 msgstr ""
 
-#: includes/events-ui.php:174
+#: includes/events-ui.php:175
 msgid "Eigene Charakterbilder deaktiviert"
 msgstr ""
 
-#: includes/events-ui.php:175
+#: includes/events-ui.php:176
 msgid "Spielereinladungen benötigen Freigabe"
 msgstr ""
 
-#: includes/events-ui.php:175
+#: includes/events-ui.php:176
 msgid "Direkte Spielereinladungen erlaubt"
 msgstr ""
 
-#: includes/events-ui.php:178
+#: includes/events-ui.php:179
 msgid "Eingeladen von"
 msgstr ""
 
-#: includes/events-ui.php:178
+#: includes/events-ui.php:179
 msgid "Einladung offen"
 msgstr ""
 
-#: includes/events-ui.php:180
+#: includes/events-ui.php:181
 msgid "Mitglieder:"
 msgstr ""
 
-#: includes/events-ui.php:182
-#: includes/events-ui.php:278
+#: includes/events-ui.php:183
+#: includes/events-ui.php:279
 #: includes/universes-ui.php:191
 msgid "Ohne Universum"
 msgstr ""
 
-#: includes/events-ui.php:186
+#: includes/events-ui.php:187
 msgid "Öffentlicher Teaser"
 msgstr ""
 
-#: includes/events-ui.php:186
+#: includes/events-ui.php:187
 msgid "Geschlossene Kampagne"
 msgstr ""
 
-#: includes/events-ui.php:187
+#: includes/events-ui.php:188
 msgid "Anfragen mit Freigabe"
 msgstr ""
 
-#: includes/events-ui.php:187
+#: includes/events-ui.php:188
 msgid "Persönliche Aufnahme"
 msgstr ""
 
-#: includes/events-ui.php:226
+#: includes/events-ui.php:227
 msgid "Würfe, Charakteränderungen, Freigaben, Regeländerungen und geschützte Mitgliederverwaltung. Du siehst nur Einträge, für die du berechtigt bist. Der jeweilige Änderungsverlauf beginnt mit der Einführung seiner Protokollierung."
 msgstr ""
 
-#: includes/events-ui.php:230
+#: includes/events-ui.php:231
 msgid "Diese Protokollseite enthält keine für dich sichtbaren Ereignisse."
 msgstr ""
 
-#: includes/events-ui.php:236
+#: includes/events-ui.php:237
 msgid "Privat: Charakterbesitzer und Spielleiter"
 msgstr ""
 
-#: includes/events-ui.php:241
+#: includes/events-ui.php:242
 msgid "Wurfdetails"
 msgstr ""
 
-#: includes/events-ui.php:246
+#: includes/events-ui.php:247
 #: includes/trade-ui.php:104
 msgid "Handel"
 msgstr ""
 
-#: includes/events-ui.php:285
+#: includes/events-ui.php:286
 #, php-format
 msgid "Revision %1$d → %2$d"
 msgstr ""
 
-#: includes/events-ui.php:286
+#: includes/events-ui.php:287
 msgid "Änderung ansehen: Vorher / Nachher"
 msgstr ""
 
-#: includes/events-ui.php:292
+#: includes/events-ui.php:293
 msgid "Protokollseiten"
 msgstr ""
 
-#: includes/events-ui.php:293
+#: includes/events-ui.php:294
 msgid "Neuere Ereignisse"
 msgstr ""
 
-#: includes/events-ui.php:294
+#: includes/events-ui.php:295
 msgid "Ältere Ereignisse"
 msgstr ""
 
@@ -5418,12 +5523,12 @@ msgid "Frontend-Arbeitsbereich"
 msgstr ""
 
 #: includes/frontend.php:150
-#: includes/frontend.php:309
+#: includes/frontend.php:312
 msgid "Spielen"
 msgstr ""
 
 #: includes/frontend.php:152
-#: includes/frontend.php:285
+#: includes/frontend.php:288
 #: includes/table-ui.php:62
 msgid "Spielleitung"
 msgstr ""
@@ -5511,23 +5616,28 @@ msgstr ""
 msgid "Für diesen Spielleitungsbereich hast du keine Berechtigung."
 msgstr ""
 
-#: includes/frontend.php:286
+#: includes/frontend.php:261
+#: includes/play-rounds-ui.php:248
+msgid "Diese Freundesgruppe ist nur für eingeladene Personen verfügbar."
+msgstr ""
+
+#: includes/frontend.php:289
 msgid "Bereite deine Welten und Kampagnen vor und verwalte ihre Freigaben."
 msgstr ""
 
-#: includes/frontend.php:297
+#: includes/frontend.php:300
 msgid "Deine Kampagnen"
 msgstr ""
 
-#: includes/frontend.php:300
+#: includes/frontend.php:303
 msgid "Du bist noch keiner Kampagne zugeordnet."
 msgstr ""
 
-#: includes/frontend.php:301
+#: includes/frontend.php:304
 msgid "Zur Game-Lounge und meinen Einladungen"
 msgstr ""
 
-#: includes/frontend.php:310
+#: includes/frontend.php:313
 msgid "Vorbereiten"
 msgstr ""
 
@@ -6557,7 +6667,7 @@ msgid "Automatische Gruppe"
 msgstr ""
 
 #: includes/lounge.php:76
-#: includes/play-rounds.php:6
+#: includes/play-rounds.php:8
 msgid "Solo-Abenteuer"
 msgstr ""
 
@@ -7282,184 +7392,326 @@ msgstr ""
 msgid "Diese Figur wurde bereits ins Universum aufgenommen oder vorgeschlagen. Vorlagen werden nicht automatisch durch spätere Figurenänderungen überschrieben."
 msgstr ""
 
-#: includes/play-rounds-ui.php:53
+#: includes/play-friends.php:19
+msgid "Hierfür muss die Freundschaftsfunktion von PS Community aktiviert sein."
+msgstr ""
+
+#: includes/play-friends.php:57
+msgid "Wähle bestehende, nicht blockierte PS-Community-Freunde dieser Website."
+msgstr ""
+
+#: includes/play-rounds-ui.php:65
 msgid "Spielarten anbieten"
 msgstr ""
 
-#: includes/play-rounds-ui.php:59
+#: includes/play-rounds-ui.php:71
 msgid "Spieler dürfen eigene Solo- und automatische Gruppenrunden anlegen."
 msgstr ""
 
-#: includes/play-rounds-ui.php:60
+#: includes/play-rounds-ui.php:72
 msgid "Solo und automatische Gruppen brauchen ein freigegebenes Abenteuer ohne notwendige Spielleiterentscheidungen. Laufende Runden bleiben beim Abschalten eines Angebots erhalten."
 msgstr ""
 
-#: includes/play-rounds-ui.php:61
+#: includes/play-rounds-ui.php:73
 msgid "Angebot speichern"
 msgstr ""
 
-#: includes/play-rounds-ui.php:75
-msgid "Runden"
+#: includes/play-rounds-ui.php:84
+msgid "Die Spielleitung hat noch kein automatisch spielbares Abenteuer dieser Spielart freigegeben."
 msgstr ""
 
-#: includes/play-rounds-ui.php:91
-msgid "Wartebereich öffnen"
+#: includes/play-rounds-ui.php:87
+msgid "Du hast noch keine verfügbaren PS-Community-Freunde auf dieser Website. Verwalte zuerst deine Freundschaften in PS Community."
 msgstr ""
 
-#: includes/play-rounds-ui.php:91
-msgid "Runde öffnen"
+#: includes/play-rounds-ui.php:89
+msgid "Zum Spielen brauchst du einen eigenen freigegebenen Charakter dieses Universums mit passenden Regeln. Erstelle ihn im Charakterprofil oder warte auf seine Freigabe und kehre anschließend hierher zurück."
 msgstr ""
 
-#: includes/play-rounds-ui.php:95
-msgid "Hier wartet noch keine Runde."
+#: includes/play-rounds-ui.php:93
+msgid "Charakter erstellen / Freigabe prüfen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:101
-msgid "Neue Runde"
+#: includes/play-rounds-ui.php:94
+msgid "Das Charakterprofil ist nicht verfügbar. Bitte wende dich an die Website-Administration."
 msgstr ""
 
-#: includes/play-rounds-ui.php:110
-msgid "Wartebereich anlegen"
+#: includes/play-rounds-ui.php:98
+msgid "Mit Freunden spielen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:120
-msgid "Wartet auf den Spielbeginn"
+#: includes/play-rounds-ui.php:98
+#: includes/play-rounds-ui.php:116
+msgid "Solo spielen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:120
-msgid "Spiel läuft"
+#: includes/play-rounds-ui.php:99
+msgid "Wähle Abenteuer, eigenen Charakter und Freunde. Diese nehmen ihre Einladung in der Game-Lounge an und wählen jeweils eine eigene freigegebene Figur desselben Universums. Fehlender Kampagnenzugang benötigt weiterhin die vorgesehene Freigabe und Annahme."
 msgstr ""
 
-#: includes/play-rounds-ui.php:135
-msgid "Diese Solo-Runde ist privat."
+#: includes/play-rounds-ui.php:100
+msgid "Wähle ein freigegebenes Abenteuer und deinen Charakter. Danach beginnt das vorbereitete Spiel direkt, ohne Wartebereich. Laufende Spiele kannst du unten fortsetzen."
 msgstr ""
 
-#: includes/play-rounds-ui.php:140
-msgid "Zu den Runden dieser Kampagne"
+#: includes/play-rounds-ui.php:108
+msgid "PS-Community-Freunde einladen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:147
-msgid "Teilnehmer"
-msgstr ""
-
-#: includes/play-rounds-ui.php:148
-msgid "Noch kein Charakter ausgewählt."
-msgstr ""
-
-#: includes/play-rounds-ui.php:161
-msgid "Mein Charakter · Werte und Inventar"
-msgstr ""
-
-#: includes/play-rounds-ui.php:163
-msgid "Runde verlassen"
-msgstr ""
-
-#: includes/play-rounds-ui.php:172
+#: includes/play-rounds-ui.php:112
+#: includes/play-rounds-ui.php:287
 msgid "Mein Charakter"
 msgstr ""
 
-#: includes/play-rounds-ui.php:176
-msgid "Charakter wechseln"
+#: includes/play-rounds-ui.php:116
+msgid "Gruppe vorbereiten und Freunde einladen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:176
-msgid "Mit diesem Charakter teilnehmen"
+#: includes/play-rounds-ui.php:132
+msgid "Neue automatische Spiele sind derzeit nicht freigegeben. Deine bestehenden Spiele kannst du weiterhin öffnen."
 msgstr ""
 
-#: includes/play-rounds-ui.php:178
-msgid "Du brauchst einen eigenen freigegebenen Charakter mit passenden Regeln."
+#: includes/play-rounds-ui.php:134
+msgid "Runden"
 msgstr ""
 
-#: includes/play-rounds-ui.php:183
-msgid "Pause · Teilnehmer ändern"
+#: includes/play-rounds-ui.php:152
+msgid "Wartebereich öffnen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:185
-msgid "Spiel starten"
+#: includes/play-rounds-ui.php:152
+msgid "Runde öffnen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:185
-msgid "Spiel fortsetzen"
+#: includes/play-rounds-ui.php:156
+msgid "Hier wartet noch keine Runde."
 msgstr ""
 
-#: includes/play-rounds-ui.php:187
-msgid "Runde abschließen"
+#: includes/play-rounds-ui.php:162
+msgid "Neue Runde"
 msgstr ""
 
-#: includes/play-rounds-ui.php:193
-msgid "Die Spieler wählen ihre Charaktere. Danach kannst du das Spiel starten."
+#: includes/play-rounds-ui.php:171
+msgid "Wartebereich anlegen"
 msgstr ""
 
-#: includes/play-rounds-ui.php:193
-msgid "Wähle deinen Charakter. Die Runde beginnt erst mit „Spiel starten“."
+#: includes/play-rounds-ui.php:181
+msgid "Wartet auf den Spielbeginn"
 msgstr ""
 
-#: includes/play-rounds-ui.php:194
-msgid "Während der Pause können Spieler beitreten oder ihre Teilnahme beenden."
+#: includes/play-rounds-ui.php:181
+msgid "Spiel läuft"
+msgstr ""
+
+#: includes/play-rounds-ui.php:199
+msgid "Einladungen zu Freundesgruppen"
 msgstr ""
 
 #: includes/play-rounds-ui.php:204
+msgid "Einladung öffnen und Charakter wählen"
+msgstr ""
+
+#: includes/play-rounds-ui.php:206
+msgid "Nimm zuerst die Kampagneneinladung an. Eine eventuell erforderliche Freigabe der Spielleitung bleibt notwendig."
+msgstr ""
+
+#: includes/play-rounds-ui.php:208
+msgid "Die PS-Community-Freundschaft ist nicht mehr verfügbar oder wurde blockiert. Eine Annahme ist deshalb nicht möglich."
+msgstr ""
+
+#: includes/play-rounds-ui.php:210
+#: includes/play-rounds-ui.php:219
+msgid "Gruppeneinladung ablehnen"
+msgstr ""
+
+#: includes/play-rounds-ui.php:222
+msgid "Wartet auf Annahme und Charakterwahl"
+msgstr ""
+
+#: includes/play-rounds-ui.php:223
+msgid "Angenommen"
+msgstr ""
+
+#: includes/play-rounds-ui.php:223
+#: includes/trade.php:18
+msgid "Abgelehnt"
+msgstr ""
+
+#: includes/play-rounds-ui.php:223
+#: includes/trade.php:18
+msgid "Zurückgezogen"
+msgstr ""
+
+#: includes/play-rounds-ui.php:224
+msgid "Eingeladene Freunde"
+msgstr ""
+
+#: includes/play-rounds-ui.php:229
+msgid "Kampagnenzugang noch offen; die vorhandene Kampagneneinladung muss zuerst freigegeben und angenommen werden."
+msgstr ""
+
+#: includes/play-rounds-ui.php:233
+msgid "Gruppeneinladung zurückziehen"
+msgstr ""
+
+#: includes/play-rounds-ui.php:239
+msgid "Der Gastgeber startet, sobald die offenen Einladungen beantwortet oder ausdrücklich zurückgezogen wurden."
+msgstr ""
+
+#: includes/play-rounds-ui.php:249
+msgid "Diese Solo-Runde ist privat."
+msgstr ""
+
+#: includes/play-rounds-ui.php:254
+msgid "Zu den Runden dieser Kampagne"
+msgstr ""
+
+#: includes/play-rounds-ui.php:262
+msgid "Teilnehmer"
+msgstr ""
+
+#: includes/play-rounds-ui.php:263
+msgid "Noch kein Charakter ausgewählt."
+msgstr ""
+
+#: includes/play-rounds-ui.php:276
+msgid "Mein Charakter · Werte und Inventar"
+msgstr ""
+
+#: includes/play-rounds-ui.php:278
+msgid "Runde verlassen"
+msgstr ""
+
+#: includes/play-rounds-ui.php:291
+msgid "Charakter wechseln"
+msgstr ""
+
+#: includes/play-rounds-ui.php:291
+msgid "Einladung annehmen und mit diesem Charakter teilnehmen"
+msgstr ""
+
+#: includes/play-rounds-ui.php:291
+msgid "Mit diesem Charakter teilnehmen"
+msgstr ""
+
+#: includes/play-rounds-ui.php:293
+msgid "Du brauchst einen eigenen freigegebenen Charakter mit passenden Regeln."
+msgstr ""
+
+#: includes/play-rounds-ui.php:296
+msgid "Meine Charaktere dieses Universums öffnen"
+msgstr ""
+
+#: includes/play-rounds-ui.php:300
+msgid "Pause · Teilnehmer ändern"
+msgstr ""
+
+#: includes/play-rounds-ui.php:304
+msgid "Spiel starten"
+msgstr ""
+
+#: includes/play-rounds-ui.php:304
+msgid "Spiel fortsetzen"
+msgstr ""
+
+#: includes/play-rounds-ui.php:306
+msgid "Runde abschließen"
+msgstr ""
+
+#: includes/play-rounds-ui.php:312
+msgid "Dein Charakter ist ausgewählt. Sobald alle bereit sind, kannst du das Spiel starten."
+msgstr ""
+
+#: includes/play-rounds-ui.php:313
+msgid "Dein Charakter ist ausgewählt. Der Gastgeber startet das gemeinsame Spiel."
+msgstr ""
+
+#: includes/play-rounds-ui.php:314
+msgid "Die Spieler wählen ihre Charaktere. Danach kannst du das Spiel starten."
+msgstr ""
+
+#: includes/play-rounds-ui.php:314
+msgid "Wähle deinen Charakter. Die Runde beginnt erst mit „Spiel starten“."
+msgstr ""
+
+#: includes/play-rounds-ui.php:315
+msgid "Während der Pause können Spieler beitreten oder ihre Teilnahme beenden."
+msgstr ""
+
+#: includes/play-rounds-ui.php:325
 msgid "Diese Runde ist abgeschlossen."
 msgstr ""
 
-#: includes/play-rounds-ui.php:205
+#: includes/play-rounds-ui.php:326
 msgid "Das Spiel läuft. Eine neue Teilnahme ist möglich, sobald die Runde pausiert."
 msgstr ""
 
-#: includes/play-rounds.php:6
+#: includes/play-rounds.php:8
 msgid "Mit Spielleiter"
 msgstr ""
 
-#: includes/play-rounds.php:7
+#: includes/play-rounds.php:9
 msgid "Automatisches Gruppenabenteuer"
 msgstr ""
 
-#: includes/play-rounds.php:11
+#: includes/play-rounds.php:13
 msgid "Die Runde wurde geändert oder ist nicht verfügbar. Bitte lade den aktuellen Stand neu."
 msgstr ""
 
-#: includes/play-rounds.php:164
+#: includes/play-rounds.php:174
 msgid "Die Spielleitung muss zuerst ein Universum zuordnen."
 msgstr ""
 
-#: includes/play-rounds.php:181
+#: includes/play-rounds.php:183
+#: includes/play-rounds.php:337
+msgid "Wähle einen eigenen freigegebenen Charakter mit passenden Universumsregeln."
+msgstr ""
+
+#: includes/play-rounds.php:200
 msgid "Diese Spielart oder das Anlegen einer Runde ist nicht freigegeben. Die Kampagne braucht ein zugeordnetes Universum."
 msgstr ""
 
-#: includes/play-rounds.php:198
+#: includes/play-rounds.php:220
 msgid "Wähle ein freigegebenes Abenteuer dieser Spielart ohne erforderliche Spielleiterentscheidungen."
 msgstr ""
 
-#: includes/play-rounds.php:202
+#: includes/play-rounds.php:224
 msgid "Die Spielleitung muss zuerst die Charaktervorlage einrichten."
 msgstr ""
 
-#: includes/play-rounds.php:206
+#: includes/play-rounds.php:228
 msgid "Die Ausrüstungsvorlagen der Kampagne und ihres Universums müssen für gemeinsame Charaktere zusammenpassen."
 msgstr ""
 
-#: includes/play-rounds.php:210
+#: includes/play-rounds.php:234
 #, php-format
 msgid "Runde %d"
 msgstr ""
 
-#: includes/play-rounds.php:253
-msgid "Wähle einen eigenen freigegebenen Charakter mit passenden Universumsregeln."
+#: includes/play-rounds.php:285
+msgid "Kampagne und Runde gehören nicht mehr zum selben Universum. Bitte informiere die Spielleitung."
 msgstr ""
 
-#: includes/play-rounds.php:268
+#: includes/play-rounds.php:355
+msgid "Für diese Gruppe brauchst du eine gültige Einladung eines PS-Community-Freundes."
+msgstr ""
+
+#: includes/play-rounds.php:360
 msgid "Die Runde muss vor einer neuen Teilnahme pausiert werden."
 msgstr ""
 
-#: includes/play-rounds.php:322
+#: includes/play-rounds.php:409
+msgid "Warte auf offene Einladungen oder ziehe sie vor dem gemeinsamen Start zurück."
+msgstr ""
+
+#: includes/play-rounds.php:412
 msgid "Mindestens ein Spieler muss zuerst einen Charakter auswählen."
 msgstr ""
 
-#: includes/play-rounds.php:405
+#: includes/play-rounds.php:491
 msgid "Ein ausgewählter Charakter spielt bereits in einer anderen laufenden Runde. Beende dort zuerst seine Teilnahme."
 msgstr ""
 
-#: includes/play-rounds.php:422
+#: includes/play-rounds.php:508
 msgid "Dieser Charakter nimmt noch an einer bisherigen Spielsitzung teil. Beende diese zuerst."
 msgstr ""
 
@@ -8552,14 +8804,6 @@ msgid "Wartet auf Spielleiterfreigabe"
 msgstr ""
 
 #: includes/trade.php:18
-msgid "Zurückgezogen"
-msgstr ""
-
-#: includes/trade.php:18
-msgid "Abgelehnt"
-msgstr ""
-
-#: includes/trade.php:18
 #: includes/trade.php:25
 msgid "Durch Spielleitung abgelehnt"
 msgstr ""
@@ -8660,35 +8904,35 @@ msgstr ""
 msgid "Die Mitgliedereinladungen sind beschädigt."
 msgstr ""
 
-#: includes/universe-members.php:46
+#: includes/universe-members.php:51
 msgid "Diese Website-Person ist nicht verfügbar."
 msgstr ""
 
-#: includes/universe-members.php:51
+#: includes/universe-members.php:56
 msgid "Die Einladungen wurden geändert. Bitte lade die Übersicht neu."
 msgstr ""
 
-#: includes/universe-members.php:58
+#: includes/universe-members.php:63
 msgid "Du darfst diese Einladung nicht ändern."
 msgstr ""
 
-#: includes/universe-members.php:62
+#: includes/universe-members.php:67
 msgid "Die Person ist bereits Mitglied oder eingeladen."
 msgstr ""
 
-#: includes/universe-members.php:66
+#: includes/universe-members.php:71
 msgid "Für diese Person besteht bereits eine Einladung."
 msgstr ""
 
-#: includes/universe-members.php:80
+#: includes/universe-members.php:85
 msgid "Die Einladung ist nicht mehr offen oder benötigt zuerst die Freigabe der Spielleitung."
 msgstr ""
 
-#: includes/universe-members.php:84
+#: includes/universe-members.php:89
 msgid "Du bist bereits Mitglied."
 msgstr ""
 
-#: includes/universe-members.php:89
+#: includes/universe-members.php:94
 msgid "Die maximale Zahl expliziter Universumsmitglieder ist erreicht."
 msgstr ""
 

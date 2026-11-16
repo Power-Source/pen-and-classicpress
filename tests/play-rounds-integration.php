@@ -2,8 +2,11 @@
 if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) { exit( "Run this test with WP-CLI.\n" ); }
 require_once dirname( __DIR__ ) . '/ps-pen-paper.php';
 require_once ABSPATH . 'wp-admin/includes/user.php';
-if ( ! defined( 'CPC_CORE_PLUGINS' ) ) { define( 'CPC_CORE_PLUGINS', 'core-profile,core-activity' ); }
+if ( ! defined( 'CPC_CORE_PLUGINS' ) ) { define( 'CPC_CORE_PLUGINS', 'core-profile,core-activity,core-friendships' ); }
 require_once dirname( __DIR__, 2 ) . '/ps-community/activity/cpc_profile_tabs.php';
+require_once dirname( __DIR__, 2 ) . '/ps-community/friendships/cpc_friendships_core.php';
+require_once dirname( __DIR__, 2 ) . '/ps-community/friendships/cpc_custom_post_friendships.php';
+cpc_custom_post_friendship();
 if ( is_multisite() ) { require_once ABSPATH . 'wp-admin/includes/ms.php'; }
 ps_pen_paper_register_campaign_type();
 ps_pen_paper_register_universe_type();
@@ -13,9 +16,12 @@ ps_pen_paper_register_event_type();
 ps_pen_paper_register_adventure_types();
 ps_pen_paper_register_item_type();
 ps_pen_paper_register_trade_type();
+ps_pen_paper_register_npc_type();
 
 $original_user = get_current_user_id();
-$users = array(); $parents = array();
+$users = array(); $parents = array(); $friendships = array();
+$normal_friends = static function () { return 0; };
+add_filter( 'pre_option_cpc_friendships_all', $normal_friends );
 $check = static function ( $condition, $message ) { if ( ! $condition ) { throw new RuntimeException( $message ); } };
 $success = static function ( $value, $message ) use ( $check ) {
 	$check( ! is_wp_error( $value ), $message . ( is_wp_error( $value ) ? ': ' . $value->get_error_code() . ': ' . $value->get_error_message() : '' ) );
@@ -64,9 +70,18 @@ try {
 	$scene_id = $success( ps_pen_paper_save_scene( $source, 0, array( 'title' => 'START', 'text' => 'Visible story', 'secret' => 'SECRET_ROUND_NOTE', 'grid' => '0' ), '0' ), 'Scene fixture failed' );
 	$success( ps_pen_paper_publish_scene( $source, $scene_id, '1', 'confirmed' ), 'Scene publication failed' );
 	$adventure_id = $success( ps_pen_paper_save_adventure( $source, 0, 'Round adventure', (string) $scene_id, '0' ), 'Adventure fixture failed' );
+	$npc_input = array( 'kind' => 'enemy', 'name' => 'Prepared watcher', 'description' => 'A watcher',
+		'secret' => 'REACTION_PRIVATE_SECRET', 'scene_id' => '0', 'properties' => '', 'values' => 'Attention | 4' );
+	$npc_id = $success( ps_pen_paper_save_npc( $source, 0, $npc_input, '0' ), 'Reaction NPC fixture failed' );
+	$reaction = array( 'npc' => $npc_id . ':1:0', 'expression' => '1W6', 'threshold' => '100', 'when' => 'decision',
+		'success_text' => 'Watcher reacts', 'failure_text' => 'Watcher waits', 'confirmation' => 'confirmed' );
+	$stale_reaction = $reaction; $stale_reaction['npc'] = $npc_id . ':999:0';
+	$check( is_wp_error( ps_pen_paper_prepare_adventure_reaction( $source, $stale_reaction, array(), $rules ) ), 'Stale NPC choice accepted.' );
+	$unconfirmed = $reaction; unset( $unconfirmed['confirmation'] );
+	$check( is_wp_error( ps_pen_paper_prepare_adventure_reaction( $source, $unconfirmed, array(), $rules ) ), 'NPC value published without explicit confirmation.' );
 	$success( ps_pen_paper_save_adventure_edge( $source, $adventure_id, array( 'from_scene' => (string) $scene_id, 'choice' => 'Finish',
 		'expression' => '', 'attribute' => '', 'threshold' => '0', 'success_scene' => '0', 'failure_scene' => '0',
-		'cost_resource' => $field, 'cost_amount' => '2', 'cost_timing' => 'attempt' ), '1' ), 'Adventure edge failed' );
+		'cost_resource' => $field, 'cost_amount' => '2', 'cost_timing' => 'attempt', 'reaction' => $reaction ), '1' ), 'Adventure edge failed' );
 	$scenario_input = array( 'chapter_id' => '0', 'order' => '0', 'mode' => 'both', 'repeat' => '1', 'rewards' => 'once',
 		'minimum_field' => '', 'minimum_value' => '0', 'prerequisites' => array() );
 	$success( ps_pen_paper_save_adventure_scenario( $source, $adventure_id, $scenario_input, '2' ), 'Scenario fixture failed' );
@@ -173,12 +188,21 @@ try {
 		$gm_alias = $success( ps_pen_paper_attach_base_character( $source_id, $gm_base, '1', '1', 'shared', 'confirmed' ), 'GM player attachment failed' );
 		$_GET = array( 'pspp_campaign' => (string) $source_id, 'pspp_character' => (string) $gm_alias );
 		$playing_gm = ps_pen_paper_frontend_shortcode();
+		$chat_room = array( 'id' => ps_pen_paper_chat_id( $source_id ), 'blog_id' => get_current_blog_id(), 'session_type' => 'page' );
+		$check( ! ps_pen_paper_chat_moderator( true, $chat_room ), 'Initial player chat render retained GM moderation.' );
 		$check( false !== strpos( $playing_gm, 'Playing GM' ) &&
 			false === strpos( $playing_gm, 'value="save_character_context"' ) &&
 			false === strpos( $playing_gm, 'value="grant_item"' ) &&
 			false === strpos( $playing_gm, 'value="change_wallet"' ), 'Own GM character exposed privileged inventory, currency or context actions in player view.' );
+		$_GET = array( 'pspp_campaign' => (string) $source_id, 'pspp_mode' => 'solo' );
+		$solo_entry = ps_pen_paper_frontend_shortcode();
+		$check( false !== strpos( $solo_entry, 'value="begin_solo_play"' ) &&
+			false !== strpos( $solo_entry, 'name="play_character"' ) &&
+			false === strpos( $solo_entry, 'value="create_play_round"' ), 'Solo player entry still required technical lobby creation or omitted character selection.' );
+		$_GET = array( 'pspp_campaign' => (string) $source_id, 'pspp_character' => (string) $gm_alias );
 		$_GET['pspp_view'] = 'lead';
 		$managing_gm = ps_pen_paper_frontend_shortcode();
+		$check( ps_pen_paper_chat_moderator( false, $chat_room ), 'Initial leadership chat render lost GM moderation.' );
 		$check( false !== strpos( $managing_gm, 'value="save_character_context"' ) &&
 			false !== strpos( $managing_gm, 'value="grant_item"' ), 'Leadership lost its own character management actions.' );
 		$saved_post = $_POST;
@@ -285,6 +309,9 @@ try {
 		}
 		if ( 'group' === $mode ) {
 			wp_set_current_user( $users['gm'] );
+			$check( ! in_array( $id, array_column( ps_pen_paper_lounge_running_adventures( $source, true ), 'round_id' ), true ) &&
+				in_array( $id, array_column( ps_pen_paper_lounge_running_adventures( $source ), 'round_id' ), true ),
+				'Player lounge exposed an unjoined group through GM privileges or leadership lost it.' );
 			$check( null === ps_pen_paper_adventure_group_records( $round, true )[ $state['run_id'] ]['state'] &&
 				null !== ps_pen_paper_adventure_group_records( $round )[ $state['run_id'] ]['state'],
 				'GM player projection exposed an unjoined group or leadership lost its view.' );
@@ -332,7 +359,171 @@ try {
 		$check( 'completed' === ps_pen_paper_play_round( $id )['status'] && ! ps_pen_paper_game_round( $id )['active'] &&
 			$before_base['active']['values'][ $field ]['current'] - 2 === ps_pen_paper_raw_character_state( $characters['player'] )['active']['values'][ $field ]['current'],
 			'Completion, session stop or persistent profile resource cost failed.' );
+		$progress = get_post_meta( $state['run_id'], 'solo' === $mode ? '_pspp_adventure_run' : '_pspp_adventure_group', true );
+		$decision = 'solo' === $mode ? $progress['history'][0] : $progress['history'][0]['decision'];
+		$check( false === $decision['reaction']['success'] && 'Watcher waits' === $decision['reaction']['text'] &&
+			$decision['reaction']['total'] >= 5 && $decision['reaction']['total'] <= 10,
+			'Prepared NPC value, die or failure response was lost in solo/group execution.' );
 	}
+	$entry_revision = (string) ps_pen_paper_play_options( $source_id )['revision'];
+	$base_revision = (string) ps_pen_paper_raw_character_state( $characters['player'] )['revision'];
+	$fixture_posts = static function () use ( $users ) {
+		return get_posts( array( 'post_type' => array_merge( array( 'pspp_campaign', 'pspp_universe' ), ps_pen_paper_campaign_record_types() ),
+			'post_status' => array( 'private', 'draft' ), 'author__in' => array_values( $users ), 'fields' => 'ids',
+			'posts_per_page' => -1, 'orderby' => 'ID', 'order' => 'ASC' ) );
+	};
+	$before_entry = $fixture_posts();
+	$check( is_wp_error( ps_pen_paper_create_play_round( $source, 'solo', $adventure_id, wp_generate_uuid4(),
+		$entry_revision, $characters['other'], '1' ) ) && $before_entry === $fixture_posts(), 'Direct solo entry accepted a foreign character or left a round behind.' );
+	$check( is_wp_error( ps_pen_paper_create_play_round( $source, 'solo', $adventure_id, wp_generate_uuid4(),
+		$entry_revision, $characters['player'], '999' ) ) && $before_entry === $fixture_posts(), 'Stale direct entry retained partial content.' );
+	$reject_run = static function ( $data ) {
+		if ( 'pspp_adventure_run' === $data['post_type'] && 'private' === $data['post_status'] ) { $data['post_status'] = 'draft'; }
+		return $data;
+	};
+	add_filter( 'wp_insert_post_data', $reject_run );
+	try {
+		$check( is_wp_error( ps_pen_paper_create_play_round( $source, 'solo', $adventure_id, wp_generate_uuid4(),
+			$entry_revision, $characters['player'], $base_revision ) ), 'Failed solo run publication reported success.' );
+	} finally { remove_filter( 'wp_insert_post_data', $reject_run ); }
+	$check( $before_entry === $fixture_posts(), 'Failed direct solo start retained cloned scenes, a lobby, a character or history.' );
+	$entry_token = wp_generate_uuid4();
+	$direct_id = $success( ps_pen_paper_create_play_round( $source, 'solo', $adventure_id, $entry_token,
+		$entry_revision, $characters['player'], $base_revision ), 'Direct solo entry failed' ); $parents[] = $direct_id;
+	$direct = ps_pen_paper_play_round( $direct_id );
+	$check( 'active' === $direct['status'] && $direct['run_id'] > 0 && 1 === count( $direct['participants'] ) &&
+		$direct['participants'][0]['source_id'] === $characters['player'] && ps_pen_paper_game_round( $direct_id )['active'],
+		'Direct solo entry stopped in a lobby or omitted its character, run or active session.' );
+	$before_retry = $fixture_posts();
+	$check( $direct_id === ps_pen_paper_create_play_round( $source, 'solo', $adventure_id, $entry_token,
+		$entry_revision, $characters['player'], $base_revision ) && $before_retry === $fixture_posts(), 'Repeated solo submit created duplicate content.' );
+	$check( is_wp_error( ps_pen_paper_create_play_round( $source, 'solo', $adventure_id, wp_generate_uuid4(),
+		$entry_revision, $characters['player'], $base_revision ) ) && $before_retry === $fixture_posts(), 'Direct solo entry started an already active character or retained partial content.' );
+	$direct_round = ps_pen_paper_get_campaign( $direct_id );
+	$direct_run = get_post_meta( $direct['run_id'], '_pspp_adventure_run', true );
+	$before_reaction_character = ps_pen_paper_raw_character_state( $characters['player'] );
+	$before_reaction_events = ps_pen_paper_get_events( $direct_round );
+	$fail_reaction = static function ( $check, $id, $key, $value ) {
+		return '_pspp_event' === $key && 'adventure_run' === ( $value['kind'] ?? '' ) ? false : $check;
+	};
+	add_filter( 'update_post_metadata', $fail_reaction, 10, 4 );
+	try {
+		$check( is_wp_error( ps_pen_paper_advance_adventure_run( $direct_round, $direct['run_id'], $direct_run['snapshot']['edges'][0]['id'], '1' ) ),
+			'Failed reaction history write reported success.' );
+	} finally { remove_filter( 'update_post_metadata', $fail_reaction, 10 ); }
+	$check( $direct_run === get_post_meta( $direct['run_id'], '_pspp_adventure_run', true ) &&
+		$before_reaction_character === ps_pen_paper_raw_character_state( $characters['player'] ) &&
+		$before_reaction_events === ps_pen_paper_get_events( $direct_round ), 'NPC reaction failure retained costs, history or completion.' );
+	$success( ps_pen_paper_advance_adventure_run( $direct_round, $direct['run_id'], $direct_run['snapshot']['edges'][0]['id'], '1' ), 'Direct solo action failed' );
+	$check( 'completed' === ps_pen_paper_play_round( $direct_id )['status'] &&
+		1 === count( get_post_meta( $direct['run_id'], '_pspp_adventure_run', true )['history'] ), 'Direct solo action did not persist and complete its prepared flow.' );
+	$reaction_run = get_post_meta( $direct['run_id'], '_pspp_adventure_run', true );
+	$check( ps_pen_paper_valid_adventure_run( $reaction_run ) &&
+		false === strpos( wp_json_encode( $reaction_run['snapshot'] ), 'REACTION_PRIVATE_SECRET' ), 'Reaction exposed NPC secrets or invalidated direct solo history.' );
+	$forged = $reaction_run; $forged['history'][0]['reaction']['total']++;
+	$check( ! ps_pen_paper_valid_adventure_run( $forged ), 'Forged NPC total accepted.' );
+	$forged = $reaction_run; unset( $forged['history'][0]['reaction'] );
+	$check( ! ps_pen_paper_valid_adventure_run( $forged ), 'Required NPC reaction could be removed from history.' );
+	$forged = $reaction_run; $forged['history'][0]['reaction']['roll']['groups'] = 'invalid';
+	$check( ! ps_pen_paper_valid_adventure_run( $forged ), 'Malformed NPC dice groups accepted.' );
+	$triggered = $direct_run['snapshot']['edges'][0]['reaction']; $triggered['when'] = 'failure';
+	$entry = $reaction_run['history'][0];
+	$check( null === ps_pen_paper_adventure_reaction_result( $triggered, $reaction_run['snapshot'], array(), $entry ),
+		'Failure-only reaction ran after a successful/no-probe action.' );
+	$fixed_reaction = $triggered; $fixed_reaction['when'] = 'decision'; $fixed_reaction['expression'] = ''; $fixed_reaction['threshold'] = 4;
+	$fixed = ps_pen_paper_adventure_reaction_result( $fixed_reaction, $reaction_run['snapshot'], array(), $entry );
+	$check( 4 === $fixed['total'] && true === $fixed['success'] && null === $fixed['roll'] &&
+		ps_pen_paper_valid_adventure_reaction_result( $fixed_reaction, $fixed, $reaction_run['snapshot'], array(), $entry ),
+		'Deterministic NPC value comparison at the exact threshold failed.' );
+	$friend_revision = (string) ps_pen_paper_raw_character_state( $characters['player'] )['revision'];
+	$before_friends = $fixture_posts();
+	$check( is_wp_error( ps_pen_paper_create_play_round( $source, 'group', $adventure_id, wp_generate_uuid4(),
+		$entry_revision, $characters['player'], $friend_revision, array( $users['other'] ) ) ) &&
+		$before_friends === $fixture_posts(), 'A non-friend received a group invitation or left partial content.' );
+	foreach ( array( 'other', 'outsider' ) as $friend ) {
+		$friendships[ $friend ] = $success( wp_insert_post( array( 'post_type' => 'cpc_friendship', 'post_status' => 'publish',
+			'post_author' => $users['player'], 'meta_input' => array( 'cpc_member1' => $users['player'], 'cpc_member2' => $users[ $friend ] ) ), true ), 'Friendship fixture failed' );
+	}
+	wp_update_post( array( 'ID' => $friendships['other'], 'post_status' => 'pending' ) );
+	$check( ! ps_pen_paper_play_friend_allowed( $users['player'], $users['other'] ), 'Pending friendship was accepted.' );
+	wp_update_post( array( 'ID' => $friendships['other'], 'post_status' => 'publish' ) );
+	cpc_set_blocked_users( $users['other'], array( $users['player'] ) );
+	$check( is_wp_error( ps_pen_paper_create_play_round( $source, 'group', $adventure_id, wp_generate_uuid4(),
+		$entry_revision, $characters['player'], $friend_revision, array( $users['other'] ) ) ), 'Reverse blocking did not prevent an invitation.' );
+	cpc_set_blocked_users( $users['other'], array() );
+	$member_offers = ps_pen_paper_member_invitations( $source_id );
+	$before_friends = $fixture_posts();
+	$check( is_wp_error( ps_pen_paper_create_play_round( $source, 'group', $adventure_id, wp_generate_uuid4(),
+		$entry_revision, $characters['player'], '999', array( $users['outsider'] ) ) ) &&
+		$before_friends === $fixture_posts() && $member_offers === ps_pen_paper_member_invitations( $source_id ),
+		'Failed friend-group creation retained a round or campaign invitation.' );
+	$friend_token = wp_generate_uuid4();
+	$friend_id = $success( ps_pen_paper_create_play_round( $source, 'group', $adventure_id, $friend_token,
+		$entry_revision, $characters['player'], $friend_revision, array( $users['other'], $users['outsider'] ) ), 'Friend-group entry failed' );
+	$parents[] = $friend_id; $friend_round = ps_pen_paper_get_campaign( $friend_id ); $friend_state = ps_pen_paper_play_round( $friend_id );
+	$check( 'lobby' === $friend_state['status'] && 1 === count( $friend_state['participants'] ) &&
+		$friend_id === ps_pen_paper_create_play_round( $source, 'group', $adventure_id, $friend_token,
+			$entry_revision, $characters['player'], $friend_revision, array( $users['other'], $users['outsider'] ) ), 'Friend entry omitted its host or duplicated a submitted group.' );
+	$check( is_wp_error( ps_pen_paper_change_play_round( $friend_round, 'start', (string) $friend_state['revision'] ) ), 'Start silently discarded unanswered invitations.' );
+	$member_offers = ps_pen_paper_member_invitations( $source_id );
+	$check( 'approval' === $member_offers['entries'][0]['status'] && ! ps_pen_paper_campaign_role( $source, $users['outsider'] ), 'Friendship bypassed campaign approval.' );
+	wp_set_current_user( $users['outsider'] );
+	$check( is_wp_error( ps_pen_paper_change_member_invitation( $source_id, $users['outsider'], 'accept', (string) $member_offers['revision'] ) ),
+		'Unapproved campaign invitation was accepted.' );
+	ob_start(); ps_pen_paper_render_friend_round_offers( ps_pen_paper_lounge_data(), $frontend_page ); $offers_html = ob_get_clean();
+	$check( false !== strpos( $offers_html, 'Nimm zuerst die Kampagneneinladung an' ), 'Pending campaign access hid the friend invitation or offered a premature entry.' );
+	$success( ps_pen_paper_change_play_round( $friend_round, 'decline_invite', (string) $friend_state['revision'] ), 'Declining a friend invitation required campaign membership' );
+	wp_set_current_user( $users['gm'] );
+	$success( ps_pen_paper_change_member_invitation( $source_id, $users['outsider'], 'approve', (string) $member_offers['revision'] ), 'Campaign invitation approval failed' );
+	$member_offers = ps_pen_paper_member_invitations( $source_id );
+	$characters['outsider'] = $success( ps_pen_paper_save_character( $universe_id, 0, $users['outsider'], array( 'name' => 'Uninvited participant',
+		'values' => array( $field => array( 'current' => '10', 'maximum' => '20' ) ) ), '0', '1' ), 'Outsider character failed' );
+	$foreign_world = $success( ps_pen_paper_save_universe( 0, array( 'name' => 'Different universe with identical rules', 'description' => '' ), '0' ), 'Foreign universe failed' );
+	$parents[] = $foreign_world;
+	update_post_meta( $foreign_world, '_pspp_rules', $rules );
+	$foreign_character = $success( ps_pen_paper_save_character( $foreign_world, 0, $users['other'], array( 'name' => 'Wrong universe',
+		'values' => array( $field => array( 'current' => '10', 'maximum' => '20' ) ) ), '0', '1' ), 'Foreign character failed' );
+	$check( ! ps_pen_paper_can_open_friend_round( ps_pen_paper_play_round( $friend_id ) ), 'Uninvited GM gained a friend-group player projection.' );
+	wp_set_current_user( $users['outsider'] );
+	$success( ps_pen_paper_change_member_invitation( $source_id, $users['outsider'], 'accept', (string) $member_offers['revision'] ), 'Approved campaign access failed' );
+	$friend_state = ps_pen_paper_play_round( $friend_id );
+	$check( ! ps_pen_paper_can_open_friend_round( $friend_state ) &&
+		is_wp_error( ps_pen_paper_change_play_round( $friend_round, 'join', (string) $friend_state['revision'], $characters['outsider'], '1' ) ),
+		'Campaign membership bypassed a declined friend-group invitation.' );
+	wp_set_current_user( $users['other'] );
+	$choices = $success( ps_pen_paper_play_characters( $source, $friend_id ), 'Friend character choices failed' );
+	$check( isset( $choices[ $characters['other'] ] ) && ! isset( $choices[ $foreign_character ] ) &&
+		is_wp_error( ps_pen_paper_change_play_round( $friend_round, 'join', (string) $friend_state['revision'], $foreign_character, '1' ) ) &&
+		is_wp_error( ps_pen_paper_change_play_round( $friend_round, 'join', (string) $friend_state['revision'], $characters['player'], $friend_revision ) ) &&
+		is_wp_error( ps_pen_paper_change_play_round( $friend_round, 'join', (string) $friend_state['revision'], $characters['other'], '999' ) ),
+		'An invitation allowed a foreign-universe, foreign-owned or stale character.' );
+	cpc_set_blocked_users( $users['player'], array( $users['other'] ) );
+	$check( is_wp_error( ps_pen_paper_change_play_round( $friend_round, 'join', (string) $friend_state['revision'], $characters['other'], '1' ) ) &&
+		$friend_state === ps_pen_paper_play_round( $friend_id ), 'A newly blocked friendship was accepted or partially changed the round.' );
+	cpc_set_blocked_users( $users['player'], array() );
+	$success( ps_pen_paper_change_play_round( $friend_round, 'join', (string) $friend_state['revision'], $characters['other'], '1' ), 'Friend invitation acceptance with own universe character failed' );
+	$friend_state = ps_pen_paper_play_round( $friend_id );
+	$check( 'accepted' === $friend_state['invitations'][0]['status'] && 2 === count( $friend_state['participants'] ) &&
+		'player' === ps_pen_paper_campaign_role( $friend_round, $users['other'] ), 'Accepting did not persist participation or granted GM access.' );
+	wp_set_current_user( $users['player'] );
+	$success( ps_pen_paper_change_play_round( $friend_round, 'start', (string) $friend_state['revision'] ), 'Shared friend-group start failed' );
+	$friend_state = ps_pen_paper_play_round( $friend_id ); $friend_group = get_post_meta( $friend_state['run_id'], '_pspp_adventure_group', true );
+	$success( ps_pen_paper_write_adventure_group( $friend_round, $friend_state['run_id'], (string) $friend_group['revision'], 'propose',
+		array( 'character_id' => $friend_state['participants'][0]['character_id'], 'edge_id' => $friend_group['snapshot']['edges'][0]['id'] ) ), 'Prepared friend-group decision failed' );
+	$friend_group = get_post_meta( $friend_state['run_id'], '_pspp_adventure_group', true );
+	$check( 'completed' === ps_pen_paper_play_round( $friend_id )['status'] && 1 === count( $friend_group['history'] ) &&
+		'Watcher waits' === $friend_group['history'][0]['decision']['reaction']['text'], 'Friend-group execution lost shared progress or its prepared NPC reaction.' );
+	$revoke_id = $success( ps_pen_paper_create_play_round( $source, 'group', $adventure_id, wp_generate_uuid4(),
+		$entry_revision, $characters['player'], (string) ps_pen_paper_raw_character_state( $characters['player'] )['revision'],
+		array( $users['outsider'] ) ), 'Revocation group fixture failed' );
+	$parents[] = $revoke_id; $revoke_round = ps_pen_paper_get_campaign( $revoke_id );
+	$success( ps_pen_paper_change_play_round( $revoke_round, 'revoke_invite', (string) ps_pen_paper_play_round( $revoke_id )['revision'],
+		$users['outsider'] ), 'Host could not revoke an unanswered invitation' );
+	wp_set_current_user( $users['outsider'] );
+	$check( ! ps_pen_paper_can_open_friend_round( ps_pen_paper_play_round( $revoke_id ) ) &&
+		is_wp_error( ps_pen_paper_change_play_round( $revoke_round, 'join', (string) ps_pen_paper_play_round( $revoke_id )['revision'],
+			$characters['outsider'], '1' ) ), 'Revoked invitation remained usable.' );
+	wp_set_current_user( $users['player'] );
 	$success( ps_pen_paper_change_play_round( $round_a, 'join', (string) ps_pen_paper_play_round( $a )['revision'],
 		$characters['player'], (string) ps_pen_paper_raw_character_state( $characters['player'] )['revision'] ), 'Returning to paused round failed' );
 	$success( ps_pen_paper_change_membership( $source_id, $users['player'], 'leave', '', (string) ps_pen_paper_membership_revision( $source_id )['revision'] ), 'Campaign departure failed' );
@@ -340,7 +531,9 @@ try {
 		! ps_pen_paper_can_view_campaign( $round_a ) && ps_pen_paper_record_post( $characters['player'] ), 'Campaign departure retained a live round participant or deleted the profile character.' );
 	WP_CLI::success( 'Play round integration tests passed.' );
 } finally {
+	remove_filter( 'pre_option_cpc_friendships_all', $normal_friends );
 	wp_set_current_user( $original_user );
+	foreach ( $friendships as $id ) { wp_delete_post( $id, true ); }
 	foreach ( $parents as $parent ) {
 		$children = get_posts( array( 'post_type' => ps_pen_paper_campaign_record_types(), 'post_status' => array( 'private', 'draft', 'trash' ),
 			'post_parent' => $parent, 'posts_per_page' => -1 ) );

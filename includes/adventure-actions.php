@@ -141,5 +141,9 @@ function ps_pen_paper_execute_adventure_edge( $campaign, $character, $snapshot, 
 		if ( is_wp_error( $entry['effects'] ) ) { return $entry['effects']; }
 	}
 	if ( isset( $snapshot['scenario'] ) ) { $entry['scenario_attempt'] = $attempt; }
+	if ( isset( $edge['reaction'] ) ) {
+		$entry['reaction'] = ps_pen_paper_adventure_reaction_result( $edge['reaction'], $snapshot, $history, $entry );
+		if ( is_wp_error( $entry['reaction'] ) ) { return $entry['reaction']; }
+	}
 	return $entry;
 }

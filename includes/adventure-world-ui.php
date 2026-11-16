@@ -95,16 +95,53 @@ function ps_pen_paper_render_adventure_item_row( $items, $index ) {
 	<?php
 }
 
-function ps_pen_paper_render_adventure_effect_row( $states, $index ) {
+function ps_pen_paper_render_adventure_effect_row( $states, $index, $prefix = 'adventure_edge[effects]' ) {
 	?>
 	<div data-condition-row>
-		<label><?php esc_html_e( 'Zustand setzen', 'ps-pen-paper' ); ?><select name="adventure_edge[effects][<?php echo esc_attr( $index ); ?>][state]"><option value=""><?php esc_html_e( 'Keine Zustandsfolge', 'ps-pen-paper' ); ?></option>
+		<label><?php esc_html_e( 'Zustand setzen', 'ps-pen-paper' ); ?><select name="<?php echo esc_attr( $prefix ); ?>[<?php echo esc_attr( $index ); ?>][state]"><option value=""><?php esc_html_e( 'Keine Zustandsfolge', 'ps-pen-paper' ); ?></option>
 			<?php foreach ( $states as $state ) : ?><option value="<?php echo esc_attr( $state['id'] ); ?>"><?php echo esc_html( $state['label'] ); ?></option><?php endforeach; ?>
 		</select></label>
-		<label><?php esc_html_e( 'Neuer Wert', 'ps-pen-paper' ); ?><input name="adventure_edge[effects][<?php echo esc_attr( $index ); ?>][value]" maxlength="2000"></label>
-		<label><?php esc_html_e( 'Wann?', 'ps-pen-paper' ); ?><select name="adventure_edge[effects][<?php echo esc_attr( $index ); ?>][when]"><option value="decision"><?php esc_html_e( 'Bei Ausführung', 'ps-pen-paper' ); ?></option><option value="success"><?php esc_html_e( 'Bei Erfolg', 'ps-pen-paper' ); ?></option><option value="failure"><?php esc_html_e( 'Bei Misserfolg', 'ps-pen-paper' ); ?></option></select></label>
+		<label><?php esc_html_e( 'Neuer Wert', 'ps-pen-paper' ); ?><input name="<?php echo esc_attr( $prefix ); ?>[<?php echo esc_attr( $index ); ?>][value]" maxlength="2000"></label>
+		<label><?php esc_html_e( 'Wann?', 'ps-pen-paper' ); ?><select name="<?php echo esc_attr( $prefix ); ?>[<?php echo esc_attr( $index ); ?>][when]"><option value="decision"><?php esc_html_e( 'Bei Ausführung', 'ps-pen-paper' ); ?></option><option value="success"><?php esc_html_e( 'Bei Erfolg', 'ps-pen-paper' ); ?></option><option value="failure"><?php esc_html_e( 'Bei Misserfolg', 'ps-pen-paper' ); ?></option></select></label>
 		<button type="button" data-remove-condition hidden><?php esc_html_e( 'Zustandsfolge entfernen', 'ps-pen-paper' ); ?></button>
 	</div>
+	<?php
+}
+
+function ps_pen_paper_render_adventure_reaction_fields( $campaign, $draft ) {
+	$npcs = ps_pen_paper_npc_records( $campaign );
+	if ( is_wp_error( $npcs ) ) { echo '<p role="alert">' . esc_html( $npcs->get_error_message() ) . '</p>'; return; }
+	$prefix = 'adventure_edge[reaction]';
+	?>
+	<details class="pspp-fold"><summary><?php esc_html_e( 'Vorbereitete NPC-/Gegnerreaktion (optional)', 'ps-pen-paper' ); ?></summary>
+		<p><?php esc_html_e( 'Die Reaktion folgt auf diese Spielerentscheidung. NPC-Wert plus optionaler Serverwurf werden mit deinem Zielwert verglichen. Ohne Würfel wird nur der ausgewählte Wert verglichen; ohne Zahlenwert zählt 0. Es gibt keine vorgeschriebene Kampfregel.', 'ps-pen-paper' ); ?></p>
+		<label><?php esc_html_e( 'NPC und freizugebender Zahlenwert', 'ps-pen-paper' ); ?><select name="adventure_edge[reaction][npc]">
+			<option value=""><?php esc_html_e( 'Keine automatische Reaktion', 'ps-pen-paper' ); ?></option>
+			<?php foreach ( $npcs as $id => $state ) :
+				$base = $id . ':' . $state['revision'] . ':'; ?>
+				<option value="<?php echo esc_attr( $base . 'none' ); ?>"><?php echo esc_html( $state['npc']['name'] . ' · ' . __( 'Ohne Zahlenwert', 'ps-pen-paper' ) ); ?></option>
+				<?php foreach ( $state['npc']['values'] as $index => $value ) : ?>
+					<option value="<?php echo esc_attr( $base . $index ); ?>"><?php echo esc_html( $state['npc']['name'] . ' · ' . $value['label'] . ': ' . $value['value'] ); ?></option>
+				<?php endforeach; ?>
+			<?php endforeach; ?>
+		</select></label>
+		<label><?php esc_html_e( 'Reaktion auslösen', 'ps-pen-paper' ); ?><select name="adventure_edge[reaction][when]">
+			<option value="decision"><?php esc_html_e( 'Nach jeder Ausführung', 'ps-pen-paper' ); ?></option>
+			<option value="success"><?php esc_html_e( 'Nur nach erfolgreicher Spielerprobe (auch ohne Probe)', 'ps-pen-paper' ); ?></option>
+			<option value="failure"><?php esc_html_e( 'Nur nach gescheiterter Spielerprobe', 'ps-pen-paper' ); ?></option>
+		</select></label>
+		<label><?php esc_html_e( 'Optionaler NPC-Würfelausdruck', 'ps-pen-paper' ); ?><input name="adventure_edge[reaction][expression]" placeholder="1W6"></label>
+		<label><?php esc_html_e( 'NPC-Reaktion erfolgreich ab', 'ps-pen-paper' ); ?><input type="number" name="adventure_edge[reaction][threshold]" min="-1000000" max="1000000" value="0" required></label>
+		<label><?php esc_html_e( 'Öffentliche Reaktion bei NPC-Erfolg', 'ps-pen-paper' ); ?><textarea name="adventure_edge[reaction][success_text]" maxlength="2000"></textarea></label>
+		<label><?php esc_html_e( 'Öffentliche Reaktion bei NPC-Misserfolg', 'ps-pen-paper' ); ?><textarea name="adventure_edge[reaction][failure_text]" maxlength="2000"></textarea></label>
+		<fieldset data-condition-editor data-next-index="2"><legend><?php esc_html_e( 'Zustandsfolgen der NPC-Reaktion', 'ps-pen-paper' ); ?></legend>
+			<p><?php esc_html_e( 'Erfolg und Misserfolg beziehen sich hier auf die NPC-Probe. Diese Folgen gelten nach den normalen Entscheidungsfolgen. Weitere Spieleraktionen können die Zustände als Voraussetzungen nutzen.', 'ps-pen-paper' ); ?></p>
+			<div data-condition-rows><?php ps_pen_paper_render_adventure_effect_row( $draft['states'] ?? array(), 0, $prefix . '[effects]' ); ps_pen_paper_render_adventure_effect_row( $draft['states'] ?? array(), 1, $prefix . '[effects]' ); ?></div>
+			<template data-condition-template><?php ps_pen_paper_render_adventure_effect_row( $draft['states'] ?? array(), '__INDEX__', $prefix . '[effects]' ); ?></template>
+			<button type="button" data-add-condition hidden><?php esc_html_e( 'Weitere Reaktionsfolge', 'ps-pen-paper' ); ?></button>
+		</fieldset>
+		<label><input type="checkbox" name="adventure_edge[reaction][confirmation]" value="confirmed"><?php esc_html_e( 'NPC-Name, ausgewählter Zahlenwert und Reaktion dürfen im Abenteuer erscheinen. Geheimnisse und andere NPC-Werte werden nicht übernommen. Die Auswahl wird als feste Kopie gespeichert; spätere NPC-Änderungen verändern sie nicht.', 'ps-pen-paper' ); ?></label>
+	</details>
 	<?php
 }
 

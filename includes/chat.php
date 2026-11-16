@@ -35,6 +35,16 @@ function ps_pen_paper_chat_access( $allowed, $session ) {
 
 function ps_pen_paper_chat_moderator( $moderator, $session ) {
 	if ( isset( $session['id'] ) && is_string( $session['id'] ) && 0 === strpos( $session['id'], 'pspp-' ) ) {
+		if ( isset( $_SERVER['HTTP_X_PSPP_VIEW'] ) ) {
+			$view = $_SERVER['HTTP_X_PSPP_VIEW'];
+			if ( ! in_array( $view, array( 'overview', 'lead' ), true ) ) {
+				error_log( 'PS Pen & Paper: invalid chat workspace header.' );
+				return false;
+			}
+			if ( 'overview' === $view ) { return false; }
+		} elseif ( ps_pen_paper_is_frontend_page() && ! ps_pen_paper_management_view( get_queried_object_id() ) ) {
+			return false;
+		}
 		$campaign = ps_pen_paper_chat_campaign( $session );
 		return $campaign && ps_pen_paper_chat_access( false, $session ) && ps_pen_paper_can_manage_campaign( $campaign );
 	}
@@ -59,10 +69,10 @@ function ps_pen_paper_chat_rolls( $campaign ) {
 	return $rolls;
 }
 
-function ps_pen_paper_render_chat( $campaign ) {
+function ps_pen_paper_render_chat( $campaign, $page_id = 0 ) {
 	global $psource_chat;
 	?>
-	<details class="pspp-chat-dock" data-table-chat>
+	<details class="pspp-chat-dock" data-table-chat data-chat-view="<?php echo ps_pen_paper_management_view( $page_id ) ? 'lead' : 'overview'; ?>">
 		<summary><?php esc_html_e( 'Rundenchat', 'ps-pen-paper' ); ?> <span data-chat-unread hidden></span></summary>
 		<div class="pspp-chat-body">
 			<section aria-label="<?php esc_attr_e( 'Öffentliche Gruppenwürfe', 'ps-pen-paper' ); ?>">
@@ -88,6 +98,7 @@ function ps_pen_paper_render_chat( $campaign ) {
 					echo '<p role="alert">' . esc_html( $chat_id->get_error_message() ) . '</p>';
 				} else {
 				$colors = $style['colors'];
+				wp_enqueue_script( 'pspp-chat-view', plugins_url( '../assets/chat.js', __FILE__ ), array( 'jquery' ), '0.29.3', true );
 				echo $psource_chat->process_chat_shortcode( array(
 					'id' => $chat_id,
 					'access_provider' => 'ps-pen-paper',

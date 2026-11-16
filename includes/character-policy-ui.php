@@ -143,7 +143,7 @@ function ps_pen_paper_render_member_invitation_form( $scope, $page_id = 0 ) {
 
 function ps_pen_paper_render_profile_invitations( $page_id = 0, $management_scope = null ) {
 	$invitations = ps_pen_paper_profile_invitations();
-	echo '<h3>' . esc_html( $management_scope ? __( 'Offene Einladungen verwalten', 'ps-pen-paper' ) : __( 'Deine Einladungen', 'ps-pen-paper' ) ) . '</h3>';
+	echo '<h3>' . esc_html( $management_scope ? __( 'Offene Einladungen verwalten', 'ps-pen-paper' ) : __( 'Universums- und Kampagneneinladungen', 'ps-pen-paper' ) ) . '</h3>';
 	foreach ( $invitations['errors'] as $error ) { echo '<p role="alert">' . esc_html( $error ) . '</p>'; }
 	$buckets = $management_scope ? array( 'approvals', 'sent' ) : array( 'received' );
 	$shown = false;
@@ -176,7 +176,7 @@ function ps_pen_paper_render_profile_invitations( $page_id = 0, $management_scop
 			echo '</section>';
 		}
 	}
-	if ( ! $shown ) { echo '<p>' . esc_html__( 'Keine offenen Einladungen.', 'ps-pen-paper' ) . '</p>'; }
+	if ( ! $shown ) { echo '<p>' . esc_html__( 'Keine offenen Universums- oder Kampagneneinladungen.', 'ps-pen-paper' ) . '</p>'; }
 }
 
 function ps_pen_paper_render_portrait_presets( $scope, $character, $page_id = 0, $profile = false ) {

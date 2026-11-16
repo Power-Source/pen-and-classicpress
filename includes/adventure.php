@@ -59,6 +59,10 @@ function ps_pen_paper_valid_adventure_edge( $edge ) {
 		$keys[] = 'repeat_reward';
 		if ( ! ps_pen_paper_valid_adventure_reward( $edge['repeat_reward'] ) ) { return false; }
 	}
+	if ( is_array( $edge ) && array_key_exists( 'reaction', $edge ) ) {
+		$keys[] = 'reaction';
+		if ( ! ps_pen_paper_valid_adventure_reaction( $edge['reaction'] ) ) { return false; }
+	}
 	if ( ! is_array( $edge ) || $keys !== array_keys( $edge ) ||
 		! is_string( $edge['id'] ) || ! wp_is_uuid( $edge['id'] ) ||
 		! is_int( $edge['from_scene'] ) || $edge['from_scene'] < 1 ||
@@ -327,6 +331,8 @@ function ps_pen_paper_adventure_validate_draft( $campaign, $draft, $rules ) {
 			}
 			if ( ! $field ) { return ps_pen_paper_adventure_error(); }
 		}
+		if ( ! empty( $edge['reaction']['expression'] ) &&
+			is_wp_error( ps_pen_paper_parse_dice( $edge['reaction']['expression'], $rules['dice'] ) ) ) { return ps_pen_paper_adventure_reaction_error(); }
 		foreach ( array( 'reward', 'repeat_reward' ) as $reward_key ) {
 			if ( ! isset( $edge[ $reward_key ] ) ) { continue; }
 			if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
@@ -513,6 +519,10 @@ function ps_pen_paper_save_adventure_edge( $campaign, $id, $input, $revision, $r
 				$edge['repeat_reward'] = ps_pen_paper_prepare_adventure_reward( $campaign, $input['repeat_reward'] );
 				if ( is_wp_error( $edge['repeat_reward'] ) ) { return $edge['repeat_reward']; }
 			}
+			if ( array_key_exists( 'reaction', $input ) ) {
+				$edge['reaction'] = ps_pen_paper_prepare_adventure_reaction( $campaign, $input['reaction'], $before['draft']['states'] ?? array(), $rules );
+				if ( is_wp_error( $edge['reaction'] ) ) { return $edge['reaction']; }
+			}
 			if ( ! ps_pen_paper_valid_adventure_edge( $edge ) ) { return ps_pen_paper_adventure_error(); }
 			$after['draft']['edges'][] = $edge;
 		}
@@ -634,6 +644,7 @@ function ps_pen_paper_valid_adventure_run( $run, $prior_history = array() ) {
 		if ( is_array( $entry ) && array_key_exists( 'items', $entry ) ) { $keys[] = 'items'; }
 		if ( is_array( $entry ) && array_key_exists( 'effects', $entry ) ) { $keys[] = 'effects'; }
 		if ( is_array( $entry ) && array_key_exists( 'scenario_attempt', $entry ) ) { $keys[] = 'scenario_attempt'; }
+		if ( is_array( $entry ) && array_key_exists( 'reaction', $entry ) ) { $keys[] = 'reaction'; }
 		if ( ! is_array( $entry ) || $keys !== array_keys( $entry ) ||
 			! is_string( $entry['edge_id'] ) || ! wp_is_uuid( $entry['edge_id'] ) || ! is_int( $entry['source_scene'] ) ||
 			! is_string( $entry['choice'] ) || ! ( null === $entry['roll'] || ( is_array( $entry['roll'] ) && isset( $entry['roll']['total'], $entry['roll']['threshold'], $entry['roll']['success'] ) &&
@@ -724,6 +735,10 @@ function ps_pen_paper_valid_adventure_run( $run, $prior_history = array() ) {
 			$effects = ps_pen_paper_adventure_effects_result( $edge, $run['snapshot'], $prior_history, $entry['roll'] );
 			if ( is_wp_error( $effects ) || ! array_key_exists( 'effects', $entry ) || $entry['effects'] !== $effects ) { return false; }
 		} elseif ( array_key_exists( 'effects', $entry ) ) { return false; }
+		if ( isset( $edge['reaction'] ) ) {
+			if ( ! array_key_exists( 'reaction', $entry ) ||
+				! ps_pen_paper_valid_adventure_reaction_result( $edge['reaction'], $entry['reaction'], $run['snapshot'], $prior_history, $entry ) ) { return false; }
+		} elseif ( array_key_exists( 'reaction', $entry ) ) { return false; }
 		$prior_history[] = $entry;
 		$scene_id = $entry['target_scene'];
 		$seen[ $entry['edge_id'] ] = true;

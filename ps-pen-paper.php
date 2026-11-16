@@ -53,6 +53,7 @@ require_once __DIR__ . '/includes/adventure-scenarios.php';
 require_once __DIR__ . '/includes/adventure-scenarios-ui.php';
 require_once __DIR__ . '/includes/adventure-world-ui.php';
 require_once __DIR__ . '/includes/adventure-actions.php';
+require_once __DIR__ . '/includes/adventure-reactions.php';
 require_once __DIR__ . '/includes/adventure-review.php';
 require_once __DIR__ . '/includes/adventure-review-ui.php';
 require_once __DIR__ . '/includes/adventure-groups.php';

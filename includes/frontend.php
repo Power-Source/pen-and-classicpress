@@ -56,7 +56,7 @@ function ps_pen_paper_handle_frontend_action() {
 	}
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
 	if ( 'change_booking_link' === $operation && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
-	if ( in_array( $operation, array( 'save_play_options', 'create_play_round', 'change_play_round' ), true ) &&
+	if ( in_array( $operation, array( 'save_play_options', 'create_play_round', 'begin_solo_play', 'begin_group_play', 'change_play_round' ), true ) &&
 		ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( 'leave_campaign' === $operation && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'save_slot_icon', 'save_item_action_policy', 'set_item_outside', 'use_item', 'review_item_use', 'end_item_effect', 'advance_game_round', 'start_game_session', 'end_game_session' ), true ) &&
@@ -256,6 +256,9 @@ function ps_pen_paper_frontend_shortcode() {
 	$management = 'overview' !== $view;
 	if ( $management && ! ( $campaign ? ps_pen_paper_can_manage_campaign( $campaign ) : ps_pen_paper_can_open_leadership() ) ) {
 		return ps_pen_paper_frontend_message( __( 'Für diesen Spielleitungsbereich hast du keine Berechtigung.', 'ps-pen-paper' ) );
+	}
+	if ( $round && ! $management && ! ps_pen_paper_can_open_friend_round( $round_state ) ) {
+		return ps_pen_paper_frontend_message( __( 'Diese Freundesgruppe ist nur für eingeladene Personen verfügbar.', 'ps-pen-paper' ) );
 	}
 	if ( $character_id && ! ps_pen_paper_get_character( $round ? $round : $campaign, $character_id ) ) {
 		return ps_pen_paper_frontend_message( __( 'Dieser Charakter ist für dich nicht verfügbar.', 'ps-pen-paper' ) );

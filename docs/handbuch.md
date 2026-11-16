@@ -113,8 +113,10 @@ automatischen Aktualisierungen. Entwurfsbilder bleiben im Leitungsbereich.
 
 **Stand der Überarbeitung:** Getrennte Einstiege, Vorbereitungsbereiche und diese
 verschachtelten Ansichten sind umgesetzt. Die abschließende Prüfung aller
-Unteransichten einschließlich Chatmoderation, durchgehende NPC-/Gegnerautomatik
-und die vier vereinfachten Spielerwege sind noch offen; siehe [Roadmap](../ROADMAP.md).
+Altansichten, weiterführende Automatik und die beiden weiteren
+vereinfachten Spielerwege sind noch offen. Der direkte Soloeinstieg, Freundesgruppen und die
+ansichtsbezogene Chatmoderation sowie vorbereitete NPC-Reaktionen sind umgesetzt;
+siehe [Roadmap](../ROADMAP.md).
 Die älteren Abbildungen weiter unten zeigen teilweise noch die gemischte Ansicht.
 
 - **Meine Charaktere** öffnet dein Charakterprofil.
@@ -124,10 +126,17 @@ Die älteren Abbildungen weiter unten zeigen teilweise noch die gemischte Ansich
 - **Spielmodus wählen** zeigt nur die von der Leitung angebotenen Spielarten:
   **Mit Spielleiter**, **Solo-Abenteuer** und **Automatisches Gruppenabenteuer**.
   Automatische Abenteuer müssen für den jeweiligen Modus veröffentlicht sein.
-- Öffne eine bestehende Runde oder lege einen **Wartebereich** an, wenn du dazu
-  berechtigt bist. Wähle dort deinen eigenen freigegebenen Universumscharakter.
-  **Spiel starten** beginnt anschließend das Abenteuer; ein leerer Wartebereich
-  ist noch kein laufendes Spiel.
+- Unter **Solo-Abenteuer** wählst du Abenteuer und eigenen freigegebenen Charakter.
+  **Solo spielen** beginnt direkt mit der ersten Szene, ohne Wartebereich.
+  Unter **Meine laufenden Spiele** setzt du einen gespeicherten Stand fort.
+- Unter **Automatisches Gruppenabenteuer** wählst du Abenteuer, eigene
+  Universumsfigur und PS-Community-Freunde. Diese nehmen ihre Einladung in der
+  **Game-Lounge** mit einer eigenen freigegebenen Figur desselben Universums an.
+  Erst danach startet der Gastgeber das gemeinsame vorbereitete Spiel.
+  Fehlender Kampagnenzugang benötigt weiterhin die vorgesehene Freigabe und Annahme.
+- Bei geleiteten Spielen öffnest du weiterhin eine bestehende Runde
+  oder legst, soweit erlaubt, einen **Wartebereich** an. Dort wählen die
+  Teilnehmer ihre Charaktere; **Spiel starten** beginnt die Runde.
 - **Einladungen** kannst du annehmen oder ablehnen. Vor der Annahme erhältst du
   keine internen Kampagnendaten.
 - **Kampagne verlassen** beendet nach Bestätigung deine Mitgliedschaft und
@@ -189,7 +198,9 @@ verzögern.
 ### Rundenchat
 
 „Rundenchat“ öffnet die Chatbox in der Bildschirmecke. Nachrichten und
-Moderation stammen aus PS Chat; Spielleiter sind Moderatoren ihres Raums.
+Moderation stammen aus PS Chat. Leitungskonten moderieren ihren Raum nur im
+bewusst geöffneten Bereich **Spielleitung**, nicht unter **Spielen**. Das gilt
+auch bei nachgeladenen Nachrichten; der gemeinsame Raum bleibt unverändert.
 Zugang haben nur aktuelle Kampagnenmitglieder sowie Website-Administratoren.
 Eine getrennte Anmeldung zu einzelnen Sitzungen gibt es noch nicht.
 
@@ -2184,16 +2195,107 @@ Betrag, gegebenenfalls Tabellenwurf oder die ausgebliebene Belohnung bei Misserf
 
 ### Solo spielen
 
-1. Öffne den eigenen Charakterbogen oder den eigenen privaten
-   Pen-&-Paper-Profilbereich.
-2. Ein freigegebenes Abenteuer mit **Solo starten** beginnen. Ein Durchlauf
-   gehört genau diesem Charakter und kann nicht zurückgesetzt werden.
+1. Öffne in der **Game-Lounge** die Kampagne und **Solo-Abenteuer**.
+   Die Spielleitung muss Solo und das Anlegen eigener Spiele freigegeben haben.
+2. Wähle ein freigegebenes Abenteuer und deinen eigenen passenden,
+   freigegebenen Universumscharakter. **Solo spielen** führt direkt zur ersten
+   Szene. Ohne passende Figur erhältst du den Weg ins Charakterprofil.
+   Ein Durchlauf gehört genau diesem Charakter und kann nicht zurückgesetzt werden.
 3. Die angezeigte Szene lesen und eine der verfügbaren Entscheidungen wählen.
    Proben werden serverseitig durchgeführt; der gespeicherte Verlauf enthält
    Entscheidung, Würfelergebnis, verwendeten Zahlenwert und Szenenübergang.
 4. Bei einer abgeschlossenen Szene ohne weitere Entscheidungen ist der
    Durchlauf beendet. Ein Neuladen oder wiederholtes Absenden erzeugt keinen
    zweiten Fortschritt.
+5. Du kannst die Seite verlassen und dich abmelden. Über **Meine laufenden
+   Spiele** in der Lounge öffnest du nach erneuter Anmeldung die gespeicherte
+   Szene samt Verlauf. Aktionen führen nicht in die Bogenverwaltung zurück.
+
+Erstellung, Charakterteilnahme und Spielbeginn werden gemeinsam gespeichert.
+Eine veraltete Eingabe oder ein Speicherfehler lässt weder eine halbfertige Runde
+noch einen zusätzlichen Durchlauf zurück. Ein bereits in einer anderen laufenden
+Runde verwendeter Charakter lässt sich nicht gleichzeitig erneut starten.
+Dieser Einstieg führt vorbereitete Entscheidungen und ausdrücklich eingerichtete
+NPC-Reaktionen aus. Er ersetzt keine eigenständige Kampf- oder Simulationsengine.
+
+### Mit Freunden spielen
+
+1. Die Leitung veröffentlicht ein automatisch als Gruppe spielbares Abenteuer
+   ohne erforderliche manuelle Spielleiterentscheidungen. Unter **Spielarten
+   anbieten** erlaubt sie automatische Gruppen und das Anlegen eigener Spiele.
+   PS Community und dessen Freundschaftsmodul müssen aktiviert sein.
+2. Öffne in der **Game-Lounge** die Kampagne und **Automatisches Gruppenabenteuer**.
+   Wähle Abenteuer, eigene freigegebene Figur und bestätigte Freunde dieser
+   Website. **Gruppe vorbereiten und Freunde einladen** speichert Runde,
+   Gastgeberteilnahme und Einladungen gemeinsam.
+3. Freunde finden die Einladung unter **Einladungen zu Freundesgruppen** in der
+   Lounge. Fehlt der Kampagnenzugang, wird dafür der bestehende Einladungsprozess
+   verwendet: gegebenenfalls zuerst Leitungsfreigabe, dann persönliche Annahme
+   der Kampagneneinladung. Freundschaft erteilt selbst keine Mitgliedschaft.
+4. **Einladung öffnen und Charakter wählen** zeigt ausschließlich eigene
+   freigegebene Charaktere aus dem Universum dieser Kampagne. Ein Charakter aus
+   einer anderen Welt bleibt ausgeschlossen, auch bei identischen Regeln.
+   **Einladung annehmen und mit diesem Charakter teilnehmen** bestätigt die
+   Teilnahme; alternativ lässt sich die Gruppeneinladung ablehnen.
+5. Unter **Eingeladene Freunde** sieht der Gastgeber den Stand. Er wartet auf
+   Antworten oder zieht offene Gruppeneinladungen ausdrücklich zurück.
+   Anschließend beginnt **Spiel starten** das gemeinsame Abenteuer.
+6. Die Spieler verwenden die bestehenden vorbereiteten Entscheidungen und
+   NPC-Reaktionen. Nach erneuter Anmeldung lässt sich die Runde über
+   **Meine laufenden Spiele** fortsetzen.
+
+Blockierungen gelten in beiden Richtungen und werden vor einer neuen Teilnahme
+erneut geprüft. Die Rundeneinladung ersetzt weder Charakterfreigabe noch
+Besitzer-, Universums- oder Revisionsprüfung. Unbeteiligte Kampagnenmitglieder
+können eine solche geschlossene Freundesrunde nicht öffnen oder ihr beitreten.
+Die Leitung öffnet die Verwaltung ausdrücklich über **Spielleitung**.
+Ablehnen oder Zurückziehen einer Gruppeneinladung ändert keine gesonderte
+Kampagnenmitgliedschaft oder Kampagneneinladung.
+
+Die Freundschaften selbst werden ausschließlich in PS Community verwaltet;
+die Spieleinladungen erscheinen in der Game-Lounge. Vorhandene offene
+Gruppenrunden bleiben unverändert.
+
+### NPC-/Gegnerreaktionen vorbereiten
+
+1. Öffne unter **Spielleitung** die Kampagnenvorbereitung und lege deine NPCs
+   oder Gegner mit frei benannten Zahlenwerten an.
+2. Öffne dein Abenteuer. Unter **Abenteuerzustände und Begegnungsabläufe**
+   kannst du beispielsweise den Zustand „Tor“ mit Startwert „geschlossen“ anlegen.
+3. Öffne **Entscheidung oder Probe ergänzen** und darin
+   **Vorbereitete NPC-/Gegnerreaktion (optional)**.
+   Wähle die Figur mit genau dem Zahlenwert, der verwendet werden darf.
+4. Lege fest, wann die Reaktion auslöst: nach jeder Entscheidung, nur nach
+   Spielererfolg oder nur nach gescheiterter Spielerprobe. Eine Entscheidung
+   ohne Spielerprobe zählt als erfolgreich.
+5. Optional würfelt der Server und addiert den gewählten NPC-Wert. Ab deinem
+   Zielwert zählt die NPC-Reaktion als erfolgreich. Ohne Würfel wird nur der
+   Zahlenwert verglichen; ohne ausgewählten Zahlenwert zählt 0.
+6. Trage öffentliche Reaktionstexte und gewünschte Zustandsfolgen ein.
+   Hier beziehen sich **Bei Erfolg** und **Bei Misserfolg** auf die NPC-Reaktion.
+   Normale Entscheidungsfolgen werden zuerst angewendet, danach die NPC-Folgen.
+   Weitere Aktionen können diese Zustände als Voraussetzungen nutzen.
+7. Bestätige ausdrücklich die Freigabe und speichere die Entscheidung.
+   Die **Automatikprüfung des Entwurfs** nennt Entscheidungen, eingerichtete
+   Reaktionen und notwendige Spielleiterfreigaben. Abenteuer mit solchen
+   manuellen Freigaben werden nicht für automatische Starts angeboten.
+8. Veröffentliche das Abenteuer. Der gewählte NPC-Name und genau ein Zahlenwert
+   werden als feste Kopie übernommen, nicht Geheimnisse oder der vollständige
+   NPC-Bogen. Spätere Änderungen am NPC verändern weder die gespeicherte
+   Reaktion noch laufende Durchläufe. Für eine andere Reaktion entfernst du
+   die Entscheidung aus dem Entwurf und legst sie mit neuer Auswahl erneut an.
+
+**Beispiel:** Eine Torwache verwendet „Aufmerksamkeit 4“ und W6, Zielwert 5.
+Ihre erfolgreiche Reaktion setzt „Tor“ auf „offen“. Die folgende Entscheidung
+„Durch das offene Tor gehen“ verlangt diesen Zustand. Spielerzug, Würfelbeleg
+und NPC-Folgen bleiben auch nach erneuter Anmeldung erhalten; bei einem
+Speicherfehler wird der gesamte Zug einschließlich seiner Kosten zurückgenommen.
+
+Pro Entscheidung ist eine Reaktion möglich. Sie wirkt auf die Zustände des
+jeweiligen Solo- beziehungsweise Gruppendurchlaufs, nicht auf andere Spiele.
+Eine bloße NPC-Zuordnung zu einer Begegnung löst keine Reaktion aus.
+Eigene Initiativeabläufe, mehrere selbstständige NPC-Züge oder direkte
+NPC-Ressourcenänderungen sind damit nicht eingeführt.
 
 Durchläufe und ihre Würfe sind nur für den Charakterbesitzer und die aktuelle
 Spielleitung sichtbar. Das Entfernen aus der Kampagne entzieht den Zugriff;

@@ -102,7 +102,7 @@ function ps_pen_paper_handle_admin_action() {
 			ps_pen_paper_fail( __( 'Die Runde wurde inzwischen wiederhergestellt. Alte Eingaben wurden nicht übernommen. Bitte lade die Seite neu.', 'ps-pen-paper' ) );
 		}
 	}
-	if ( in_array( $operation, array( 'save_play_options', 'create_play_round', 'change_play_round' ), true ) ) { ps_pen_paper_handle_play_action( $operation, $page_id, $scope_id ); }
+	if ( in_array( $operation, array( 'save_play_options', 'create_play_round', 'begin_solo_play', 'begin_group_play', 'change_play_round' ), true ) ) { ps_pen_paper_handle_play_action( $operation, $page_id, $scope_id ); }
 	if ( 'change_booking_link' === $operation ) { ps_pen_paper_handle_booking_action( $page_id, $scope_id ); }
 	if ( 'group_adventure' === $operation ) { ps_pen_paper_handle_adventure_group_action(); }
 	if ( 'leave_campaign' === $operation ) {

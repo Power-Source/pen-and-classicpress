@@ -270,18 +270,52 @@ Auch die eingebetteten Bogen-, Inventar-, Handels-, Verbrauchs- und Porträtansi
 zeigen Leitungswerkzeuge nur im Verwaltungsbereich. Unter **Spielen** bleiben
 Würfelfiguren auf eigene Charaktere begrenzt; Protokolle, Gruppenstände und
 Kartenaktualisierungen verwenden die Spieleransicht statt erweiterter Leitungsrechte.
-Die abschließende Prüfung aller Unteransichten einschließlich der
-Chatmoderation steht noch aus. Die vollständige
-NPC-/Gegnerautomatik und die vier vereinfachten Spielerwege sind weiterhin
-offene Ziele der [Roadmap](ROADMAP.md).
+Auch Chatmoderation und die Liste laufender Spiele beachten diesen Bereich.
+Der direkte Soloeinstieg, Freundesgruppen und vorbereitete NPC-/Gegnerreaktionen sind umgesetzt.
+Die abschließende Prüfung sämtlicher Altansichten, weiterführende Automatik
+und die beiden weiteren
+vereinfachten Spielerwege bleiben Ziele der [Roadmap](ROADMAP.md).
 
 Unter **Spielarten anbieten** legt die Leitung fest, ob die Kampagne geleitet,
 solo oder als automatisches Gruppenabenteuer gespielt werden darf und ob Spieler
 selbst neue automatische Runden anlegen dürfen. Automatische Abenteuer benötigen
 eine passende Veröffentlichung ohne erforderliche Spielleiterentscheidungen.
-Nach der Moduswahl öffnest du eine bestehende Runde oder legst einen Wartebereich
-an. Dort wählst du deinen eigenen freigegebenen Universumscharakter. Erst
-**Spiel starten** beginnt das Spiel; ein leerer Wartebereich startet nicht.
+Unter **Solo-Abenteuer** wählst du das freigegebene Abenteuer und deinen eigenen
+freigegebenen Universumscharakter. **Solo spielen** führt direkt zur ersten Szene.
+Runde, Teilnahme und Spielbeginn werden gemeinsam gespeichert; bei einem Fehler
+bleibt kein halbfertiger Wartebereich zurück. Aktionen bleiben im Abenteuer;
+über die Lounge lässt sich der gespeicherte Stand auch nach erneuter Anmeldung öffnen.
+Ist das Anlegen neuer Spiele deaktiviert, bleiben bestehende Spiele erreichbar.
+Unter **Automatisches Gruppenabenteuer** wählst du Abenteuer, eigene Figur und
+bestätigte PS-Community-Freunde dieser Website. Die eigene Teilnahme und die
+Einladungen werden zusammen gespeichert. Freunde öffnen die Einladung in der
+Game-Lounge und nehmen mit einer eigenen freigegebenen Figur aus demselben
+Universum an. Gleiche Regeln allein erlauben keine universumsfremde Figur;
+Besitzer, Universumszuordnung und Revision werden auch serverseitig geprüft.
+Blockierungen gelten in beiden Richtungen. Fehlender Kampagnenzugang wird über
+die vorhandene Kampagneneinladung einschließlich erforderlicher Leitungsfreigabe
+und persönlicher Annahme behandelt, nicht automatisch erteilt.
+Der Gastgeber wartet auf Antworten oder zieht offene Gruppeneinladungen
+ausdrücklich zurück und startet danach das gemeinsame vorbereitete Abenteuer.
+Neue Freundesgruppen sind nur für Eingeladene und Teilnehmer sichtbar; die
+Leitung verwaltet sie bewusst im Leitungsbereich.
+Für diesen Einstieg muss das Freundschaftsmodul von PS Community aktiviert sein.
+Es gibt keine zweite Freundesverwaltung. Bestehende offene Gruppen bleiben
+unverändert nutzbar.
+
+Die bisherige Rundenverwaltung für geleitete Spiele bleibt erhalten:
+Im Wartebereich wählen die Teilnehmer ihre Charaktere; erst **Spiel starten**
+beginnt die Runde.
+
+**Vorbereitete NPC-Reaktionen:** Die Leitung kann pro Entscheidung einen NPC
+oder Gegner samt ausgewähltem Zahlenwert übernehmen, eine optionale Serverprobe
+mit Zielwert und öffentliche Reaktionen für Erfolg/Misserfolg festlegen.
+Reaktionen können nach jeder Ausführung oder nur nach Spielererfolg/-misserfolg
+auslösen. Ihre Zustandsfolgen schalten beispielsweise einen Zugang oder die
+nächste Aktion frei. Zahlenwert und Reaktion werden ausdrücklich freigegeben
+und versioniert; Geheimnisse und andere NPC-Werte bleiben intern. Das ist keine
+vorgegebene Kampfmechanik: Initiative, eigenständige NPC-Züge und automatische
+NPC-Ressourcenänderungen werden dadurch nicht eingeführt.
 
 Dieselbe vorbereitete Kampagne kann mehrere unabhängige Runden haben:
 Szenenauswahl, Karten, Spielzüge, Abenteuer und Protokolle bleiben getrennt.
@@ -988,6 +1022,10 @@ raumbezogene Moderation, Spieler Zugang durch ihre aktuelle Mitgliedschaft;
 Website-Administratoren behalten ihren administrativen Zugriff.
 Entfernte Mitglieder verlieren den Zugriff bei der nächsten Anfrage, ehemalige
 Spielleiter auch ihre Moderation. AFK verändert diese Rechte nicht.
+Im Frontend-Bereich **Spielen** erhalten auch Leitungskonten keine Chatmoderation.
+Erst **Spielleitung** stellt sie wieder bereit. Der Ansichtskontext wird für
+Legacy-AJAX und REST pro Anfrage übermittelt, nicht als gemeinsame
+Raumeinstellung gespeichert; er kann keine zusätzlichen Rechte vergeben.
 
 **Benötigt die ergänzten Spieltisch-Schnittstellen im PS-Chat-Plugin:**
 `psource_chat_session_access()` und die Filter `psource_chat_session_access`
@@ -1490,6 +1528,19 @@ AFK/Rückkehr, Verbindungsablauf, Zugkonflikte und Historie sowie kampagnenbezog
 Chat-Moderation und Rechteentzug. Für die Chat-Schnittstellentests muss PS Chat
 als benachbartes Plugin installiert sein; es muss dafür nicht aktiviert werden.
 Auch diese Prüfung entfernt ausschließlich ihre eigenen Testdaten.
+
+`tests/play-rounds-integration.php` prüft zusätzlich den direkten Soloeinstieg:
+eigenen Charakter, sofortigen Spielbeginn, gespeicherte Aktionen, doppelte
+Absendeversuche, bereits belegte Charaktere und vollständige Rücknahme bei
+veraltetem Bogen oder fehlgeschlagener Durchlauf-Veröffentlichung.
+Der Test prüft außerdem Freundesgruppen: bestätigte statt ausstehender
+Freundschaften, beidseitige Blockierungen, Annahme/Ablehnung und Zurückziehen,
+Kampagnenfreigaben, universumsfremde Figuren trotz identischer Regeln,
+Besitzer-/Revisionsprüfung, atomare Rücknahme samt Kampagneneinladung sowie
+gemeinsamen Start und vorbereitete NPC-Reaktionen. PS Community muss hierfür
+als benachbartes Plugin installiert, aber nicht aktiviert sein.
+`node tests/chat-ui.js` prüft die Ansichtskontexte beider Chat-Transporte;
+fremde Domains und nicht zugehörige Anfragen erhalten keinen solchen Header.
 
 `tests/access-integration.php` prüft geschlossene Standardwerte, die ausdrückliche
 Teaserfreigabe ohne interne Daten, Anträge und Spielleiterentscheidungen,

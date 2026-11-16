@@ -15,6 +15,7 @@ ps_pen_paper_register_adventure_types();
 ps_pen_paper_register_item_type();
 ps_pen_paper_register_loot_types();
 ps_pen_paper_register_folio_type();
+ps_pen_paper_register_npc_type();
 
 $original_user = get_current_user_id();
 $users = array();
@@ -911,10 +912,17 @@ try {
 				'npcs' => array(), 'confirmation' => 'confirmed' ) );
 		$check( true === ps_pen_paper_save_adventure_world( $campaign, $world_id, $world_input, '1' ), 'World definitions failed.' );
 		$world_state = ps_pen_paper_get_adventure( $campaign, $world_id ); $state_id = $world_state['draft']['states'][0]['id'];
+		$npc_input = array( 'kind' => 'npc', 'name' => 'Gate keeper', 'description' => 'A prepared keeper',
+			'secret' => 'KEEPER_PRIVATE_SECRET', 'scene_id' => '0', 'properties' => '', 'values' => 'Attention | 10' );
+		$keeper_id = ps_pen_paper_save_npc( $campaign, 0, $npc_input, '0' );
+		$check( is_int( $keeper_id ), 'Prepared keeper fixture failed.' );
 		$world_edge = array( 'from_scene' => (string) $scenes['START_ORIGINAL'], 'choice' => 'Open gate', 'expression' => '',
 			'attribute' => '', 'threshold' => '0', 'success_scene' => (string) $scenes['SUCCESS_SCENE'], 'failure_scene' => '0',
 			'items' => array( 'mode' => 'all', 'rows' => array( array( 'item_id' => (string) $world_key, 'minimum' => '1' ) ) ),
-			'effects' => array( array( 'state' => $state_id, 'value' => 'open', 'when' => 'decision' ) ) );
+			'effects' => array( array( 'state' => $state_id, 'value' => 'spoken', 'when' => 'decision' ) ),
+			'reaction' => array( 'npc' => $keeper_id . ':1:0', 'expression' => '1W6', 'threshold' => '11', 'when' => 'success',
+				'success_text' => 'The keeper opens the gate.', 'failure_text' => 'The keeper waits.', 'confirmation' => 'confirmed',
+				'effects' => array( array( 'state' => $state_id, 'value' => 'open', 'when' => 'success' ) ) ) );
 		$check( true === ps_pen_paper_save_adventure_edge( $campaign, $world_id, $world_edge, '2' ), 'World decision failed.' );
 		$world_finish = array( 'from_scene' => (string) $scenes['SUCCESS_SCENE'], 'choice' => 'Pass gate', 'expression' => '',
 			'attribute' => '', 'threshold' => '0', 'success_scene' => '0', 'failure_scene' => '0',
@@ -922,6 +930,8 @@ try {
 		$check( true === ps_pen_paper_save_adventure_edge( $campaign, $world_id, $world_finish, '3' ) &&
 			true === ps_pen_paper_publish_adventure( $campaign, $world_id, '4', 'confirmed' ), 'World publication failed.' );
 		$world_state = ps_pen_paper_get_adventure( $campaign, $world_id ); $world_edge_id = $world_state['published']['edges'][0]['id'];
+		$npc_input['name'] = 'Changed keeper'; $npc_input['values'] = 'Attention | -100';
+		$check( $keeper_id === ps_pen_paper_save_npc( $campaign, $keeper_id, $npc_input, '1' ), 'Keeper edit failed.' );
 		$bad_world = $world_state['published']; $bad_world['encounters'][0]['phases'] = array_reverse( $bad_world['encounters'][0]['phases'] );
 		$check( ! ps_pen_paper_valid_adventure_publication( $bad_world ), 'Disconnected encounter phases accepted.' );
 		$bad_world = $world_state['published']; $bad_world['edges'][0]['effects'] = 'invalid';
@@ -942,8 +952,15 @@ try {
 		$check( true === ps_pen_paper_advance_adventure_run( $campaign, $world_run, $world_edge_id, '1' ), 'Approved item did not permit world choice.' );
 		$world_after = get_post_meta( $world_run, '_pspp_adventure_run', true );
 		$check( ps_pen_paper_valid_adventure_run( $world_after ) && 1 === $world_after['history'][0]['items']['rows'][0]['count'] &&
-			'closed' === $world_after['history'][0]['effects'][0]['before'] && 'open' === $world_after['history'][0]['effects'][0]['after'] &&
+			'closed' === $world_after['history'][0]['effects'][0]['before'] && 'spoken' === $world_after['history'][0]['effects'][0]['after'] &&
+			'spoken' === $world_after['history'][0]['reaction']['effects'][0]['before'] &&
+			'open' === $world_after['history'][0]['reaction']['effects'][0]['after'] &&
+			'Gate keeper' === $world_after['history'][0]['reaction']['name'] &&
+			true === $world_after['history'][0]['reaction']['success'] &&
+			false === strpos( wp_json_encode( $world_after['snapshot'] ), 'KEEPER_PRIVATE_SECRET' ) &&
 			'closed' === ps_pen_paper_adventure_state_values( $world_after['snapshot'], array() )[ $state_id ], 'World receipts or run isolation failed.' );
+		$forged_world = $world_after; $forged_world['history'][0]['reaction']['effects'][0]['before'] = 'closed';
+		$check( ! ps_pen_paper_valid_adventure_run( $forged_world ), 'Forged NPC reaction state transition accepted.' );
 		$forged_world = $world_after; $forged_world['history'][0]['effects'][0]['before'] = 'open';
 		$check( ! ps_pen_paper_valid_adventure_run( $forged_world ), 'Forged prior state accepted.' );
 		$check( true === ps_pen_paper_advance_adventure_run( $campaign, $world_run, $world_state['published']['edges'][1]['id'], '2' ), 'State-conditioned continuation failed.' );

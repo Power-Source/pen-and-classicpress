@@ -45,23 +45,23 @@ function ps_pen_paper_lounge_universe_id( $data ) {
 	return $data['universes'] ? (int) array_key_first( $data['universes'] ) : 0;
 }
 
-function ps_pen_paper_lounge_running_adventures( $campaign ) {
+function ps_pen_paper_lounge_running_adventures( $campaign, $player_view = false ) {
 	$result = array();
 	$rounds = ps_pen_paper_play_rounds( $campaign );
 	if ( is_wp_error( $rounds ) ) { return $rounds; }
 	foreach ( $rounds as $row ) {
 		$state = $row['state'];
 		if ( 'completed' === $state['status'] || ( ! ps_pen_paper_play_participant( $state, get_current_user_id() ) &&
-			$state['host_id'] !== get_current_user_id() && 'gm' !== ps_pen_paper_campaign_role( $campaign, get_current_user_id() ) ) ) { continue; }
+			$state['host_id'] !== get_current_user_id() && ( $player_view || 'gm' !== ps_pen_paper_campaign_role( $campaign, get_current_user_id() ) ) ) ) { continue; }
 		$result[] = array( 'round_id' => (int) $row['post']->ID, 'title' => $row['post']->post_title,
 			'mode' => ps_pen_paper_play_modes()[ $state['mode'] ], 'status' => ps_pen_paper_play_statuses()[ $state['status'] ] );
 	}
-	$groups = ps_pen_paper_adventure_group_records( $campaign );
+	$groups = ps_pen_paper_adventure_group_records( $campaign, $player_view );
 	if ( is_wp_error( $groups ) ) { return $groups; }
 	foreach ( $groups as $id => $record ) {
 		if ( 'completed' === $record['status'] || ! $record['state'] ) { continue; }
 		$member = ps_pen_paper_adventure_group_member( $campaign, $record['state'], get_current_user_id() );
-		$leading = 'gm' === ps_pen_paper_campaign_role( $campaign, get_current_user_id() ) && ps_pen_paper_adventure_group_electorate( $record['state'] );
+		$leading = ! $player_view && 'gm' === ps_pen_paper_campaign_role( $campaign, get_current_user_id() ) && ps_pen_paper_adventure_group_electorate( $record['state'] );
 		if ( ! $member && ! $leading ) { continue; }
 		$result[] = array( 'title' => $record['title'], 'character_id' => 0, 'anchor' => 'pspp-adventure-group-' . $id,
 			'mode' => __( 'Automatische Gruppe', 'ps-pen-paper' ), 'paused' => 'paused' === $record['status'] );
@@ -188,7 +188,7 @@ function ps_pen_paper_render_lounge( $page_id, $data, $universe_id ) {
 				<?php $found = false;
 				foreach ( $data['campaigns'] as $row ) :
 					if ( '1' === get_post_meta( $row['post']->ID, '_pspp_archived', true ) ) { continue; }
-					$runs = ps_pen_paper_lounge_running_adventures( $row['post'] );
+					$runs = ps_pen_paper_lounge_running_adventures( $row['post'], true );
 					if ( is_wp_error( $runs ) ) { echo '<li role="alert">' . esc_html( $runs->get_error_message() ) . '</li>'; continue; }
 					if ( ! $row['role'] && ! $runs ) { continue; }
 					$found = true; $campaign = $row['post'];
@@ -216,7 +216,7 @@ function ps_pen_paper_render_lounge( $page_id, $data, $universe_id ) {
 				</div></details>
 			<?php endif; ?>
 		</section>
-		<section id="pspp-lounge-invitations"><?php ps_pen_paper_render_profile_invitations( $page_id ); ?></section>
+		<section id="pspp-lounge-invitations"><?php ps_pen_paper_render_profile_invitations( $page_id ); ps_pen_paper_render_friend_round_offers( $data, $page_id ); ?></section>
 	</section>
 	<?php
 }

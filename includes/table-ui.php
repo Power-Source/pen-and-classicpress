@@ -186,7 +186,7 @@ function ps_pen_paper_render_table( $campaign, $page_id, $character_id ) {
 			</div>
 			<noscript><p><?php esc_html_e( 'Ohne JavaScript stehen die Bereiche untereinander zur Verfügung. Anwesenheit und Zugsteuerung benötigen JavaScript.', 'ps-pen-paper' ); ?></p></noscript>
 		<?php endif; ?>
-		<?php ps_pen_paper_render_chat( $campaign ); ?>
+		<?php ps_pen_paper_render_chat( $campaign, $page_id ); ?>
 	</div>
 	<?php
 }

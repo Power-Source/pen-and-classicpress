@@ -194,6 +194,7 @@ function ps_pen_paper_render_adventure_groups( $campaign, $page_id ) {
 							}
 							if ( array_key_exists( 'reward', $decision ) ) { $detail .= ' · ' . ps_pen_paper_adventure_reward_history_label( $group['snapshot'], $decision ); }
 						}
+						if ( isset( $decision['reaction'] ) ) { $detail .= ' · ' . ps_pen_paper_adventure_reaction_label( $decision['reaction'] ); }
 						echo esc_html( $detail );
 					?></li>
 				<?php endforeach; ?></ol><?php endif; ?>

@@ -41,6 +41,11 @@ function ps_pen_paper_change_member_invitation( $scope_id, $user_id, $operation,
 		return new WP_Error( 'forbidden', __( 'Diese Einladung ist nicht verfügbar.', 'ps-pen-paper' ) );
 	}
 	return ps_pen_paper_atomic_event( $scope_id, function () use ( $scope_id, $user_id, $operation, $revision ) {
+		return ps_pen_paper_write_member_invitation( $scope_id, $user_id, $operation, $revision );
+	} );
+}
+
+function ps_pen_paper_write_member_invitation( $scope_id, $user_id, $operation, $revision ) {
 		$scope = ps_pen_paper_get_character_scope( $scope_id );
 		$user = ps_pen_paper_site_user( $user_id );
 		if ( ! $scope || ! ps_pen_paper_can_access_site() || ! $user || ! user_can( $user, 'read' ) ) { return new WP_Error( 'forbidden', __( 'Diese Website-Person ist nicht verfügbar.', 'ps-pen-paper' ) ); }
@@ -110,7 +115,6 @@ function ps_pen_paper_change_member_invitation( $scope_id, $user_id, $operation,
 		if ( ! ps_pen_paper_valid_member_invitations( $after ) ) { return new WP_Error( 'invitation_limit', __( 'Es können höchstens 500 Einladungen offen sein.', 'ps-pen-paper' ) ); }
 		return ps_pen_paper_write_document_event( $scope_id, $scope_id, '_pspp_member_invitations', $before, $after,
 			array( 'kind' => 'member_invitation_saved', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0 ), false );
-	} );
 }
 
 function ps_pen_paper_profile_invitations() {

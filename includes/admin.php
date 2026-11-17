@@ -28,7 +28,7 @@ function ps_pen_paper_enqueue_admin_assets( $hook ) {
 	}
 	$url = plugin_dir_url( dirname( __DIR__ ) . '/ps-pen-paper.php' );
 	wp_enqueue_style( 'ps-pen-paper-admin', $url . 'assets/admin.css', array(), '0.7.0' );
-	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.9.3' );
+	wp_enqueue_style( 'ps-pen-paper-game', $url . 'assets/frontend.css', array(), '0.29.6' );
 	wp_enqueue_script( 'ps-pen-paper-admin', $url . 'assets/admin.js', array(), '0.26.0', true );
 	wp_enqueue_script( 'ps-pen-paper-style', $url . 'assets/styles.js', array(), '0.7.0', true );
 	wp_enqueue_script( 'ps-pen-paper-dice', $url . 'assets/dice.js', array( 'ps-pen-paper-admin' ), '0.7.0', true );
@@ -461,7 +461,7 @@ function ps_pen_paper_render_admin_page() {
 		<?php elseif ( isset( $_GET['page'] ) && 'ps-pen-paper-characters' === $_GET['page'] ) : ?>
 			<div class="pspp-game"><?php ps_pen_paper_render_character_library(); ?></div>
 		<?php elseif ( isset( $_GET['page'] ) && 'ps-pen-paper-settings' === $_GET['page'] ) : ?>
-			<?php ps_pen_paper_render_settings_directory(); ?>
+			<div class="pspp-game"><?php ps_pen_paper_render_settings_directory(); ?></div>
 			<?php ps_pen_paper_render_creator_permissions(); ?>
 		<?php else : ?>
 			<div class="pspp-game"><?php ps_pen_paper_render_dashboard(); ?></div>

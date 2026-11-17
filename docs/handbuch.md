@@ -289,8 +289,13 @@ Im Backend unter **Pen & Paper** und im Frontend nach dem Wechsel zu **Spielleit
 - **Universen:** Welten, Regelvorlagen und Basisbögen verwalten; Kampagnen zuordnen.
 - **Kampagnen:** Runde wählen oder mit Erstellberechtigung im Backend und Frontend anlegen.
 - **Charakterverwaltung:** eigene und als Spielleitung verwaltbare Bögen finden.
-- **Einstellungen:** verwaltbare Runde wählen; Zugang, Anfragen, Bilder und Farben
-  direkt im Frontend ändern. Globale Erstellberechtigungen bleiben im Backend.
+- **Einstellungen:** Universum aufklappen und dessen Welt, Farben,
+  Charaktervorgaben sowie Währung und Handel verwalten. Unter
+  **Kampagneneinstellungen** eine zugehörige Kampagne auswählen und öffnen;
+  dort liegen ihr Zugang, Anfragen und Bilder. Je nach Berechtigung sind nur
+  Kampagneneinstellungen verfügbar. Ältere unzugeordnete Kampagnen erscheinen
+  gesondert zur ausdrücklichen Zuordnung. Globale Erstellberechtigungen bleiben
+  im Backend.
 
 ### Universum anlegen und Kampagnen zuordnen
 

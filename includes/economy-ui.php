@@ -15,6 +15,7 @@ function ps_pen_paper_handle_economy_action( $operation ) {
 		$result = ps_pen_paper_save_currency( $scope, isset( $_POST['currency'] ) ? wp_unslash( $_POST['currency'] ) : null, ps_pen_paper_posted_text( 'currency_revision' ) );
 		$url = 'pspp_universe' === $scope->post_type ? ps_pen_paper_universe_url( $id, $page_id ) : ( $page_id ? ps_pen_paper_game_url( $page_id, $id ) : ps_pen_paper_admin_url( $id ) );
 		$url .= '#pspp-settings';
+		if ( 'pspp_universe' === $scope->post_type ) { $url = ps_pen_paper_settings_return_url( $id, $page_id, 'economy' ) ?: $url; }
 	} else {
 		$character_id = ps_pen_paper_posted_id( 'character_id' );
 		if ( 'confirmed' !== ps_pen_paper_posted_text( 'wallet_confirmation' ) ) { ps_pen_paper_fail( __( 'Bitte bestätige die Guthabenbuchung ausdrücklich.', 'ps-pen-paper' ) ); }

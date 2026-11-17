@@ -59,6 +59,9 @@ function ps_pen_paper_handle_character_policy_action( $operation ) {
 	if ( 'member_invitation' === $operation && $page_id && in_array( $decision, array( 'accept', 'decline' ), true ) ) {
 		$return_url = ps_pen_paper_game_url( $page_id ) . '#pspp-lounge-invitations';
 	}
+	$settings_return = in_array( $operation, array( 'save_character_policy', 'upload_portrait_preset', 'member_invitation' ), true )
+		? ps_pen_paper_settings_return_url( $id, $page_id, 'characters' ) : '';
+	if ( $settings_return ) { $return_url = $settings_return; }
 	wp_safe_redirect( add_query_arg( 'pspp_notice', $notice, $profile_url ?: $return_url ) );
 	exit;
 }

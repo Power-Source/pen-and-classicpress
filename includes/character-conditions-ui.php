@@ -74,6 +74,9 @@ function ps_pen_paper_handle_condition_action( $operation, $page_id, $scope_id )
 	}
 	if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
 	$url = 'pspp_universe' === $scope->post_type ? ps_pen_paper_universe_url( $scope->ID, $page_id ) : ps_pen_paper_game_url( $page_id, $scope->ID );
+	if ( 'save_condition_policy' === $operation && 'pspp_universe' === $scope->post_type ) {
+		$url = ps_pen_paper_settings_return_url( $scope_id, $page_id, 'conditions' ) ?: $url;
+	}
 	wp_safe_redirect( $url ); exit;
 }
 
@@ -97,13 +100,13 @@ function ps_pen_paper_render_condition_row( $index, $definition, $rules ) {
 	<?php
 }
 
-function ps_pen_paper_render_condition_policy( $scope, $page_id ) {
+function ps_pen_paper_render_condition_policy( $scope, $page_id, $open = false ) {
 	$owner = ps_pen_paper_condition_scope( $scope ); $policy = ps_pen_paper_condition_policy( $scope );
 	if ( is_wp_error( $owner ) || is_wp_error( $policy ) ) { echo '<p role="alert">' . esc_html( is_wp_error( $owner ) ? $owner->get_error_message() : $policy->get_error_message() ) . '</p>'; return; }
 	if ( (int) $owner->ID !== (int) $scope->ID || ! ps_pen_paper_can_manage_character_scope( $owner ) ) { return; }
 	$rules = ps_pen_paper_get_rules( $owner->ID );
 	?>
-	<details class="pspp-fold"><summary><?php esc_html_e( 'Charakterzustände, Verletzung und Tod selbst regeln', 'ps-pen-paper' ); ?></summary>
+	<details class="pspp-fold" <?php if ( $open ) { echo 'open'; } ?>><summary><?php esc_html_e( 'Charakterzustände, Verletzung und Tod selbst regeln', 'ps-pen-paper' ); ?></summary>
 	<p><?php esc_html_e( 'Es gibt keine fest eingebaute Todesregel. Namen, Auswirkungen, Rettung und Wiederbelebung bestimmst du. Abenteuererfolg und Charakterzustand sind unabhängig. Keine Figur wird durch einen Zustand gelöscht.', 'ps-pen-paper' ); ?></p>
 	<?php ps_pen_paper_form_start( 'save_condition_policy', 'pspp_campaign_' . $owner->ID, $owner->ID, $page_id ); ?>
 		<input type="hidden" name="condition_revision" value="<?php echo esc_attr( $policy['revision'] ); ?>">

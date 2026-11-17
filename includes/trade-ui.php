@@ -14,6 +14,7 @@ function ps_pen_paper_handle_trade_action( $operation ) {
 		$result = ps_pen_paper_save_trade_policy( $scope, $input, ps_pen_paper_posted_text( 'trade_policy_revision' ) );
 		$url = 'pspp_universe' === $scope->post_type ? ps_pen_paper_universe_url( $id, $page_id ) : ( $page_id ? ps_pen_paper_game_url( $page_id, $id ) : ps_pen_paper_admin_url( $id ) );
 		$url .= '#pspp-settings';
+		if ( 'pspp_universe' === $scope->post_type ) { $url = ps_pen_paper_settings_return_url( $id, $page_id, 'economy' ) ?: $url; }
 	} else {
 		if ( 'pspp_campaign' !== $scope->post_type || ! ps_pen_paper_get_character( $scope, $character_id ) || 'confirmed' !== ps_pen_paper_posted_text( 'trade_confirmation' ) ) { ps_pen_paper_fail( ps_pen_paper_trade_error()->get_error_message() ); }
 		$items = isset( $_POST['trade_items'] ) ? wp_unslash( $_POST['trade_items'] ) : ps_pen_paper_posted_text( 'trade_item' );

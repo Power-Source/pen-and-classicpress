@@ -201,6 +201,7 @@ function ps_pen_paper_handle_universe_style_action() {
 	if ( 'complete' !== ps_pen_paper_posted_text( 'style_complete' ) ) { ps_pen_paper_fail( __( 'Das Formular wurde nicht vollständig übertragen.', 'ps-pen-paper' ) ); }
 	$result = ps_pen_paper_save_style( $id, isset( $_POST['style_colors'] ) ? wp_unslash( $_POST['style_colors'] ) : null, ps_pen_paper_posted_text( 'style_revision' ) );
 	if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
-	wp_safe_redirect( add_query_arg( 'pspp_notice', 'style_saved', ps_pen_paper_dashboard_url( 'universes', $page_id ) ) );
+	$return_url = ps_pen_paper_settings_return_url( $id, $page_id, 'style' );
+	wp_safe_redirect( add_query_arg( 'pspp_notice', 'style_saved', $return_url ?: ps_pen_paper_dashboard_url( 'universes', $page_id ) ) );
 	exit;
 }

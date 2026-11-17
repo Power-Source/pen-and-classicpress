@@ -30,13 +30,43 @@ function ps_pen_paper_handle_economy_action( $operation ) {
 }
 
 function ps_pen_paper_render_currency_settings( $scope, $page_id ) {
-	if ( ! ps_pen_paper_community_available() || ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_character_scope( $scope ) ) { return; }
+	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_character_scope( $scope ) ) { return; }
 	$source = ps_pen_paper_currency_scope( $scope );
 	$currency = is_wp_error( $source ) ? $source : ps_pen_paper_currency_document( $source->ID );
 	?>
 	<section class="pspp-currency-settings">
 	<h3><?php esc_html_e( 'Währung & Guthaben', 'ps-pen-paper' ); ?></h3>
-	<?php if ( is_wp_error( $currency ) ) { echo '<p role="alert">' . esc_html( $currency->get_error_message() ) . '</p></section>'; return; }
+	<?php if ( 'pspp_campaign' === $scope->post_type && ! metadata_exists( 'post', $scope->ID, '_pspp_play_round' ) ) :
+		$link = ps_pen_paper_get_universe_link( $scope->ID );
+		$world = ! is_wp_error( $link ) && isset( $link['rules_base'] ) ? ps_pen_paper_get_universe( $link['universe_id'] ) : null;
+		$world_document = $world ? ps_pen_paper_universe_document( $world->ID ) : null;
+		if ( is_wp_error( $link ) || is_wp_error( $world_document ) ) :
+			echo '<p role="alert">' . esc_html( is_wp_error( $link ) ? $link->get_error_message() : $world_document->get_error_message() ) . '</p>';
+		elseif ( $world ) :
+			$local = 'local' === ( $link['economy_mode'] ?? 'universe' );
+			$flexible = ps_pen_paper_inheritance_allows( ps_pen_paper_get_rules( $world->ID ), 'economy' );
+			if ( $flexible || $local ) :
+				ps_pen_paper_form_start( 'link_universe', 'pspp_universe_link_' . $scope->ID, $scope->ID, $page_id ); ?>
+				<input type="hidden" name="universe_id" value="<?php echo esc_attr( $world->ID ); ?>">
+				<input type="hidden" name="universe_revision" value="<?php echo esc_attr( $world_document['revision'] ); ?>">
+				<input type="hidden" name="link_revision" value="<?php echo esc_attr( $link['revision'] ); ?>">
+				<input type="hidden" name="economy_mode" value="<?php echo $local ? 'universe' : 'local'; ?>">
+				<input type="hidden" name="economy_return" value="campaign">
+				<p><?php esc_html_e( 'Beim Wechsel werden keine Guthaben übertragen oder umgerechnet. Bestehende Konten, gemeinsame Basisbögen und offene Handelsangebote können den Wechsel sperren.', 'ps-pen-paper' ); ?></p>
+				<label class="pspp-check"><input type="checkbox" name="link_confirmation" value="confirmed" required><?php echo esc_html( $local ? __( 'Universumswirtschaft wieder verwenden', 'ps-pen-paper' ) : __( 'Eigene Kampagnenwirtschaft verwenden; vorhandene lokale Vorlagen bleiben erhalten', 'ps-pen-paper' ) ); ?></label>
+				<button type="submit"><?php esc_html_e( 'Wirtschaftszuordnung ändern', 'ps-pen-paper' ); ?></button>
+				</form>
+			<?php endif;
+		endif;
+	endif; ?>
+	<?php if ( ! ps_pen_paper_community_available() ) { echo '<p>' . esc_html__( 'Währung und Handelsänderungen benötigen aktives PS Community.', 'ps-pen-paper' ) . '</p></section>'; return; }
+	if ( is_wp_error( $currency ) ) { echo '<p role="alert">' . esc_html( $currency->get_error_message() ) . '</p></section>'; return; }
+	$editable = ps_pen_paper_require_campaign_economy_edit( $scope );
+	if ( is_wp_error( $editable ) ) {
+		echo '<p role="alert">' . esc_html( $editable->get_error_message() ) . '</p>';
+		echo '<p>' . esc_html( $currency['name'] . ' (' . $currency['symbol'] . ')' ) . '</p></section>';
+		return;
+	}
 	if ( $source->ID !== $scope->ID ) : ?>
 		<p><?php echo esc_html( $currency['revision'] ? $currency['name'] . ' (' . $currency['symbol'] . ') · ' . ps_pen_paper_wallet_modes()[ $currency['wallet_mode'] ] : __( 'Die Universumsleitung hat noch keine Währung eingerichtet.', 'ps-pen-paper' ) ); ?></p>
 		<p><?php esc_html_e( 'Währung und Guthabenmodell stammen aus dem Universum. Getrennte Konten verwaltet die Kampagnenleitung; gemeinsame Konten ausschließlich die Universumsleitung.', 'ps-pen-paper' ); ?></p>
@@ -54,7 +84,7 @@ function ps_pen_paper_render_currency_settings( $scope, $page_id ) {
 			<?php endif; ?>
 			<p><?php echo esc_html( 'pspp_universe' === $scope->post_type
 				? __( 'Gemeinsame Konten benötigen gemeinsame Basisbögen und werden nur von der Universumsleitung bebucht. Bei getrennten Konten bucht die jeweilige Kampagnenleitung.', 'ps-pen-paper' )
-				: __( 'Diese Kampagne führt ihre Währung und Guthaben unabhängig. Bei einer späteren Universumszuordnung können die lokalen Währungs- und Handelsregeln ausdrücklich beibehalten werden. Eine Kontenübertragung oder Währungsumrechnung benötigt eine gesonderte Migration.', 'ps-pen-paper' ) ); ?></p>
+				: __( 'Diese Kampagne führt ihre Währung und Guthaben unabhängig. Bestehende Konten werden nicht übertragen oder in eine andere Währung umgerechnet.', 'ps-pen-paper' ) ); ?></p>
 			<p><?php esc_html_e( 'Nach der ersten Buchung bleibt das Guthabenmodell zum Schutz der Konten fest; Name und Kürzel bleiben änderbar.', 'ps-pen-paper' ); ?></p>
 			<button type="submit"><?php esc_html_e( 'Währungseinstellungen speichern', 'ps-pen-paper' ); ?></button>
 		</form>

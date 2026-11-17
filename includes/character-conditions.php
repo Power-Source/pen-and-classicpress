@@ -32,10 +32,21 @@ function ps_pen_paper_valid_character_conditions( $values ) {
 }
 
 function ps_pen_paper_valid_condition_policy( $policy ) {
-	return is_array( $policy ) && array_keys( ps_pen_paper_condition_policy_default() ) === array_keys( $policy ) &&
+	if ( ! is_array( $policy ) ) { return false; }
+	if ( array_key_exists( 'inherit', $policy ) ) {
+		if ( ! is_bool( $policy['inherit'] ) || empty( $policy['revision'] ) ) { return false; }
+		unset( $policy['inherit'] );
+	}
+	return array_keys( ps_pen_paper_condition_policy_default() ) === array_keys( $policy ) &&
 		is_int( $policy['revision'] ) && $policy['revision'] >= 0 && is_bool( $policy['campaign_local'] ) &&
 		is_bool( $policy['campaign_universe'] ) && is_bool( $policy['automatic'] ) && ps_pen_paper_valid_character_conditions( $policy['definitions'] ) &&
 		( $policy['revision'] > 0 || $policy === ps_pen_paper_condition_policy_default() );
+}
+
+function ps_pen_paper_condition_policy_document( $scope_id ) {
+	$policy = get_post_meta( $scope_id, '_pspp_condition_policy', true );
+	if ( '' === $policy ) { return ps_pen_paper_condition_policy_default(); }
+	return ps_pen_paper_valid_condition_policy( $policy ) ? $policy : ps_pen_paper_condition_error();
 }
 
 function ps_pen_paper_condition_scope( $scope ) {
@@ -51,9 +62,8 @@ function ps_pen_paper_condition_scope( $scope ) {
 function ps_pen_paper_condition_policy( $scope ) {
 	$owner = ps_pen_paper_condition_scope( $scope );
 	if ( is_wp_error( $owner ) ) { return $owner; }
-	$policy = get_post_meta( $owner->ID, '_pspp_condition_policy', true );
-	if ( '' === $policy ) { $policy = ps_pen_paper_condition_policy_default(); }
-	if ( ! ps_pen_paper_valid_condition_policy( $policy ) ) { return ps_pen_paper_condition_error(); }
+	$policy = ps_pen_paper_condition_policy_document( $owner->ID );
+	if ( is_wp_error( $policy ) ) { return $policy; }
 	if ( 'pspp_campaign' === $scope->post_type && metadata_exists( 'post', $scope->ID, '_pspp_play_round' ) &&
 		metadata_exists( 'post', $scope->ID, '_pspp_condition_policy' ) ) {
 		$round = ps_pen_paper_play_round( $scope->ID );
@@ -64,7 +74,40 @@ function ps_pen_paper_condition_policy( $scope ) {
 		}
 		return $snapshot;
 	}
+	if ( 'pspp_campaign' === $scope->post_type && (int) $owner->ID !== (int) $scope->ID &&
+		metadata_exists( 'post', $scope->ID, '_pspp_condition_policy' ) ) {
+		$link = ps_pen_paper_get_universe_link( $scope->ID );
+		if ( is_wp_error( $link ) ) { return $link; }
+		if ( isset( $link['rules_base'] ) ) {
+			$local = ps_pen_paper_condition_policy_document( $scope->ID );
+			if ( is_wp_error( $local ) ) { return $local; }
+			if ( empty( $local['inherit'] ) ) {
+				unset( $local['inherit'] );
+				foreach ( array( 'campaign_local', 'campaign_universe', 'automatic' ) as $permission ) {
+					$local[ $permission ] = $local[ $permission ] && $policy[ $permission ];
+				}
+				return $local;
+			}
+		}
+	}
 	return $policy;
+}
+
+function ps_pen_paper_check_condition_rules( $scope, $rules ) {
+	$policy = ps_pen_paper_condition_policy( $scope );
+	if ( is_wp_error( $policy ) ) { return $policy; }
+	$fields = array_column( $rules['fields'], null, 'id' );
+	foreach ( $policy['definitions'] as $definition ) {
+		foreach ( $definition['modifiers'] as $id => $amount ) {
+			if ( ! isset( $fields[ $id ] ) || ! in_array( $fields[ $id ]['type'], array( 'attribute', 'number' ), true ) ) {
+				return ps_pen_paper_condition_error( __( 'Eine Zustandsvorlage verwendet ein Feld, das im neuen Regelwerk fehlt oder einen anderen Typ hat. Passe zuerst die Zustandsvorlage an.', 'ps-pen-paper' ) );
+			}
+		}
+		if ( $definition['threshold'] && 'resource' !== ( $fields[ $definition['threshold']['resource'] ]['type'] ?? null ) ) {
+			return ps_pen_paper_condition_error( __( 'Eine Zustandsvorlage verwendet eine Ressource, die im neuen Regelwerk fehlt oder einen anderen Typ hat. Passe zuerst die Zustandsvorlage an.', 'ps-pen-paper' ) );
+		}
+	}
+	return true;
 }
 
 function ps_pen_paper_condition_context( $scope, $character ) {
@@ -167,21 +210,55 @@ function ps_pen_paper_apply_character_conditions( $scope, $character, $state ) {
 function ps_pen_paper_save_condition_policy( $scope, $policy, $revision ) {
 	$owner = ps_pen_paper_condition_scope( $scope );
 	if ( is_wp_error( $owner ) ) { return $owner; }
-	if ( (int) $owner->ID !== (int) $scope->ID || ! ps_pen_paper_can_manage_character_scope( $owner ) ) { return ps_pen_paper_condition_error(); }
-	return ps_pen_paper_scope_lock( $owner->ID, function () use ( $owner, $policy, $revision ) {
-		return ps_pen_paper_atomic_event( $owner->ID, function () use ( $owner, $policy, $revision ) {
-			$before = ps_pen_paper_condition_policy( $owner );
+	if ( ! ps_pen_paper_can_manage_character_scope( $scope ) ) { return ps_pen_paper_condition_error(); }
+	return ps_pen_paper_scope_lock( $owner->ID, function () use ( $owner, $scope, $policy, $revision ) {
+		return ps_pen_paper_atomic_event( $scope->ID, function () use ( $owner, $scope, $policy, $revision ) {
+			$local = (int) $owner->ID !== (int) $scope->ID;
+			if ( ! ps_pen_paper_can_manage_character_scope( $scope ) ) { return ps_pen_paper_condition_error(); }
+			if ( $local ) {
+				$link = ps_pen_paper_get_universe_link( $scope->ID );
+				if ( is_wp_error( $link ) ) { return $link; }
+				if ( ! isset( $link['rules_base'] ) || metadata_exists( 'post', $scope->ID, '_pspp_play_round' ) ||
+					! ps_pen_paper_inheritance_allows( ps_pen_paper_get_rules( $owner->ID ), 'conditions' ) ) { return ps_pen_paper_condition_error(); }
+			}
+			$before = ps_pen_paper_condition_policy_document( $scope->ID );
 			if ( is_wp_error( $before ) ) { return $before; }
 			if ( ! is_string( $revision ) || (string) $before['revision'] !== $revision || ! ps_pen_paper_valid_condition_policy( $policy ) ||
-				$policy['revision'] !== $before['revision'] + 1 ) { return ps_pen_paper_condition_error(); }
-			$fields = array_column( ps_pen_paper_get_rules( $owner->ID )['fields'], null, 'id' );
+				isset( $policy['inherit'] ) || $policy['revision'] !== $before['revision'] + 1 ) { return ps_pen_paper_condition_error(); }
+			if ( $local ) {
+				$world = ps_pen_paper_condition_policy_document( $owner->ID );
+				if ( is_wp_error( $world ) ) { return $world; }
+				foreach ( array( 'campaign_local', 'campaign_universe', 'automatic' ) as $permission ) {
+					if ( $policy[ $permission ] && ! $world[ $permission ] ) { return ps_pen_paper_condition_error(); }
+				}
+				$policy['inherit'] = false;
+			}
+			$fields = array_column( ps_pen_paper_get_rules( $scope->ID )['fields'], null, 'id' );
 			foreach ( $policy['definitions'] as $definition ) {
 				foreach ( $definition['modifiers'] as $id => $amount ) {
 					if ( ! isset( $fields[ $id ] ) || ! in_array( $fields[ $id ]['type'], array( 'attribute', 'number' ), true ) ) { return ps_pen_paper_condition_error(); }
 				}
 				if ( $definition['threshold'] && 'resource' !== ( $fields[ $definition['threshold']['resource'] ]['type'] ?? null ) ) { return ps_pen_paper_condition_error(); }
 			}
-			return ps_pen_paper_write_document_event( $owner->ID, $owner->ID, '_pspp_condition_policy', $before, $policy,
+			return ps_pen_paper_write_document_event( $scope->ID, $scope->ID, '_pspp_condition_policy', $before, $policy,
+				array( 'kind' => 'condition_policy_saved', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0 ), false );
+		} );
+	} );
+}
+
+function ps_pen_paper_reset_condition_policy( $scope, $revision ) {
+	$owner = ps_pen_paper_condition_scope( $scope );
+	if ( is_wp_error( $owner ) ) { return $owner; }
+	if ( (int) $owner->ID === (int) $scope->ID || ! ps_pen_paper_can_manage_character_scope( $scope ) ||
+		metadata_exists( 'post', $scope->ID, '_pspp_play_round' ) ) { return ps_pen_paper_condition_error(); }
+	return ps_pen_paper_scope_lock( $owner->ID, function () use ( $scope, $revision ) {
+		return ps_pen_paper_atomic_event( $scope->ID, function () use ( $scope, $revision ) {
+			if ( ! ps_pen_paper_can_manage_character_scope( $scope ) ) { return ps_pen_paper_condition_error(); }
+			$before = ps_pen_paper_condition_policy_document( $scope->ID );
+			if ( is_wp_error( $before ) ) { return $before; }
+			if ( ! is_string( $revision ) || (string) $before['revision'] !== $revision || ! $before['revision'] || ! empty( $before['inherit'] ) ) { return ps_pen_paper_condition_error(); }
+			$after = $before; $after['revision']++; $after['inherit'] = true;
+			return ps_pen_paper_write_document_event( $scope->ID, $scope->ID, '_pspp_condition_policy', $before, $after,
 				array( 'kind' => 'condition_policy_saved', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0 ), false );
 		} );
 	} );

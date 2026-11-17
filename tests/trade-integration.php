@@ -44,6 +44,12 @@ try {
 	wp_set_current_user( $users['gm'] ); $check( true === ps_pen_paper_save_trade_policy( $campaign, $policy, '0' ), 'Policy failed.' );
 	wp_set_current_user( $users['a'] ); $token = wp_generate_uuid4();
 	$trade = ps_pen_paper_offer_trade( $campaign, $a, $b, 'sale', $give, '5', '2', '1', $token ); $check( is_int( $trade ), 'Offer failed.' );
+	wp_set_current_user( $users['gm'] );
+	$target = ps_pen_paper_save_universe( 0, array( 'name' => 'Trade association target', 'description' => '' ), '0' );
+	$check( is_int( $target ), 'Trade association universe fixture failed.' ); $parents[] = $target;
+	$blocked = ps_pen_paper_preview_universe_link( $c, $target, 'local' );
+	$check( is_wp_error( $blocked ) && 'trades_in_use' === $blocked->get_error_code(), 'Open trade did not block a currency association change.' );
+	wp_set_current_user( $users['a'] );
 	$check( $trade === ps_pen_paper_offer_trade( $campaign, $a, $b, 'sale', $give, '5', '2', '1', $token ), 'Offer retry duplicated reservation.' );
 	$check( is_wp_error( ps_pen_paper_offer_trade( $campaign, $a, $b, 'gift', $give, '0', '2', '1', wp_generate_uuid4() ) ), 'Reserved item offered twice.' );
 	$check( is_wp_error( ps_pen_paper_save_gear( $campaign, $a, 'equip_items', array( 'slots' => array( 'hand' => $give ) ), '2' ) ), 'Reserved item equipped.' );

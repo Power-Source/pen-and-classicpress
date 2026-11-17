@@ -34,6 +34,10 @@ function ps_pen_paper_handle_universe_action( $operation ) {
 		ps_pen_paper_fail( $result->get_error_message() );
 	}
 	$return_url = 'save_universe' === $operation ? ps_pen_paper_settings_return_url( $id, $page_id, 'world' ) : '';
+	if ( 'link_universe' === $operation && 'campaign' === ps_pen_paper_posted_text( 'economy_return' ) ) {
+		$return_url = ( $page_id ? ps_pen_paper_game_url( $page_id, $campaign_id ) : ps_pen_paper_admin_url( $campaign_id ) ) . '#pspp-settings';
+		$notice = 'economy_linked';
+	}
 	wp_safe_redirect( add_query_arg( 'pspp_notice', $notice, $return_url ?: ps_pen_paper_dashboard_url( 'universes', $page_id ) ) );
 	exit;
 }

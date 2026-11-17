@@ -165,6 +165,83 @@ try {
 		$local_link === ps_pen_paper_get_universe_link( $local_campaign_id ) &&
 		22 === ps_pen_paper_wallet_context( $local_campaign, $local_character )['wallet']['balance'],
 		'A locally funded campaign lost its required universe or its account.' );
+	$inherit_world = $universes['campaign'];
+	$inherit_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => 'Inherited economy' ), true );
+	$check( is_int( $inherit_id ), 'Inherited economy fixture failed.' ); $parents[] = $inherit_id;
+	add_post_meta( $inherit_id, '_pspp_gm', (string) $users['world_gm'] );
+	$inherit_campaign = ps_pen_paper_get_campaign( $inherit_id );
+	$world_revision = (string) ps_pen_paper_universe_document( $inherit_world->ID )['revision'];
+	$check( ! is_wp_error( ps_pen_paper_save_universe_link( $inherit_id, $inherit_world->ID, '0', $world_revision, 'confirmed', 'universe', true ) ), 'Inherited economy link failed.' );
+	$check( is_wp_error( ps_pen_paper_save_universe_link( $inherit_id, $inherit_world->ID, '1', $world_revision, 'confirmed', 'local' ) ), 'Fixed economy accepted a local override.' );
+	$world_rules = ps_pen_paper_get_rules( $inherit_world->ID );
+	$world_input = ps_pen_paper_inheritance_rules_input( $world_rules );
+	$world_input['campaign_policy'] = array( 'extra_fields' => false, 'globals' => array( 'economy' ), 'fields' => array() );
+	$world_rules = ps_pen_paper_save_rules( $inherit_world->ID, $world_input, (string) $world_rules['revision'] );
+	$check( ! is_wp_error( $world_rules ), 'Economy delegation failed.' );
+	$link = ps_pen_paper_get_universe_link( $inherit_id );
+	wp_set_current_user( $users['gm'] );
+	ob_start(); ps_pen_paper_render_currency_settings( $inherit_campaign, 0 ); $economy_html = ob_get_clean();
+	$check( false !== strpos( $economy_html, 'name="economy_mode" value="local"' ) &&
+		false !== strpos( $economy_html, 'name="economy_return" value="campaign"' ), 'Campaign GM lacks the economy switch or its return destination.' );
+	$fail_copy = function ( $data, $postarr ) {
+		if ( isset( $postarr['ID'] ) && 'pspp_event' === $data['post_type'] && 'private' === $data['post_status'] ) {
+			$event = get_post_meta( $postarr['ID'], '_pspp_event', true );
+			if ( isset( $event['kind'] ) && 'currency_saved' === $event['kind'] ) { $data['post_status'] = 'draft'; }
+		}
+		return $data;
+	};
+	add_filter( 'wp_insert_post_data', $fail_copy, 10, 2 );
+	try {
+		$failed = ps_pen_paper_save_universe_link( $inherit_id, $inherit_world->ID, (string) $link['revision'], $world_revision, 'confirmed', 'local' );
+		$check( is_wp_error( $failed ) && $link === ps_pen_paper_get_universe_link( $inherit_id ) &&
+			! metadata_exists( 'post', $inherit_id, '_pspp_currency' ) && ! metadata_exists( 'post', $inherit_id, '_pspp_trade_policy' ),
+			'Failed local economy initialization left partial data.' );
+	} finally { remove_filter( 'wp_insert_post_data', $fail_copy, 10 ); }
+	$local = ps_pen_paper_save_universe_link( $inherit_id, $inherit_world->ID, (string) $link['revision'], $world_revision, 'confirmed', 'local' );
+	$currency = ps_pen_paper_currency_document( $inherit_id );
+	$trade = ps_pen_paper_trade_policy( $inherit_campaign );
+	$check( ! is_wp_error( $local ) && $local['rules_base'] === $link['rules_base'] &&
+		1 === $currency['revision'] && $currency['name'] === ps_pen_paper_currency_document( $inherit_world->ID )['name'] &&
+		$currency['currency_id'] !== ps_pen_paper_currency_document( $inherit_world->ID )['currency_id'] &&
+		'campaign' === $currency['wallet_mode'] && ! $currency['in_use'] &&
+		! is_wp_error( $trade ) && 1 === $trade['policy']['revision'] && empty( $trade['policy']['transfers'] ),
+		'Local economy was not safely initialized from universe settings.' );
+	$check( true === ps_pen_paper_save_currency( $inherit_campaign, array( 'name' => 'Local credits', 'symbol' => 'LC', 'wallet_mode' => 'campaign' ), '1' ) &&
+		true === ps_pen_paper_save_trade_policy( $inherit_campaign, array( 'kinds' => array( 'gift' ), 'approval' => '1' ), '1' ) &&
+		is_wp_error( ps_pen_paper_save_trade_policy( $inherit_campaign, array( 'kinds' => array( 'gift' ), 'transfers' => '1' ), '2' ) ),
+		'Delegated economy edits failed or expanded global transfers.' );
+	wp_set_current_user( $users['world_gm'] );
+	$world_input['campaign_policy']['globals'] = array();
+	$world_rules = ps_pen_paper_save_rules( $inherit_world->ID, $world_input, (string) $world_rules['revision'] );
+	$check( ! is_wp_error( $world_rules ), 'Economy delegation revocation failed.' );
+	wp_set_current_user( $users['gm'] );
+	$check( is_wp_error( ps_pen_paper_require_inherited_rules( $inherit_id ) ) &&
+		is_wp_error( ps_pen_paper_save_currency( $inherit_campaign, array( 'name' => 'Forbidden', 'symbol' => 'F', 'wallet_mode' => 'campaign' ), '2' ) ) &&
+		is_wp_error( ps_pen_paper_save_trade_policy( $inherit_campaign, array( 'kinds' => array( 'gift' ) ), '2' ) ),
+		'Revoked local economy remained editable or allowed new games.' );
+	ob_start(); ps_pen_paper_render_currency_settings( $inherit_campaign, 0 ); $economy_html = ob_get_clean();
+	ob_start(); ps_pen_paper_render_trade_policy( $inherit_campaign, 0 ); $trade_html = ob_get_clean();
+	$check( false !== strpos( $economy_html, 'name="economy_mode" value="universe"' ) &&
+		false === strpos( $economy_html, 'value="save_currency"' ) && false === strpos( $trade_html, 'value="save_trade_policy"' ) &&
+		false !== strpos( $economy_html, 'nicht mehr freigegeben' ) && false !== strpos( $trade_html, 'nicht mehr freigegeben' ),
+		'Revoked economy cannot be reset or still shows editable settings.' );
+	$reset = ps_pen_paper_save_universe_link( $inherit_id, $inherit_world->ID, (string) $local['revision'], $world_revision, 'confirmed', 'universe' );
+	$check( ! is_wp_error( $reset ) && 'Local credits' === ps_pen_paper_currency_document( $inherit_id )['name'] &&
+		true === ps_pen_paper_synchronize_inherited_rules( $inherit_campaign ), 'Reset deleted local documents or failed to resolve inheritance.' );
+	wp_set_current_user( $users['world_gm'] );
+	$world_input['campaign_policy']['globals'] = array( 'economy' );
+	$world_rules = ps_pen_paper_save_rules( $inherit_world->ID, $world_input, (string) $world_rules['revision'] );
+	$check( ! is_wp_error( $world_rules ), 'Restoring economy delegation failed.' );
+	$parked = wp_insert_post( array( 'post_type' => 'pspp_character', 'post_status' => 'draft', 'post_parent' => $inherit_id, 'post_author' => $users['player'], 'post_title' => 'Parked wallet fixture' ), true );
+	$check( is_int( $parked ), 'Parked wallet fixture failed.' );
+	update_post_meta( $parked, '_pspp_wallet', $local_wallet_before );
+	wp_set_current_user( $users['gm'] );
+	foreach ( array( 'draft', 'trash' ) as $status ) {
+		wp_update_post( array( 'ID' => $parked, 'post_status' => $status ) );
+		$blocked = ps_pen_paper_preview_universe_link( $inherit_id, $inherit_world->ID, 'local' );
+		$check( is_wp_error( $blocked ) && 'wallets_in_use' === $blocked->get_error_code(), 'A ' . $status . ' wallet did not block rescoping.' );
+	}
+	wp_delete_post( $parked, true );
 	delete_post_meta( $campaign->ID, '_pspp_player', (string) $users['player'] );
 	wp_set_current_user( $users['player'] );
 	$check( is_wp_error( ps_pen_paper_wallet_context( $campaign, $character_id ) ), 'Removed member retained wallet access.' );
@@ -172,7 +249,7 @@ try {
 } finally {
 	wp_set_current_user( $original_user );
 	foreach ( $parents as $parent ) {
-		foreach ( get_posts( array( 'post_type' => array( 'pspp_character', 'pspp_event' ), 'post_status' => array( 'private', 'draft' ), 'post_parent' => $parent, 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $id ) { wp_delete_post( $id, true ); }
+		foreach ( get_posts( array( 'post_type' => array( 'pspp_character', 'pspp_event' ), 'post_status' => array( 'private', 'draft', 'trash' ), 'post_parent' => $parent, 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $id ) { wp_delete_post( $id, true ); }
 		wp_delete_post( $parent, true );
 	}
 	foreach ( $users as $id ) { is_multisite() ? wpmu_delete_user( $id ) : wp_delete_user( $id ); }

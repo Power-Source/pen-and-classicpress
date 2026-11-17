@@ -33,6 +33,15 @@ function ps_pen_paper_currency_document( $scope_id ) {
 	return ps_pen_paper_valid_currency( $value ) ? $value : new WP_Error( 'invalid_currency', __( 'Die Währungseinstellungen sind beschädigt. Bitte informiere die Spielleitung.', 'ps-pen-paper' ) );
 }
 
+function ps_pen_paper_require_campaign_economy_edit( $scope ) {
+	if ( 'pspp_campaign' !== $scope->post_type || metadata_exists( 'post', $scope->ID, '_pspp_play_round' ) ) { return true; }
+	$source = ps_pen_paper_inheritance_source( $scope->ID );
+	if ( is_wp_error( $source ) ) { return $source; }
+	if ( ! $source || 'local' !== ( $source['link']['economy_mode'] ?? 'universe' ) ) { return true; }
+	return ps_pen_paper_inheritance_allows( $source['rules'], 'economy' ) ? true :
+		new WP_Error( 'fixed_universe_rule', __( 'Die Universumsleitung hat die eigene Kampagnenwirtschaft nicht mehr freigegeben. Bestehende Konten bleiben unverändert.', 'ps-pen-paper' ) );
+}
+
 function ps_pen_paper_save_currency( $scope, $input, $revision ) {
 	if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
 	if ( ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_character_scope( $scope ) ) {
@@ -42,9 +51,12 @@ function ps_pen_paper_save_currency( $scope, $input, $revision ) {
 		! is_string( $input['name'] ) || ! is_string( $input['symbol'] ) || ! is_string( $input['wallet_mode'] ) ) {
 		return new WP_Error( 'invalid_currency', __( 'Bitte übertrage Name, Kürzel und Guthabenmodell vollständig.', 'ps-pen-paper' ) );
 	}
+	return ps_pen_paper_with_inheritance_lock( $scope->ID, function () use ( $scope, $input, $revision ) {
 	return ps_pen_paper_atomic_event( $scope->ID, function () use ( $scope, $input, $revision ) {
 		$fresh = ps_pen_paper_get_character_scope( $scope->ID );
 		if ( ! $fresh || ! ps_pen_paper_can_manage_character_scope( $fresh ) ) { return new WP_Error( 'forbidden', __( 'Die Verwaltungsberechtigung ist nicht mehr gültig.', 'ps-pen-paper' ) ); }
+		$allowed = ps_pen_paper_require_campaign_economy_edit( $fresh );
+		if ( is_wp_error( $allowed ) ) { return $allowed; }
 		$source = ps_pen_paper_currency_scope( $fresh );
 		if ( is_wp_error( $source ) ) { return $source; }
 		if ( $source->ID !== $fresh->ID ) { return new WP_Error( 'universe_currency', __( 'Diese Kampagne verwendet die Währungseinstellungen ihres Universums.', 'ps-pen-paper' ) ); }
@@ -62,6 +74,7 @@ function ps_pen_paper_save_currency( $scope, $input, $revision ) {
 		}
 		return ps_pen_paper_write_document_event( $fresh->ID, $fresh->ID, '_pspp_currency', $before, $after,
 			array( 'kind' => 'currency_saved', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0 ), false );
+	} );
 	} );
 }
 
@@ -203,6 +216,6 @@ function ps_pen_paper_write_wallet_transfer( $payer, $payee, $units, $reason ) {
 }
 
 function ps_pen_paper_campaign_has_wallets( $campaign_id ) {
-	return (bool) get_posts( array( 'post_type' => 'pspp_character', 'post_status' => 'private', 'post_parent' => $campaign_id,
+	return (bool) get_posts( array( 'post_type' => 'pspp_character', 'post_status' => array( 'private', 'draft', 'pending', 'publish', 'future', 'trash' ), 'post_parent' => $campaign_id,
 		'posts_per_page' => 1, 'fields' => 'ids', 'meta_query' => array( array( 'key' => '_pspp_wallet', 'compare' => 'EXISTS' ) ) ) );
 }

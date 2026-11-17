@@ -121,6 +121,18 @@ function ps_pen_paper_preview_universe_link( $campaign_id, $universe_id, $econom
 		return $before;
 	}
 	$current_mode = isset( $before['economy_mode'] ) ? $before['economy_mode'] : 'universe';
+	$economy_change = isset( $before['rules_base'] ) && $before['universe_id'] === $universe_id && $current_mode !== $economy_mode;
+	if ( isset( $before['rules_base'] ) && $before['universe_id'] !== $universe_id ) {
+		return new WP_Error( 'rules_conflict', __( 'Eine Kampagne mit aktiver Regelvererbung kann nicht ohne Weiteres einem anderen Universum zugeordnet werden. Erstelle dafür eine neue Kampagne.', 'ps-pen-paper' ) );
+	}
+	if ( $economy_change && 'local' === $economy_mode ) {
+		$source = ps_pen_paper_get_rules( $universe_id );
+		if ( ! ps_pen_paper_inheritance_allows( $source, 'economy' ) ) {
+			return new WP_Error( 'fixed_universe_rule', __( 'Die Universumsleitung hat keine eigene Kampagnenwirtschaft freigegeben.', 'ps-pen-paper' ) );
+		}
+		$ready = ps_pen_paper_require_inherited_rules( $campaign_id );
+		if ( is_wp_error( $ready ) ) { return $ready; }
+	}
 	if ( ( $before['universe_id'] !== $universe_id || $current_mode !== $economy_mode ) && ps_pen_paper_has_shared_characters( $campaign_id ) ) {
 		return new WP_Error( 'context_in_use', __( 'Diese Kampagne nutzt gemeinsame Basisbögen. Führe sie im Kampagnenkontext zunächst ausdrücklich unabhängig weiter, bevor du die Universumszuordnung wechselst oder löst.', 'ps-pen-paper' ) );
 	}
@@ -128,12 +140,21 @@ function ps_pen_paper_preview_universe_link( $campaign_id, $universe_id, $econom
 		$currency_scope = ps_pen_paper_currency_scope( $campaign );
 		if ( is_wp_error( $currency_scope ) ) { return $currency_scope; }
 		if ( $currency_scope->ID !== $campaign->ID || ( $universe_id && 'local' !== $economy_mode ) ) {
-			return new WP_Error( 'wallets_in_use', __( 'Diese Kampagne hat bereits Guthabenkonten. Wähle „Lokale Währung und Handelsregeln behalten“, wenn die Konten zur Kampagne gehören. Die Übertragung bestehender Universumskonten oder die Umrechnung in eine andere Währung benötigt eine gesonderte Migration.', 'ps-pen-paper' ) );
+			return new WP_Error( 'wallets_in_use', __( 'Diese Kampagne hat bereits Guthabenkonten. Wähle „Lokale Währung und Handelsregeln behalten“, wenn die Konten zur Kampagne gehören. Bestehende Konten werden nicht übertragen oder in eine andere Währung umgerechnet.', 'ps-pen-paper' ) );
+		}
+	}
+	if ( $before['universe_id'] !== $universe_id || $current_mode !== $economy_mode ) {
+		$trades = ps_pen_paper_trade_records_internal( $campaign );
+		if ( is_wp_error( $trades ) ) { return $trades; }
+		foreach ( $trades as $trade ) {
+			if ( ps_pen_paper_trade_open( $trade ) ) {
+				return new WP_Error( 'trades_in_use', __( 'Offene Handelsangebote müssen vor dem Wechsel der Wirtschaftszuordnung abgeschlossen oder zurückgezogen werden.', 'ps-pen-paper' ) );
+			}
 		}
 	}
 	$documents = array( 0 => array( 'revision' => 0, 'name' => '' ) );
 	foreach ( array_unique( array( $before['universe_id'], $universe_id ) ) as $id ) {
-		if ( $id && ! ps_pen_paper_can_manage_universe( ps_pen_paper_get_universe( $id ) ) ) {
+		if ( $id && ! $economy_change && ! ps_pen_paper_can_manage_universe( ps_pen_paper_get_universe( $id ) ) ) {
 			return new WP_Error( 'forbidden', __( 'Du musst das bisherige und das gewählte Universum verwalten dürfen. Bei einer fehlenden Zuordnung wende dich an den Administrator.', 'ps-pen-paper' ) );
 		}
 		if ( $id ) {
@@ -141,15 +162,18 @@ function ps_pen_paper_preview_universe_link( $campaign_id, $universe_id, $econom
 			if ( is_wp_error( $documents[ $id ] ) ) {
 				return $documents[ $id ];
 			}
+			if ( $economy_change && ! ps_pen_paper_can_manage_universe( ps_pen_paper_get_universe( $id ) ) ) {
+				$documents[ $id ] = array_intersect_key( $documents[ $id ], array_flip( array( 'revision', 'name' ) ) );
+			}
 		}
 	}
 	return array( 'before' => $before, 'universe' => $documents[ $universe_id ], 'source_universe' => $documents[ $before['universe_id'] ], 'campaign' => $campaign, 'economy_mode' => $economy_mode );
 }
 
 function ps_pen_paper_save_universe_link( $campaign_id, $universe_id, $revision, $universe_revision, $confirmed, $economy_mode = 'universe', $copy_new_rules = false ) {
-	if ( $copy_new_rules ) {
-		return ps_pen_paper_scope_lock( $universe_id, function () use ( $campaign_id, $universe_id, $revision, $universe_revision, $confirmed, $economy_mode ) {
-			return ps_pen_paper_save_universe_link_locked( $campaign_id, $universe_id, $revision, $universe_revision, $confirmed, $economy_mode, true );
+	if ( $universe_id ) {
+		return ps_pen_paper_scope_lock( $universe_id, function () use ( $campaign_id, $universe_id, $revision, $universe_revision, $confirmed, $economy_mode, $copy_new_rules ) {
+			return ps_pen_paper_save_universe_link_locked( $campaign_id, $universe_id, $revision, $universe_revision, $confirmed, $economy_mode, $copy_new_rules );
 		} );
 	}
 	return ps_pen_paper_save_universe_link_locked( $campaign_id, $universe_id, $revision, $universe_revision, $confirmed, $economy_mode, false );
@@ -172,6 +196,7 @@ function ps_pen_paper_save_universe_link_locked( $campaign_id, $universe_id, $re
 		return new WP_Error( 'context_in_use', __( 'Diese Kampagne nutzt gemeinsame Basisbögen. Führe sie im Kampagnenkontext zunächst ausdrücklich unabhängig weiter, bevor du die Universumszuordnung wechselst oder löst.', 'ps-pen-paper' ) );
 	}
 	$after = array( 'revision' => $preview['before']['revision'] + 1, 'universe_id' => $universe_id, 'name' => $preview['universe']['name'] );
+	if ( isset( $preview['before']['rules_base'] ) && $preview['before']['universe_id'] === $universe_id ) { $after['rules_base'] = $preview['before']['rules_base']; }
 	if ( $universe_id && 'local' === $economy_mode ) { $after['economy_mode'] = 'local'; }
 	$result = ps_pen_paper_atomic_event( $campaign_id, function () use ( $campaign_id, $universe_id, $preview, $after, $economy_mode, $copy_new_rules ) {
 		$current = ps_pen_paper_preview_universe_link( $campaign_id, $universe_id, $economy_mode );
@@ -194,7 +219,13 @@ function ps_pen_paper_save_universe_link_locked( $campaign_id, $universe_id, $re
 		$link_event = ps_pen_paper_write_document_event( $campaign_id, $campaign_id, '_pspp_universe_link', $preview['before'], $after, array(
 			'kind' => 'universe_linked', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0,
 		), false );
-		if ( is_wp_error( $link_event ) || ! $copy_new_rules || 0 === $source['revision'] ) { return $link_event; }
+		if ( is_wp_error( $link_event ) ) { return $link_event; }
+		if ( isset( $preview['before']['rules_base'] ) && 'local' === $economy_mode &&
+			'local' !== ( $preview['before']['economy_mode'] ?? 'universe' ) ) {
+			$economy = ps_pen_paper_initialize_campaign_economy( $campaign_id, $universe_id );
+			if ( is_wp_error( $economy ) ) { return $economy; }
+		}
+		if ( ! $copy_new_rules || 0 === $source['revision'] ) { return $link_event; }
 		$before_rules = ps_pen_paper_get_rules( $campaign_id );
 		$source['revision'] = 1;
 		return ps_pen_paper_write_document_event( $campaign_id, $campaign_id, '_pspp_rules', $before_rules, $source, array(
@@ -202,4 +233,29 @@ function ps_pen_paper_save_universe_link_locked( $campaign_id, $universe_id, $re
 		), false );
 	} );
 	return is_wp_error( $result ) ? $result : ( $copy_new_rules ? ps_pen_paper_get_universe_link( $campaign_id ) : $after );
+}
+
+function ps_pen_paper_initialize_campaign_economy( $campaign_id, $universe_id ) {
+	if ( ! metadata_exists( 'post', $campaign_id, '_pspp_currency' ) ) {
+		$before = ps_pen_paper_currency_document( $campaign_id );
+		$currency = ps_pen_paper_currency_document( $universe_id );
+		if ( is_wp_error( $before ) || is_wp_error( $currency ) ) { return is_wp_error( $before ) ? $before : $currency; }
+		if ( $currency['revision'] ) {
+			$currency['revision'] = 1; $currency['currency_id'] = wp_generate_uuid4();
+			$currency['wallet_mode'] = 'campaign'; $currency['in_use'] = false;
+			$saved = ps_pen_paper_write_document_event( $campaign_id, $campaign_id, '_pspp_currency', $before, $currency,
+				array( 'kind' => 'currency_saved', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0 ), false );
+			if ( is_wp_error( $saved ) ) { return $saved; }
+		}
+	}
+	if ( ! metadata_exists( 'post', $campaign_id, '_pspp_trade_policy' ) ) {
+		$universe = ps_pen_paper_get_universe( $universe_id );
+		$trade = $universe ? ps_pen_paper_trade_policy( $universe ) : ps_pen_paper_trade_error();
+		if ( is_wp_error( $trade ) ) { return $trade; }
+		$before = ps_pen_paper_trade_policy_default(); $after = $trade['policy'];
+		$after['revision'] = 1; unset( $after['transfers'] );
+		return ps_pen_paper_write_document_event( $campaign_id, $campaign_id, '_pspp_trade_policy', $before, $after,
+			array( 'kind' => 'trade_policy', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0 ), false );
+	}
+	return 0;
 }

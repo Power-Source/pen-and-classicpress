@@ -84,7 +84,7 @@ function ps_pen_paper_handle_admin_action() {
 		ps_pen_paper_fail( __( 'Diese Aktion gehört nicht ins Charakterprofil. Öffne dafür die Game-Lounge oder die Spielverwaltung.', 'ps-pen-paper' ) );
 	}
 	$page_id = ps_pen_paper_posted_id( 'pspp_frontend_page' );
-	if ( in_array( $operation, array( 'create', 'update', 'save_rules', 'save_rules_migration', 'sync_inherited_rules', 'add_member', 'remove_member' ), true ) ) {
+	if ( in_array( $operation, array( 'create', 'update', 'save_rules', 'save_rules_migration', 'sync_inherited_rules', 'activate_legacy_inheritance', 'add_member', 'remove_member' ), true ) ) {
 		if ( ! ps_pen_paper_can_access_site() ) {
 			ps_pen_paper_fail( __( 'Du hast keinen Zugriff auf den Spielbereich dieser Website.', 'ps-pen-paper' ) );
 		}
@@ -114,7 +114,7 @@ function ps_pen_paper_handle_admin_action() {
 		wp_safe_redirect( ps_pen_paper_game_url( $page_id ) ); exit;
 	}
 	if ( 'save_universe_style' === $operation ) { ps_pen_paper_handle_universe_style_action(); }
-	if ( in_array( $operation, array( 'save_condition_policy', 'change_character_condition' ), true ) ) { ps_pen_paper_handle_condition_action( $operation, $page_id, $scope_id ); }
+	if ( in_array( $operation, array( 'save_condition_policy', 'reset_condition_policy', 'change_character_condition' ), true ) ) { ps_pen_paper_handle_condition_action( $operation, $page_id, $scope_id ); }
 	if ( in_array( $operation, array( 'profile_create_character', 'save_character_policy', 'member_invitation', 'upload_portrait_preset', 'select_portrait_preset', 'profile_portrait' ), true ) ) {
 		ps_pen_paper_handle_character_policy_action( $operation );
 	}
@@ -305,6 +305,12 @@ function ps_pen_paper_handle_admin_action() {
 		ps_pen_paper_redirect( 'style_saved', $campaign_id );
 	}
 
+	if ( 'activate_legacy_inheritance' === $operation ) {
+		$result = ps_pen_paper_activate_legacy_inheritance( $campaign_id, ps_pen_paper_posted_text( 'inheritance_preview_hash' ), ps_pen_paper_posted_text( 'inheritance_confirmation' ) );
+		if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
+		ps_pen_paper_redirect( 'rules_saved', $campaign_id, $page_id, 'pspp-rulebook' );
+	}
+
 	if ( 'sync_inherited_rules' === $operation ) {
 		$result = ps_pen_paper_synchronize_inherited_rules( $campaign );
 		if ( is_wp_error( $result ) && 'inheritance_migration_required' === $result->get_error_code() ) {
@@ -431,6 +437,7 @@ function ps_pen_paper_render_notice() {
 		'character_policy_saved' => __( 'Charaktervorgaben oder Porträt gespeichert.', 'ps-pen-paper' ),
 		'universe_saved' => __( 'Universum gespeichert.', 'ps-pen-paper' ),
 		'universe_linked' => __( 'Universumszuordnung gespeichert. Kampagnendaten und Rechte bleiben unverändert.', 'ps-pen-paper' ),
+		'economy_linked' => __( 'Wirtschaftszuordnung gespeichert. Guthaben wurden weder übertragen noch umgerechnet.', 'ps-pen-paper' ),
 		'context_saved' => __( 'Universumsvorlage, Basisbogen oder Kampagnenkontext gespeichert.', 'ps-pen-paper' ),
 		'scene_saved' => __( 'Szenenaktion gespeichert. Freigabe und Anzeige am Tisch sind getrennte Schritte.', 'ps-pen-paper' ),
 		'folio_saved' => __( 'Mappenaktion gespeichert. Nur ausdrücklich freigegebene Handouts sind für die Runde sichtbar.', 'ps-pen-paper' ),

@@ -12,7 +12,27 @@ function ps_pen_paper_inheritance_globals() {
 		'roll_visibilities' => __( 'Wurfsichtbarkeiten', 'ps-pen-paper' ),
 		'allocation' => __( 'Punkteverteilung', 'ps-pen-paper' ),
 		'progression' => __( 'Erfahrung und Stufen', 'ps-pen-paper' ),
+		'conditions' => __( 'Kampagnenabhängige Zustandsvorlagen', 'ps-pen-paper' ),
+		'economy' => __( 'Eigene Kampagnenwirtschaft und Handelsregeln', 'ps-pen-paper' ),
 	);
+}
+
+function ps_pen_paper_inheritance_allows( $rules, $key ) {
+	return in_array( $key, $rules['campaign_policy']['globals'] ?? array(), true );
+}
+
+function ps_pen_paper_inheritance_area_conflict( $campaign_id, $source ) {
+	$link = ps_pen_paper_get_universe_link( $campaign_id );
+	if ( is_wp_error( $link ) ) { return $link; }
+	if ( 'local' === ( $link['economy_mode'] ?? 'universe' ) && ! ps_pen_paper_inheritance_allows( $source, 'economy' ) ) {
+		return new WP_Error( 'inheritance_economy_conflict', __( 'Die Kampagne verwendet eine eigene Wirtschaft, die das Universum nicht mehr freigibt. Kläre die Konten und stelle die Universumswirtschaft wieder ein oder bitte die Universumsleitung um Freigabe.', 'ps-pen-paper' ) );
+	}
+	$local = get_post_meta( $campaign_id, '_pspp_condition_policy', true );
+	if ( '' !== $local && ( ! ps_pen_paper_valid_condition_policy( $local ) ||
+		( empty( $local['inherit'] ) && ! ps_pen_paper_inheritance_allows( $source, 'conditions' ) ) ) ) {
+		return new WP_Error( 'inheritance_condition_conflict', __( 'Die Kampagne hat eigene Zustandsvorlagen, die das Universum nicht mehr freigibt. Setze sie ausdrücklich auf die Universumsvorgaben zurück oder bitte die Universumsleitung um Freigabe.', 'ps-pen-paper' ) );
+	}
+	return true;
 }
 
 function ps_pen_paper_inheritance_policy_default() {
@@ -122,6 +142,8 @@ function ps_pen_paper_require_inherited_rules( $campaign_id, $rules = null ) {
 	if ( 0 === $source['rules']['revision'] ) {
 		return new WP_Error( 'universe_rules_missing', __( 'Die Universumsleitung muss zuerst ein Regelwerk einrichten.', 'ps-pen-paper' ) );
 	}
+	$area_check = ps_pen_paper_inheritance_area_conflict( $campaign_id, $source['rules'] );
+	if ( is_wp_error( $area_check ) ) { return $area_check; }
 	return ps_pen_paper_validate_inherited_rules( null === $rules ? ps_pen_paper_get_rules( $campaign_id ) : $rules, $source['rules'] );
 }
 
@@ -202,15 +224,130 @@ function ps_pen_paper_inheritance_rules_input( $rules ) {
 	return $input;
 }
 
+function ps_pen_paper_inheritance_preserves_content_rules( $before, $after ) {
+	if ( array_diff( $before['dice'], $after['dice'] ) || ( $before['progression'] ?? null ) !== ( $after['progression'] ?? null ) ) { return false; }
+	$fields = array_column( $after['fields'], null, 'id' );
+	foreach ( $before['fields'] as $old ) {
+		if ( ! isset( $fields[ $old['id'] ] ) || $fields[ $old['id'] ]['type'] !== $old['type'] ) { return false; }
+		$new = $fields[ $old['id'] ];
+		if ( in_array( $old['type'], array( 'number', 'attribute', 'resource' ), true ) &&
+			( $new['min'] > $old['min'] || $new['max'] < $old['max'] ) ) { return false; }
+		if ( in_array( $old['type'], array( 'text', 'choice' ), true ) && ! empty( $new['choices'] ) &&
+			( empty( $old['choices'] ) || array_diff( $old['choices'], $new['choices'] ) ) ) { return false; }
+	}
+	return true;
+}
+
+function ps_pen_paper_inheritance_item_compatible( $item, $rules ) {
+	if ( ! ps_pen_paper_validate_item( $item ) ) { return false; }
+	$fields = array_column( $rules['fields'], null, 'id' );
+	foreach ( $item['bonuses'] as $id => $bonus ) {
+		if ( ! isset( $fields[ $id ] ) || ! in_array( $fields[ $id ]['type'], array( 'attribute', 'number' ), true ) ||
+			( ! empty( $rules['progression'] ) && in_array( $id, array( $rules['progression']['experience_field'], $rules['progression']['level_field'] ), true ) ) ) { return false; }
+	}
+	return ! isset( $item['use_rule'] ) || ps_pen_paper_validate_item_use_for_rules( $item['use_rule'], $rules );
+}
+
+function ps_pen_paper_inheritance_loot_compatible( $state, $rules ) {
+	if ( ! ps_pen_paper_valid_loot_table( $state ) || ! $state['revision'] ) { return false; }
+	$check_table = static function ( $table ) use ( &$check_table, $rules ) {
+		if ( ! in_array( $table['table']['die'], $rules['dice'], true ) ) { return false; }
+		foreach ( $table['table']['rows'] as $row ) {
+			if ( is_wp_error( ps_pen_paper_loot_spec( $row['quantity'], 100, null === $row['item'], $rules['dice'] ) ) ||
+				is_wp_error( ps_pen_paper_loot_spec( $row['money'], 999999999, true, $rules['dice'] ) ) ||
+				( null !== $row['item'] && ! ps_pen_paper_inheritance_item_compatible( $row['item']['item'], $rules ) ) ) { return false; }
+			foreach ( $row['items'] ?? array() as $extra ) {
+				if ( ! ps_pen_paper_inheritance_item_compatible( $extra['item']['item'], $rules ) || is_wp_error( ps_pen_paper_loot_spec( $extra['quantity'], 100, false, $rules['dice'] ) ) ) { return false; }
+			}
+			if ( ! empty( $row['nested'] ) && ! $check_table( $row['nested']['table'] ) ) { return false; }
+		}
+		return true;
+	};
+	return $check_table( $state );
+}
+
 function ps_pen_paper_inheritance_content_conflict( $campaign_id, $before, $after ) {
+	$campaign = ps_pen_paper_get_campaign( $campaign_id );
+	if ( ! $campaign ) { return new WP_Error( 'invalid_inheritance', __( 'Die Kampagne ist nicht verfügbar.', 'ps-pen-paper' ) ); }
+	$conditions = ps_pen_paper_check_condition_rules( $campaign, $after );
+	if ( is_wp_error( $conditions ) ) { return $conditions; }
 	if ( ps_pen_paper_character_schema( $before ) === ps_pen_paper_character_schema( $after ) && $before['dice'] === $after['dice'] ) { return true; }
+	if ( ps_pen_paper_inheritance_preserves_content_rules( $before, $after ) ) { return true; }
 	$dependent = get_posts( array(
-		'post_type' => array( 'pspp_adventure', 'pspp_item', 'pspp_loot_table', 'pspp_npc', 'pspp_adventure_run', 'pspp_adventure_group' ),
-		'post_status' => array( 'private', 'draft', 'trash' ), 'post_parent' => $campaign_id, 'posts_per_page' => 1, 'fields' => 'ids',
+		'post_type' => array( 'pspp_adventure', 'pspp_item', 'pspp_loot_table', 'pspp_adventure_run', 'pspp_adventure_group' ),
+		'post_status' => array( 'private', 'draft', 'trash' ), 'post_parent' => $campaign_id, 'posts_per_page' => -1,
 	) );
-	return $dependent
-		? new WP_Error( 'inheritance_content_conflict', __( 'Vorbereitete Abenteuer, Gegenstände oder andere Spielinhalte können von der Universumsänderung betroffen sein. Ihre Auswirkungen können noch nicht automatisch geprüft werden; die Übernahme bleibt gesperrt.', 'ps-pen-paper' ) )
-		: true;
+	foreach ( $dependent as $post ) {
+		if ( 'pspp_item' === $post->post_type ) {
+			$state = get_post_meta( $post->ID, '_pspp_item', true );
+			if ( is_array( $state ) && isset( $state['revision'], $state['item'] ) && is_int( $state['revision'] ) && $state['revision'] > 0 &&
+				ps_pen_paper_inheritance_item_compatible( $state['item'], $after ) ) { continue; }
+			$campaign = ps_pen_paper_get_campaign( $campaign_id );
+			if ( $campaign && ps_pen_paper_can_manage_campaign( $campaign ) ) {
+				/* translators: %d is the ID of the affected item template. */
+				return new WP_Error( 'inheritance_content_conflict', sprintf( __( 'Gegenstandsvorlage #%d passt nicht zum neuen Regelwerk oder ist beschädigt. Prüfe Boni und Nutzungsregeln.', 'ps-pen-paper' ), $post->ID ) );
+			}
+			return new WP_Error( 'inheritance_content_conflict', __( 'Eine Gegenstandsvorlage passt nicht zum neuen Regelwerk oder ist beschädigt. Bitte informiere die Spielleitung.', 'ps-pen-paper' ) );
+		}
+		if ( 'pspp_loot_table' === $post->post_type ) {
+			if ( ps_pen_paper_inheritance_loot_compatible( get_post_meta( $post->ID, '_pspp_loot_table', true ), $after ) ) { continue; }
+			$campaign = ps_pen_paper_get_campaign( $campaign_id );
+			if ( $campaign && ps_pen_paper_can_manage_campaign( $campaign ) ) {
+				/* translators: %d is the ID of the affected loot table. */
+				return new WP_Error( 'inheritance_content_conflict', sprintf( __( 'Beutetabelle #%d oder eine eingebettete Belohnung passt nicht zum neuen Regelwerk oder ist beschädigt. Prüfe Würfel, Mengen und Gegenstandsregeln.', 'ps-pen-paper' ), $post->ID ) );
+			}
+			return new WP_Error( 'inheritance_content_conflict', __( 'Eine Beutetabelle oder eine eingebettete Belohnung passt nicht zum neuen Regelwerk oder ist beschädigt. Bitte informiere die Spielleitung.', 'ps-pen-paper' ) );
+		}
+		return new WP_Error( 'inheritance_content_conflict', __( 'Vorbereitete Abenteuer, Gegenstände oder andere Spielinhalte sind möglicherweise nicht mit der Universumsänderung vereinbar. Prüfe die Inhalte; nicht automatisch prüfbare Änderungen bleiben gesperrt.', 'ps-pen-paper' ) );
+	}
+	return true;
+}
+
+function ps_pen_paper_preview_legacy_inheritance( $campaign_id ) {
+	$universe = ps_pen_paper_context_campaign( $campaign_id );
+	if ( is_wp_error( $universe ) ) { return $universe; }
+	$link = ps_pen_paper_get_universe_link( $campaign_id );
+	if ( is_wp_error( $link ) ) { return $link; }
+	$before = ps_pen_paper_get_rules( $campaign_id );
+	$source = ps_pen_paper_get_rules( $universe->ID );
+	if ( isset( $link['rules_base'] ) || metadata_exists( 'post', $campaign_id, '_pspp_play_round' ) ||
+		! ps_pen_paper_valid_rules_document( $before ) || ! ps_pen_paper_valid_rules_document( $source ) ) {
+		return new WP_Error( 'legacy_inheritance_unavailable', __( 'Diese Kampagne kann nicht unverändert mit dem Universumsregelwerk verbunden werden. Prüfe zunächst Zuordnung und Regelwerke.', 'ps-pen-paper' ) );
+	}
+	$after = $before; $after['revision']++;
+	if ( array_key_exists( 'campaign_policy', $source ) ) { $after['campaign_policy'] = $source['campaign_policy']; }
+	else { unset( $after['campaign_policy'] ); }
+	if ( ! ps_pen_paper_valid_rules_document( $after ) || is_wp_error( ps_pen_paper_validate_inherited_rules( $after, $source ) ) ) {
+		return new WP_Error( 'legacy_inheritance_conflict', __( 'Das bestehende Kampagnenregelwerk widerspricht festen Universumsregeln oder freigegebenen Grenzen. Passe es zunächst ausdrücklich an; vorhandene Charakterdaten werden nicht automatisch verändert.', 'ps-pen-paper' ) );
+	}
+	$preview = array( 'link' => $link, 'source' => $source, 'before' => $before, 'after' => $after );
+	$preview['hash'] = hash( 'sha256', wp_json_encode( $preview ) );
+	return $preview;
+}
+
+function ps_pen_paper_activate_legacy_inheritance( $campaign_id, $hash, $confirmation ) {
+	$preview = ps_pen_paper_preview_legacy_inheritance( $campaign_id );
+	if ( is_wp_error( $preview ) ) { return $preview; }
+	if ( 'confirmed' !== $confirmation || ! is_string( $hash ) || ! hash_equals( $preview['hash'], $hash ) ) {
+		return new WP_Error( 'conflict', __( 'Bestätige die aktuelle Vorschau der Regelverbindung. Bei Änderungen bitte die Seite neu laden.', 'ps-pen-paper' ) );
+	}
+	return ps_pen_paper_scope_lock( $preview['link']['universe_id'], function () use ( $campaign_id, $preview ) {
+		return ps_pen_paper_atomic_event( $campaign_id, function () use ( $campaign_id, $preview ) {
+			$current = ps_pen_paper_preview_legacy_inheritance( $campaign_id );
+			if ( is_wp_error( $current ) ) { return $current; }
+			if ( ! hash_equals( $preview['hash'], $current['hash'] ) ) {
+				return new WP_Error( 'conflict', __( 'Kampagnen- oder Universumsregeln wurden geändert. Bitte prüfe eine neue Vorschau.', 'ps-pen-paper' ) );
+			}
+			$event = ps_pen_paper_write_document_event( $campaign_id, $campaign_id, '_pspp_rules', $preview['before'], $preview['after'], array(
+				'kind' => 'rules_saved', 'visibility' => 'group', 'recipient_id' => 0, 'rules_revision' => $preview['after']['revision'], 'fields' => array(),
+			), false );
+			if ( is_wp_error( $event ) ) { return $event; }
+			$link = $preview['link']; $updated = $link; $updated['revision']++; $updated['rules_base'] = $preview['source'];
+			return ps_pen_paper_write_document_event( $campaign_id, $campaign_id, '_pspp_universe_link', $link, $updated, array(
+				'kind' => 'universe_linked', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0,
+			), false );
+		} );
+	} );
 }
 
 function ps_pen_paper_pending_inherited_campaigns( $universe_id ) {
@@ -253,6 +390,8 @@ function ps_pen_paper_synchronize_inherited_rules( $campaign ) {
 			}
 			$after = ps_pen_paper_rebase_inherited_rules( $link['rules_base'], $before, $current['rules'] );
 			if ( is_wp_error( $after ) ) { return $after; }
+			$area_check = ps_pen_paper_inheritance_area_conflict( $campaign->ID, $current['rules'] );
+			if ( is_wp_error( $area_check ) ) { return $area_check; }
 			$schema_changed = ps_pen_paper_character_schema( $before ) !== ps_pen_paper_character_schema( $after );
 			$characters = get_posts( array(
 				'post_type' => 'pspp_character', 'post_status' => array( 'private', 'draft', 'trash' ),
@@ -261,6 +400,8 @@ function ps_pen_paper_synchronize_inherited_rules( $campaign ) {
 			if ( $schema_changed && $characters ) {
 				return new WP_Error( 'inheritance_migration_required', __( 'Die Universumsregel ändert verwendete Charakterfelder. Die Spielleitung muss die Übernahme mit einer Charaktervorschau prüfen; neue Spiele bleiben bis dahin gesperrt.', 'ps-pen-paper' ) );
 			}
+			$pending_check = ps_pen_paper_check_pending_item_uses_for_rules( $campaign->ID, $before, $after );
+			if ( is_wp_error( $pending_check ) ) { return $pending_check; }
 			$content_check = ps_pen_paper_inheritance_content_conflict( $campaign->ID, $before, $after );
 			if ( is_wp_error( $content_check ) ) { return $content_check; }
 			$event = ps_pen_paper_write_document_event( $campaign->ID, $campaign->ID, '_pspp_rules', $before, $after, array(

@@ -979,14 +979,32 @@ Neue Kampagnen erhalten beim Anlegen eine Verbindung zum Universumsregelwerk.
 Die Universumsleitung gibt dort flexible Regeln und Feldgrenzen frei; nicht
 freigegebene Vorgaben sind fest. Kompatible Änderungen werden übernommen,
 kampagneneigene Abweichungen bleiben erhalten. Konflikte sperren neue Spiele;
-Charakteränderungen benötigen eine bestätigte Vorschau. Vorbereitete Inhalte
-können die Übernahme derzeit ebenfalls blockieren, weil ihre Auswirkungen noch
-nicht automatisch geprüft werden. Bereits laufende Runden bleiben unverändert.
+Charakteränderungen benötigen eine bestätigte Vorschau; unpassende offene
+Gegenstandsanträge und aktive Wirkungen müssen zuvor geklärt werden. Lokale
+Gegenstandsvorlagen und Beutetabellen einschließlich verschachtelter Tabellen
+und eingebetteter Gegenstandsregeln werden auf Verträglichkeit geprüft. Andere
+vorbereitete Inhalte können die Übernahme weiterhin vorsorglich blockieren.
+Bereits laufende Runden bleiben unverändert.
 Ältere Kampagnen werden nicht automatisch in diese Verbindung aufgenommen.
-Eine ältere leere Kampagne kann die Vorlage ausdrücklich als Kopie übernehmen;
-dafür sind Verwaltungsrechte an Universum und Kampagne erforderlich.
-Weitere Regelbereiche wie Wirtschaft und Zustände besitzen weiterhin eigene
-Vorgaben und sind nicht Bestandteil dieser Regelwerkvererbung.
+Stimmen ihre Regeln mit den festen Vorgaben und Grenzen überein, können
+Universums- und Kampagnenleitung die Verbindung nach einer Vorschau ausdrücklich
+aktivieren, ohne Charakterwerte zu verändern. Abweichungen müssen vorher
+bereinigt werden. Eine ältere leere Kampagne kann die Vorlage weiterhin
+ausdrücklich als Kopie übernehmen. Beide Schritte erfordern Verwaltungsrechte
+an Universum und Kampagne.
+Auch Zustandsvorlagen und Wirtschaft mit Handelsregeln sind feste
+Universumsvorgaben, solange die Universumsleitung keine kampagnenindividuelle
+Anpassung freigibt. Freigegebene Zustandsvorlagen dürfen innerhalb der
+Universumsbefugnisse angepasst und ausdrücklich zurückgesetzt werden;
+gespeicherte Charakterfolgen bleiben erhalten. Bei freigegebener eigener
+Wirtschaft übernimmt die Kampagne zunächst Währung und Handelsregeln als
+unabhängige Vorlagen. Der Wechsel über **Währung & Guthaben** überträgt oder
+rechnet keine Konten um und ist bei vorhandenen Konten, gemeinsamen Basisbögen
+oder offenen Handelsangeboten gegebenenfalls gesperrt. Entzieht die
+Universumsleitung eine Freigabe, bleiben lokale Daten erhalten; neue Spiele
+sind bis zur Klärung gesperrt. Rundenzustandsvorlagen bleiben eingefroren,
+Befugniswiderrufe gelten weiterhin. Eine gemeinsam genutzte Universumswirtschaft
+verwendet auch in laufenden Runden die aktuellen Universumsvorgaben.
 Beim Import mit Universumsbindung muss die gesicherte Regelbasis genau zum
 gewählten Universumsregelwerk passen; andernfalls wird die Bindung abgelehnt.
 Ein Basisbogen kann nur für einen bereits aufgenommenen Kampagnenteilnehmer und

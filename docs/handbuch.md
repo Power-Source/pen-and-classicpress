@@ -353,10 +353,21 @@ weiter zu ihrer Währung passen.
    die Spielleitung über einen Beitrittsantrag.
 5. Bei einer bereits zugeordneten Kampagne ohne gespeichertes Regelwerk und ohne
    Charaktere die **Regelvorlage übernehmen** ausdrücklich bestätigen. Die
-   Feldkennungen bleiben erhalten. Diese ältere Übernahme erzeugt derzeit eine
-   unabhängige Kopie, keine automatische Regelvererbung.
+   Feldkennungen bleiben erhalten. Diese Übernahme erzeugt zunächst eine
+   unabhängige Kopie. Stimmen die Kampagnenregeln mit den Universumsvorgaben
+   überein, kann anschließend im Kampagnenregelwerk die **Regelvererbung
+   aktiviert** werden. Die Vorschau und Bestätigung erfordern Verwaltungsrechte
+   an Kampagne und Universum; Charakterwerte bleiben unverändert.
 6. Einen freigegebenen Basisbogen wählen, **Gemeinsamer Basisstand** oder
    **Unabhängige Kampagnenkopie** auswählen und die Übernahme bestätigen.
+
+Bei einer strukturellen Regelmigration prüft die Vorschau auch angelegte
+Ausrüstung, offene Gegenstandsnutzungsanträge und aktive temporäre Wirkungen.
+Unpassende Anträge und Wirkungen müssen zunächst geklärt werden. Lokale
+Gegenstandsvorlagen und Beutetabellen mit verschachtelten Tabellen und
+eingebetteten Gegenstandsregeln werden auf die neuen Regeln geprüft; bei
+anderen vorbereiteten Inhalten kann die Übernahme weiterhin vorsorglich gesperrt
+bleiben.
 
 ![Universumsregelvorlage, Basisbogen und Übernahme in getrennte Kampagnen](images/13-universum-basisboegen.png)
 
@@ -738,6 +749,13 @@ Folgen und/oder **dauerhafte Universumsfolgen** setzen und aufheben dürfen.
 Vorbereitete Abenteuerautomatik und Rettungsausnahmen müssen ausdrücklich
 zugelassen werden. Die Universumsleitung behält ihre eigene Korrekturbefugnis.
 Spieler können geschützte Folgen nicht durch Bearbeiten ihres Bogens entfernen.
+
+Im Universumsregelwerk kann die Leitung zusätzlich **Kampagnenabhängige
+Zustandsvorlagen** freigeben. Dann kann die Kampagnenleitung eigene Vorlagen
+innerhalb der Universumsbefugnisse bearbeiten und ausdrücklich auf die
+Universumsvorgaben zurücksetzen. Gespeicherte Charakterfolgen bleiben dabei
+erhalten. Wird die Freigabe entzogen, sperrt eine lokale Abweichung neue
+Spiele, bis sie zurückgesetzt oder erneut freigegeben wird.
 
 Neue Spielrunden erhalten beim Anlegen einen eigenen Stand der Zustandsvorlagen.
 Spätere Änderungen der Vorlagen gelten für neu angelegte Runden, nicht
@@ -1257,8 +1275,18 @@ prüft die Spielleitung die Universumsänderungen und bestätigt gegebenenfalls
 die Charaktervorschau. Vorbereitete Inhalte können eine Übernahme derzeit
 blockieren, weil ihre Auswirkungen noch nicht automatisch geprüft werden.
 Laufende Runden behalten ihren Stand. Ältere Kampagnen mit unabhängigen
-Regelkopien werden nicht automatisch verknüpft; Wirtschaft und Zustände haben
-weiterhin eigene Vorgaben.
+Regelkopien werden nicht automatisch verknüpft, können aber bei passenden
+Vorgaben ausdrücklich verbunden werden. Die Universumsleitung kann auch
+Kampagnenanpassungen für Zustandsvorlagen und für die Wirtschaft mit
+Handelsregeln freigeben. Unter **Währung & Guthaben** wechselt die
+Kampagnenleitung bei entsprechender Freigabe zur eigenen Wirtschaft; beim
+ersten Wechsel beginnen neue Vorlagen mit den Universumseinstellungen.
+Vorhandene lokale Vorlagen bleiben beim erneuten Wechsel erhalten. Ein bestätigter Wechsel
+überträgt oder rechnet keine Guthaben um. Vorhandene Konten, gemeinsame
+Basisbögen oder offene Handelsangebote können ihn sperren. Beim Entzug der
+Freigabe bleiben lokale Daten bestehen, neue Spiele sind bis zur Klärung
+gesperrt. Eine gemeinsam genutzte Universumswirtschaft bleibt auch für
+laufende Runden mit den aktuellen Universumseinstellungen verbunden.
 
 Alternativ führt **Mein Charakterprofil**
 am Spieltisch dorthin. Im Tab lassen sich Bogen, Porträt und Ausrüstung

@@ -270,8 +270,26 @@ function ps_pen_paper_apply_progression( $snapshot, $rules ) {
 
 function ps_pen_paper_save_rules( $campaign_id, $input, $revision ) {
 	return ps_pen_paper_with_inheritance_lock( $campaign_id, function () use ( $campaign_id, $input, $revision ) {
-		return ps_pen_paper_save_rules_locked( $campaign_id, $input, $revision );
+		return ps_pen_paper_scope_lock( $campaign_id, function () use ( $campaign_id, $input, $revision ) {
+			return ps_pen_paper_save_rules_locked( $campaign_id, $input, $revision );
+		} );
 	} );
+}
+
+function ps_pen_paper_check_pending_item_uses_for_rules( $scope_id, $before, $after ) {
+	if ( ! array_diff( $before['dice'], $after['dice'] ) ) { return true; }
+	$characters = get_posts( array( 'post_type' => 'pspp_character', 'post_status' => array( 'private', 'draft', 'trash' ),
+		'post_parent' => $scope_id, 'posts_per_page' => -1, 'fields' => 'ids' ) );
+	foreach ( $characters as $character_id ) {
+		$gear = ps_pen_paper_gear_state( $character_id );
+		if ( is_wp_error( $gear ) ) { return $gear; }
+		foreach ( $gear['uses']['pending'] ?? array() as $uuid => $request ) {
+			if ( ! ps_pen_paper_validate_item_use_for_rules( $gear['active']['items'][ $uuid ]['item']['use_rule'], $after ) ) {
+				return new WP_Error( 'equipment_conflict', __( 'Ein offener Gegenstandsnutzungsantrag passt nicht zu den neuen Regeln. Kläre ihn vor der Regeländerung.', 'ps-pen-paper' ) );
+			}
+		}
+	}
+	return true;
 }
 
 function ps_pen_paper_save_rules_locked( $campaign_id, $input, $revision ) {
@@ -291,15 +309,23 @@ function ps_pen_paper_save_rules_locked( $campaign_id, $input, $revision ) {
 		$allowed = ps_pen_paper_validate_inherited_edit( $campaign_id, $rules );
 		if ( is_wp_error( $allowed ) ) { return $allowed; }
 	}
+	$conditions = ps_pen_paper_check_condition_rules( $campaign, $rules );
+	if ( is_wp_error( $conditions ) ) { return $conditions; }
 	$existing_ids = array_column( $previous['fields'], 'id' );
 	foreach ( $input['fields'] ?? array() as $field ) {
 		if ( '' !== $field['id'] && ! in_array( $field['id'], $existing_ids, true ) ) {
 			return new WP_Error( 'invalid_rules', __( 'Ein neues Feld benötigt eine leere Kennung. Bereits erzeugte Vorschaukennungen dürfen nur über die bestätigte Migration übernommen werden.', 'ps-pen-paper' ) );
 		}
 	}
-	if ( ps_pen_paper_has_characters( $campaign_id ) && ps_pen_paper_character_schema( $rules ) !== ps_pen_paper_character_schema( $previous ) ) {
-		return new WP_Error( 'schema_preview_required', __( 'Die verwendeten Charakterfelder haben sich geändert. Prüfe zuerst die Vorschau und löse alle angezeigten Datenkonflikte ausdrücklich.', 'ps-pen-paper' ) );
+	if ( ps_pen_paper_character_schema( $rules ) !== ps_pen_paper_character_schema( $previous ) ) {
+		$characters = get_posts( array( 'post_type' => 'pspp_character', 'post_status' => array( 'private', 'draft', 'trash' ),
+			'post_parent' => $campaign_id, 'posts_per_page' => 1, 'fields' => 'ids' ) );
+		if ( $characters ) {
+			return new WP_Error( 'schema_preview_required', __( 'Die verwendeten Charakterfelder haben sich geändert. Prüfe zuerst die Vorschau und löse alle angezeigten Datenkonflikte ausdrücklich.', 'ps-pen-paper' ) );
+		}
 	}
+	$pending_check = ps_pen_paper_check_pending_item_uses_for_rules( $campaign_id, $previous, $rules );
+	if ( is_wp_error( $pending_check ) ) { return $pending_check; }
 	$saved = ps_pen_paper_save_document_event( $campaign_id, $campaign_id, '_pspp_rules', $previous, $rules, array(
 		'kind' => 'rules_saved', 'visibility' => 'pspp_universe' === $campaign->post_type ? 'gm' : 'group', 'recipient_id' => 0,
 		'rules_revision' => $rules['revision'], 'fields' => array(),
@@ -495,11 +521,40 @@ function ps_pen_paper_character_point_budget( $snapshot, $rules ) {
 	}
 
 	function ps_pen_paper_check_character_gear_for_rules( $scope, $character, $snapshot, $pending_character_snapshot, $rules ) {
-		if ( 'pspp_campaign' !== $scope->post_type || ! ps_pen_paper_community_available() ) { return true; }
+		if ( ! in_array( $scope->post_type, array( 'pspp_campaign', 'pspp_universe' ), true ) ) { return true; }
 		$gear = ps_pen_paper_gear_state( $character->ID );
 		if ( is_wp_error( $gear ) ) { return $gear; }
+		$character_state = ps_pen_paper_raw_character_state( $character->ID );
+		if ( is_wp_error( $character_state ) ) { return $character_state; }
+		if ( isset( $character_state['context'] ) ) {
+			if ( null !== $snapshot ) { $snapshot = ps_pen_paper_apply_context_values( $snapshot, $character_state['context'] ); }
+			if ( is_wp_error( $snapshot ) ) { return $snapshot; }
+			if ( null !== $pending_character_snapshot ) { $pending_character_snapshot = ps_pen_paper_apply_context_values( $pending_character_snapshot, $character_state['context'] ); }
+			if ( is_wp_error( $pending_character_snapshot ) ) { return $pending_character_snapshot; }
+		}
 		$fields = array_column( $rules['fields'], null, 'id' );
-		$check = function ( $gear_snapshot, $character_snapshot ) use ( $fields, $rules ) {
+		$effect_fields = ps_pen_paper_item_effect_fields( $rules );
+		$effects = array();
+		$resource_effects = array();
+		foreach ( $gear['uses']['pending'] ?? array() as $uuid => $request ) {
+			if ( ! ps_pen_paper_validate_item_use_for_rules( $gear['active']['items'][ $uuid ]['item']['use_rule'], $rules ) ) {
+				return new WP_Error( 'equipment_conflict', __( 'Ein offener Gegenstandsnutzungsantrag passt nicht zu den neuen Regeln. Kläre ihn vor der Regeländerung.', 'ps-pen-paper' ) );
+			}
+		}
+		foreach ( $gear['uses']['effects'] ?? array() as $effect ) {
+			if ( ! $effect['temporary'] || $effect['ended'] ) { continue; }
+			foreach ( $effect['deltas'] as $field_id => $delta ) {
+				if ( ! isset( $effect_fields[ $field_id ] ) || $effect_fields[ $field_id ]['type'] !== $effect['types'][ $field_id ] ) {
+					return new WP_Error( 'equipment_conflict', __( 'Eine aktive Gegenstandswirkung verweist auf ein entferntes oder inkompatibles Feld. Beende sie vor der Regeländerung.', 'ps-pen-paper' ) );
+				}
+				if ( 'resource' !== $effect_fields[ $field_id ]['type'] ) {
+					$effects[ $field_id ] = ( $effects[ $field_id ] ?? 0 ) + $delta;
+				} else {
+					$resource_effects[] = array( 'field' => $field_id, 'delta' => $delta );
+				}
+			}
+		}
+		$check = function ( $gear_snapshot, $character_snapshot ) use ( $fields, $rules, $effects, $resource_effects ) {
 			if ( ! $gear_snapshot || ! $character_snapshot ) { return true; }
 			$bonuses = array();
 			foreach ( $gear_snapshot['slots'] as $instance_id ) {
@@ -523,13 +578,36 @@ function ps_pen_paper_character_point_budget( $snapshot, $rules ) {
 					return new WP_Error( 'equipment_conflict', __( 'Die angelegte Ausrüstung würde den neuen Wertebereich verletzen. Passe zuerst Ausrüstung oder Feldgrenzen an.', 'ps-pen-paper' ) );
 				}
 			}
+			foreach ( $effects as $field_id => $delta ) {
+				if ( ! isset( $character_snapshot['values'][ $field_id ] ) || ! is_int( $character_snapshot['values'][ $field_id ] ) ||
+					$character_snapshot['values'][ $field_id ] + ( $bonuses[ $field_id ] ?? 0 ) + $delta < $fields[ $field_id ]['min'] ||
+					$character_snapshot['values'][ $field_id ] + ( $bonuses[ $field_id ] ?? 0 ) + $delta > $fields[ $field_id ]['max'] ) {
+					return new WP_Error( 'equipment_conflict', __( 'Eine aktive Gegenstandswirkung würde den neuen Wertebereich verletzen. Beende sie oder passe die Feldgrenzen an.', 'ps-pen-paper' ) );
+				}
+			}
+			foreach ( $resource_effects as $effect ) {
+				$field_id = $effect['field'];
+				$value = $character_snapshot['values'][ $field_id ] ?? null;
+				if ( ! is_array( $value ) || ! isset( $value['current'], $value['maximum'] ) ||
+					! is_int( $value['current'] ) || ! is_int( $value['maximum'] ) ||
+					$value['current'] - $effect['delta'] < $fields[ $field_id ]['min'] ||
+					$value['current'] - $effect['delta'] > min( $fields[ $field_id ]['max'], $value['maximum'] ) ) {
+					return new WP_Error( 'equipment_conflict', __( 'Eine aktive Ressourcenwirkung könnte unter den neuen Grenzen nicht beendet werden. Kläre sie vor der Regeländerung.', 'ps-pen-paper' ) );
+				}
+			}
 			return true;
 		};
 		$active_check = $check( $gear['active'], $snapshot );
 		if ( is_wp_error( $active_check ) ) { return $active_check; }
-		if ( $gear['pending'] && $pending_character_snapshot ) {
-			$pending_check = $check( $gear['pending'], $pending_character_snapshot );
+		if ( $pending_character_snapshot ) {
+			$pending_check = $check( $gear['active'], $pending_character_snapshot );
 			if ( is_wp_error( $pending_check ) ) { return $pending_check; }
+		}
+		if ( $gear['pending'] ) {
+			foreach ( array( $snapshot, $pending_character_snapshot ) as $candidate ) {
+				$pending_check = $check( $gear['pending'], $candidate );
+				if ( is_wp_error( $pending_check ) ) { return $pending_check; }
+			}
 		}
 		return true;
 	}
@@ -549,12 +627,16 @@ function ps_pen_paper_character_point_budget( $snapshot, $rules ) {
 			$source = ps_pen_paper_inheritance_source( $scope_id );
 			if ( is_wp_error( $source ) ) { return $source; }
 			if ( ! $source || $source['link']['rules_base'] === $source['rules'] ) { return new WP_Error( 'no_migration', __( 'Es gibt keine ausstehende Universumsänderung.', 'ps-pen-paper' ) ); }
+			$area_check = ps_pen_paper_inheritance_area_conflict( $scope_id, $source['rules'] );
+			if ( is_wp_error( $area_check ) ) { return $area_check; }
 			$merged = ps_pen_paper_rebase_inherited_rules( $source['link']['rules_base'], $before, $source['rules'] );
 			if ( is_wp_error( $merged ) ) { return $merged; }
 			$input = ps_pen_paper_inheritance_rules_input( $merged );
 		}
 		$after = ps_pen_paper_validate_rules( $input, $before );
 		if ( is_wp_error( $after ) ) { return $after; }
+		$conditions = ps_pen_paper_check_condition_rules( $scope, $after );
+		if ( is_wp_error( $conditions ) ) { return $conditions; }
 		if ( 'pspp_campaign' === $scope->post_type ) {
 			$allowed = $inherited ? ps_pen_paper_validate_inherited_rules( $after, $source['rules'] ) : ps_pen_paper_validate_inherited_edit( $scope_id, $after );
 			if ( is_wp_error( $allowed ) ) { return $allowed; }
@@ -645,10 +727,14 @@ function ps_pen_paper_character_point_budget( $snapshot, $rules ) {
 				if ( ps_pen_paper_get_rules( $scope_id ) !== $preview['before'] ) {
 					return new WP_Error( 'conflict', __( 'Das Regelwerk wurde inzwischen geändert. Bitte erstelle eine neue Vorschau.', 'ps-pen-paper' ) );
 				}
+				$conditions = ps_pen_paper_check_condition_rules( $scope, $preview['after'] );
+				if ( is_wp_error( $conditions ) ) { return $conditions; }
 				if ( isset( $preview['inheritance'] ) ) {
 					$source = ps_pen_paper_inheritance_source( $scope_id );
 					if ( is_wp_error( $source ) ) { return $source; }
 					if ( $source !== $preview['inheritance'] ) { return new WP_Error( 'conflict', __( 'Das Universumsregelwerk wurde inzwischen geändert. Bitte erstelle eine neue Vorschau.', 'ps-pen-paper' ) ); }
+					$area_check = ps_pen_paper_inheritance_area_conflict( $scope_id, $source['rules'] );
+					if ( is_wp_error( $area_check ) ) { return $area_check; }
 					$content_check = ps_pen_paper_inheritance_content_conflict( $scope_id, $preview['before'], $preview['after'] );
 					if ( is_wp_error( $content_check ) ) { return $content_check; }
 				}

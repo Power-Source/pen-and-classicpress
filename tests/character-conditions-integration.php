@@ -209,16 +209,28 @@ try {
 	$check( empty( $raw( $character_id )['conditions'] ) && isset( $raw( $base_id )['conditions'][ $dead['id'] ] ) && 'completed' === $group['status'] &&
 		'success' === ps_pen_paper_scenario_outcome( $group['snapshot'], array_column( $group['history'], 'decision' ) ), 'Group victory did not remain independent of permanent character death' );
 	wp_set_current_user( $users['world'] );
-	$export = ps_pen_paper_export_campaign( $campaign_id, 'complete' );
-	$check( $export, 'Export with consequences' );
-	$parsed = ps_pen_paper_parse_import( wp_json_encode( $export ) ); $check( $parsed, 'Import parsing of status snapshots and events' );
-	$documents = ps_pen_paper_import_documents( $parsed );
-	$check( empty( $documents['conflicts'] ), 'Import document validation: ' . implode( ', ', $documents['conflicts'] ) );
-	$options = array( 'operation' => 'copy', 'target_id' => 0, 'universe_mode' => 'copy', 'universe_id' => 0, 'users' => array(), 'bases' => array() );
-	foreach ( $parsed['users'] as $id => $requirement ) { $options['users'][ $id ] = $id; }
-	$map = array(); $next = 100000;
-	foreach ( array_keys( $parsed['records'] ) as $id ) { $map[ $id ] = $next++; }
-	$prepared = ps_pen_paper_prepare_import( $parsed, $options, $map, true ); $check( $prepared, 'Restorable consequence data and historical events' );
+	$world_rules = ps_pen_paper_get_rules( $universe_id );
+	$world_input = ps_pen_paper_inheritance_rules_input( $world_rules );
+	$world_input['campaign_policy'] = array( 'extra_fields' => false, 'globals' => array( 'conditions' ), 'fields' => array() );
+	$check( ps_pen_paper_save_rules( $universe_id, $world_input, (string) $world_rules['revision'] ), 'Condition backup delegation' );
+	$inheritance = ps_pen_paper_preview_legacy_inheritance( $campaign_id );
+	$check( $inheritance, 'Condition backup inheritance preview' );
+	$check( ps_pen_paper_activate_legacy_inheritance( $campaign_id, $inheritance['hash'], 'confirmed' ), 'Condition backup inheritance' );
+	$local_policy = ps_pen_paper_condition_policy( $world ); $local_policy['revision'] = 1;
+	$check( ps_pen_paper_save_condition_policy( $campaign, $local_policy, '0' ), 'Local condition backup fixture' );
+	foreach ( array( 'local', 'inherited' ) as $form ) {
+		if ( 'inherited' === $form ) { $check( ps_pen_paper_reset_condition_policy( $campaign, '1' ), 'Reset condition backup fixture' ); }
+		$export = ps_pen_paper_export_campaign( $campaign_id, 'complete' );
+		$check( $export, 'Export with ' . $form . ' consequences' );
+		$parsed = ps_pen_paper_parse_import( wp_json_encode( $export ) ); $check( $parsed, 'Import parsing of status snapshots and events' );
+		$documents = ps_pen_paper_import_documents( $parsed );
+		$check( empty( $documents['conflicts'] ), 'Import document validation: ' . implode( ', ', $documents['conflicts'] ) );
+		$options = array( 'operation' => 'copy', 'target_id' => 0, 'universe_mode' => 'copy', 'universe_id' => 0, 'users' => array(), 'bases' => array() );
+		foreach ( $parsed['users'] as $id => $requirement ) { $options['users'][ $id ] = $id; }
+		$map = array(); $next = 100000;
+		foreach ( array_keys( $parsed['records'] ) as $id ) { $map[ $id ] = $next++; }
+		$prepared = ps_pen_paper_prepare_import( $parsed, $options, $map, true ); $check( $prepared, 'Restorable ' . $form . ' consequence data and historical events' );
+	}
 	$broken = $raw( $character_id ); $broken['conditions'] = array( $captured['id'] => $captured ); $broken['conditions'][ $captured['id'] ]['block_actions'] = '0';
 	$check( ! ps_pen_paper_import_character_valid( $broken, $rules ), 'Malformed imported condition bypassed action restrictions' );
 	echo "Character conditions: permissions, local/permanent effects, rescue, thresholds, modifiers, rollback, solo/group and backup passed.\n";

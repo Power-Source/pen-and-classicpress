@@ -582,9 +582,13 @@ ungeprüften Versionssprung. Die Versionsübersicht weiter unten ist historisch.
   ältere leere Kampagnen können sie ausdrücklich übernehmen. Die Feldkennungen
   bleiben stabil. Neu verknüpfte Kampagnen übernehmen kompatible Änderungen
   unter Beachtung fester und flexibler Vorgaben; Konflikte sperren neue Spiele.
-  Charakterkonflikte benötigen eine bestätigte Vorschau. Die Prüfung vorbereiteter
-  Inhalte, die Verknüpfung älterer Kampagnen und die einheitliche Vererbung weiterer
-  Regelbereiche sind noch offen.
+  Charakterkonflikte benötigen eine bestätigte Vorschau. Lokale Gegenstandsvorlagen
+  und Beutetabellen werden geprüft; die Prüfung weiterer vorbereiteter Inhalte
+  ist noch offen. Zustandsvorlagen und Wirtschaft einschließlich Handel
+  folgen ebenfalls festen oder freigegebenen Kampagnenvorgaben; Konten werden
+  beim Wechsel nicht übertragen oder umgerechnet.
+  Ältere Kampagnen können bei passenden Regeln ausdrücklich verbunden werden;
+  abweichende Vorgaben müssen zuvor angepasst werden.
 - Bei der Aufnahme eines bereits zugelassenen Besitzers wählt die Spielleitung
   **gemeinsamen Basisstand oder unabhängige Kampagnenkopie**. Beide Varianten sind
   vorhanden; bestehende Kampagnenbögen bleiben unverändert.

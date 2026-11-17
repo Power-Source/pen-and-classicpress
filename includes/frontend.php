@@ -55,7 +55,7 @@ function ps_pen_paper_handle_frontend_action() {
 		return;
 	}
 	$operation = ps_pen_paper_posted_text( 'pspp_operation' );
-	if ( in_array( $operation, array( 'save_condition_policy', 'change_character_condition' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
+	if ( in_array( $operation, array( 'save_condition_policy', 'reset_condition_policy', 'change_character_condition' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( 'change_booking_link' === $operation && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'save_play_options', 'create_play_round', 'begin_solo_play', 'begin_group_play', 'change_play_round' ), true ) &&
 		ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
@@ -69,7 +69,7 @@ function ps_pen_paper_handle_frontend_action() {
 	if ( in_array( $operation, array( 'save_trade_policy', 'offer_trade', 'change_trade' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( 'transfer_campaign_assets' === $operation && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'configure_wiki', 'prepare_wiki', 'publish_wiki', 'save_wiki_link' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
-	if ( in_array( $operation, array( 'request_base_character', 'request_universe_character', 'review_base_character', 'reattach_character', 'save_rules_migration', 'sync_inherited_rules', 'invite_user', 'revoke_invitation', 'accept_invitation', 'decline_invitation' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
+	if ( in_array( $operation, array( 'request_base_character', 'request_universe_character', 'review_base_character', 'reattach_character', 'save_rules_migration', 'sync_inherited_rules', 'activate_legacy_inheritance', 'invite_user', 'revoke_invitation', 'accept_invitation', 'decline_invitation' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'save_loot_table', 'roll_loot', 'award_loot' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) { ps_pen_paper_handle_admin_action(); }
 	if ( in_array( $operation, array( 'save_npc', 'offer_npc', 'copy_npc', 'approve_npc', 'save_currency', 'change_wallet', 'save_equipment_schema', 'save_item', 'grant_item', 'remove_items', 'equip_items', 'review_gear', 'save_portrait', 'save_sheet_style' ), true ) && ps_pen_paper_posted_id( 'pspp_frontend_page' ) === get_queried_object_id() ) {
 		ps_pen_paper_handle_admin_action();

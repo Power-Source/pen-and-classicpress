@@ -16,7 +16,9 @@ function ps_pen_paper_prepare_condition_policy( $scope, $input ) {
 	$before = ps_pen_paper_condition_policy( $scope );
 	if ( is_wp_error( $before ) ) { return $before; }
 	if ( ! is_array( $input ) || ! is_array( $input['definitions'] ?? null ) ) { return ps_pen_paper_condition_error(); }
-	$policy = ps_pen_paper_condition_policy_default(); $policy['revision'] = $before['revision'] + 1;
+	$document = ps_pen_paper_condition_policy_document( $scope->ID );
+	if ( is_wp_error( $document ) ) { return $document; }
+	$policy = ps_pen_paper_condition_policy_default(); $policy['revision'] = $document['revision'] + 1;
 	foreach ( array( 'campaign_local', 'campaign_universe', 'automatic' ) as $key ) {
 		if ( isset( $input[ $key ] ) && '1' !== $input[ $key ] ) { return ps_pen_paper_condition_error(); }
 		$policy[ $key ] = isset( $input[ $key ] );
@@ -68,6 +70,9 @@ function ps_pen_paper_handle_condition_action( $operation, $page_id, $scope_id )
 		if ( 'complete' !== ps_pen_paper_posted_text( 'conditions_complete' ) ) { ps_pen_paper_fail( __( 'Die Zustandsvorgaben wurden nicht vollständig übertragen.', 'ps-pen-paper' ) ); }
 		$policy = ps_pen_paper_prepare_condition_policy( $scope, isset( $_POST['condition_policy'] ) ? wp_unslash( $_POST['condition_policy'] ) : null );
 		$result = is_wp_error( $policy ) ? $policy : ps_pen_paper_save_condition_policy( $scope, $policy, ps_pen_paper_posted_text( 'condition_revision' ) );
+	} elseif ( 'reset_condition_policy' === $operation ) {
+		if ( 'confirmed' !== ps_pen_paper_posted_text( 'condition_reset_confirmation' ) ) { ps_pen_paper_fail( __( 'Bitte bestätige das Zurücksetzen der Kampagnenvorlagen.', 'ps-pen-paper' ) ); }
+		$result = ps_pen_paper_reset_condition_policy( $scope, ps_pen_paper_posted_text( 'condition_revision' ) );
 	} else {
 		$result = ps_pen_paper_change_character_condition( $scope, ps_pen_paper_posted_id( 'character_id' ), ps_pen_paper_posted_text( 'condition_id' ),
 			ps_pen_paper_posted_text( 'condition_scope' ), ps_pen_paper_posted_text( 'condition_operation' ), ps_pen_paper_posted_text( 'character_revision' ) );
@@ -103,13 +108,32 @@ function ps_pen_paper_render_condition_row( $index, $definition, $rules ) {
 function ps_pen_paper_render_condition_policy( $scope, $page_id, $open = false ) {
 	$owner = ps_pen_paper_condition_scope( $scope ); $policy = ps_pen_paper_condition_policy( $scope );
 	if ( is_wp_error( $owner ) || is_wp_error( $policy ) ) { echo '<p role="alert">' . esc_html( is_wp_error( $owner ) ? $owner->get_error_message() : $policy->get_error_message() ) . '</p>'; return; }
-	if ( (int) $owner->ID !== (int) $scope->ID || ! ps_pen_paper_can_manage_character_scope( $owner ) ) { return; }
-	$rules = ps_pen_paper_get_rules( $owner->ID );
+	if ( ! ps_pen_paper_can_manage_character_scope( $scope ) ) { return; }
+	$local = (int) $owner->ID !== (int) $scope->ID;
+	$document = ps_pen_paper_condition_policy_document( $scope->ID );
+	if ( is_wp_error( $document ) ) { echo '<p role="alert">' . esc_html( $document->get_error_message() ) . '</p>'; return; }
+	$link = $local ? ps_pen_paper_get_universe_link( $scope->ID ) : null;
+	if ( is_wp_error( $link ) ) { echo '<p role="alert">' . esc_html( $link->get_error_message() ) . '</p>'; return; }
+	$editable = ! $local || ( isset( $link['rules_base'] ) && ! metadata_exists( 'post', $scope->ID, '_pspp_play_round' ) &&
+		ps_pen_paper_inheritance_allows( ps_pen_paper_get_rules( $owner->ID ), 'conditions' ) );
+	$rules = ps_pen_paper_get_rules( $scope->ID );
 	?>
 	<details class="pspp-fold" <?php if ( $open ) { echo 'open'; } ?>><summary><?php esc_html_e( 'Charakterzustände, Verletzung und Tod selbst regeln', 'ps-pen-paper' ); ?></summary>
 	<p><?php esc_html_e( 'Es gibt keine fest eingebaute Todesregel. Namen, Auswirkungen, Rettung und Wiederbelebung bestimmst du. Abenteuererfolg und Charakterzustand sind unabhängig. Keine Figur wird durch einen Zustand gelöscht.', 'ps-pen-paper' ); ?></p>
-	<?php ps_pen_paper_form_start( 'save_condition_policy', 'pspp_campaign_' . $owner->ID, $owner->ID, $page_id ); ?>
-		<input type="hidden" name="condition_revision" value="<?php echo esc_attr( $policy['revision'] ); ?>">
+	<?php if ( $local && $document['revision'] && empty( $document['inherit'] ) ) : ?>
+		<?php ps_pen_paper_form_start( 'reset_condition_policy', 'pspp_campaign_' . $scope->ID, $scope->ID, $page_id ); ?>
+			<input type="hidden" name="condition_revision" value="<?php echo esc_attr( $document['revision'] ); ?>">
+			<label><input type="checkbox" name="condition_reset_confirmation" value="confirmed" required><?php esc_html_e( 'Kampagneneigene Zustandsvorlagen auf die Universumsvorgaben zurücksetzen. Bereits gesetzte Folgen bleiben erhalten.', 'ps-pen-paper' ); ?></label>
+			<button type="submit"><?php esc_html_e( 'Universumsvorgaben wieder verwenden', 'ps-pen-paper' ); ?></button>
+		</form>
+	<?php endif; ?>
+	<?php if ( ! $editable ) : ?>
+		<p><?php esc_html_e( 'Die Zustandsvorlagen sind durch das Universum festgelegt und können hier nicht bearbeitet werden.', 'ps-pen-paper' ); ?></p>
+	</details>
+	<?php return; endif; ?>
+	<?php if ( $local ) : ?><p><?php esc_html_e( 'Die Universumsleitung erlaubt kampagneneigene Zustandsvorlagen. Ihre Befugnisse und Automatikfreigaben bleiben die Obergrenze; bestehende Runden behalten ihren vorbereiteten Stand.', 'ps-pen-paper' ); ?></p><?php endif; ?>
+	<?php ps_pen_paper_form_start( 'save_condition_policy', 'pspp_campaign_' . $scope->ID, $scope->ID, $page_id ); ?>
+		<input type="hidden" name="condition_revision" value="<?php echo esc_attr( $document['revision'] ); ?>">
 		<?php foreach ( array( 'campaign_local' => __( 'Kampagnenleitungen dürfen lokale Charakterfolgen setzen und aufheben', 'ps-pen-paper' ),
 			'campaign_universe' => __( 'Kampagnenleitungen dürfen dauerhafte Folgen am Universumscharakter setzen und aufheben', 'ps-pen-paper' ),
 			'automatic' => __( 'Vorbereitete Abenteuer dürfen Rettungsausnahmen und automatische Folgen innerhalb dieser Befugnisse ausführen', 'ps-pen-paper' ) ) as $key => $label ) : ?>

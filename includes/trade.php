@@ -55,9 +55,12 @@ function ps_pen_paper_save_trade_policy( $scope, $input, $revision ) {
 	if ( is_wp_error( $gate = ps_pen_paper_require_community() ) ) { return $gate; }
 	if ( ! $scope || ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_character_scope( $scope ) || ! is_array( $input ) ||
 		! isset( $input['kinds'], $input['approval'] ) || ! is_array( $input['kinds'] ) || ! in_array( $input['approval'], array( '0', '1' ), true ) ) { return ps_pen_paper_trade_error(); }
+	return ps_pen_paper_with_inheritance_lock( $scope->ID, function () use ( $scope, $input, $revision ) {
 	return ps_pen_paper_atomic_event( $scope->ID, function () use ( $scope, $input, $revision ) {
 		$scope = ps_pen_paper_get_character_scope( $scope->ID );
 		if ( ! $scope || ! ps_pen_paper_can_manage_character_scope( $scope ) ) { return ps_pen_paper_trade_error(); }
+		$allowed = ps_pen_paper_require_campaign_economy_edit( $scope );
+		if ( is_wp_error( $allowed ) ) { return $allowed; }
 		$current = ps_pen_paper_trade_policy( $scope );
 		if ( is_wp_error( $current ) || $current['scope']->ID !== $scope->ID || ! is_string( $revision ) || (string) $current['policy']['revision'] !== $revision ) { return ps_pen_paper_trade_error(); }
 		$before = $current['policy']; $after = array( 'revision' => $before['revision'] + 1, 'kinds' => array_values( $input['kinds'] ), 'approval' => '1' === $input['approval'] );
@@ -68,6 +71,7 @@ function ps_pen_paper_save_trade_policy( $scope, $input, $revision ) {
 		if ( ! ps_pen_paper_valid_trade_policy( $after ) ) { return ps_pen_paper_trade_error(); }
 		return ps_pen_paper_write_document_event( $scope->ID, $scope->ID, '_pspp_trade_policy', $before, $after,
 			array( 'kind' => 'trade_policy', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0 ), false );
+	} );
 	} );
 }
 

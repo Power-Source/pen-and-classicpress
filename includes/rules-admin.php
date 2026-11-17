@@ -112,6 +112,14 @@ function ps_pen_paper_render_rules( $campaign, $can_manage, $page_id = 0 ) {
 	$locked = false;
 	$used_sheets = ps_pen_paper_has_characters( $campaign->ID );
 	$inheritance = 'pspp_campaign' === $campaign->post_type ? ps_pen_paper_inheritance_source( $campaign->ID ) : null;
+	$legacy_preview = null;
+	if ( $can_manage && 'pspp_campaign' === $campaign->post_type && null === $inheritance ) {
+		$link = ps_pen_paper_get_universe_link( $campaign->ID );
+		if ( ! is_wp_error( $link ) && $link['universe_id'] && ps_pen_paper_can_manage_universe( ps_pen_paper_get_universe( $link['universe_id'] ) ) &&
+			$rules['revision'] && ! metadata_exists( 'post', $campaign->ID, '_pspp_play_round' ) ) {
+			$legacy_preview = ps_pen_paper_preview_legacy_inheritance( $campaign->ID );
+		}
+	}
 	?>
 	<section class="pspp-rules" aria-labelledby="pspp-rules-heading">
 		<h2 id="pspp-rules-heading"><?php esc_html_e( 'Regelwerk und Charakterbogen-Vorlage', 'ps-pen-paper' ); ?></h2>
@@ -143,6 +151,21 @@ function ps_pen_paper_render_rules( $campaign, $can_manage, $page_id = 0 ) {
 					<?php endforeach; ?>
 				</ul>
 				<p><?php echo esc_html( $base_policy['extra_fields'] ? __( 'Zusätzliche Kampagnenfelder sind erlaubt.', 'ps-pen-paper' ) : __( 'Zusätzliche Kampagnenfelder sind nicht freigegeben.', 'ps-pen-paper' ) ); ?></p>
+			</details>
+		<?php endif; ?>
+		<?php if ( $legacy_preview ) : ?>
+			<details>
+				<summary><?php esc_html_e( 'Bestehendes Regelwerk mit dem Universum verbinden', 'ps-pen-paper' ); ?></summary>
+				<?php if ( is_wp_error( $legacy_preview ) ) : ?>
+					<p role="alert"><?php echo esc_html( $legacy_preview->get_error_message() ); ?></p>
+				<?php else : ?>
+					<p><?php esc_html_e( 'Die aktuellen Kampagnenregeln erfüllen die Universumsvorgaben. Charaktere und Feldwerte bleiben unverändert. Künftige Universumsänderungen werden unter Beachtung der freigegebenen Anpassungen übernommen oder bei Konflikten zur Prüfung vorgelegt.', 'ps-pen-paper' ); ?></p>
+					<?php ps_pen_paper_form_start( 'activate_legacy_inheritance', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
+						<input type="hidden" name="inheritance_preview_hash" value="<?php echo esc_attr( $legacy_preview['hash'] ); ?>">
+						<p><label class="pspp-check"><input type="checkbox" name="inheritance_confirmation" value="confirmed" required> <?php esc_html_e( 'Ich bestätige die Verbindung mit dem aktuellen Universumsregelwerk und dessen festen und flexiblen Vorgaben.', 'ps-pen-paper' ); ?></label></p>
+						<?php submit_button( __( 'Regelvererbung aktivieren', 'ps-pen-paper' ) ); ?>
+					</form>
+				<?php endif; ?>
 			</details>
 		<?php endif; ?>
 		<?php if ( ! $can_manage ) : ?>

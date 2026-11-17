@@ -33,6 +33,7 @@ function ps_pen_paper_render_trade_policy( $scope, $page_id ) {
 	$current = ps_pen_paper_trade_policy( $scope );
 	if ( is_wp_error( $current ) ) { echo '<p role="alert">' . esc_html( $current->get_error_message() ) . '</p>'; return; }
 	$p = $current['policy'];
+	$editable = ps_pen_paper_require_campaign_economy_edit( $scope );
 	?>
 	<section class="pspp-settings-section"><h3><?php esc_html_e( 'Handelsregeln', 'ps-pen-paper' ); ?></h3>
 	<p><?php esc_html_e( 'Spielerhandel bleibt innerhalb derselben Kampagne. Die Spielleitung bestimmt erlaubte Arten und zusätzliche Freigabe. Standardmäßig ist keine Handelsart aktiviert und eine Spielleiterfreigabe erforderlich. Eine Regeländerung macht offene Angebote nicht mehr ausführbar; sie können zurückgezogen oder abgelehnt werden.', 'ps-pen-paper' ); ?></p>
@@ -41,6 +42,9 @@ function ps_pen_paper_render_trade_policy( $scope, $page_id ) {
 		<?php ps_pen_paper_render_trade_snapshot( $p ); ?>
 	<?php elseif ( ! ps_pen_paper_community_available() ) : ?>
 		<p><?php esc_html_e( 'Handelsänderungen benötigen aktives PS Community.', 'ps-pen-paper' ); ?></p>
+	<?php elseif ( is_wp_error( $editable ) ) : ?>
+		<p role="alert"><?php echo esc_html( $editable->get_error_message() ); ?></p>
+		<?php ps_pen_paper_render_trade_snapshot( $p ); ?>
 	<?php else : ps_pen_paper_form_start( 'save_trade_policy', 'pspp_campaign_' . $scope->ID, $scope->ID, $page_id ); ?>
 		<input type="hidden" name="trade_complete" value="complete"><input type="hidden" name="trade_policy_revision" value="<?php echo esc_attr( $p['revision'] ); ?>">
 		<?php foreach ( ps_pen_paper_trade_kinds() as $key => $label ) : ?><label class="pspp-check"><input type="checkbox" name="trade_policy[kinds][]" value="<?php echo esc_attr( $key ); ?>" <?php checked( in_array( $key, $p['kinds'], true ) ); ?>><?php echo esc_html( $label ); ?></label><?php endforeach; ?>

@@ -73,6 +73,9 @@ try {
 	$check( true === $use( $dice_failed ) && ! isset( ps_pen_paper_gear_state( $character_id )['active']['items'][ $dice_failed ] ) && 5 === $value( $attribute ), 'Configured failed-test consumption wrong.' );
 	$approval = $grant( 'approval', array( $attribute => 1 ) );
 	$check( true === $use( $approval ) && 5 === $value( $attribute ) && is_wp_error( $use( $approval ) ), 'Approval prerequisite bypassed.' );
+	$changed_rules = $rules; $changed_rules['fields'] = array_values( array_filter( $rules['fields'], static function ( $field ) use ( $attribute ) { return $field['id'] !== $attribute; } ) );
+	$check( is_wp_error( ps_pen_paper_check_character_gear_for_rules( $campaign, $character, ps_pen_paper_raw_character_state( $character_id )['active'], null, $changed_rules ) ),
+		'Migration accepted an incompatible pending item-use request.' );
 	wp_set_current_user( $users['gm'] );
 	$check( true === $use( $approval, 'review_item_use', 'game', 'approve' ) && 6 === $value( $attribute ), 'Approval did not atomically apply.' );
 	$permanent = $grant( 'immediate', array( $resource => 2 ) );
@@ -103,8 +106,38 @@ try {
 	$check( $before === ps_pen_paper_gear_state( $character_id ) && $raw === ps_pen_paper_raw_character_state( $character_id ), 'Consume/effect journal rollback was partial.' );
 	$temp = $grant( 'immediate', array( $attribute => 2 ), true );
 	$check( true === $use( $temp ) && 8 === $value( $attribute ), 'Temporary effect missing.' );
-	$raw = ps_pen_paper_raw_character_state( $character_id ); $raw['active']['values'][ $attribute ] = 7; $raw['revision']++; update_post_meta( $character_id, '_pspp_character', $raw );
+	$migration_snapshot = ps_pen_paper_raw_character_state( $character_id )['active'];
+	$changed_rules = $rules; $changed_rules['fields'] = array_values( array_filter( $rules['fields'], static function ( $field ) use ( $attribute ) { return $field['id'] !== $attribute; } ) );
+	$check( is_wp_error( ps_pen_paper_check_character_gear_for_rules( $campaign, $character, $migration_snapshot, null, $changed_rules ) ),
+		'Migration accepted removal of a field used by an active temporary effect.' );
+	$changed_rules = $rules; $changed_rules['fields'][0]['max'] = 7;
+	$check( is_wp_error( ps_pen_paper_check_character_gear_for_rules( $campaign, $character, $migration_snapshot, null, $changed_rules ) ),
+		'Migration accepted a range excluding an active temporary effect.' );
+	$check( true === ps_pen_paper_check_character_gear_for_rules( $campaign, $character, $migration_snapshot, null, $rules ),
+		'Compatible temporary effect blocked migration.' );
+	$pending_snapshot = $migration_snapshot; $pending_snapshot['values'][ $attribute ] = 9;
+	$check( is_wp_error( ps_pen_paper_check_character_gear_for_rules( $campaign, $character, $migration_snapshot, $pending_snapshot, $rules ) ),
+		'Migration ignored an incompatible pending character with active gear.' );
+	$context_state = ps_pen_paper_raw_character_state( $character_id );
+	$with_context = $context_state;
+	$with_context['context'] = array( 'universe_id' => 1, 'source_id' => 1, 'source_revision' => 1, 'mode' => 'copy',
+		'overrides' => array( $attribute => 8 ), 'note' => '' );
+	update_post_meta( $character_id, '_pspp_character', $with_context );
+	try {
+		$changed_rules = $rules; $changed_rules['fields'][0]['max'] = 9;
+		$check( is_wp_error( ps_pen_paper_check_character_gear_for_rules( $campaign, $character, $migration_snapshot, null, $changed_rules ) ),
+			'Migration ignored effective context overrides with active item effects.' );
+	} finally { update_post_meta( $character_id, '_pspp_character', $context_state ); }
 	wp_set_current_user( $users['gm'] );
+	$migration_input = ps_pen_paper_inheritance_rules_input( $rules ); $migration_input['fields'][0]['max'] = '7';
+	$preview = ps_pen_paper_preview_rules_migration( $campaign_id, $migration_input, (string) $rules['revision'] );
+	$check( is_wp_error( $preview ) && 'equipment_conflict' === $preview->get_error_code(),
+		'The actual migration preview accepted an out-of-range active effect.' );
+	$migration_input['fields'][0]['max'] = '9';
+	$preview = ps_pen_paper_preview_rules_migration( $campaign_id, $migration_input, (string) $rules['revision'] );
+	$check( ! is_wp_error( $preview ) && $migration_snapshot === ps_pen_paper_raw_character_state( $character_id )['active'],
+		'Compatible migration preview failed or changed the character.' );
+	$raw = ps_pen_paper_raw_character_state( $character_id ); $raw['active']['values'][ $attribute ] = 7; $raw['revision']++; update_post_meta( $character_id, '_pspp_character', $raw );
 	$check( true === $use( $temp, 'end_item_effect' ) && 7 === $value( $attribute ) && true === $use( $temp, 'end_item_effect' ), 'Temporary ending undid unrelated later edit or replay was not idempotent.' );
 	$round_item = $grant( 'round', array( $attribute => 1 ), true, 1 );
 	$check( is_wp_error( $use( $round_item ) ), 'Round prerequisite ran with no session.' );
@@ -152,6 +185,9 @@ try {
 	$check( true === $use( $profile_round, 'use_item', 'profile' ) && 6 === $value( $resource )['current'], 'Profile round rule was not replaced by permitted immediate use.' );
 	$temp_resource = $grant( 'immediate', array( $resource => 2 ), true );
 	$check( true === $use( $temp_resource ) && 8 === $value( $resource )['current'], 'Temporary resource not available natively.' );
+	$changed_rules = $rules; $changed_rules['fields'][1]['min'] = 7;
+	$check( is_wp_error( ps_pen_paper_check_character_gear_for_rules( $campaign, $character, ps_pen_paper_raw_character_state( $character_id )['active'], null, $changed_rules ) ),
+		'Migration accepted bounds preventing a temporary resource effect from ending.' );
 	$cost = ps_pen_paper_character_resource_cost( $campaign, $character, $resource, 3 );
 	$spent = ps_pen_paper_with_character_resource_locks( $campaign, $character, $cost, function () use ( $campaign, $character, $cost ) {
 		return ps_pen_paper_atomic_event( $character->ID, function () use ( $campaign, $character, $cost ) { return ps_pen_paper_write_character_resource_cost( $campaign, $character, $cost ); } );
@@ -159,10 +195,14 @@ try {
 	$check( true === $spent && 5 === $value( $resource )['current'], 'Normal resource spending could not spend temporary restoration.' );
 	wp_set_current_user( $users['gm'] );
 	$check( true === $use( $temp_resource, 'end_item_effect' ) && 3 === $value( $resource )['current'], 'Ending resource effect undid unrelated later spending.' );
-	$profile_approval = $grant( 'test', array( $attribute => 1 ), false, 0, 100, 'keep', 'approval' );
+	$profile_approval = $grant( 'test', array( $attribute => 1 ), false, 0, 100, 'keep', 'approval', 'W6' );
 	wp_set_current_user( $users['player'] );
 	$check( true === $use( $profile_approval, 'use_item', 'profile' ) && 8 === $value( $attribute ) && is_wp_error( $use( $profile_approval ) ), 'Profile approval bypassed prerequisite or changed its trusted context.' );
 	wp_set_current_user( $users['gm'] );
+	$dice_change = ps_pen_paper_inheritance_rules_input( $rules ); $dice_change['dice'] = array( '20' );
+	$blocked = ps_pen_paper_save_rules( $campaign_id, $dice_change, (string) $rules['revision'] );
+	$check( is_wp_error( $blocked ) && 'equipment_conflict' === $blocked->get_error_code() &&
+		$rules === ps_pen_paper_get_rules( $campaign_id ), 'Removing a die broke an open item-use approval.' );
 	$check( true === $use( $profile_approval, 'review_item_use', 'game', 'approve' ) && 9 === $value( $attribute ) &&
 		'profile' === ps_pen_paper_gear_state( $character_id )['uses']['receipts'][ $profile_approval ]['context'], 'GM gameplay review reinterpreted profile prerequisite or log origin.' );
 	$ending_range = $grant( 'immediate', array( $resource => 2 ), true );
@@ -232,6 +272,9 @@ try {
 	wp_set_current_user( $users['gm'] );
 	$check( true === $scoped_use( $world, $basis, $basis_temp, 'review_item_use', 'game', 'approve' ) && 8 === ps_pen_paper_character_state( $world, $basis )['active']['values'][ $attribute ] &&
 		0 === ps_pen_paper_gear_state( $basis_id )['uses']['effects'][ $basis_temp ]['expires'], 'Basis GM approval demanded the game probe or did not support explicit temporary ending.' );
+	$changed_rules = $rules; $changed_rules['fields'][0]['max'] = 7;
+	$check( is_wp_error( ps_pen_paper_check_character_gear_for_rules( $world, $basis, ps_pen_paper_raw_character_state( $basis_id )['active'], null, $changed_rules ) ),
+		'Universe migration accepted combined equipment and temporary effect outside the range.' );
 	$link = array( 'revision' => 1, 'universe_id' => $world_id, 'name' => 'Basis inventory fixture', 'economy_mode' => 'local' );
 	$check( ps_pen_paper_valid_universe_link( $link ), 'Shared universe link fixture is not native-valid.' );
 	update_post_meta( $campaign_id, '_pspp_universe_link', $link );

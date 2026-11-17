@@ -776,8 +776,10 @@ function ps_pen_paper_adventure_run_records( $campaign, $character_id ) {
 }
 
 function ps_pen_paper_start_adventure_run( $campaign, $adventure_id, $character_id, $adventure_revision, $character_revision ) {
-	return ps_pen_paper_scope_write( $campaign, function () use ( $campaign, $adventure_id, $character_id, $adventure_revision, $character_revision ) {
-		return ps_pen_paper_start_adventure_run_locked( $campaign, $adventure_id, $character_id, $adventure_revision, $character_revision );
+	return ps_pen_paper_with_inheritance_lock( $campaign ? (int) $campaign->ID : 0, function () use ( $campaign, $adventure_id, $character_id, $adventure_revision, $character_revision ) {
+		return ps_pen_paper_scope_write( $campaign, function () use ( $campaign, $adventure_id, $character_id, $adventure_revision, $character_revision ) {
+			return ps_pen_paper_start_adventure_run_locked( $campaign, $adventure_id, $character_id, $adventure_revision, $character_revision );
+		} );
 	} );
 }
 
@@ -808,6 +810,8 @@ function ps_pen_paper_start_adventure_run_locked( $campaign, $adventure_id, $cha
 					if ( 'active' === $state['status'] || ! isset( $adventure['published']['scenario'] ) ) { $run_id = (int) $existing->ID; return 0; }
 				}
 			}
+			$inherited = ps_pen_paper_require_inherited_rules( $campaign->ID );
+			if ( is_wp_error( $inherited ) ) { return $inherited; }
 			$snapshot = $adventure['published'];
 			$access = ps_pen_paper_scenario_access( $campaign, (int) $adventure_id, $snapshot, $character, 'solo' );
 			if ( is_wp_error( $access ) ) { return $access; }

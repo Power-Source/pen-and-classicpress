@@ -975,11 +975,20 @@ Regelvorlage und die Basisbögen der Welt. Nur die Universumsleitung bearbeitet
 Basisbögen; ihr Besitzer muss ein leseberechtigtes Website-Mitglied sein.
 Besitz allein öffnet weder die private Weltbeschreibung noch deren Historie.
 
-Eine zugeordnete Kampagne kann die Vorlage ausdrücklich übernehmen, solange sie
-noch kein gespeichertes Regelwerk und keine Charaktere besitzt. Die Feldkennungen
-bleiben erhalten; das Kampagnenregelwerk ist danach ein eigenständiger Stand,
-keine automatisch synchronisierte Verbindung. Bestehende Regeln werden nicht ersetzt.
-Für die Übernahme sind Verwaltungsrechte an Universum und Kampagne erforderlich.
+Neue Kampagnen erhalten beim Anlegen eine Verbindung zum Universumsregelwerk.
+Die Universumsleitung gibt dort flexible Regeln und Feldgrenzen frei; nicht
+freigegebene Vorgaben sind fest. Kompatible Änderungen werden übernommen,
+kampagneneigene Abweichungen bleiben erhalten. Konflikte sperren neue Spiele;
+Charakteränderungen benötigen eine bestätigte Vorschau. Vorbereitete Inhalte
+können die Übernahme derzeit ebenfalls blockieren, weil ihre Auswirkungen noch
+nicht automatisch geprüft werden. Bereits laufende Runden bleiben unverändert.
+Ältere Kampagnen werden nicht automatisch in diese Verbindung aufgenommen.
+Eine ältere leere Kampagne kann die Vorlage ausdrücklich als Kopie übernehmen;
+dafür sind Verwaltungsrechte an Universum und Kampagne erforderlich.
+Weitere Regelbereiche wie Wirtschaft und Zustände besitzen weiterhin eigene
+Vorgaben und sind nicht Bestandteil dieser Regelwerkvererbung.
+Beim Import mit Universumsbindung muss die gesicherte Regelbasis genau zum
+gewählten Universumsregelwerk passen; andernfalls wird die Bindung abgelehnt.
 Ein Basisbogen kann nur für einen bereits aufgenommenen Kampagnenteilnehmer und
 bei übereinstimmenden Feldschemas übernommen werden:
 

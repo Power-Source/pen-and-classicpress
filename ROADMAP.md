@@ -578,8 +578,13 @@ ungeprüften Versionssprung. Die Versionsübersicht weiter unten ist historisch.
 ### Universum vor Kampagne: Grundmodell seit Version 0.11.0
 
 - Universen besitzen Regelvorlage und leitungsverwaltete Basisbögen.
-  Leere Kampagnen übernehmen die Vorlage ausdrücklich mit stabilen Feldkennungen;
-  spätere Regeländerungen werden nicht automatisch synchronisiert.
+  Neue Kampagnen übernehmen eine vorhandene Vorlage beim Anlegen; zugeordnete
+  ältere leere Kampagnen können sie ausdrücklich übernehmen. Die Feldkennungen
+  bleiben stabil. Neu verknüpfte Kampagnen übernehmen kompatible Änderungen
+  unter Beachtung fester und flexibler Vorgaben; Konflikte sperren neue Spiele.
+  Charakterkonflikte benötigen eine bestätigte Vorschau. Die Prüfung vorbereiteter
+  Inhalte, die Verknüpfung älterer Kampagnen und die einheitliche Vererbung weiterer
+  Regelbereiche sind noch offen.
 - Bei der Aufnahme eines bereits zugelassenen Besitzers wählt die Spielleitung
   **gemeinsamen Basisstand oder unabhängige Kampagnenkopie**. Beide Varianten sind
   vorhanden; bestehende Kampagnenbögen bleiben unverändert.

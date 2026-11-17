@@ -108,6 +108,8 @@ function ps_pen_paper_play_rounds( $source ) {
 function ps_pen_paper_copy_round_content( $source, $target_id, $universe_id ) {
 	$types = array( 'pspp_scene', 'pspp_folio', 'pspp_npc', 'pspp_item', 'pspp_loot_table', 'pspp_adventure' );
 	$root_keys = array( '_pspp_rules', '_pspp_equipment_schema', '_pspp_backdrop', '_pspp_sheet_style', '_pspp_currency', '_pspp_trade_policy', '_pspp_item_action_policy' );
+	$conditions = ps_pen_paper_condition_policy( $source );
+	if ( is_wp_error( $conditions ) ) { return $conditions; }
 	$posts = array_merge( array( $source, ps_pen_paper_get_universe( $universe_id ) ),
 		get_posts( array( 'post_type' => array_merge( $types, array( 'pspp_asset', 'pspp_wiki_entry' ) ),
 			'post_parent__in' => array( $source->ID, $universe_id ), 'post_status' => 'private', 'posts_per_page' => -1 ) ) );
@@ -165,6 +167,7 @@ function ps_pen_paper_copy_round_content( $source, $target_id, $universe_id ) {
 			}
 		}
 	}
+	if ( ! ps_pen_paper_import_insert_meta( $target_id, '_pspp_condition_policy', $conditions ) ) { return ps_pen_paper_play_error(); }
 	return $map;
 }
 
@@ -215,6 +218,8 @@ function ps_pen_paper_create_play_round_locked( $source, $mode, $adventure_id, $
 			if ( null !== $friends && array_column( $previous['invitations'] ?? array(), 'user_id' ) !== $friends ) { return ps_pen_paper_play_error(); }
 			$id = (int) $existing[0]->ID; return 0;
 		}
+		$inherited = ps_pen_paper_require_inherited_rules( $source->ID );
+		if ( is_wp_error( $inherited ) ) { return $inherited; }
 		if ( 'guided' !== $mode ) {
 			$records = ps_pen_paper_adventure_records( $source, false );
 			$adventure = ! is_wp_error( $records ) ? ( $records[ $adventure_id ] ?? null ) : null;
@@ -240,7 +245,8 @@ function ps_pen_paper_create_play_round_locked( $source, $mode, $adventure_id, $
 		if ( is_wp_error( $id ) || ! $id ) { return ps_pen_paper_play_error(); }
 		$map = ps_pen_paper_copy_round_content( $source, (int) $id, $link['universe_id'] );
 		if ( is_wp_error( $map ) ) { return $map; }
-		if ( ! ps_pen_paper_import_insert_meta( $id, '_pspp_universe_link', $link ) || ! ps_pen_paper_import_insert_meta( $id, '_pspp_play_token', $hash ) ) { return ps_pen_paper_play_error(); }
+		$round_link = $link; unset( $round_link['rules_base'] );
+		if ( ! ps_pen_paper_import_insert_meta( $id, '_pspp_universe_link', $round_link ) || ! ps_pen_paper_import_insert_meta( $id, '_pspp_play_token', $hash ) ) { return ps_pen_paper_play_error(); }
 		$state = array( 'revision' => 1, 'source_id' => (int) $source->ID, 'mode' => $mode, 'status' => 'lobby',
 			'host_id' => get_current_user_id(), 'adventure_id' => $adventure_id ? $map[ $adventure_id ] : 0, 'run_id' => 0, 'participants' => array() );
 		if ( null !== $invitations ) { $state['invitations'] = $invitations; }

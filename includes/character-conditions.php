@@ -52,8 +52,19 @@ function ps_pen_paper_condition_policy( $scope ) {
 	$owner = ps_pen_paper_condition_scope( $scope );
 	if ( is_wp_error( $owner ) ) { return $owner; }
 	$policy = get_post_meta( $owner->ID, '_pspp_condition_policy', true );
-	if ( '' === $policy ) { return ps_pen_paper_condition_policy_default(); }
-	return ps_pen_paper_valid_condition_policy( $policy ) ? $policy : ps_pen_paper_condition_error();
+	if ( '' === $policy ) { $policy = ps_pen_paper_condition_policy_default(); }
+	if ( ! ps_pen_paper_valid_condition_policy( $policy ) ) { return ps_pen_paper_condition_error(); }
+	if ( 'pspp_campaign' === $scope->post_type && metadata_exists( 'post', $scope->ID, '_pspp_play_round' ) &&
+		metadata_exists( 'post', $scope->ID, '_pspp_condition_policy' ) ) {
+		$round = ps_pen_paper_play_round( $scope->ID );
+		$snapshot = get_post_meta( $scope->ID, '_pspp_condition_policy', true );
+		if ( ! $round || is_wp_error( $round ) || ! ps_pen_paper_valid_condition_policy( $snapshot ) ) { return ps_pen_paper_condition_error(); }
+		foreach ( array( 'campaign_local', 'campaign_universe', 'automatic' ) as $permission ) {
+			$snapshot[ $permission ] = $snapshot[ $permission ] && $policy[ $permission ];
+		}
+		return $snapshot;
+	}
+	return $policy;
 }
 
 function ps_pen_paper_condition_context( $scope, $character ) {

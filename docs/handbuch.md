@@ -340,18 +340,21 @@ weiter zu ihrer Währung passen.
 
 1. Im Universum **Regelwerk & Basischaraktere** öffnen.
 2. **Universumsregelwerk bearbeiten** aufklappen. Felder, Wertebereiche, Startwerte,
-   erlaubte Würfel und Wurfsichtbarkeiten festlegen und speichern.
+   erlaubte Würfel und Wurfsichtbarkeiten festlegen und speichern. Unter
+   **Feste und flexible Universumsregeln** die kampagnenindividuellen Freigaben
+   und gegebenenfalls Feldgrenzen bestimmen; alle übrigen Vorgaben sind fest.
    Die Spielerbearbeitung ist eine Vorgabe für spätere Kampagnen; Basisbögen
    bearbeitet unabhängig davon ausschließlich die Universumsleitung.
 3. Einen **Basischarakter** für ein leseberechtigtes Mitglied dieser Website
    anlegen. Der Besitz öffnet noch keine Kampagne und keine Universumsverwaltung.
-4. Eine neue, noch unkonfigurierte Kampagne zuordnen und den Besitzer dort als
-   Teilnehmer aufnehmen. Die persönliche Aufnahme erfolgt weiterhin im Backend,
-   alternativ entscheidet die Spielleitung über einen Beitrittsantrag.
-5. Unter **In eine Kampagne übernehmen** die **Regelvorlage übernehmen**
-   ausdrücklich bestätigen. Das funktioniert nur ohne gespeichertes
-   Kampagnenregelwerk und ohne Charaktere. Die Feldkennungen bleiben erhalten;
-   spätere Vorlagenänderungen werden nicht automatisch nachgezogen.
+4. Eine neue Kampagne im Universum anlegen und den Besitzer dort als Teilnehmer
+   aufnehmen. Das vorhandene Regelwerk wird beim Anlegen übernommen. Die
+   persönliche Aufnahme erfolgt weiterhin im Backend, alternativ entscheidet
+   die Spielleitung über einen Beitrittsantrag.
+5. Bei einer bereits zugeordneten Kampagne ohne gespeichertes Regelwerk und ohne
+   Charaktere die **Regelvorlage übernehmen** ausdrücklich bestätigen. Die
+   Feldkennungen bleiben erhalten. Diese ältere Übernahme erzeugt derzeit eine
+   unabhängige Kopie, keine automatische Regelvererbung.
 6. Einen freigegebenen Basisbogen wählen, **Gemeinsamer Basisstand** oder
    **Unabhängige Kampagnenkopie** auswählen und die Übernahme bestätigen.
 
@@ -736,6 +739,14 @@ Vorbereitete Abenteuerautomatik und Rettungsausnahmen müssen ausdrücklich
 zugelassen werden. Die Universumsleitung behält ihre eigene Korrekturbefugnis.
 Spieler können geschützte Folgen nicht durch Bearbeiten ihres Bogens entfernen.
 
+Neue Spielrunden erhalten beim Anlegen einen eigenen Stand der Zustandsvorlagen.
+Spätere Änderungen der Vorlagen gelten für neu angelegte Runden, nicht
+nachträglich für deren bereits vorbereitete Definitionen. Widerruft die
+Universumsleitung eine Befugnis oder die Automatik, gilt dieser Widerruf auch
+für bestehende Runden. Ältere Runden ohne gespeicherten Vorlagenstand verwenden
+weiterhin die aktuellen Universumsregeln. Bereits gespeicherte dauerhafte
+Folgen bleiben am gemeinsamen Universumsbogen bestehen.
+
 **Lokal** bezieht sich auf genau diesen Kampagnen-/Rundenbogen; eine andere Runde
 übernimmt diese Folge nicht. **Dauerhaft** schreibt am verbundenen Universumsbogen
 und wirkt dadurch auch in dessen anderen gemeinsamen Bögen. Unabhängige Kopien
@@ -759,8 +770,9 @@ nicht automatisch die ganze Gruppe. Beispielsweise kann eine misslungene Probe
 überwinden und den Zustand aufheben. In einer Gruppe müssen gesunde Mitspieler
 den Zustand des Handelnden nicht selbst haben, um seine Rettung zu unterstützen.
 Ändert die Universumsleitung Befugnisse oder die verwendete Zustandsschablone,
-müssen nicht mehr passende automatische Folgen neu vorbereitet/veröffentlicht
-werden; sie werden nicht still durch Ersatzregeln ausgeführt.
+müssen nicht mehr passende automatische Folgen für neu vorbereitete Runden
+neu vorbereitet/veröffentlicht werden; sie werden nicht still durch
+Ersatzregeln ausgeführt.
 
 Am Spieltisch und Bogen bleiben eigene Folgen sichtbar. Unzulässige Aktionen
 sind gesperrt; gültige vorbereitete Rettungsaktionen bleiben nutzbar.
@@ -1237,8 +1249,16 @@ Nach Annahme ist die Runde im **Spielbereich** zugänglich.
 Unter **Bögen** den freigegebenen Universumscharakter auswählen und
 **Mit diesem Charakter mitspielen** einreichen; die Leitung bestätigt die
 Aufnahme unter **Werte → Offener Antrag → Freigeben**.
-Eine leere neue Kampagne bietet **Regeln dieses Universums übernehmen**.
-Bestehende Regeln werden nicht automatisch überschrieben.
+Eine neue Kampagne übernimmt beim Anlegen das Regelwerk ihres Universums. Wird
+es erst später eingerichtet, wird die leere Vorlage übernommen. Kompatible
+Änderungen werden automatisch nachgezogen; freigegebene Kampagnenanpassungen
+bleiben erhalten. Bei Konflikten sind neue Spiele gesperrt. Unter **Regelwerk**
+prüft die Spielleitung die Universumsänderungen und bestätigt gegebenenfalls
+die Charaktervorschau. Vorbereitete Inhalte können eine Übernahme derzeit
+blockieren, weil ihre Auswirkungen noch nicht automatisch geprüft werden.
+Laufende Runden behalten ihren Stand. Ältere Kampagnen mit unabhängigen
+Regelkopien werden nicht automatisch verknüpft; Wirtschaft und Zustände haben
+weiterhin eigene Vorgaben.
 
 Alternativ führt **Mein Charakterprofil**
 am Spieltisch dorthin. Im Tab lassen sich Bogen, Porträt und Ausrüstung

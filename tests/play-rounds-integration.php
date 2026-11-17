@@ -113,8 +113,26 @@ try {
 	$check( array() === ps_pen_paper_booking_links( $a )['events'], 'New round inherited scheduling references from the template.' );
 	$check( $a === ps_pen_paper_create_play_round( $source, 'guided', 0, $token, '1' ), 'Repeated create produced a second round.' );
 	$check( is_wp_error( ps_pen_paper_create_play_round( $source, 'solo', $adventure_id, $token, '1' ) ), 'Changed create payload reused an action token.' );
+	$changed_policy = $condition_policy; $changed_policy['revision'] = 2; $changed_policy['campaign_local'] = false;
+	$changed_policy['definitions'][ $injury_id ]['label'] = 'Changed world injury';
+	$success( ps_pen_paper_save_condition_policy( $world, $changed_policy, '1' ), 'Condition policy update failed' );
+	$first_policy = $success( ps_pen_paper_condition_policy( ps_pen_paper_get_campaign( $a ) ), 'First round policy failed' );
+	$check( 'Round injury' === $first_policy['definitions'][ $injury_id ]['label'] && ! $first_policy['campaign_local'],
+		'An existing round changed its condition definition or retained a revoked permission.' );
 	$b = $success( ps_pen_paper_create_play_round( $source, 'guided', 0, wp_generate_uuid4(), '1' ), 'Second guided round failed' ); $parents[] = $b;
 	$round_a = ps_pen_paper_get_campaign( $a ); $round_b = ps_pen_paper_get_campaign( $b );
+	$condition_policy['revision'] = 3;
+	$success( ps_pen_paper_save_condition_policy( $world, $condition_policy, '2' ), 'Condition policy restoration failed' );
+	$second_policy = $success( ps_pen_paper_condition_policy( $round_b ), 'Second round policy failed' );
+	$check( 'Changed world injury' === $second_policy['definitions'][ $injury_id ]['label'] && ! $second_policy['campaign_local'] &&
+		ps_pen_paper_condition_policy( $round_a )['campaign_local'], 'Rounds did not retain their own definitions and original permission limits.' );
+	$snapshot = get_post_meta( $b, '_pspp_condition_policy', true );
+	update_post_meta( $b, '_pspp_condition_policy', array( 'revision' => 999 ) );
+	$check( is_wp_error( ps_pen_paper_condition_policy( $round_b ) ), 'A damaged round policy silently fell back to the world policy.' );
+	update_post_meta( $b, '_pspp_condition_policy', $snapshot );
+	delete_post_meta( $b, '_pspp_condition_policy' );
+	$check( $condition_policy === ps_pen_paper_condition_policy( $round_b ), 'Legacy rounds without a snapshot changed behavior.' );
+	add_post_meta( $b, '_pspp_condition_policy', $snapshot, true );
 	$check( ! ps_pen_paper_play_round( $source_id ) && 'lobby' === ps_pen_paper_play_round( $a )['status'] &&
 		! ps_pen_paper_game_round( $a )['active'] && ! get_post_meta( $a, '_pspp_player', false ), 'Creating a round started play or copied players.' );
 	$check( ! in_array( $a, wp_list_pluck( ps_pen_paper_get_campaigns(), 'ID' ), true ), 'Runtime appeared as a prepared campaign.' );
@@ -273,8 +291,15 @@ try {
 	$success( ps_pen_paper_change_wallet( $world, $characters['player'], 'debit', '2', 'Round expense',
 		(string) ps_pen_paper_resolve_wallet_context( $world, ps_pen_paper_record_post( $characters['player'] ) )['wallet']['revision'],
 		(string) ps_pen_paper_currency_document( $universe_id )['revision'] ), 'Round expense failed' );
+	$changed_policy['revision'] = 4; $changed_policy['campaign_local'] = true;
+	$changed_policy['definitions'][ $injury_id ]['block_actions'] = true;
+	$success( ps_pen_paper_save_condition_policy( $world, $changed_policy, '3' ), 'Changed blocking condition failed' );
 	$success( ps_pen_paper_change_character_condition( $round_a, $alias_id, $injury_id, 'local', 'set',
 		(string) ps_pen_paper_raw_character_state( $alias_id )['revision'] ), 'Round injury failed' );
+	$check( true === ps_pen_paper_require_character_conditions( $round_a, $alias_id ),
+		'Updated universe condition blocked an existing round instead of using its prepared definition.' );
+	$condition_policy['revision'] = 5;
+	$success( ps_pen_paper_save_condition_policy( $world, $condition_policy, '4' ), 'Blocking condition restoration failed' );
 	$map_a = ps_pen_paper_map_selection( $round_a ); $map_b = ps_pen_paper_map_selection( $round_b );
 	$check( $map_a['scene_id'] && $map_b['scene_id'] && $map_a['scene_id'] !== $map_b['scene_id'] &&
 		0 === ps_pen_paper_map_selection( $source )['scene_id'], 'Guided rounds shared their scene or changed the template.' );
@@ -380,8 +405,11 @@ try {
 	foreach ( array_keys( $parsed['records'] ) as $record_id ) { $map[ $record_id ] = $next_id++; }
 	$prepared = $success( ps_pen_paper_prepare_import( $parsed, $options, $map, true ), 'Round backup preparation failed' );
 	$keys = array_column( $prepared[ $a ]['meta'], 'key' );
+	$round_metadata = array_column( $prepared[ $a ]['meta'], 'value', 'key' );
 	$check( ! in_array( '_pspp_play_round', $keys, true ) && ! in_array( '_pspp_play_token', $keys, true ) &&
 		in_array( '_pspp_import_archive', $keys, true ), 'Imported runtime activated old campaign authority or start tokens.' );
+	$check( $condition_policy['definitions'] === $round_metadata['_pspp_condition_policy']['definitions'],
+		'Round backup lost the prepared condition definitions.' );
 	$result_metadata = array_column( $prepared[ $alias_id ]['meta'], 'value', 'key' );
 	$check( $stored_statement === $result_metadata['_pspp_play_result'], 'Backup preparation lost or changed the immutable personal statement.' );
 	foreach ( $prepared[ $a ]['meta'] as $entry ) {

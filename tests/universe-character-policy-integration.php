@@ -94,6 +94,35 @@ try {
 	$rules = ps_pen_paper_save_rules( $universe_id, $rules_input, '0' );
 	$check( ! is_wp_error( $rules ), 'Native rules creation failed: ' . ( is_wp_error( $rules ) ? $rules->get_error_message() : '' ) );
 	$check( 'text' === $rules['fields'][0]['type'] && array( 'Wanderer', 'Wächter' ) === $rules['fields'][0]['choices'], 'Text choices introduced a fixed system or failed validation.' );
+	$before_creation = wp_list_pluck( ps_pen_paper_get_campaigns(), 'ID' );
+	$result = $create_campaign( array( 'universe_id' => (string) $universe_id ) );
+	$new_campaigns = array_values( array_diff( wp_list_pluck( ps_pen_paper_get_campaigns(), 'ID' ), $before_creation ) );
+	$check( null !== $result['redirect'] && null === $result['error'] && 1 === count( $new_campaigns ) &&
+		$rules === ps_pen_paper_get_rules( $new_campaigns[0] ) &&
+		$rules === ps_pen_paper_get_rules( $created[0]->ID ),
+		'Campaign creation or subsequent universe setup failed to provide inherited rules.' );
+	$second_rules = ps_pen_paper_save_rules( $second_universe, $rules_input, '0' );
+	$check( ! is_wp_error( $second_rules ), 'Second world rule fixture failed.' );
+	$second_input = $rules_input; $second_input['fields'][0]['id'] = $second_rules['fields'][0]['id'];
+	$second_input['description'] = 'Second world revision';
+	$second_rules = ps_pen_paper_save_rules( $second_universe, $second_input, '1' );
+	$check( ! is_wp_error( $second_rules ) && 2 === $second_rules['revision'], 'Second world revision fixture failed.' );
+	$before_creation = wp_list_pluck( ps_pen_paper_get_campaigns(), 'ID' );
+	$result = $create_campaign( array( 'universe_id' => (string) $second_universe ) );
+	$new_campaigns = array_values( array_diff( wp_list_pluck( ps_pen_paper_get_campaigns(), 'ID' ), $before_creation ) );
+	$second_rules['revision'] = 1;
+	$updated_existing = $second_rules; $updated_existing['revision'] = 2;
+	$check( null !== $result['redirect'] && null === $result['error'] && 1 === count( $new_campaigns ) &&
+		$second_rules === ps_pen_paper_get_rules( $new_campaigns[0] ) &&
+		$updated_existing === ps_pen_paper_get_rules( $selected[0] ), 'Campaign rule revision or automatic universe updates failed.' );
+	$invalid_source_campaign = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => 'Invalid rule source fixture' ), true );
+	$scopes[] = $invalid_source_campaign;
+	$valid_source = get_post_meta( $second_universe, '_pspp_rules', true );
+	update_post_meta( $second_universe, '_pspp_rules', array( 'revision' => 0 ) );
+	try { $invalid_source = ps_pen_paper_link_new_campaign( $invalid_source_campaign, $second_universe, '1' ); }
+	finally { update_post_meta( $second_universe, '_pspp_rules', $valid_source ); }
+	$check( is_wp_error( $invalid_source ) && 0 === ps_pen_paper_get_universe_link( $invalid_source_campaign )['revision'] &&
+		0 === ps_pen_paper_get_rules( $invalid_source_campaign )['revision'], 'Invalid universe rules were accepted or partially linked.' );
 	$field_id = $rules['fields'][0]['id'];
 	wp_set_current_user( $users['outsider'] );
 	$default_choices = array_values( array_filter( ps_pen_paper_profile_universe_choices(), function ( $choice ) use ( $universe_id ) { return $choice['id'] === $universe_id; } ) );
@@ -213,8 +242,29 @@ try {
 	$copy_campaign_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => 'Explicit universe copy campaign' ), true );
 	$scopes[] = $copy_campaign_id;
 	add_post_meta( $copy_campaign_id, '_pspp_player', (string) $users['player'] );
-	$check( ! is_wp_error( ps_pen_paper_link_new_campaign( $copy_campaign_id, $universe_id, '1' ) ) &&
-		! is_wp_error( ps_pen_paper_adopt_universe_rules( $copy_campaign_id, '1', 'confirmed' ) ), 'Explicit universe rules adoption failed.' );
+	$check( ! is_wp_error( ps_pen_paper_link_new_campaign( $copy_campaign_id, $universe_id, '1' ) ), 'New campaign association failed.' );
+	$inherited = ps_pen_paper_get_rules( $universe_id ); $inherited['revision'] = 1;
+	$check( $inherited === ps_pen_paper_get_rules( $copy_campaign_id ), 'New campaign did not inherit the universe rulebook.' );
+	$rules_only_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => 'Existing rules without characters' ), true );
+	$scopes[] = $rules_only_id;
+	$rules_only = ps_pen_paper_save_rules( $rules_only_id, $rules_input, '0' );
+	$check( ! is_wp_error( $rules_only ) && is_wp_error( ps_pen_paper_link_new_campaign( $rules_only_id, $universe_id, '1' ) ) &&
+		$rules_only === ps_pen_paper_get_rules( $rules_only_id ) && 0 === ps_pen_paper_get_universe_link( $rules_only_id )['revision'],
+		'Automatic adoption overwrote existing campaign rules or partially linked the campaign.' );
+	$rollback_id = wp_insert_post( array( 'post_type' => 'pspp_campaign', 'post_status' => 'private', 'post_author' => $users['gm'], 'post_title' => 'Rule adoption rollback' ), true );
+	$scopes[] = $rollback_id;
+	$publications = 0;
+	$fail_rule_event = static function ( $data ) use ( &$publications ) {
+		if ( 'pspp_event' === $data['post_type'] && 'private' === $data['post_status'] && 2 === ++$publications ) { $data['post_status'] = 'draft'; }
+		return $data;
+	};
+	add_filter( 'wp_insert_post_data', $fail_rule_event );
+	try { $failed_link = ps_pen_paper_link_new_campaign( $rollback_id, $universe_id, '1' ); }
+	finally { remove_filter( 'wp_insert_post_data', $fail_rule_event ); }
+	$check( is_wp_error( $failed_link ) && 0 === ps_pen_paper_get_universe_link( $rollback_id )['revision'] &&
+		0 === ps_pen_paper_get_rules( $rollback_id )['revision'] &&
+		! get_posts( array( 'post_type' => 'pspp_event', 'post_status' => array( 'private', 'draft' ), 'post_parent' => $rollback_id, 'fields' => 'ids' ) ),
+		'Failed rule adoption did not roll back the universe link, rulebook and events.' );
 	$copy_id = ps_pen_paper_attach_base_character( $copy_campaign_id, $character_id, '2', '1', 'copy', 'confirmed' );
 	$check( is_int( $copy_id ), 'Explicit base copy failed.' );
 	$copy_portrait = ps_pen_paper_portrait_state( $copy_id );
@@ -224,7 +274,7 @@ try {
 	$check( true === ps_pen_paper_change_member_invitation( $universe_id, $users['invited'], 'accept', '4' ) && ps_pen_paper_is_universe_member( $universe ), 'Approved member invitation not accepted.' );
 	wp_set_current_user( $users['outsider'] );
 	$check( ! ps_pen_paper_profile_characters() && ! ps_pen_paper_get_character( $universe, $character_id ), 'Another player obtained private base sheets.' );
-	WP_CLI::success( 'Mandatory campaign universes, automatic sole-universe assignment, profile forms, native creation/limits, choices, invitation approval/rollback, private frozen portraits and explicit legacy repair passed.' );
+	WP_CLI::success( 'Mandatory universes, atomic initial rule adoption, profile forms, choices, invitation approval/rollback, private frozen portraits and explicit legacy repair passed.' );
 } finally {
 	wp_set_current_user( $original_user );
 	foreach ( $scopes as $scope_id ) {

@@ -474,6 +474,8 @@ function ps_pen_paper_prepare_import_event_snapshot_valid( $kind, $snapshot, $ev
 		if ( ! is_array( $rules ) || ! is_array( $event['fields'] ) ) { return false; }
 		$rules['revision'] = max( 1, $event['rules_revision'] );
 		$rules['fields'] = $event['fields'];
+		// The current campaign policy may refer to fields added after this historical event.
+		unset( $rules['campaign_policy'] );
 		if ( ! ps_pen_paper_import_rules_valid( $rules ) || ! ps_pen_paper_import_character_valid( $snapshot, $rules ) ) { return false; }
 		return true;
 	}
@@ -881,6 +883,10 @@ function ps_pen_paper_prepare_import_remap_value( $key, &$value, $record, $parse
 			if ( 0 === $source_universe ) { return true; }
 			$mapped = ps_pen_paper_prepare_import_id( $source_universe, 'pspp_universe', $records, $id_map );
 			if ( is_wp_error( $mapped ) ) { return $mapped; }
+			if ( 'bind' === $options['universe_mode'] && 'pspp_campaign' === $record['type'] && isset( $value['rules_base'] ) &&
+				ps_pen_paper_get_rules( $mapped ) !== $value['rules_base'] ) {
+				return new WP_Error( 'inheritance_import_conflict', __( 'Die gesicherte Regelbasis stimmt nicht mit dem gewählten Universum überein. Eine automatische Umstellung auf dessen Regeln ist nicht sicher möglich.', 'ps-pen-paper' ) );
+			}
 			$value['universe_id'] = $mapped;
 			if ( 'bind' === $options['universe_mode'] && function_exists( 'ps_pen_paper_universe_document' ) ) {
 				$document = ps_pen_paper_universe_document( $mapped );

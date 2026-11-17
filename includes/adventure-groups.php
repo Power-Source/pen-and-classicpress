@@ -144,6 +144,11 @@ function ps_pen_paper_write_adventure_group( $campaign, $id, $revision, $operati
 	if ( ! $campaign ) { return ps_pen_paper_adventure_group_error(); }
 	$round = ps_pen_paper_play_round( $campaign->ID );
 	if ( is_wp_error( $round ) ) { return $round; }
+	if ( ! $round && 'create' === $operation ) {
+		return ps_pen_paper_with_inheritance_lock( (int) $campaign->ID, function () use ( $campaign, $id, $revision, $operation, $input ) {
+			return ps_pen_paper_write_adventure_group_locked( $campaign, $id, $revision, $operation, $input );
+		} );
+	}
 	if ( ! $round ) { return ps_pen_paper_write_adventure_group_locked( $campaign, $id, $revision, $operation, $input ); }
 	if ( 'group' !== $round['mode'] || $round['run_id'] !== $id || 'active' !== $round['status'] ||
 		! in_array( $operation, array( 'propose', 'vote', 'unvote', 'cancel', 'execute' ), true ) ) { return ps_pen_paper_play_error(); }
@@ -215,6 +220,8 @@ function ps_pen_paper_write_adventure_group_locked( $campaign, $id, $revision, $
 					( $id && ( ! $post || 'pspp_adventure_group' !== $post->post_type || 'private' !== $post->post_status || (int) $post->post_parent !== (int) $campaign->ID ) ) ) { return ps_pen_paper_adventure_group_error(); }
 				$gm = ps_pen_paper_can_manage_campaign( $campaign ); $user_id = get_current_user_id();
 				if ( 'create' === $operation ) {
+					$inherited = ps_pen_paper_require_inherited_rules( $campaign->ID );
+					if ( is_wp_error( $inherited ) ) { return $inherited; }
 					$adventure = ps_pen_paper_get_adventure( $campaign, $input['adventure_id'] );
 					if ( ! $gm || is_wp_error( $adventure ) || 'published' !== $adventure['status'] ||
 						( isset( $adventure['published']['scenario'] ) && 'solo' === $adventure['published']['scenario']['mode'] ) ||

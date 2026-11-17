@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-function ps_pen_paper_render_rule_field( $field, $index, $locked = false ) {
+function ps_pen_paper_render_rule_field( $field, $index, $locked = false, $policy = null ) {
 	$prefix = 'rules[fields][' . $index . ']';
 	$element_id = 'pspp-field-' . $index;
 	?>
@@ -80,6 +80,21 @@ function ps_pen_paper_render_rule_field( $field, $index, $locked = false ) {
 			<input type="hidden" name="<?php echo esc_attr( $prefix . '[required]' ); ?>" value="1">
 		<?php endif; ?>
 		<p><label class="pspp-check"><input type="checkbox" name="<?php echo esc_attr( $prefix . '[required]' ); ?>" value="1" <?php checked( $field['required'] ); ?> <?php disabled( $locked ); ?>> <?php esc_html_e( 'Pflichtfeld', 'ps-pen-paper' ); ?></label></p>
+		<?php if ( null !== $policy && '' !== $field['id'] ) :
+			$setting = $policy['fields'][ $field['id'] ] ?? null;
+			$policy_prefix = 'rules[campaign_policy][fields][' . $field['id'] . ']';
+			?>
+			<fieldset>
+				<legend><?php esc_html_e( 'Vorgabe für Kampagnen', 'ps-pen-paper' ); ?></legend>
+				<label class="pspp-check"><input type="checkbox" name="<?php echo esc_attr( $policy_prefix . '[enabled]' ); ?>" value="1" <?php checked( null !== $setting ); ?>> <?php esc_html_e( 'Dieses Feld darf kampagnenindividuell angepasst werden', 'ps-pen-paper' ); ?></label>
+				<?php if ( in_array( $field['type'], array( 'number', 'attribute', 'resource' ), true ) ) : ?>
+					<?php foreach ( array( 'min' => __( 'Untergrenze für Kampagnen', 'ps-pen-paper' ), 'max' => __( 'Obergrenze für Kampagnen', 'ps-pen-paper' ) ) as $key => $label ) : ?>
+						<p><label><?php echo esc_html( $label ); ?> <input type="number" step="1" min="-1000000" max="1000000" name="<?php echo esc_attr( $policy_prefix . '[' . $key . ']' ); ?>" value="<?php echo esc_attr( $setting[ $key ] ?? '' ); ?>"></label></p>
+					<?php endforeach; ?>
+					<p class="description"><?php esc_html_e( 'Leer lässt die jeweilige Grenze offen. Die Universumswerte müssen innerhalb der angegebenen Grenzen liegen.', 'ps-pen-paper' ); ?></p>
+				<?php endif; ?>
+			</fieldset>
+		<?php endif; ?>
 		<div class="pspp-actions" data-field-actions hidden>
 			<button type="button" class="button" data-move="up"><?php esc_html_e( 'Nach oben', 'ps-pen-paper' ); ?></button>
 			<button type="button" class="button" data-move="down"><?php esc_html_e( 'Nach unten', 'ps-pen-paper' ); ?></button>
@@ -93,11 +108,43 @@ function ps_pen_paper_render_rule_field( $field, $index, $locked = false ) {
 
 function ps_pen_paper_render_rules( $campaign, $can_manage, $page_id = 0 ) {
 	$rules = ps_pen_paper_get_rules( $campaign->ID );
+	$policy = $rules['campaign_policy'] ?? ps_pen_paper_inheritance_policy_default();
 	$locked = false;
 	$used_sheets = ps_pen_paper_has_characters( $campaign->ID );
+	$inheritance = 'pspp_campaign' === $campaign->post_type ? ps_pen_paper_inheritance_source( $campaign->ID ) : null;
 	?>
 	<section class="pspp-rules" aria-labelledby="pspp-rules-heading">
 		<h2 id="pspp-rules-heading"><?php esc_html_e( 'Regelwerk und Charakterbogen-Vorlage', 'ps-pen-paper' ); ?></h2>
+		<?php if ( $can_manage && 'pspp_universe' === $campaign->post_type && ps_pen_paper_pending_inherited_campaigns( $campaign->ID ) ) : ?>
+			<p role="alert"><?php esc_html_e( 'Mindestens eine verknüpfte Kampagne konnte die aktuellen Universumsregeln noch nicht übernehmen. Ihre Spielleitung kann die ausstehende Änderung im Kampagnenregelwerk prüfen.', 'ps-pen-paper' ); ?></p>
+		<?php endif; ?>
+		<?php if ( is_wp_error( $inheritance ) ) : ?>
+			<p role="alert"><?php echo esc_html( $inheritance->get_error_message() ); ?></p>
+		<?php elseif ( $inheritance && $inheritance['link']['rules_base'] !== $inheritance['rules'] ) : ?>
+			<p role="alert"><?php esc_html_e( 'Das Universumsregelwerk wurde geändert. Bis zur Übernahme können keine neuen Spiele gestartet werden; laufende Runden bleiben unverändert.', 'ps-pen-paper' ); ?></p>
+			<?php if ( $can_manage ) : ?>
+				<p><?php esc_html_e( 'Prüfe die Übernahme. Bei widersprechenden Kampagnenanpassungen kannst du zunächst die bisherigen flexiblen Vorgaben zurücksetzen und erneut prüfen.', 'ps-pen-paper' ); ?></p>
+				<?php ps_pen_paper_form_start( 'sync_inherited_rules', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
+					<?php submit_button( __( 'Universumsänderungen prüfen', 'ps-pen-paper' ) ); ?>
+				</form>
+			<?php endif; ?>
+		<?php endif; ?>
+		<?php if ( $can_manage && is_array( $inheritance ) ) :
+			$base_policy = $inheritance['link']['rules_base']['campaign_policy'] ?? ps_pen_paper_inheritance_policy_default();
+			?>
+			<details>
+				<summary><?php esc_html_e( 'Universumsvorgaben für diese Kampagne', 'ps-pen-paper' ); ?></summary>
+				<ul>
+					<?php foreach ( ps_pen_paper_inheritance_globals() as $key => $label ) : ?>
+						<li><?php echo esc_html( $label ); ?>: <?php echo esc_html( in_array( $key, $base_policy['globals'], true ) ? __( 'flexibel', 'ps-pen-paper' ) : __( 'fest', 'ps-pen-paper' ) ); ?></li>
+					<?php endforeach; ?>
+					<?php foreach ( $inheritance['link']['rules_base']['fields'] as $field ) : ?>
+						<li><?php echo esc_html( $field['label'] ); ?>: <?php echo esc_html( isset( $base_policy['fields'][ $field['id'] ] ) ? __( 'flexibel', 'ps-pen-paper' ) : __( 'fest', 'ps-pen-paper' ) ); ?></li>
+					<?php endforeach; ?>
+				</ul>
+				<p><?php echo esc_html( $base_policy['extra_fields'] ? __( 'Zusätzliche Kampagnenfelder sind erlaubt.', 'ps-pen-paper' ) : __( 'Zusätzliche Kampagnenfelder sind nicht freigegeben.', 'ps-pen-paper' ) ); ?></p>
+			</details>
+		<?php endif; ?>
 		<?php if ( ! $can_manage ) : ?>
 			<?php if ( 0 === $rules['revision'] ) : ?>
 				<p><?php esc_html_e( 'Noch kein Regelwerk eingerichtet.', 'ps-pen-paper' ); ?></p>
@@ -112,7 +159,7 @@ function ps_pen_paper_render_rules( $campaign, $can_manage, $page_id = 0 ) {
 				</ul>
 			<?php endif; ?>
 		<?php else : ?>
-			<p><?php echo esc_html( 'pspp_universe' === $campaign->post_type ? __( 'Diese Vorlage gilt für die Basisbögen. Kampagnen übernehmen sie nur ausdrücklich; bestehende Kampagnenregeln werden nicht synchronisiert. Die Spielerbearbeitung wird als Vorgabe mitkopiert; Basisbögen bleiben ausschließlich durch die Universumsleitung bearbeitbar.', 'ps-pen-paper' ) : __( 'Diese Einstellungen gelten nur für diese Kampagne und ihre Charaktere und Würfe.', 'ps-pen-paper' ) ); ?></p>
+			<p><?php echo esc_html( 'pspp_universe' === $campaign->post_type ? __( 'Diese Vorlage gilt für Basisbögen und wird von neu angelegten Kampagnen übernommen. Änderungen werden für verknüpfte Kampagnen geprüft; bei Konflikten bleibt die Übernahme bis zur Klärung ausstehend. Basisbögen bleiben ausschließlich durch die Universumsleitung bearbeitbar.', 'ps-pen-paper' ) : __( 'Diese Einstellungen gelten für diese Kampagne und ihre Charaktere und Würfe. Bei vererbten Regeln dürfen nur die vom Universum freigegebenen Vorgaben angepasst werden.', 'ps-pen-paper' ) ); ?></p>
 			<?php ps_pen_paper_form_start( 'pspp_universe' === $campaign->post_type ? 'save_universe_rules' : 'save_rules', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 				<div data-rules-editor data-limit="30" data-structure-locked="<?php echo $locked ? 'true' : 'false'; ?>"
 					data-limit-message="<?php esc_attr_e( 'Es sind höchstens 30 Felder möglich.', 'ps-pen-paper' ); ?>"
@@ -121,6 +168,17 @@ function ps_pen_paper_render_rules( $campaign, $can_manage, $page_id = 0 ) {
 					data-unsaved-message="<?php esc_attr_e( 'Es gibt ungespeicherte Änderungen.', 'ps-pen-paper' ); ?>"
 					data-change-message="<?php esc_attr_e( 'Feldliste geändert. Bitte speichere das Regelwerk.', 'ps-pen-paper' ); ?>">
 					<input type="hidden" name="rules_revision" value="<?php echo esc_attr( $rules['revision'] ); ?>">
+					<?php if ( 'pspp_universe' === $campaign->post_type ) : ?>
+						<fieldset>
+							<legend><strong><?php esc_html_e( 'Feste und flexible Universumsregeln', 'ps-pen-paper' ); ?></strong></legend>
+							<p><?php esc_html_e( 'Nicht ausgewählte Vorgaben sind fest. Ausgewählte Vorgaben dürfen Kampagnenleitungen anpassen. Zusätzliche Felder benötigen eine eigene Freigabe.', 'ps-pen-paper' ); ?></p>
+							<input type="hidden" name="rules[campaign_policy_present]" value="1">
+							<label class="pspp-check"><input type="checkbox" name="rules[campaign_policy][extra_fields]" value="1" <?php checked( $policy['extra_fields'] ); ?>> <?php esc_html_e( 'Zusätzliche kampagneneigene Charakterfelder erlauben', 'ps-pen-paper' ); ?></label>
+							<?php foreach ( ps_pen_paper_inheritance_globals() as $key => $label ) : ?>
+								<label class="pspp-check"><input type="checkbox" name="rules[campaign_policy][globals][]" value="<?php echo esc_attr( $key ); ?>" <?php checked( in_array( $key, $policy['globals'], true ) ); ?>> <?php echo esc_html( $label ); ?></label>
+							<?php endforeach; ?>
+						</fieldset>
+					<?php endif; ?>
 					<p><label for="pspp-rule-name"><?php esc_html_e( 'Name des Regelwerks', 'ps-pen-paper' ); ?></label>
 						<input id="pspp-rule-name" name="rules[name]" type="text" value="<?php echo esc_attr( $rules['name'] ); ?>" maxlength="200" required></p>
 					<p><label for="pspp-rule-description"><?php esc_html_e( 'Regelbeschreibung und Hausregeln', 'ps-pen-paper' ); ?></label>
@@ -203,7 +261,7 @@ function ps_pen_paper_render_rules( $campaign, $can_manage, $page_id = 0 ) {
 					</fieldset>
 					<div data-fields>
 						<?php foreach ( $rules['fields'] as $index => $field ) : ?>
-							<?php ps_pen_paper_render_rule_field( $field, $index, $locked ); ?>
+							<?php ps_pen_paper_render_rule_field( $field, $index, $locked, 'pspp_universe' === $campaign->post_type ? $policy : null ); ?>
 						<?php endforeach; ?>
 					</div>
 					<template data-field-template>
@@ -224,9 +282,9 @@ function ps_pen_paper_render_rules( $campaign, $can_manage, $page_id = 0 ) {
 	<?php
 }
 
-function ps_pen_paper_show_rules_migration_preview( $scope, $input, $revision, $page_id = 0 ) {
+function ps_pen_paper_show_rules_migration_preview( $scope, $input, $revision, $page_id = 0, $inherited = false ) {
 	if ( ! $scope ) { ps_pen_paper_fail( __( 'Die Regelwerksvorlage ist nicht mehr verfügbar.', 'ps-pen-paper' ) ); }
-	$preview = ps_pen_paper_preview_rules_migration( $scope->ID, $input, $revision );
+	$preview = ps_pen_paper_preview_rules_migration( $scope->ID, $input, $revision, $inherited );
 	if ( is_wp_error( $preview ) ) { ps_pen_paper_fail( $preview->get_error_message() ); }
 	ob_start();
 	ps_pen_paper_render_rules_migration_preview( $scope, $preview, $page_id );
@@ -271,12 +329,22 @@ function ps_pen_paper_render_rules_migration_preview( $campaign, $preview, $page
 		<?php endforeach; ?>
 		<?php ps_pen_paper_form_start( 'pspp_universe' === $campaign->post_type ? 'save_universe_rules' : 'save_rules_migration', 'pspp_campaign_' . $campaign->ID, $campaign->ID, $page_id ); ?>
 			<?php if ( 'pspp_universe' === $campaign->post_type ) : ?><input type="hidden" name="rules_migration" value="1"><?php endif; ?>
+			<?php if ( isset( $preview['inheritance'] ) ) : ?><input type="hidden" name="rules_inheritance" value="1"><?php endif; ?>
 			<input type="hidden" name="rules_revision" value="<?php echo esc_attr( $preview['before']['revision'] ); ?>">
 			<input type="hidden" name="migration_preview_hash" value="<?php echo esc_attr( $preview['hash'] ); ?>">
 			<input type="hidden" name="rules_complete" value="complete">
 			<input type="hidden" name="rules[name]" value="<?php echo esc_attr( $rules['name'] ); ?>">
 			<input type="hidden" name="rules[description]" value="<?php echo esc_attr( $rules['description'] ); ?>">
 			<input type="hidden" name="rules[character_mode]" value="<?php echo esc_attr( ps_pen_paper_character_mode( $rules ) ); ?>">
+			<?php if ( 'pspp_universe' === $campaign->post_type && array_key_exists( 'campaign_policy', $rules ) ) : ?>
+				<input type="hidden" name="rules[campaign_policy_present]" value="1">
+				<?php if ( $rules['campaign_policy']['extra_fields'] ) : ?><input type="hidden" name="rules[campaign_policy][extra_fields]" value="1"><?php endif; ?>
+				<?php foreach ( $rules['campaign_policy']['globals'] as $key ) : ?><input type="hidden" name="rules[campaign_policy][globals][]" value="<?php echo esc_attr( $key ); ?>"><?php endforeach; ?>
+				<?php foreach ( $rules['campaign_policy']['fields'] as $id => $bounds ) : ?>
+					<input type="hidden" name="<?php echo esc_attr( 'rules[campaign_policy][fields][' . $id . '][enabled]' ); ?>" value="1">
+					<?php foreach ( $bounds as $key => $value ) : ?><input type="hidden" name="<?php echo esc_attr( 'rules[campaign_policy][fields][' . $id . '][' . $key . ']' ); ?>" value="<?php echo esc_attr( null === $value ? '' : $value ); ?>"><?php endforeach; ?>
+				<?php endforeach; ?>
+			<?php endif; ?>
 			<?php if ( array_key_exists( 'dice_mechanics', $rules ) ) : ?>
 				<input type="hidden" name="rules[dice_mechanics_present]" value="1">
 				<?php foreach ( ps_pen_paper_allowed_dice_mechanics( $rules ) as $mechanic ) : ?><input type="hidden" name="rules[dice_mechanics][]" value="<?php echo esc_attr( $mechanic ); ?>"><?php endforeach; ?>

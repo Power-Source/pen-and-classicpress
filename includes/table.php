@@ -258,6 +258,15 @@ function ps_pen_paper_game_round( $campaign_id ) {
 }
 
 function ps_pen_paper_control_game_round( $campaign, $operation, $revision ) {
+	if ( 'start_game_session' === $operation ) {
+		return ps_pen_paper_with_inheritance_lock( (int) $campaign->ID, function () use ( $campaign, $operation, $revision ) {
+			return ps_pen_paper_control_game_round_locked( $campaign, $operation, $revision );
+		} );
+	}
+	return ps_pen_paper_control_game_round_locked( $campaign, $operation, $revision );
+}
+
+function ps_pen_paper_control_game_round_locked( $campaign, $operation, $revision ) {
 	if ( 'pspp_campaign' !== $campaign->post_type || ! ps_pen_paper_can_access_site() || ! ps_pen_paper_can_manage_campaign( $campaign ) ) { return ps_pen_paper_equipment_error( 'forbidden' ); }
 	$play = ps_pen_paper_play_round( $campaign->ID );
 	if ( is_wp_error( $play ) ) { return $play; }
@@ -285,6 +294,8 @@ function ps_pen_paper_control_game_round( $campaign, $operation, $revision ) {
 				$after['round']++;
 			} elseif ( 'start_game_session' === $operation ) {
 				if ( $before['active'] ) { return 0; }
+				$inherited = ps_pen_paper_require_inherited_rules( $campaign->ID );
+				if ( is_wp_error( $inherited ) ) { return $inherited; }
 				$after['active'] = true;
 			} elseif ( 'end_game_session' === $operation ) {
 				if ( ! $before['active'] ) { return 0; }

@@ -93,7 +93,8 @@ function ps_pen_paper_valid_universe_link( $link ) {
 	return is_array( $link ) && isset( $link['revision'], $link['universe_id'], $link['name'] ) &&
 		is_int( $link['revision'] ) && $link['revision'] >= 1 && is_int( $link['universe_id'] ) &&
 		$link['universe_id'] >= 0 && is_string( $link['name'] ) &&
-		( ! array_key_exists( 'economy_mode', $link ) || in_array( $link['economy_mode'], array( 'universe', 'local' ), true ) );
+		( ! array_key_exists( 'economy_mode', $link ) || in_array( $link['economy_mode'], array( 'universe', 'local' ), true ) ) &&
+		( ! array_key_exists( 'rules_base', $link ) || ( $link['universe_id'] > 0 && ps_pen_paper_valid_inheritance_base( $link['rules_base'] ) ) );
 }
 
 function ps_pen_paper_get_universe_link( $campaign_id ) {
@@ -145,7 +146,16 @@ function ps_pen_paper_preview_universe_link( $campaign_id, $universe_id, $econom
 	return array( 'before' => $before, 'universe' => $documents[ $universe_id ], 'source_universe' => $documents[ $before['universe_id'] ], 'campaign' => $campaign, 'economy_mode' => $economy_mode );
 }
 
-function ps_pen_paper_save_universe_link( $campaign_id, $universe_id, $revision, $universe_revision, $confirmed, $economy_mode = 'universe' ) {
+function ps_pen_paper_save_universe_link( $campaign_id, $universe_id, $revision, $universe_revision, $confirmed, $economy_mode = 'universe', $copy_new_rules = false ) {
+	if ( $copy_new_rules ) {
+		return ps_pen_paper_scope_lock( $universe_id, function () use ( $campaign_id, $universe_id, $revision, $universe_revision, $confirmed, $economy_mode ) {
+			return ps_pen_paper_save_universe_link_locked( $campaign_id, $universe_id, $revision, $universe_revision, $confirmed, $economy_mode, true );
+		} );
+	}
+	return ps_pen_paper_save_universe_link_locked( $campaign_id, $universe_id, $revision, $universe_revision, $confirmed, $economy_mode, false );
+}
+
+function ps_pen_paper_save_universe_link_locked( $campaign_id, $universe_id, $revision, $universe_revision, $confirmed, $economy_mode, $copy_new_rules ) {
 	$preview = ps_pen_paper_preview_universe_link( $campaign_id, $universe_id, $economy_mode );
 	if ( is_wp_error( $preview ) ) {
 		return $preview;
@@ -163,15 +173,33 @@ function ps_pen_paper_save_universe_link( $campaign_id, $universe_id, $revision,
 	}
 	$after = array( 'revision' => $preview['before']['revision'] + 1, 'universe_id' => $universe_id, 'name' => $preview['universe']['name'] );
 	if ( $universe_id && 'local' === $economy_mode ) { $after['economy_mode'] = 'local'; }
-	$result = ps_pen_paper_atomic_event( $campaign_id, function () use ( $campaign_id, $universe_id, $preview, $after, $economy_mode ) {
+	$result = ps_pen_paper_atomic_event( $campaign_id, function () use ( $campaign_id, $universe_id, $preview, $after, $economy_mode, $copy_new_rules ) {
 		$current = ps_pen_paper_preview_universe_link( $campaign_id, $universe_id, $economy_mode );
 		if ( is_wp_error( $current ) ) { return $current; }
 		if ( $current['before'] !== $preview['before'] || $current['universe'] !== $preview['universe'] ) {
 			return new WP_Error( 'conflict', __( 'Die Zuordnung wurde geändert. Bitte prüfe eine neue Vorschau.', 'ps-pen-paper' ) );
 		}
-		return ps_pen_paper_write_document_event( $campaign_id, $campaign_id, '_pspp_universe_link', $preview['before'], $after, array(
+		$source = null;
+		if ( $copy_new_rules ) {
+			$source = ps_pen_paper_get_rules( $universe_id );
+			if ( 0 !== $preview['before']['revision'] || metadata_exists( 'post', $campaign_id, '_pspp_rules' ) ||
+				metadata_exists( 'post', $campaign_id, '_pspp_play_round' ) || ps_pen_paper_has_characters( $campaign_id ) ||
+				! is_array( $source ) || ! isset( $source['revision'] ) || ! is_int( $source['revision'] ) ||
+				( 0 === $source['revision'] && metadata_exists( 'post', $universe_id, '_pspp_rules' ) ) ||
+				( 0 !== $source['revision'] && ! ps_pen_paper_valid_rules_document( $source ) ) ) {
+				return new WP_Error( 'rules_conflict', __( 'Das Universumsregelwerk oder die neue Kampagne ist nicht für eine automatische Übernahme geeignet. Es wurde nichts übernommen.', 'ps-pen-paper' ) );
+			}
+			$after['rules_base'] = $source;
+		}
+		$link_event = ps_pen_paper_write_document_event( $campaign_id, $campaign_id, '_pspp_universe_link', $preview['before'], $after, array(
 			'kind' => 'universe_linked', 'visibility' => 'gm', 'recipient_id' => 0, 'fields' => array(), 'rules_revision' => 0,
 		), false );
+		if ( is_wp_error( $link_event ) || ! $copy_new_rules || 0 === $source['revision'] ) { return $link_event; }
+		$before_rules = ps_pen_paper_get_rules( $campaign_id );
+		$source['revision'] = 1;
+		return ps_pen_paper_write_document_event( $campaign_id, $campaign_id, '_pspp_rules', $before_rules, $source, array(
+			'kind' => 'rules_saved', 'visibility' => 'group', 'recipient_id' => 0, 'rules_revision' => 1, 'fields' => array(),
+		), false );
 	} );
-	return is_wp_error( $result ) ? $result : $after;
+	return is_wp_error( $result ) ? $result : ( $copy_new_rules ? ps_pen_paper_get_universe_link( $campaign_id ) : $after );
 }

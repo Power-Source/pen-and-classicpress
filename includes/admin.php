@@ -84,7 +84,7 @@ function ps_pen_paper_handle_admin_action() {
 		ps_pen_paper_fail( __( 'Diese Aktion gehört nicht ins Charakterprofil. Öffne dafür die Game-Lounge oder die Spielverwaltung.', 'ps-pen-paper' ) );
 	}
 	$page_id = ps_pen_paper_posted_id( 'pspp_frontend_page' );
-	if ( in_array( $operation, array( 'create', 'update', 'save_rules', 'save_rules_migration', 'add_member', 'remove_member' ), true ) ) {
+	if ( in_array( $operation, array( 'create', 'update', 'save_rules', 'save_rules_migration', 'sync_inherited_rules', 'add_member', 'remove_member' ), true ) ) {
 		if ( ! ps_pen_paper_can_access_site() ) {
 			ps_pen_paper_fail( __( 'Du hast keinen Zugriff auf den Spielbereich dieser Website.', 'ps-pen-paper' ) );
 		}
@@ -305,6 +305,15 @@ function ps_pen_paper_handle_admin_action() {
 		ps_pen_paper_redirect( 'style_saved', $campaign_id );
 	}
 
+	if ( 'sync_inherited_rules' === $operation ) {
+		$result = ps_pen_paper_synchronize_inherited_rules( $campaign );
+		if ( is_wp_error( $result ) && 'inheritance_migration_required' === $result->get_error_code() ) {
+			ps_pen_paper_show_rules_migration_preview( $campaign, null, (string) ps_pen_paper_get_rules( $campaign_id )['revision'], $page_id, true );
+		}
+		if ( is_wp_error( $result ) ) { ps_pen_paper_fail( $result->get_error_message() ); }
+		ps_pen_paper_redirect( 'rules_saved', $campaign_id, $page_id, 'pspp-rulebook' );
+	}
+
 	if ( 'save_rules' === $operation || 'save_rules_migration' === $operation ) {
 		if ( 'complete' !== ps_pen_paper_posted_text( 'rules_complete' ) ) {
 			ps_pen_paper_fail( __( 'Das Formular wurde nicht vollständig übertragen. Es wurde nichts gespeichert.', 'ps-pen-paper' ) );
@@ -316,7 +325,7 @@ function ps_pen_paper_handle_admin_action() {
 		}
 		$result = 'save_rules_migration' === $operation
 			? ps_pen_paper_save_rules_migration( $campaign_id, $input, $revision, isset( $_POST['resolutions'] ) ? wp_unslash( $_POST['resolutions'] ) : array(),
-				ps_pen_paper_posted_text( 'migration_confirmation' ), ps_pen_paper_posted_text( 'migration_preview_hash' ) )
+				ps_pen_paper_posted_text( 'migration_confirmation' ), ps_pen_paper_posted_text( 'migration_preview_hash' ), '1' === ps_pen_paper_posted_text( 'rules_inheritance' ) )
 			: ps_pen_paper_save_rules( $campaign_id, $input, $revision );
 		if ( is_wp_error( $result ) ) {
 			ps_pen_paper_fail( $result->get_error_message() );

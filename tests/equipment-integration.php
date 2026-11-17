@@ -136,6 +136,21 @@ try {
 	$check( true === ps_pen_paper_save_gear( $campaign, $character_id, 'review_gear', array( 'decision' => 'approve' ), '2' ), 'Equipment approval failed.' );
 	$state = ps_pen_paper_character_state( $campaign, $character );
 	$check( 7 === $state['active']['values'][ $field ] && $raw === get_post_meta( $character_id, '_pspp_character', true ), 'Effective bonuses changed base state or were not applied.' );
+	foreach ( array( 'experience_field', 'level_field' ) as $progression_field ) {
+		$other_field = wp_generate_uuid4();
+		$migration_input = $input;
+		$migration_input['fields'][0]['id'] = $field;
+		$migration_input['fields'][] = array( 'id' => $other_field, 'label' => 'Fortschritt', 'type' => 'number', 'description' => '', 'min' => '0', 'max' => '10', 'start' => '0' );
+		$migration_input['progression_mode'] = 'configured';
+		$migration_input['progression'] = array(
+			'experience_field' => 'experience_field' === $progression_field ? $field : $other_field,
+			'level_field' => 'level_field' === $progression_field ? $field : $other_field,
+			'thresholds' => '0 : 1',
+		);
+		$conflict = ps_pen_paper_preview_rules_migration( $id, $migration_input, '1' );
+		$check( is_wp_error( $conflict ) && 'progression_bonus' === $conflict->get_error_code(),
+			'Migration accepted equipped bonuses on a progression field.' );
+	}
 	wp_set_current_user( $users['player'] );
 	ob_start(); ps_pen_paper_render_characters( $campaign, $character_id ); $html = ob_get_clean();
 	$check( false !== strpos( $html, 'value="equip_items"' ) && false !== strpos( $html, 'value="save_portrait"' ), 'Approved character without a pending base request has no equipment/portrait controls.' );

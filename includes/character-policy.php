@@ -255,5 +255,5 @@ function ps_pen_paper_link_new_campaign( $campaign_id, $universe_id, $universe_r
 	if ( $link['revision'] || ps_pen_paper_has_characters( $campaign_id ) ) {
 		return new WP_Error( 'legacy_confirmation_required', __( 'Bestehende Kampagnen müssen über die ausdrücklich bestätigte Zuordnung repariert werden.', 'ps-pen-paper' ) );
 	}
-	return ps_pen_paper_save_universe_link( $campaign_id, $universe_id, '0', $universe_revision, 'confirmed' );
+	return ps_pen_paper_save_universe_link( $campaign_id, $universe_id, '0', $universe_revision, 'confirmed', 'universe', true );
 }

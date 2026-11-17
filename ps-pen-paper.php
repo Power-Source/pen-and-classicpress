@@ -15,6 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once __DIR__ . '/includes/scope-state.php';
 require_once __DIR__ . '/includes/campaigns.php';
 require_once __DIR__ . '/includes/rules.php';
+require_once __DIR__ . '/includes/rules-inheritance.php';
 require_once __DIR__ . '/includes/rules-admin.php';
 require_once __DIR__ . '/includes/characters.php';
 require_once __DIR__ . '/includes/characters-admin.php';

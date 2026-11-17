@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PS Pen & Paper
  * Description: Ein universeller Baukasten für Pen-and-Paper-Kampagnen.
- * Version: 0.29.0
+ * Version: 1.0.0
  * Author: PSOURCE
  * Text Domain: ps-pen-paper
  * Domain Path: /languages

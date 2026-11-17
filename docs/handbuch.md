@@ -1,6 +1,6 @@
 # PS Pen & Paper – Pluginhandbuch
 
-Stand: Version 0.26.0 · 15. November 2026.
+Stand: Version 1.0.0 (Beta) · 17. November 2026.
 
 Dieses Handbuch beschreibt den vorhandenen Funktionsumfang, nicht die gesamte
 Roadmap. Die Abbildungen zur Demorunde stammen aus der tatsächlich angelegten
